@@ -88,3 +88,29 @@ def forecast(match_id: int):
             "most_likely_score":{"home":score[0],"away":score[1]},
             "samples":{"home":len(h),"away":len(a)},
             "disclaimer":"Experimental estimate, not calibrated or validated; historical data may be incomplete."}
+
+
+@router.get("/forecasts/upcoming")
+def upcoming_forecasts(league_provider_id: str = "fd:2013", limit: int = 10):
+    """Small, bounded preview for the WordPress match board."""
+    from fastapi import Query
+    if not 1 <= limit <= 20:
+        raise HTTPException(422, "limit must be between 1 and 20")
+    with engine.connect() as c:
+        fixtures = c.execute(text("""
+            SELECT m.id, m.start_time, ht.name AS home_team, at.name AS away_team
+            FROM matches m
+            JOIN leagues l ON l.id = m.league_id
+            JOIN teams ht ON ht.id = m.home_team_id
+            JOIN teams at ON at.id = m.away_team_id
+            WHERE l.provider_league_id = :league
+              AND m.start_time > NOW()
+              AND m.status NOT IN ('FT','AET','PEN')
+            ORDER BY m.start_time, m.id LIMIT :limit
+        """), {"league":league_provider_id, "limit":limit}).mappings().all()
+    items = []
+    for fixture in fixtures:
+        result = forecast(fixture["id"])
+        items.append({"match":dict(fixture), "forecast":result})
+    return {"league_provider_id":league_provider_id, "items":items,
+            "total":len(items), "note":"Experimental predictions; not validated or calibrated."}
