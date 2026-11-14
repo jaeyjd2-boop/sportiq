@@ -14,9 +14,9 @@ def collect_leagues():
                 c.execute(text("""INSERT INTO leagues(sport_id,provider_league_id,name,country,logo_url,coverage) VALUES(:sid,:ext,:name,:country,:logo,CAST(:coverage AS JSONB)) ON CONFLICT(sport_id,provider_league_id) DO UPDATE SET name=EXCLUDED.name,country=EXCLUDED.country,logo_url=EXCLUDED.logo_url,coverage=EXCLUDED.coverage"""),{"sid":sid,"ext":str(l.get("id")),"name":l.get("name") or "Unknown","country":country,"logo":l.get("logo"),"coverage":json.dumps((x.get("seasons") or [{}])[0].get("coverage",{}))})
         return len(items)
     finally: client.close()
-def collect_fixtures(day:date):
+def collect_fixtures(day:date, end_day=None):
     client=FootballDataClient()
-    try: items=client.fixtures(day.isoformat())
+    try: items=client.fixtures_range(day.isoformat(), (end_day or day).isoformat())
     finally: client.close()
     count=0
     with engine.begin() as c:
