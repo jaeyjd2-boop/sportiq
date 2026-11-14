@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SportIQ Account Privacy Requests
  * Description: Logged-in member privacy request intake without automatic account deletion.
- * Version: 0.1.0
+ * Version: 0.2.0
  * Requires PHP: 7.4
  */
 if (!defined('ABSPATH')) exit;
@@ -81,3 +81,76 @@ function sportiq_privacy_request_register_type() {
 }
 add_action('init', 'sportiq_privacy_request_register_type');
 add_shortcode('sportiq_privacy_request', 'sportiq_privacy_request_shortcode');
+
+
+/**
+ * Include SportIQ favorites in the WordPress core personal-data export workflow.
+ * Uses only the requested user's email and never exposes another member's data.
+ */
+function sportiq_privacy_export_favorites($email_address, $page = 1) {
+    if ((int) $page !== 1) return array('data' => array(), 'done' => true);
+    $user = get_user_by('email', $email_address);
+    if (!$user) return array('data' => array(), 'done' => true);
+    $favorites = get_user_meta($user->ID, 'sportiq_favorites_v1', true);
+    if (!is_array($favorites) || !$favorites) {
+        return array('data' => array(), 'done' => true);
+    }
+    $items = array();
+    foreach ($favorites as $key => $value) {
+        // Preserve the original stored structure without exporting unrelated user meta.
+        $items[] = array(
+            'name' => is_string($key) ? $key : '관심 목록 항목',
+            'value' => is_scalar($value) ? (string) $value : wp_json_encode($value, JSON_UNESCAPED_UNICODE),
+        );
+    }
+    return array(
+        'data' => array(array(
+            'group_id' => 'sportiq-favorites',
+            'group_label' => 'SportIQ 관심 목록',
+            'item_id' => 'sportiq-favorites-' . $user->ID,
+            'data' => $items,
+        )),
+        'done' => true,
+    );
+}
+function sportiq_privacy_register_exporter($exporters) {
+    $exporters['sportiq-favorites'] = array(
+        'exporter_friendly_name' => 'SportIQ 관심 팀·리그',
+        'callback' => 'sportiq_privacy_export_favorites',
+    );
+    return $exporters;
+}
+add_filter('wp_privacy_personal_data_exporters', 'sportiq_privacy_register_exporter');
+
+/**
+ * WordPress core invokes erasers only during its separate verified erasure
+ * workflow; the SportIQ request form itself does not invoke this callback.
+ */
+function sportiq_privacy_erase_favorites($email_address, $page = 1) {
+    if ((int) $page !== 1) {
+        return array('items_removed' => false, 'items_retained' => false, 'messages' => array(), 'done' => true);
+    }
+    $user = get_user_by('email', $email_address);
+    if (!$user) {
+        return array('items_removed' => false, 'items_retained' => false, 'messages' => array(), 'done' => true);
+    }
+    $exists = metadata_exists('user', $user->ID, 'sportiq_favorites_v1');
+    if (!$exists) {
+        return array('items_removed' => false, 'items_retained' => false, 'messages' => array(), 'done' => true);
+    }
+    $removed = delete_user_meta($user->ID, 'sportiq_favorites_v1');
+    return array(
+        'items_removed' => (bool) $removed,
+        'items_retained' => !$removed,
+        'messages' => $removed ? array() : array('SportIQ 관심 목록을 삭제하지 못했습니다. 관리자가 확인해야 합니다.'),
+        'done' => true,
+    );
+}
+function sportiq_privacy_register_eraser($erasers) {
+    $erasers['sportiq-favorites'] = array(
+        'eraser_friendly_name' => 'SportIQ 관심 팀·리그',
+        'callback' => 'sportiq_privacy_erase_favorites',
+    );
+    return $erasers;
+}
+add_filter('wp_privacy_personal_data_erasers', 'sportiq_privacy_register_eraser');
