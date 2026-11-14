@@ -145,11 +145,14 @@ def prediction(match_id:int):
 
 @app.get("/v1/operations/collector-status")
 def collector_status():
-    """Public, sanitized collector freshness summary; never exposes error details."""
+    """Public sanitized summary. Historical failures do not mask later recovery."""
+    from datetime import datetime, timezone
     with engine.connect() as c:
         exists = c.execute(text("SELECT to_regclass('public.collector_runs') IS NOT NULL")).scalar()
         if not exists:
-            return {"status": "not_initialized", "jobs": [], "failed_last_24h": 0}
+            return {"status": "not_initialized", "fixtures_stale": True,
+                    "failed_last_24h": 0, "unresolved_failures": 0,
+                    "last_fixtures_success": None, "jobs": []}
         rows = c.execute(text("""
             SELECT DISTINCT ON (job_name) job_name, status, result_count, finished_at
             FROM collector_runs ORDER BY job_name, finished_at DESC, id DESC
@@ -159,15 +162,17 @@ def collector_status():
             WHERE status='failed' AND finished_at >= NOW() - INTERVAL '24 hours'
         """)).scalar_one()
         latest = c.execute(text("""
-            SELECT MAX(finished_at) FROM collector_runs WHERE job_name='fixtures' AND status='success'
+            SELECT MAX(finished_at) FROM collector_runs
+            WHERE job_name='fixtures' AND status='success'
         """)).scalar()
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
-    stale = latest is None or (now - latest).total_seconds() > 15 * 3600
+    stale = latest is None or (datetime.now(timezone.utc) - latest).total_seconds() > 15 * 3600
+    unresolved = sum(row["status"] in ("failed", "skipped") for row in rows)
     return {
-        "status": "degraded" if stale or failures else "ok",
+        "status": "degraded" if stale or unresolved else "ok",
         "fixtures_stale": stale,
+        "last_fixtures_success": latest.isoformat() if latest else None,
         "failed_last_24h": failures,
+        "unresolved_failures": unresolved,
         "jobs": [
             {"job": row["job_name"], "status": row["status"],
              "result_count": row["result_count"],
@@ -200,7 +205,7 @@ async function refresh(){
   if(!r.ok) throw Error('HTTP '+r.status);
   const data=await r.json(); overall.textContent=data.status==='ok'?'정상 운영':data.status==='degraded'?'점검 필요':'초기화 대기';
   overall.className=data.status==='ok'?'ok':'bad';
-  details.textContent='최근 24시간 실패: '+data.failed_last_24h+'건 | 경기 일정 갱신 지연: '+(data.fixtures_stale?'예':'아니요');
+  details.textContent='미복구 실패: '+data.unresolved_failures+'건 | 최근 24시간 실패 기록: '+data.failed_last_24h+'건 | 경기 일정 갱신 지연: '+(data.fixtures_stale?'예':'아니요')+' | 마지막 일정 수집 성공: '+(data.last_fixtures_success??'없음');
   body.replaceChildren();
   for(const j of data.jobs){
    const tr=document.createElement('tr');
