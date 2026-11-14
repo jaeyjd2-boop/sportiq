@@ -1,5 +1,8 @@
 """football-data.org v4 adapter returning the collector's normalized fixture shape."""
+import logging
 import httpx
+
+log = logging.getLogger('sportiq-football-data')
 from app.config import settings
 
 class FootballDataError(RuntimeError):
@@ -64,12 +67,38 @@ class FootballDataClient:
             "source": "football-data.org",
         }
 
+    def fixtures_range(self, start_day, end_day):
+        # Global /matches can return an empty set for restricted subscriptions.
+        # Fetch the subscribed competitions individually, using a bounded list.
+        competitions = ("PL", "PD", "BL1", "SA", "FL1", "CL")
+        results = []
+        seen = set()
+        for code in competitions:
+            try:
+                data = self.get(f"/competitions/{code}/matches",
+                                {"dateFrom": start_day, "dateTo": end_day})
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code in (403, 404):
+                    log.warning("competition %s unavailable: HTTP %s", code, exc.response.status_code)
+                    continue
+                raise
+            matches = data.get("matches", [])
+            missing = sum(1 for x in matches if
+                          (x.get("homeTeam") or {}).get("id") is None or
+                          (x.get("awayTeam") or {}).get("id") is None)
+            log.info("competition %s raw=%d missing_team_ids=%d", code, len(matches), missing)
+            for x in matches:
+                if x.get("id") is None or x["id"] in seen:
+                    continue
+                if (x.get("homeTeam") or {}).get("id") is None or (x.get("awayTeam") or {}).get("id") is None:
+                    continue
+                seen.add(x["id"])
+                results.append(self._normalize(x))
+        log.info("fixture range %s..%s normalized=%d", start_day, end_day, len(results))
+        return results
+
     def fixtures(self, day):
-        data = self.get("/matches", {"dateFrom": day, "dateTo": day})
-        return [self._normalize(x) for x in data.get("matches", [])
-                if x.get("id") is not None and
-                (x.get("homeTeam") or {}).get("id") is not None and
-                (x.get("awayTeam") or {}).get("id") is not None]
+        return self.fixtures_range(day, day)
 
     def live(self):
         data = self.get("/matches", {"status": "LIVE"})
