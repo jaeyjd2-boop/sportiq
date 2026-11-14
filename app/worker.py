@@ -5,6 +5,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.db import engine
 from app.collector import collect_leagues, collect_fixtures, collect_live
+from app.forecast_tracking import snapshot_forecasts, evaluate_forecasts
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("sportiq-worker")
@@ -63,6 +64,8 @@ def fixture_window():
 
 
 scheduler = BlockingScheduler(timezone="UTC")
+scheduler.add_job(lambda: safe("forecast_snapshot", snapshot_forecasts), "interval", hours=6, id="forecast_snapshot", max_instances=1, coalesce=True)
+scheduler.add_job(lambda: safe("forecast_evaluation", evaluate_forecasts), "interval", hours=6, id="forecast_evaluation", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("leagues", collect_leagues), "interval", hours=24, id="leagues", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("fixtures", fixture_window), "interval", hours=12, id="fixtures", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("live", collect_live), "interval", seconds=max(3600, settings.live_poll_seconds), id="live", max_instances=1, coalesce=True)
@@ -70,4 +73,6 @@ scheduler.add_job(lambda: safe("live", collect_live), "interval", seconds=max(36
 if __name__ == "__main__":
     safe("leagues", collect_leagues)
     safe("fixtures", fixture_window)
+    safe("forecast_snapshot", snapshot_forecasts)
+    safe("forecast_evaluation", evaluate_forecasts)
     scheduler.start()
