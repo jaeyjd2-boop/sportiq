@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg2://sportiq:sportiq_dev_password@localhost:5432/sportiq"
+    football_data_token: str = ""
     api_football_base_url: str = "https://v3.football.api-sports.io"
     api_football_key: str = ""
     api_football_timeout: int = 20
