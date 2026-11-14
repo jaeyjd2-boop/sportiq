@@ -9,6 +9,9 @@ log = logging.getLogger("sportiq-worker")
 
 
 def safe(label, fn):
+    if not settings.football_data_token:
+        log.warning("%s skipped: FOOTBALL_DATA_TOKEN is not configured", label)
+        return
     try:
         log.info("%s: %s", label, fn())
     except Exception:
@@ -41,9 +44,6 @@ scheduler.add_job(lambda: safe("live", collect_live), "interval", seconds=max(60
  # Detailed statistics/events are unavailable on football-data.org free tier.
 
 if __name__ == "__main__":
-    if not settings.football_data_token:
-        log.warning("FOOTBALL_DATA_TOKEN missing: collector is not starting")
-        raise SystemExit(0)
     safe("initial leagues", collect_leagues)
     safe("initial fixtures", fixture_window)
     scheduler.start()
