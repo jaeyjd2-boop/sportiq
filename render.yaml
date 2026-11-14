@@ -20,14 +20,14 @@ services:
         fromDatabase:
           name: sportiq-db
           property: connectionString
-      - key: API_FOOTBALL_KEY
+      - key: FOOTBALL_DATA_TOKEN
         sync: false
       - key: CORS_ORIGINS
         value: https://magnificent-taco-angel.wpcomstaging.com
       - key: LIVE_POLL_SECONDS
-        value: "60"
+        value: "600"
       - key: FIXTURE_LOOKAHEAD_DAYS
-        value: "7"
+        value: "2"
 
   - type: worker
     name: sportiq-collector
@@ -42,9 +42,9 @@ services:
         fromDatabase:
           name: sportiq-db
           property: connectionString
-      - key: API_FOOTBALL_KEY
+      - key: FOOTBALL_DATA_TOKEN
         sync: false
       - key: LIVE_POLL_SECONDS
-        value: "60"
+        value: "600"
       - key: FIXTURE_LOOKAHEAD_DAYS
-        value: "7"
+        value: "2"
