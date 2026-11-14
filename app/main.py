@@ -5,8 +5,10 @@ from sqlalchemy import text
 from app.config import settings
 from app.db import engine
 from app.details import router as details_router
+from app.diagnostics import router as diagnostics_router
 app=FastAPI(title="SportIQ API",version="1.0.0")
 app.include_router(details_router)
+app.include_router(diagnostics_router)
 app.add_middleware(CORSMiddleware,allow_origins=settings.allowed_origins,allow_credentials=False,allow_methods=["GET"],allow_headers=["*"])
 @app.get("/health")
 def health():
