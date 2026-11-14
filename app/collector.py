@@ -2,9 +2,9 @@ import json
 from datetime import date
 from sqlalchemy import text
 from app.db import engine
-from app.providers.api_football import ApiFootballClient
+from app.providers.football_data import FootballDataClient
 def collect_leagues():
-    client=ApiFootballClient()
+    client=FootballDataClient()
     try:
         items=client.leagues()
         with engine.begin() as c:
@@ -15,7 +15,7 @@ def collect_leagues():
         return len(items)
     finally: client.close()
 def collect_fixtures(day:date):
-    client=ApiFootballClient()
+    client=FootballDataClient()
     try: items=client.fixtures(day.isoformat())
     finally: client.close()
     count=0
@@ -33,7 +33,7 @@ def collect_fixtures(day:date):
     return count
 def collect_live():
     # 라이브 전용 피드에서 반환된 fixture의 날짜를 모아 해당 날짜의 최신 일정을 재수집
-    client=ApiFootballClient()
+    client=FootballDataClient()
     try: live=client.live()
     finally: client.close()
     days=sorted({str(((x.get("fixture") or {}).get("date") or ""))[:10] for x in live if (x.get("fixture") or {}).get("date")})
@@ -41,7 +41,9 @@ def collect_live():
 
 def collect_match_details(max_fixtures=2):
     """Quota-conscious enrichment of live matches; no historical backfill."""
-    client=ApiFootballClient()
+    # football-data.org free tier does not provide fixture statistics or events.
+    return 0
+    client=FootballDataClient()
     count=0
     try:
         with engine.connect() as c:
