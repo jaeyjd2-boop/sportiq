@@ -1,0 +1,47 @@
+databases:
+  - name: sportiq-db
+    databaseName: sportiq
+    user: sportiq
+    plan: basic
+
+services:
+  - type: web
+    name: sportiq-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: sh -c "python -m app.init_db && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sportiq-db
+          property: connectionString
+      - key: API_FOOTBALL_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://magnificent-taco-angel.wpcomstaging.com
+      - key: LIVE_POLL_SECONDS
+        value: "60"
+      - key: FIXTURE_LOOKAHEAD_DAYS
+        value: "7"
+
+  - type: worker
+    name: sportiq-collector
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: sh -c "python -m app.init_db && python -m app.worker"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sportiq-db
+          property: connectionString
+      - key: API_FOOTBALL_KEY
+        sync: false
+      - key: LIVE_POLL_SECONDS
+        value: "60"
+      - key: FIXTURE_LOOKAHEAD_DAYS
+        value: "7"
