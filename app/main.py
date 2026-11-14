@@ -175,3 +175,41 @@ def collector_status():
             for row in rows
         ],
     }
+
+
+@app.get("/v1/operations/dashboard", response_class=__import__("fastapi.responses", fromlist=["HTMLResponse"]).HTMLResponse)
+def operations_dashboard():
+    """Read-only operational dashboard. No credentials or error payloads."""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse("""<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SportIQ 수집 모니터링</title>
+<style>body{font-family:system-ui,sans-serif;max-width:850px;margin:3rem auto;padding:0 1rem;background:#f8fafc;color:#0f172a}
+h1{font-size:1.6rem}.panel{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:1.2rem;margin:1rem 0}
+.ok{color:#15803d}.bad{color:#b91c1c}.muted{color:#64748b}table{width:100%;border-collapse:collapse}
+td,th{padding:.7rem;text-align:left;border-bottom:1px solid #e2e8f0}button{padding:.6rem 1rem;cursor:pointer}</style>
+</head><body><h1>SportIQ 수집 모니터링</h1><p class="muted">자동 갱신: 60초</p>
+<div class="panel"><h2 id="overall">확인 중…</h2><p id="details"></p></div>
+<div class="panel"><h2>최근 작업</h2><table><thead><tr><th>작업</th><th>상태</th><th>처리 건수</th><th>완료 시각 (UTC)</th></tr></thead><tbody id="jobs"></tbody></table></div>
+<button onclick="refresh()">새로고침</button>
+<script>
+async function refresh(){
+ const overall=document.getElementById('overall'), details=document.getElementById('details'), body=document.getElementById('jobs');
+ try {
+  const r=await fetch('/v1/operations/collector-status',{cache:'no-store'});
+  if(!r.ok) throw Error('HTTP '+r.status);
+  const data=await r.json(); overall.textContent=data.status==='ok'?'정상 운영':data.status==='degraded'?'점검 필요':'초기화 대기';
+  overall.className=data.status==='ok'?'ok':'bad';
+  details.textContent='최근 24시간 실패: '+data.failed_last_24h+'건 | 경기 일정 갱신 지연: '+(data.fixtures_stale?'예':'아니요');
+  body.replaceChildren();
+  for(const j of data.jobs){
+   const tr=document.createElement('tr');
+   for(const v of [j.job,j.status,j.result_count??'-',j.finished_at??'-']){
+    const td=document.createElement('td');td.textContent=String(v);tr.appendChild(td);
+   }
+   body.appendChild(tr);
+  }
+ }catch(e){overall.textContent='상태 조회 실패';overall.className='bad';details.textContent=String(e);}
+}
+refresh();setInterval(refresh,60000);
+</script></body></html>""")
