@@ -1,6 +1,6 @@
 """Store immutable pre-kickoff forecasts and score finished matches."""
 import json
-from math import log
+from app.forecast_metrics import score_probabilities
 from sqlalchemy import text
 from app.db import engine
 from app.details import forecast
@@ -41,11 +41,9 @@ def evaluate_forecasts(limit=100):
     for r in rows:
         actual="home" if r["home_score"]>r["away_score"] else "away" if r["home_score"]<r["away_score"] else "draw"
         try:
-            probs={k:float(r["probabilities"][k]) for k in ("home","draw","away")}
-            if any(not 0<=v<=1 for v in probs.values()) or abs(sum(probs.values())-1)>0.01: continue
-        except (KeyError,ValueError,TypeError): continue
-        brier=sum((probs[k]-int(k==actual))**2 for k in probs)/3
-        loss=-log(max(probs[actual],1e-15))
+            brier,loss=score_probabilities(r["probabilities"],actual)
+        except ValueError:
+            continue
         with engine.begin() as c:
             inserted=c.execute(text("""INSERT INTO prediction_results(prediction_id,actual_result,actual_score,brier_score,log_loss)
               SELECT p.id,:actual,CAST(:score AS JSONB),:brier,:loss
