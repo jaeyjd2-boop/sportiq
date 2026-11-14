@@ -1,0 +1,25 @@
+name: Build SportIQ Privacy Plugin
+on:
+  push:
+    paths:
+      - 'wordpress/sportiq-account-privacy/**'
+      - '.github/workflows/build-sportiq-privacy.yml'
+  workflow_dispatch:
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate PHP syntax
+        run: php -l wordpress/sportiq-account-privacy/sportiq-account-privacy.php
+      - name: Build installable ZIP
+        run: |
+          mkdir -p dist
+          cd wordpress
+          zip -r ../dist/sportiq-account-privacy-v020.zip sportiq-account-privacy
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sportiq-account-privacy-v020
+          path: dist/sportiq-account-privacy-v020.zip
+          if-no-files-found: error
