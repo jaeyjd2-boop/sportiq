@@ -11,6 +11,9 @@ class SportIQ_API_Client {
     const CACHE_TTL = 15 * MINUTE_IN_SECONDS;
     const STALE_CACHE_TTL = 24 * HOUR_IN_SECONDS;
     const REQUEST_TIMEOUT = 8;
+    const FAILURE_COOLDOWN = 2 * MINUTE_IN_SECONDS;
+    const LIVE_TTL = 2 * MINUTE_IN_SECONDS;
+    const FINISHED_TTL = 12 * HOUR_IN_SECONDS;
     private $api_base_url;
 
     public function __construct() {
@@ -31,38 +34,62 @@ class SportIQ_API_Client {
         $stale_key = 'sportiq_pred_stale_' . $match_id;
         $cooldown_key = 'sportiq_pred_cool_' . $match_id;
 
+        // A shared outage cooldown prevents every distinct match from retrying.
+        $global_cooldown = 'sportiq_pred_api_cool';
         if (!$force_refresh) {
             $cached = get_transient($fresh_key);
             if (is_array($cached)) {
                 return $this->with_meta($cached, 'cache', false);
             }
-            if (get_transient($cooldown_key)) {
+            if (get_transient($cooldown_key) || get_transient($global_cooldown)) {
                 $stale = get_transient($stale_key);
                 if (is_array($stale)) {
                     return $this->with_meta($stale, 'stale_cache', true);
                 }
+                return $this->format_error('현재 예측 서버 응답이 지연되고 있습니다. 잠시 후 다시 확인해 주세요.');
             }
         }
 
         $result = $this->request_fastapi('/v1/predictions/' . $match_id);
         if (!is_wp_error($result)) {
-            set_transient($fresh_key, $result, self::CACHE_TTL);
+            set_transient($fresh_key, $result, $this->prediction_ttl($result));
             set_transient($stale_key, $result, self::STALE_CACHE_TTL);
             delete_transient($cooldown_key);
+            delete_transient($global_cooldown);
             return $this->with_meta($result, 'api', false);
         }
 
         // A missing prediction (404) is not a temporary backend outage.
         if ($result->get_error_code() === 'sportiq_not_found') {
+            set_transient($cooldown_key, 1, self::FAILURE_COOLDOWN);
             return $this->format_error('해당 경기의 예측 데이터가 없습니다.');
         }
 
+        set_transient($cooldown_key, 1, self::FAILURE_COOLDOWN);
+        set_transient($global_cooldown, 1, self::FAILURE_COOLDOWN);
         $stale = get_transient($stale_key);
         if (is_array($stale)) {
-            set_transient($cooldown_key, 1, 2 * MINUTE_IN_SECONDS);
-            return $this->with_meta($stale, 'stale_cache', true);
+            $stale['_meta'] = array('source' => 'stale_cache', 'stale' => true);
+            set_transient($fresh_key, $stale, self::FAILURE_COOLDOWN);
+            return $stale;
         }
         return $this->format_error('현재 예측 서버 응답이 지연되고 있습니다. 잠시 후 다시 확인해 주세요.');
+    }
+
+    private function prediction_ttl($data) {
+        // Current prediction endpoint has no match status; use default TTL unless supplied.
+        $status = isset($data['match_status']) && is_string($data['match_status'])
+            ? strtoupper($data['match_status']) : '';
+        if (in_array($status, array('1H', '2H', 'HT', 'IN_PLAY', 'PAUSED', 'LIVE'), true)) {
+            return self::LIVE_TTL;
+        }
+        if (in_array($status, array('FT', 'FINISHED'), true)) {
+            return self::FINISHED_TTL;
+        }
+        if (in_array($status, array('POSTPONED', 'CANCELLED', 'CANCELED'), true)) {
+            return 30 * MINUTE_IN_SECONDS;
+        }
+        return self::CACHE_TTL;
     }
 
     private function request_fastapi($path) {
