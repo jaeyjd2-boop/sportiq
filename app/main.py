@@ -220,3 +220,30 @@ async function refresh(){
 }
 refresh();setInterval(refresh,60000);
 </script></body></html>""")
+
+
+@app.get("/v1/forecast-performance")
+def forecast_performance(league_provider_id: str = "fd:2013"):
+    """Only pre-kickoff snapshots scored against final results."""
+    with engine.connect() as c:
+        row=c.execute(text("""
+            SELECT COUNT(r.id) AS evaluated,
+                   ROUND(AVG(r.brier_score)::numeric, 4) AS mean_brier,
+                   ROUND(AVG(r.log_loss)::numeric, 4) AS mean_log_loss,
+                   COUNT(r.id) FILTER(WHERE p.predicted_result=r.actual_result) AS correct
+            FROM predictions p JOIN matches m ON m.id=p.match_id
+            JOIN leagues l ON l.id=m.league_id
+            LEFT JOIN prediction_results r ON r.prediction_id=p.id
+            WHERE l.provider_league_id=:league AND p.model_version='poisson-form-v0.1'
+              AND p.created_at<m.start_time
+        """),{"league":league_provider_id}).mappings().one()
+        pending=c.execute(text("""SELECT COUNT(*) FROM predictions p JOIN matches m ON m.id=p.match_id
+          JOIN leagues l ON l.id=m.league_id WHERE l.provider_league_id=:league
+          AND p.model_version='poisson-form-v0.1' AND p.created_at<m.start_time
+          AND NOT EXISTS(SELECT 1 FROM prediction_results r WHERE r.prediction_id=p.id)"""),{"league":league_provider_id}).scalar_one()
+    return {"league_provider_id":league_provider_id,"model_version":"poisson-form-v0.1",
+            "evaluated":row["evaluated"],"pending":pending,"correct":row["correct"],
+            "accuracy":round(row["correct"]/row["evaluated"],4) if row["evaluated"] else None,
+            "mean_brier":float(row["mean_brier"]) if row["mean_brier"] is not None else None,
+            "mean_log_loss":float(row["mean_log_loss"]) if row["mean_log_loss"] is not None else None,
+            "note":"Only pre-kickoff stored predictions; no accuracy claims before sufficient samples."}
