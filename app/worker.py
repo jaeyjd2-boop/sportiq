@@ -65,7 +65,7 @@ def fixture_window():
 
 scheduler = BlockingScheduler(timezone="UTC")
 scheduler.add_job(lambda: safe("forecast_snapshot", snapshot_forecasts), "interval", hours=6, id="forecast_snapshot", max_instances=1, coalesce=True)
-scheduler.add_job(lambda: safe("forecast_evaluation", evaluate_forecasts), "interval", hours=6, id="forecast_evaluation", max_instances=1, coalesce=True)
+scheduler.add_job(lambda: safe("forecast_evaluation", evaluate_forecasts), "interval", hours=1, id="forecast_evaluation", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("leagues", collect_leagues), "interval", hours=24, id="leagues", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("fixtures", fixture_window), "interval", hours=12, id="fixtures", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("live", collect_live), "interval", seconds=max(3600, settings.live_poll_seconds), id="live", max_instances=1, coalesce=True)
