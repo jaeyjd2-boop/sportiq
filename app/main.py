@@ -14,13 +14,52 @@ def health():
 def sports():
     with engine.connect() as c: return {"items":[dict(r) for r in c.execute(text("SELECT id,code,name FROM sports ORDER BY id")).mappings().all()]}
 @app.get("/v1/leagues")
-def leagues(sport:str="football",country:str|None=None,limit:int=Query(100,ge=1,le=500)):
-    q="SELECT l.id,s.code AS sport,l.name,l.country,l.logo_url,l.coverage FROM leagues l JOIN sports s ON s.id=l.sport_id WHERE s.code=:sport"
-    p={"sport":sport,"limit":limit}
-    if country: q+=" AND l.country=:country"; p["country"]=country
+def leagues(
+    sport: str = "football",
+    country: str | None = None,
+    search: str | None = Query(None, max_length=100),
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=500),
+):
+    filters = ["s.code = :sport"]
+    params = {"sport": sport, "limit": limit, "offset": (page - 1) * limit}
+    if country:
+        filters.append("l.country = :country")
+        params["country"] = country
+    if search:
+        filters.append("l.name ILIKE :search")
+        params["search"] = "%" + search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        filters[-1] += " ESCAPE '\\'"
+    base = " FROM leagues l JOIN sports s ON s.id = l.sport_id WHERE " + " AND ".join(filters)
     with engine.connect() as c:
-        rows=c.execute(text(q+" ORDER BY l.country,l.name LIMIT :limit"),p).mappings().all()
-        return {"items":[dict(r) for r in rows],"total":len(rows)}
+        total = c.execute(text("SELECT COUNT(*)" + base), params).scalar_one()
+        rows = c.execute(text(
+            "SELECT l.id, s.code AS sport, l.name, l.country, l.logo_url, l.coverage"
+            + base + " ORDER BY l.country NULLS LAST, l.name, l.id LIMIT :limit OFFSET :offset"
+        ), params).mappings().all()
+    return {
+        "items": [dict(r) for r in rows],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": (total + limit - 1) // limit,
+        "has_next": page * limit < total,
+        "has_previous": page > 1,
+    }
+
+
+@app.get("/v1/leagues/countries")
+def league_countries(sport: str = "football"):
+    with engine.connect() as c:
+        rows = c.execute(text(
+            "SELECT l.country AS country, COUNT(*) AS league_count "
+            "FROM leagues l JOIN sports s ON s.id = l.sport_id "
+            "WHERE s.code = :sport AND l.country IS NOT NULL AND l.country <> '' "
+            "GROUP BY l.country ORDER BY l.country"
+        ), {"sport": sport}).mappings().all()
+    return {"items": [dict(r) for r in rows], "total": len(rows)}
+
+
 @app.get("/v1/matches")
 def matches(
     sport: str = "football",
