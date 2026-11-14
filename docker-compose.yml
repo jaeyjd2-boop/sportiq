@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: sportiq
+      POSTGRES_USER: sportiq
+      POSTGRES_PASSWORD: sportiq_dev_password
+    ports: ["5432:5432"]
+    volumes: ["sportiq_pgdata:/var/lib/postgresql/data"]
+  api:
+    build: .
+    command: sh -c "python -m app.init_db && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    env_file: .env
+    ports: ["8000:8000"]
+    depends_on: [db]
+  worker:
+    build: .
+    command: sh -c "python -m app.init_db && python -m app.worker"
+    env_file: .env
+    depends_on: [db]
+volumes:
+  sportiq_pgdata:
