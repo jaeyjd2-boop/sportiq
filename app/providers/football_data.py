@@ -124,6 +124,17 @@ class FootballDataClient:
             raise FootballDataError("No competition fixture requests succeeded")
         return results
 
+    def competition_fixtures_range(self, competition_code, start_day, end_day):
+        """Fetch one authorized competition, avoiding full-catalog scans."""
+        if not competition_code or not competition_code.replace("-", "").isalnum():
+            raise ValueError("Invalid competition code")
+        data = self.get(f"/competitions/{competition_code}/matches",
+                        {"dateFrom": start_day, "dateTo": end_day})
+        return [self._normalize(item) for item in data.get("matches", [])
+                if item.get("id") is not None
+                and (item.get("homeTeam") or {}).get("id") is not None
+                and (item.get("awayTeam") or {}).get("id") is not None]
+
     def fixtures(self, day):
         return self.fixtures_range(day, day)
 
