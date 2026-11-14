@@ -1,5 +1,6 @@
 """football-data.org v4 adapter returning the collector's normalized fixture shape."""
 import logging
+import time
 import httpx
 
 log = logging.getLogger('sportiq-football-data')
@@ -12,6 +13,7 @@ class FootballDataClient:
     def __init__(self):
         if not settings.football_data_token:
             raise FootballDataError("FOOTBALL_DATA_TOKEN is not configured")
+        self._last_request = 0.0
         self.client = httpx.Client(
             base_url="https://api.football-data.org/v4",
             headers={"X-Auth-Token": settings.football_data_token},
@@ -19,9 +21,23 @@ class FootballDataClient:
         )
 
     def get(self, path, params=None):
-        response = self.client.get(path, params=params)
-        response.raise_for_status()
-        return response.json()
+        for attempt in range(3):
+            wait = 8.0 - (time.monotonic() - self._last_request)
+            if wait > 0:
+                time.sleep(wait)
+            self._last_request = time.monotonic()
+            response = self.client.get(path, params=params)
+            if response.status_code == 429 and attempt < 2:
+                try:
+                    delay = max(60.0, float(response.headers.get("Retry-After", "60")))
+                except ValueError:
+                    delay = 60.0
+                log.warning("API rate limit path=%s retry_in=%.0fs", path, delay)
+                time.sleep(delay)
+                continue
+            response.raise_for_status()
+            return response.json()
+        raise FootballDataError("API retries exhausted")
 
     def leagues(self):
         data = self.get("/competitions")
@@ -68,33 +84,44 @@ class FootballDataClient:
         }
 
     def fixtures_range(self, start_day, end_day):
-        # Global /matches can return an empty set for restricted subscriptions.
-        # Fetch the subscribed competitions individually, using a bounded list.
-        competitions = ("PL", "PD", "BL1", "SA", "FL1", "CL")
-        results = []
-        seen = set()
-        for code in competitions:
+        catalog = self.get("/competitions").get("competitions", [])
+        codes = list(dict.fromkeys(str(x["code"]) for x in catalog if x.get("code")))
+        log.info("fixture scan competitions=%d codes=%s", len(codes), ",".join(codes))
+        results, seen = [], set()
+        succeeded = failed = skipped = missing_total = 0
+        for code in codes:
             try:
                 data = self.get(f"/competitions/{code}/matches",
                                 {"dateFrom": start_day, "dateTo": end_day})
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code in (403, 404):
-                    log.warning("competition %s unavailable: HTTP %s", code, exc.response.status_code)
+                    skipped += 1
+                    log.warning("competition %s inaccessible HTTP %s", code, exc.response.status_code)
                     continue
-                raise
-            matches = data.get("matches", [])
-            missing = sum(1 for x in matches if
-                          (x.get("homeTeam") or {}).get("id") is None or
-                          (x.get("awayTeam") or {}).get("id") is None)
+                failed += 1
+                log.exception("competition %s HTTP failure", code)
+                continue
+            except (httpx.RequestError, FootballDataError) as exc:
+                failed += 1
+                log.warning("competition %s request failed: %s", code, exc)
+                continue
+            succeeded += 1
+            matches = data.get("matches") or []
+            missing = 0
+            for item in matches:
+                if item.get("id") is None or item["id"] in seen:
+                    continue
+                if (item.get("homeTeam") or {}).get("id") is None or (item.get("awayTeam") or {}).get("id") is None:
+                    missing += 1
+                    continue
+                seen.add(item["id"])
+                results.append(self._normalize(item))
+            missing_total += missing
             log.info("competition %s raw=%d missing_team_ids=%d", code, len(matches), missing)
-            for x in matches:
-                if x.get("id") is None or x["id"] in seen:
-                    continue
-                if (x.get("homeTeam") or {}).get("id") is None or (x.get("awayTeam") or {}).get("id") is None:
-                    continue
-                seen.add(x["id"])
-                results.append(self._normalize(x))
-        log.info("fixture range %s..%s normalized=%d", start_day, end_day, len(results))
+        log.info("fixture scan complete range=%s..%s competitions=%d succeeded=%d skipped=%d failed=%d missing_team_ids=%d normalized=%d",
+                 start_day, end_day, len(codes), succeeded, skipped, failed, missing_total, len(results))
+        if not succeeded and codes:
+            raise FootballDataError("No competition fixture requests succeeded")
         return results
 
     def fixtures(self, day):
