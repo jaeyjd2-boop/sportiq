@@ -28,6 +28,10 @@ services:
         value: "600"
       - key: FIXTURE_LOOKAHEAD_DAYS
         value: "2"
+      - key: WEB_BACKFILL_ENABLED
+        value: "false"
+      - key: WEB_BACKFILL_COMPETITION
+        value: "PL"
 
   - type: worker
     name: sportiq-collector
