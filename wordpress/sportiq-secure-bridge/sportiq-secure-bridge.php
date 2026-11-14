@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SportIQ Secure Bridge
  * Description: Server-side HMAC client for SportIQ FastAPI.
- * Version: 0.1.0
+ * Version: 0.2.0
  * Requires PHP: 7.4
  */
 if (!defined('ABSPATH')) exit;
