@@ -18,6 +18,11 @@ def collect_fixtures(day:date, end_day=None):
     client=FootballDataClient()
     try: items=client.fixtures_range(day.isoformat(), (end_day or day).isoformat())
     finally: client.close()
+    return store_fixtures(items)
+
+
+def store_fixtures(items):
+    """Idempotently persist normalized fixtures from either current or historical feeds."""
     count=0
     with engine.begin() as c:
         sid=c.execute(text("SELECT id FROM sports WHERE code='football'")).scalar_one()
@@ -74,3 +79,30 @@ def collect_match_details(max_fixtures=2):
         return count
     finally:
         client.close()
+
+
+def collect_historical(days_back=30, window_days=7):
+    """Bounded historical backfill; explicit invocation only, not an automatic job."""
+    from datetime import timedelta, timezone, datetime
+    if not isinstance(days_back, int) or not 1 <= days_back <= 90:
+        raise ValueError("days_back must be between 1 and 90")
+    if not isinstance(window_days, int) or not 1 <= window_days <= 14:
+        raise ValueError("window_days must be between 1 and 14")
+    yesterday = datetime.now(timezone.utc).date() - timedelta(days=1)
+    first = yesterday - timedelta(days=days_back - 1)
+    client = FootballDataClient()
+    saved = 0
+    try:
+        start = first
+        while start <= yesterday:
+            end = min(start + timedelta(days=window_days - 1), yesterday)
+            fixtures = client.fixtures_range(start.isoformat(), end.isoformat())
+            historical = [item for item in fixtures
+                          if (item.get("fixture") or {}).get("status", {}).get("short") in ("FT", "AET", "PEN")
+                          and (item.get("goals") or {}).get("home") is not None
+                          and (item.get("goals") or {}).get("away") is not None]
+            saved += store_fixtures(historical)
+            start = end + timedelta(days=1)
+    finally:
+        client.close()
+    return saved
