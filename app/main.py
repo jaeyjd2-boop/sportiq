@@ -141,3 +141,37 @@ def prediction(match_id:int):
         row=c.execute(text("SELECT id,match_id,model_version,probabilities,predicted_result,predicted_score,confidence,created_at FROM predictions WHERE match_id=:id ORDER BY created_at DESC LIMIT 1"),{"id":match_id}).mappings().first()
         if not row: raise HTTPException(404,"prediction not found")
         return dict(row)
+
+
+@app.get("/v1/operations/collector-status")
+def collector_status():
+    """Public, sanitized collector freshness summary; never exposes error details."""
+    with engine.connect() as c:
+        exists = c.execute(text("SELECT to_regclass('public.collector_runs') IS NOT NULL")).scalar()
+        if not exists:
+            return {"status": "not_initialized", "jobs": [], "failed_last_24h": 0}
+        rows = c.execute(text("""
+            SELECT DISTINCT ON (job_name) job_name, status, result_count, finished_at
+            FROM collector_runs ORDER BY job_name, finished_at DESC, id DESC
+        """)).mappings().all()
+        failures = c.execute(text("""
+            SELECT COUNT(*) FROM collector_runs
+            WHERE status='failed' AND finished_at >= NOW() - INTERVAL '24 hours'
+        """)).scalar_one()
+        latest = c.execute(text("""
+            SELECT MAX(finished_at) FROM collector_runs WHERE job_name='fixtures' AND status='success'
+        """)).scalar()
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    stale = latest is None or (now - latest).total_seconds() > 15 * 3600
+    return {
+        "status": "degraded" if stale or failures else "ok",
+        "fixtures_stale": stale,
+        "failed_last_24h": failures,
+        "jobs": [
+            {"job": row["job_name"], "status": row["status"],
+             "result_count": row["result_count"],
+             "finished_at": row["finished_at"].isoformat() if row["finished_at"] else None}
+            for row in rows
+        ],
+    }
