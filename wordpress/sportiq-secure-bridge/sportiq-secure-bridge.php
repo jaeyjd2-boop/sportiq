@@ -55,3 +55,6 @@ class SportIQ_Secure_Bridge {
     }
 }
 }
+
+// Public prediction reads are separate from the authenticated HMAC bridge.
+require_once __DIR__ . '/class-sportiq-api-client.php';
