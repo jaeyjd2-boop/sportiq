@@ -44,6 +44,25 @@ def collect_live():
     days=sorted({str(((x.get("fixture") or {}).get("date") or ""))[:10] for x in live if (x.get("fixture") or {}).get("date")})
     return sum(collect_fixtures(date.fromisoformat(d)) for d in days)
 
+def refresh_forecast_results(days_back=2):
+    """Refresh recent Brazil Serie A results independently of the LIVE feed.
+
+    One competition-scoped request avoids a costly all-league scan and
+    catches matches that finish between regular fixture collection runs.
+    """
+    from datetime import datetime, timedelta, timezone
+    if not isinstance(days_back, int) or not 1 <= days_back <= 3:
+        raise ValueError("days_back must be 1..3")
+    today = datetime.now(timezone.utc).date()
+    start = today - timedelta(days=days_back)
+    client = FootballDataClient()
+    try:
+        items = client.competition_fixtures_range("BSA", start.isoformat(), today.isoformat())
+    finally:
+        client.close()
+    return store_fixtures(items) if items else 0
+
+
 def collect_match_details(max_fixtures=2):
     """Quota-conscious enrichment of live matches; no historical backfill."""
     # football-data.org free tier does not provide fixture statistics or events.
