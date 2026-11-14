@@ -7,7 +7,8 @@ from app.db import engine
 from app.details import router as details_router
 from app.diagnostics import router as diagnostics_router
 from app.security.wp_bridge_router import router as wp_bridge_router
-app=FastAPI(title="SportIQ API",version="1.0.0")
+from app.scheduler import web_backfill_lifespan
+app=FastAPI(title="SportIQ API",version="1.0.0",lifespan=web_backfill_lifespan)
 app.include_router(details_router)
 app.include_router(diagnostics_router)
 app.include_router(wp_bridge_router)
