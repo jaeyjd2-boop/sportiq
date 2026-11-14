@@ -21,21 +21,87 @@ def collect_fixtures(day:date, end_day=None):
     return store_fixtures(items)
 
 
-def store_fixtures(items):
-    """Idempotently persist normalized fixtures from either current or historical feeds."""
-    count=0
-    with engine.begin() as c:
-        sid=c.execute(text("SELECT id FROM sports WHERE code='football'")).scalar_one()
-        for x in items:
-            f=x.get("fixture") or {}; l=x.get("league") or {}; teams=x.get("teams") or {}; goals=x.get("goals") or {}
-            lid=c.execute(text("INSERT INTO leagues(sport_id,provider_league_id,name,country) VALUES(:sid,:ext,:name,:country) ON CONFLICT(sport_id,provider_league_id) DO UPDATE SET name=EXCLUDED.name RETURNING id"),{"sid":sid,"ext":str(l.get("id")),"name":l.get("name") or "Unknown","country":(x.get("country") or {}).get("name")}).scalar_one()
-            tids=[]
-            for t in [teams.get("home") or {},teams.get("away") or {}]:
-                tids.append(c.execute(text("INSERT INTO teams(sport_id,provider_team_id,name,logo_url) VALUES(:sid,:ext,:name,:logo) ON CONFLICT(sport_id,provider_team_id) DO UPDATE SET name=EXCLUDED.name,logo_url=EXCLUDED.logo_url RETURNING id"),{"sid":sid,"ext":str(t.get("id")),"name":t.get("name") or "Unknown","logo":t.get("logo")}).scalar_one())
-            venue=f.get("venue") or {}; status=f.get("status") or {}
-            c.execute(text("""INSERT INTO matches(sport_id,league_id,provider_match_id,home_team_id,away_team_id,start_time,status,status_detail,home_score,away_score,venue,referee,raw_payload,updated_at) VALUES(:sid,:lid,:ext,:home,:away,:start,:status,:detail,:hs,:ascore,:venue,:ref,CAST(:raw AS JSONB),NOW()) ON CONFLICT(sport_id,provider_match_id) DO UPDATE SET league_id=EXCLUDED.league_id,home_team_id=EXCLUDED.home_team_id,away_team_id=EXCLUDED.away_team_id,start_time=EXCLUDED.start_time,status=EXCLUDED.status,status_detail=EXCLUDED.status_detail,home_score=EXCLUDED.home_score,away_score=EXCLUDED.away_score,raw_payload=EXCLUDED.raw_payload,updated_at=NOW()"""),{"sid":sid,"lid":lid,"ext":str(f.get("id")),"home":tids[0],"away":tids[1],"start":f.get("date"),"status":status.get("short","NS"),"detail":status.get("long"),"hs":goals.get("home"),"ascore":goals.get("away"),"venue":venue.get("name"),"ref":f.get("referee"),"raw":json.dumps(x,ensure_ascii=False)})
-            count+=1
+def store_fixtures(items, chunk_size=200):
+    """Persist fixtures with cached league/team lookups and batched match upserts.
+
+    Each chunk commits atomically. Invalid records are rejected rather than
+    inventing provider IDs; any failed chunk raises for caller retry.
+    """
+    if not isinstance(chunk_size, int) or chunk_size < 1 or chunk_size > 1000:
+        raise ValueError("chunk_size must be between 1 and 1000")
+    if not items:
+        return 0
+
+    # Last occurrence wins; avoid PostgreSQL ON CONFLICT affecting one row twice.
+    unique = {}
+    for x in items:
+        fixture = x.get("fixture") or {}
+        fid = fixture.get("id")
+        if fid is None:
+            raise ValueError("fixture missing provider ID")
+        unique[str(fid)] = x
+
+    league_sql = text("INSERT INTO leagues(sport_id,provider_league_id,name,country) VALUES(:sid,:ext,:name,:country) ON CONFLICT(sport_id,provider_league_id) DO UPDATE SET name=EXCLUDED.name RETURNING id")
+    team_sql = text("INSERT INTO teams(sport_id,provider_team_id,name,logo_url) VALUES(:sid,:ext,:name,:logo) ON CONFLICT(sport_id,provider_team_id) DO UPDATE SET name=EXCLUDED.name,logo_url=EXCLUDED.logo_url RETURNING id")
+    match_sql = text("""INSERT INTO matches(sport_id,league_id,provider_match_id,home_team_id,away_team_id,start_time,status,status_detail,home_score,away_score,venue,referee,raw_payload,updated_at)
+        VALUES(:sid,:lid,:ext,:home,:away,:start,:status,:detail,:hs,:ascore,:venue,:ref,CAST(:raw AS JSONB),NOW())
+        ON CONFLICT(sport_id,provider_match_id) DO UPDATE SET
+        league_id=EXCLUDED.league_id,home_team_id=EXCLUDED.home_team_id,
+        away_team_id=EXCLUDED.away_team_id,start_time=EXCLUDED.start_time,
+        status=EXCLUDED.status,status_detail=EXCLUDED.status_detail,
+        home_score=EXCLUDED.home_score,away_score=EXCLUDED.away_score,
+        raw_payload=EXCLUDED.raw_payload,updated_at=NOW()""")
+
+    entries = list(unique.values())
+    count = 0
+    with engine.connect() as conn:
+        sid = conn.execute(text("SELECT id FROM sports WHERE code='football'")).scalar_one()
+    for offset in range(0, len(entries), chunk_size):
+        batch = entries[offset:offset + chunk_size]
+        with engine.begin() as conn:
+            league_ids = {}
+            team_ids = {}
+            match_rows = []
+            for x in batch:
+                f = x.get("fixture") or {}
+                l = x.get("league") or {}
+                teams = x.get("teams") or {}
+                goals = x.get("goals") or {}
+                league_external = l.get("id")
+                home = teams.get("home") or {}
+                away = teams.get("away") or {}
+                if league_external is None or home.get("id") is None or away.get("id") is None or not f.get("date"):
+                    raise ValueError("fixture missing league, team, or date")
+                league_key = str(league_external)
+                if league_key not in league_ids:
+                    league_ids[league_key] = conn.execute(league_sql, {
+                        "sid": sid, "ext": league_key, "name": l.get("name") or "Unknown",
+                        "country": (x.get("country") or {}).get("name")
+                    }).scalar_one()
+                tids = []
+                for team in (home, away):
+                    key = str(team["id"])
+                    if key not in team_ids:
+                        team_ids[key] = conn.execute(team_sql, {
+                            "sid": sid, "ext": key, "name": team.get("name") or "Unknown",
+                            "logo": team.get("logo")
+                        }).scalar_one()
+                    tids.append(team_ids[key])
+                venue = f.get("venue") or {}
+                state = f.get("status") or {}
+                match_rows.append({
+                    "sid": sid, "lid": league_ids[league_key], "ext": str(f["id"]),
+                    "home": tids[0], "away": tids[1], "start": f["date"],
+                    "status": state.get("short", "NS"), "detail": state.get("long"),
+                    "hs": goals.get("home"), "ascore": goals.get("away"),
+                    "venue": venue.get("name"), "ref": f.get("referee"),
+                    "raw": json.dumps(x, ensure_ascii=False),
+                })
+            # SQLAlchemy/psycopg2 executemany batches repeated match INSERTs.
+            conn.execute(match_sql, match_rows)
+        count += len(batch)
     return count
+
 def collect_live():
     # 라이브 전용 피드에서 반환된 fixture의 날짜를 모아 해당 날짜의 최신 일정을 재수집
     client=FootballDataClient()
