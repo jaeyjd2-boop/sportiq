@@ -2,13 +2,15 @@ databases:
   - name: sportiq-db
     databaseName: sportiq
     user: sportiq
-    plan: basic
+    plan: basic-256mb
+    region: singapore
 
 services:
   - type: web
     name: sportiq-api
     runtime: docker
     plan: starter
+    region: singapore
     dockerfilePath: ./Dockerfile
     dockerContext: .
     dockerCommand: sh -c "python -m app.init_db && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
@@ -31,6 +33,7 @@ services:
     name: sportiq-collector
     runtime: docker
     plan: starter
+    region: singapore
     dockerfilePath: ./Dockerfile
     dockerContext: .
     dockerCommand: sh -c "python -m app.init_db && python -m app.worker"
