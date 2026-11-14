@@ -247,3 +247,71 @@ def forecast_performance(league_provider_id: str = "fd:2013"):
             "mean_brier":float(row["mean_brier"]) if row["mean_brier"] is not None else None,
             "mean_log_loss":float(row["mean_log_loss"]) if row["mean_log_loss"] is not None else None,
             "note":"Only pre-kickoff stored predictions; no accuracy claims before sufficient samples."}
+
+
+@app.get("/v1/forecast-performance/leagues")
+def forecast_performance_leagues():
+    """Comparable pre-kickoff performance by league; no ranking for tiny samples."""
+    with engine.connect() as c:
+        rows = c.execute(text("""
+            SELECT l.provider_league_id, l.name AS league_name,
+                   COUNT(r.id) AS evaluated,
+                   COUNT(*) FILTER (WHERE r.id IS NULL) AS pending,
+                   COUNT(r.id) FILTER (WHERE p.predicted_result = r.actual_result) AS correct,
+                   ROUND(AVG(r.brier_score)::numeric, 4) AS mean_brier,
+                   ROUND(AVG(r.log_loss)::numeric, 4) AS mean_log_loss
+            FROM predictions p
+            JOIN matches m ON m.id=p.match_id
+            JOIN leagues l ON l.id=m.league_id
+            LEFT JOIN prediction_results r ON r.prediction_id=p.id
+            WHERE p.model_version='poisson-form-v0.1'
+              AND p.created_at < m.start_time
+            GROUP BY l.provider_league_id, l.name
+            ORDER BY evaluated DESC, l.name
+        """)).mappings().all()
+    return {"model_version":"poisson-form-v0.1","leagues":[{
+        "league_provider_id":r["provider_league_id"],"league_name":r["league_name"],
+        "evaluated":r["evaluated"],"pending":r["pending"],"correct":r["correct"],
+        "accuracy":round(r["correct"]/r["evaluated"],4) if r["evaluated"] else None,
+        "mean_brier":float(r["mean_brier"]) if r["mean_brier"] is not None else None,
+        "mean_log_loss":float(r["mean_log_loss"]) if r["mean_log_loss"] is not None else None,
+        "sample_sufficient":r["evaluated"]>=30,
+    } for r in rows]}
+
+
+@app.get("/v1/forecast-performance/trend")
+def forecast_performance_trend(league_provider_id: str = "fd:2013"):
+    """Daily cumulative scoring trend for pre-kickoff predictions only."""
+    with engine.connect() as c:
+        rows=c.execute(text("""
+            SELECT r.evaluated_at::date AS evaluation_date,
+                   COUNT(*) AS evaluated,
+                   COUNT(*) FILTER (WHERE p.predicted_result=r.actual_result) AS correct,
+                   SUM(r.brier_score) AS brier_total,
+                   SUM(r.log_loss) AS log_loss_total
+            FROM prediction_results r
+            JOIN predictions p ON p.id=r.prediction_id
+            JOIN matches m ON m.id=p.match_id
+            JOIN leagues l ON l.id=m.league_id
+            WHERE l.provider_league_id=:league
+              AND p.model_version='poisson-form-v0.1'
+              AND p.created_at < m.start_time
+            GROUP BY r.evaluated_at::date
+            ORDER BY evaluation_date
+        """),{"league":league_provider_id}).mappings().all()
+    total=correct=0
+    brier=loss=0.0
+    points=[]
+    for r in rows:
+        total+=r["evaluated"]
+        correct+=r["correct"]
+        brier+=float(r["brier_total"])
+        loss+=float(r["log_loss_total"])
+        points.append({"date":r["evaluation_date"].isoformat(),
+                       "evaluated":total,"accuracy":round(correct/total,4),
+                       "mean_brier":round(brier/total,4),
+                       "mean_log_loss":round(loss/total,4),
+                       "sample_sufficient":total>=30})
+    return {"league_provider_id":league_provider_id,
+            "model_version":"poisson-form-v0.1","points":points,
+            "note":"Cumulative metrics by evaluation date; 30 samples is a display threshold, not statistical proof."}
