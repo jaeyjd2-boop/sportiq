@@ -12,4 +12,6 @@ class ApiFootballClient:
     def leagues(self): return self.get("/leagues")
     def fixtures(self,day): return self.get("/fixtures",{"date":day})
     def live(self): return self.get("/fixtures",{"live":"all"})
+    def fixture_statistics(self,fixture_id): return self.get("/fixtures/statistics",{"fixture":fixture_id})
+    def fixture_events(self,fixture_id): return self.get("/fixtures/events",{"fixture":fixture_id})
     def close(self): self.client.close()
