@@ -28,3 +28,63 @@ def analysis(match_id: int):
         played=w+d+l
         return {"played":played,"wins":w,"draws":d,"losses":l,"goals_for":gf,"goals_against":ga,"points_per_game":round((3*w+d)/played,2) if played else None}
     return {"match":dict(m),"home":{"recent":[dict(x) for x in home],"form":form(home,m["home_team_id"])},"away":{"recent":[dict(x) for x in away],"form":form(away,m["away_team_id"])},"head_to_head":[dict(x) for x in h2h],"live_statistics":[dict(x) for x in stats],"events":[dict(x) for x in events],"statistics_available":bool(stats),"note":"Only stored data is shown; unavailable statistics are not estimated."}
+
+
+@router.get("/{match_id}/forecast")
+def forecast(match_id: int):
+    """Experimental pre-match Poisson forecast using only earlier stored results."""
+    from math import exp, factorial
+    with engine.connect() as c:
+        match = c.execute(text("""
+            SELECT id, home_team_id, away_team_id, start_time, status
+            FROM matches WHERE id=:id
+        """), {"id": match_id}).mappings().first()
+        if not match:
+            raise HTTPException(404, "match not found")
+        if not match["home_team_id"] or not match["away_team_id"]:
+            raise HTTPException(422, "team identifiers unavailable")
+        rows = c.execute(text("""
+            SELECT home_team_id, away_team_id, home_score, away_score, start_time
+            FROM matches
+            WHERE start_time < :kickoff AND id <> :id
+              AND status IN ('FT','AET','PEN')
+              AND home_score IS NOT NULL AND away_score IS NOT NULL
+              AND (home_team_id IN (:home,:away) OR away_team_id IN (:home,:away))
+            ORDER BY start_time DESC LIMIT 500
+        """), {"id":match_id,"kickoff":match["start_time"],
+               "home":match["home_team_id"],"away":match["away_team_id"]}).mappings().all()
+    def recent(team):
+        return [r for r in rows if r["home_team_id"] == team or r["away_team_id"] == team][:5]
+    h = recent(match["home_team_id"])
+    a = recent(match["away_team_id"])
+    if len(h) < 3 or len(a) < 3:
+        return {"match_id": match_id, "available": False,
+                "reason": "At least three completed prior matches per team are required",
+                "samples": {"home":len(h),"away":len(a)}}
+    def averages(games, team):
+        scored = sum(float(r["home_score"] if r["home_team_id"] == team else r["away_score"]) for r in games)
+        conceded = sum(float(r["away_score"] if r["home_team_id"] == team else r["home_score"]) for r in games)
+        return scored/len(games), conceded/len(games)
+    hf, ha = averages(h, match["home_team_id"])
+    af, aa = averages(a, match["away_team_id"])
+    # Shrink noisy five-match rates toward a neutral 1.3 goals per match.
+    home_lambda = min(4.0, max(0.2, 0.65*(hf+aa)/2 + 0.35*1.3))
+    away_lambda = min(4.0, max(0.2, 0.65*(af+ha)/2 + 0.35*1.3))
+    def poisson(k, rate):
+        return exp(-rate)*rate**k/factorial(k)
+    # Include all scores 0..15; normalize the negligible truncated tail.
+    matrix = [(i,j,poisson(i,home_lambda)*poisson(j,away_lambda))
+              for i in range(16) for j in range(16)]
+    total = sum(p for _,_,p in matrix)
+    probs = {
+        "home": sum(p for i,j,p in matrix if i>j)/total,
+        "draw": sum(p for i,j,p in matrix if i==j)/total,
+        "away": sum(p for i,j,p in matrix if i<j)/total,
+    }
+    score = max(matrix, key=lambda item:item[2])
+    return {"match_id":match_id,"available":True,"model_version":"poisson-form-v0.1",
+            "probabilities":{k:round(v,4) for k,v in probs.items()},
+            "expected_goals":{"home":round(home_lambda,2),"away":round(away_lambda,2)},
+            "most_likely_score":{"home":score[0],"away":score[1]},
+            "samples":{"home":len(h),"away":len(a)},
+            "disclaimer":"Experimental estimate, not calibrated or validated; historical data may be incomplete."}
