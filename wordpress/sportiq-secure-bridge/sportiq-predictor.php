@@ -42,7 +42,9 @@ function sportiq_prediction_shortcode($atts) {
     // Avoid blocking page rendering on a cold cache.
     $cached = get_transient('sportiq_pred_' . $id);
     if (is_array($cached)) {
-        $cached['_meta'] = array('source' => 'cache', 'stale' => false);
+        if (empty($cached['_meta']['stale'])) {
+            $cached['_meta'] = array('source' => 'cache', 'stale' => false);
+        }
         return sportiq_prediction_card($cached);
     }
     return '<div class="sportiq-async-container" data-match-id="' . esc_attr($id)
@@ -78,6 +80,12 @@ if (!function_exists('sportiq_prediction_footer_script')) {
 function sportiq_prediction_footer_script() {
     if (!is_singular()) { return; }
     ?>
+    <style>
+    .sportiq-skeleton{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:12px 0}
+    .sportiq-skeleton span{display:block;min-height:54px;border-radius:8px;background:#e5e7eb;animation:sportiq-pulse 1.5s ease-in-out infinite alternate}
+    @keyframes sportiq-pulse{from{opacity:.45}to{opacity:1}}
+    @media(prefers-reduced-motion:reduce){.sportiq-skeleton span{animation:none}}
+    </style>
     <script>
     (function () {
       function loadPredictions() {
