@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     api_football_base_url: str = "https://v3.football.api-sports.io"
     api_football_key: str = ""
     api_football_timeout: int = 20
+    web_backfill_enabled: bool = False
+    web_backfill_competition: str = "PL"
     cors_origins: str = "http://localhost:3000"
     live_poll_seconds: int = 60
     fixture_lookahead_days: int = 7
