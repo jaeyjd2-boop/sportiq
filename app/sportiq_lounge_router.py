@@ -65,6 +65,18 @@ def _init_db() -> None:
                 reason TEXT DEFAULT '부적절한 게시글',
                 created_at REAL NOT NULL
             );
+CREATE TABLE IF NOT EXISTS global_match_rankings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_key TEXT UNIQUE NOT NULL,
+    sport TEXT NOT NULL,
+    league TEXT NOT NULL,
+    league_color TEXT NOT NULL,
+    matchup TEXT NOT NULL,
+    schedule_venue TEXT NOT NULL,
+    votes INTEGER NOT NULL DEFAULT 0,
+    buzz_score INTEGER NOT NULL DEFAULT 80,
+    rank_change TEXT NOT NULL DEFAULT '-'
+);
             """
         )
         row = conn.execute("SELECT COUNT(*) AS cnt FROM daily_hashtags").fetchone()
@@ -95,7 +107,22 @@ def _init_db() -> None:
                 "INSERT INTO cheers(session_id, author, role, team, message, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 cseeds,
             )
-
+        grow = conn.execute("SELECT COUNT(*) AS cnt FROM global_match_rankings").fetchone()
+       if grow["cnt"] == 0:
+           gseeds = [
+("epl-liv-mun", "football", "EPL", "#38003c", "리버풀 vs 맨체스터 유나이티드", "11.22 · 안필드 노스웨스트 더비", 2840, 99, "-"),
+("unl-esp-eng", "football", "네이션스리그 A", "#003399", "스페인 vs 잉글랜드", "11.16 · 매치데이 6 빅매치", 2610, 97, "▲1"),
+("ucl-ars-bvb", "football", "챔피언스리그", "#0e1e5b", "아스널 vs 보루시아 도르트문트", "11.25 · 매치데이 5", 2390, 95, "▲2"),
+("nba-bos-dal", "basketball", "NBA", "#c9082a", "보스턴 셀틱스 vs 댈러스 매버릭스", "11.16 · TD 가든", 2150, 93, "▼1"),
+("epl-new-ars", "football", "EPL", "#38003c", "뉴캐슬 유나이티드 vs 아스널", "11.21 · 세인트 제임스 파크", 1980, 91, "▲1"),
+("nba-phx-lal", "basketball", "NBA", "#c9082a", "피닉스 선즈 vs LA 레이커스", "11.16 · 서부 라이벌전", 1840, 89, "-"),
+("laliga-bar-vil", "football", "라리가", "#ee8707", "FC 바르셀로나 vs 비야레알", "11.22 · 스포티파이 캄 노우", 1690, 87, "NEW"),
+("nfl-det-ne", "nfl", "NFL", "#013369", "디트로이트 라이온스 vs 뉴잉글랜드 패트리어츠", "11.15 · 뮌헨 인터내셔널 게임", 1540, 85, "▲2"),
+("laliga-rma-cel", "football", "라리가", "#ee8707", "레알 마드리드 vs 셀타 비고", "11.22 · 산티아고 베르나베우", 1420, 83, "▼1"),
+("nba-den-phx", "basketball", "NBA", "#c9082a", "덴버 너기츠 vs 피닉스 선즈", "11.17 · 볼 아레나", 1290, 81, "NEW"),
+           ]
+conn.executemany("INSERT OR IGNORE INTO global_match_rankings(match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", gseeds)
+           
 
 _init_db()
 
@@ -312,3 +339,22 @@ def report_post(post_id: str, payload: Optional[ReportIn] = None):
             (post_id[:64], sid[:64], reason[:200], now),
         )
     return {"ok": True, "post_id": post_id, "reported": True}
+
+@router.get("/api/rankings/global-matches")
+def get_global_matches():
+    with _get_conn() as conn:
+        rows = conn.execute("SELECT id, match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC").fetchall()
+        items = [{"rank": i + 1, "id": r["id"], "match_key": r["match_key"], "sport": r["sport"], "league": r["league"], "league_color": r["league_color"], "matchup": r["matchup"], "schedule_venue": r["schedule_venue"], "votes": r["votes"], "buzz_score": r["buzz_score"], "rank_change": r["rank_change"]} for i, r in enumerate(rows)]
+    return {"matches": items}
+
+
+@router.post("/api/rankings/global-matches/{match_id}/vote")
+def vote_global_match(match_id: int):
+    with _get_conn() as conn:
+        cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
+        rows = conn.execute("SELECT id, match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC").fetchall()
+        items = [{"rank": i + 1, "id": r["id"], "match_key": r["match_key"], "sport": r["sport"], "league": r["league"], "league_color": r["league_color"], "matchup": r["matchup"], "schedule_venue": r["schedule_venue"], "votes": r["votes"], "buzz_score": r["buzz_score"], "rank_change": r["rank_change"]} for i, r in enumerate(rows)]
+        voted = next((m for m in items if m["id"] == match_id), None)
+    return {"ok": True, "match": voted, "matches": items}
