@@ -108,20 +108,20 @@ CREATE TABLE IF NOT EXISTS global_match_rankings (
                 cseeds,
             )
        grow = conn.execute("SELECT COUNT(*) AS cnt FROM global_match_rankings").fetchone()
-         if grow["cnt"] == 0:
-           gseeds = [
-                ("epl-liv-mun", "football", "EPL", "#38003c", "리버풀 vs 맨체스터 유나이티드", "11.22 · 안필드 노스웨스트 더비", 2840, 99, "-"),
-                ("unl-esp-eng", "football", "네이션스리그 A", "#003399", "스페인 vs 잉글랜드", "11.16 · 매치데이 6 빅매치", 2610, 97, "▲1"),
-                ("ucl-ars-bvb", "football", "챔피언스리그", "#0e1e5b", "아스널 vs 보루시아 도르트문트", "11.25 · 매치데이 5", 2390, 95, "▲2"),
-                ("nba-bos-dal", "basketball", "NBA", "#c9082a", "보스턴 셀틱스 vs 댈러스 매버릭스", "11.16 · TD 가든", 2150, 93, "▼1"),
-                ("epl-new-ars", "football", "EPL", "#38003c", "뉴캐슬 유나이티드 vs 아스널", "11.21 · 세인트 제임스 파크", 1980, 91, "▲1"),
-                ("nba-phx-lal", "basketball", "NBA", "#c9082a", "피닉스 선즈 vs LA 레이커스", "11.16 · 서부 라이벌전", 1840, 89, "-"),
-                ("laliga-bar-vil", "football", "라리가", "#ee8707", "FC 바르셀로나 vs 비야레알", "11.22 · 스포티파이 캄 노우", 1690, 87, "NEW"),
-                ("nfl-det-ne", "nfl", "NFL", "#013369", "디트로이트 라이온스 vs 뉴잉글랜드 패트리어츠", "11.15 · 뮌헨 인터내셔널 게임", 1540, 85, "▲2"),
-                ("laliga-rma-cel", "football", "라리가", "#ee8707", "레알 마드리드 vs 셀타 비고", "11.22 · 산티아고 베르나베우", 1420, 83, "▼1"),
-                ("nba-den-phx", "basketball", "NBA", "#c9082a", "덴버 너기츠 vs 피닉스 선즈", "11.17 · 볼 아레나", 1290, 81, "NEW"),
-           ]
-        conn.executemany("INSERT OR IGNORE INTO global_match_rankings(match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", gseeds)
+     if grow["cnt"] == 0:
+       gseeds = [
+            ("epl-liv-mun", "football", "EPL", "#38003c", "리버풀 vs 맨체스터 유나이티드", "11.22 · 안필드 노스웨스트 더비", 2840, 99, "-"),
+            ("unl-esp-eng", "football", "네이션스리그 A", "#003399", "스페인 vs 잉글랜드", "11.16 · 매치데이 6 빅매치", 2610, 97, "▲1"),
+            ("ucl-ars-bvb", "football", "챔피언스리그", "#0e1e5b", "아스널 vs 보루시아 도르트문트", "11.25 · 매치데이 5", 2390, 95, "▲2"),
+            ("nba-bos-dal", "basketball", "NBA", "#c9082a", "보스턴 셀틱스 vs 댈러스 매버릭스", "11.16 · TD 가든", 2150, 93, "▼1"),
+            ("epl-new-ars", "football", "EPL", "#38003c", "뉴캐슬 유나이티드 vs 아스널", "11.21 · 세인트 제임스 파크", 1980, 91, "▲1"),
+            ("nba-phx-lal", "basketball", "NBA", "#c9082a", "피닉스 선즈 vs LA 레이커스", "11.16 · 서부 라이벌전", 1840, 89, "-"),
+            ("laliga-bar-vil", "football", "라리가", "#ee8707", "FC 바르셀로나 vs 비야레알", "11.22 · 스포티파이 캄 노우", 1690, 87, "NEW"),
+            ("nfl-det-ne", "nfl", "NFL", "#013369", "디트로이트 라이온스 vs 뉴잉글랜드 패트리어츠", "11.15 · 뮌헨 인터내셔널 게임", 1540, 85, "▲2"),
+            ("laliga-rma-cel", "football", "라리가", "#ee8707", "레알 마드리드 vs 셀타 비고", "11.22 · 산티아고 베르나베우", 1420, 83, "▼1"),
+            ("nba-den-phx", "basketball", "NBA", "#c9082a", "덴버 너기츠 vs 피닉스 선즈", "11.17 · 볼 아레나", 1290, 81, "NEW"),
+       ]
+    conn.executemany("INSERT OR IGNORE INTO global_match_rankings(match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", gseeds)
            
 
 _init_db()
