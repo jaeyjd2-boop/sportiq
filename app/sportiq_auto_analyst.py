@@ -932,7 +932,7 @@ def post_shorts_comment(req: ShortsCommentReq):
         conn.commit()
         new_id = cur.lastrowid
     _backup_tables_to_pg("shorts_comments")
-        return {
+    return {
         "ok": True,
         "comment": {
             "id": new_id,
