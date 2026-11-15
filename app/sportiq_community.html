@@ -42,7 +42,7 @@
   <!-- Top Header -->
   <header class="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
     <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-      <div class="flex items-center gap-3">
+      <a href="/" title="클릭하여 새로고침" aria-label="클릭하여 새로고침" class="flex items-center gap-3 cursor-pointer rounded-xl px-2 py-1 -mx-2 -my-1 transition-all duration-150 hover:bg-slate-800/50 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-emerald-500/50" onclick="event.preventDefault(); if (window.location.hash) { history.replaceState(null, '', window.location.pathname + window.location.search); } window.location.reload();">
         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 font-extrabold text-slate-950 shadow-lg shadow-emerald-500/20">IQ</div>
         <div>
           <div class="flex items-center gap-2">
@@ -51,7 +51,7 @@
           </div>
           <p class="text-xs text-slate-400">billnojay.com 오픈 스포츠 인사이트</p>
         </div>
-      </div>
+      </a>
 
       <div class="flex flex-wrap items-center gap-2">
         <div class="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs">
