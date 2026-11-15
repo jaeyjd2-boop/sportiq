@@ -35,15 +35,15 @@
     .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen antialiased">
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased pb-20 lg:pb-6">
   <!-- Toast -->
   <div id="toast" class="fixed bottom-6 right-6 z-50 hidden items-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 shadow-2xl transition-all"></div>
 
   <!-- Top Header -->
   <header class="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
-    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3">
       <a href="/" title="클릭하여 새로고침" aria-label="클릭하여 새로고침" class="flex items-center gap-3 cursor-pointer rounded-xl px-2 py-1 -mx-2 -my-1 transition-all duration-150 hover:bg-slate-800/50 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-emerald-500/50" onclick="event.preventDefault(); if (window.location.hash) { history.replaceState(null, '', window.location.pathname + window.location.search); } window.location.reload();">
-        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 font-extrabold text-slate-950 shadow-lg shadow-emerald-500/20">IQ</div>
+        <div class="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 font-extrabold text-slate-950 shadow-lg shadow-emerald-500/20">IQ</div>
         <div>
           <div class="flex items-center gap-2">
             <span class="text-lg font-extrabold tracking-tight text-white">SportIQ</span>
@@ -54,7 +54,7 @@
       </a>
 
       <div class="flex flex-wrap items-center gap-2">
-        <div class="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs">
+        <div class="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/90 px-2.5 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs">
           <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400"></span>
           <span class="text-slate-300">접속 <strong id="activeCount" class="text-emerald-400">1</strong>명</span>
           <span class="text-slate-600">|</span>
@@ -109,7 +109,8 @@
       <button onclick="switchTab('cheers')" data-tab="cheers" class="tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition">스포츠 이슈 & 응원톡</button>
       <button onclick="switchTab('ranking')" data-tab="ranking" class="tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition">분석가 랭킹</button>
     </div>
-  </nav>
+  </nav><div class="lg:hidden border-b border-slate-800/80 bg-slate-900/90 px-3 py-2"><div class="mx-auto flex max-w-7xl items-center justify-between gap-2 text-xs"><div class="flex items-center gap-1.5 font-bold text-slate-200 truncate"><span>🎁 빠른 출석 · 내 포인트</span><span id="mobilePointsBadge" class="rounded-full bg-amber-500/20 px-2 py-0.5 text-amber-300 font-extrabold">120 P</span></div><div class="flex items-center gap-1.5 shrink-0"><button id="mobileAttendanceBtn" onclick="checkAttendance()" class="rounded-lg bg-emerald-500 px-2.5 py-1 text-[11px] font-bold text-slate-950 hover:bg-emerald-400 transition">출석체크 +10P</button><button onclick="document.getElementById('quickChallengeCard')?.scrollIntoView({behavior:'smooth',block:'center'})" class="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-bold text-slate-200 hover:bg-slate-700 transition">챌린지 이동 ↓</button></div></div></div>
+  
 
   <!-- Global Big Match TOP 20 Scoreboard -->
   <section id="globalTop10BoardSection" class="mx-auto max-w-7xl px-4 pt-6">
@@ -404,7 +405,7 @@
   </section>
 
   <div id="shortsSubmitModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 p-4">
-    <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4 shadow-2xl">
+    <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between">
         <h3 class="text-base font-extrabold text-white">➕ 나만의 유튜브 숏츠 제보하기</h3>
         <button type="button" onclick="closeShortsSubmitModal()" class="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 rounded-lg bg-slate-800">닫기 &times;</button>
@@ -535,10 +536,10 @@
   </div>
 </section>
 <div id="analystDetailModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm" onclick="if(event.target===this) closeAnalystModal()">
-  <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl space-y-4">
+  <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
     <div class="flex items-center justify-between border-b border-slate-800 pb-3">
       <h3 class="text-base font-extrabold text-white">📊 분석가 상세 전적 · 주력 전술</h3>
-      <button onclick="closeAnalystModal()" class="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-400 hover:text-white">✕</button>
+      <button onclick="closeAnalystModal()" class="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-400 hover:text-white">닫기 ×</button>
     </div>
     <div id="analystModalContent" class="space-y-3 text-xs text-slate-200"></div>
   </div>
@@ -579,11 +580,11 @@
             <span class="text-xs font-bold text-emerald-400">무료 승부예측 1클릭 챌린지</span>
             <span class="text-[11px] text-slate-400">보상 +20P</span>
           </div>
-          <p class="text-xs text-slate-300 mb-2.5">아스널 vs 첼시 예상 승자는?</p>
-          <div class="grid grid-cols-3 gap-2">
-            <button onclick="quickChallenge('아스널 승')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">아스널</button>
-            <button onclick="quickChallenge('무승부')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">무승부</button>
-            <button onclick="quickChallenge('첼시 승')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">첼시</button>
+          <p id="quickChallengeTitle" class="text-xs text-slate-300 mb-2.5">아스널 vs 첼시 예상 승자는?</p>
+          <p id="quickChallengeStatus" class="hidden text-[11px] font-bold text-emerald-300 mb-2"></p><div id="quickChallengeCard" class="grid grid-cols-3 gap-2">
+            <button id="quickChallengeHomeBtn" onclick="quickChallenge(this.dataset.pick || '홈승')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">아스널</button>
+            <button id="quickChallengeDrawBtn" onclick="quickChallenge('무승부')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">무승부</button>
+            <button id="quickChallengeAwayBtn" onclick="quickChallenge(this.dataset.pick || '원정승')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">첼시</button>
           </div>
         </div>
       </div>
@@ -593,7 +594,7 @@
         <div class="text-xs font-bold text-emerald-400">MEMBER BENEFIT</div>
         <h3 class="text-base font-extrabold text-white">정회원(MEMBER) 1초 무료 전환</h3>
         <p class="text-xs text-slate-300 leading-relaxed">복잡한 절차 없이 버튼 한 번으로 정회원으로 전환하고 분석글 북마크 및 챌린지 보상을 받으세요.</p>
-        <button onclick="setRole('MEMBER', true)" class="w-full rounded-xl bg-white py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-300 transition">
+        <button id="sidebarMemberBtn" onclick="setRole('MEMBER', true)" class="w-full rounded-xl bg-white py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-300 transition">
           1초 만에 정회원(MEMBER) 무료 전환
         </button>
       </div>
@@ -625,10 +626,10 @@
 
   <!-- Write Post Modal -->
   <div id="writeModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
-    <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4">
+    <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between">
         <h3 class="text-base font-bold text-white">새 스포츠 분석 작성</h3>
-        <button onclick="closeModal('writeModal')" class="text-slate-400 hover:text-white">✕</button>
+        <button onclick="closeModal('writeModal')" class="text-slate-400 hover:text-white">닫기 ×</button>
       </div>
       <div class="space-y-3">
         <select id="postLeague" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white">
@@ -650,10 +651,10 @@
 
   <!-- Comment Modal -->
   <div id="commentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
-    <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4">
+    <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between">
         <h3 id="commentModalTitle" class="text-sm font-bold text-white">분석 댓글</h3>
-        <button onclick="closeModal('commentModal')" class="text-slate-400 hover:text-white">✕</button>
+        <button onclick="closeModal('commentModal')" class="text-slate-400 hover:text-white">닫기 ×</button>
       </div>
       <div id="commentModalList" class="space-y-2 max-h-60 overflow-y-auto scrollbar-thin"></div>
       <div class="flex gap-2">
@@ -665,10 +666,10 @@
 
   <!-- Chart.js Match Comparison Modal -->
   <div id="chartModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
-    <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4">
+    <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between">
         <h3 id="chartModalTitle" class="text-base font-bold text-white">경기 지표 비교</h3>
-        <button onclick="closeModal('chartModal')" class="text-slate-400 hover:text-white">✕</button>
+        <button onclick="closeModal('chartModal')" class="text-slate-400 hover:text-white">닫기 ×</button>
       </div>
       <div class="h-64">
         <canvas id="matchChartCanvas"></canvas>
@@ -678,10 +679,10 @@
 
   <!-- Partner Inquiry Modal -->
   <div id="partnerModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
-    <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4">
+    <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between">
         <h3 class="text-base font-bold text-white">파트너 입점·제휴 문의</h3>
-        <button onclick="closeModal('partnerModal')" class="text-slate-400 hover:text-white">✕</button>
+        <button onclick="closeModal('partnerModal')" class="text-slate-400 hover:text-white">닫기 ×</button>
       </div>
       <div class="space-y-3">
         <input id="partnerCompany" type="text" placeholder="업체/브랜드명" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" />
@@ -706,7 +707,7 @@
     localStorage.setItem('sportiq_sid', sessionId);
 
     let state = {
-      role: 'GUEST',
+      role: localStorage.getItem('sportiq_user_role') || 'GUEST',
       points: Number(localStorage.getItem('sportiq_pts') || 120),
       streak: Number(localStorage.getItem('sportiq_streak') || 3),
       checkedToday: localStorage.getItem('sportiq_checked') === new Date().toISOString().slice(0, 10),
@@ -769,7 +770,7 @@
     }
 
     function setRole(role, notify = false) {
-      state.role = role;
+      state.role = role; localStorage.setItem('sportiq_user_role', role); const mb = document.getElementById('sidebarMemberBtn'); if (mb) { if (role !== 'GUEST') { mb.className = 'w-full rounded-xl border border-emerald-500/40 bg-emerald-500/15 py-2 text-xs font-extrabold text-emerald-300 transition'; mb.textContent = `✅ ${role} 등급 혜택 활성화 중`; } else { mb.className = 'w-full rounded-xl bg-white py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-300 transition'; mb.textContent = '1초 만에 정회원(MEMBER) 무료 전환'; } }
       const labels = { GUEST: '오픈 게스트', MEMBER: '정회원 MEMBER', PRO: 'PRO 분석가' };
       document.getElementById('currentRoleBadge').textContent = labels[role] || role;
       document.querySelectorAll('.role-btn').forEach(btn => {
@@ -1072,7 +1073,7 @@
     function updatePointsUI() {
       localStorage.setItem('sportiq_pts', state.points); localStorage.setItem('sportiq_user_points', String(state.points));
       localStorage.setItem('sportiq_streak', state.streak);
-      document.getElementById('pointsBadge').textContent = state.points + ' P';
+      document.getElementById('pointsBadge').textContent = state.points + ' P'; const mpb = document.getElementById('mobilePointsBadge'); if (mpb) mpb.textContent = state.points + ' P'; const mab = document.getElementById('mobileAttendanceBtn'); if (mab) { mab.disabled = state.checkedInToday; mab.textContent = state.checkedInToday ? '✅ 출석완료' : '출석체크 +10P'; mab.className = state.checkedInToday ? 'rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-bold text-emerald-300 cursor-default' : 'rounded-lg bg-emerald-500 px-2.5 py-1 text-[11px] font-bold text-slate-950 hover:bg-emerald-400 transition'; }
       document.getElementById('streakDays').textContent = state.streak;
       const btn = document.getElementById('attendanceBtn');
       if (state.checkedToday) {
@@ -1091,7 +1092,7 @@
       showToast('출석 체크 완료! +10P가 적립되었습니다.');
     }
 
-    function quickChallenge(pick) {
+    function lockQuickChallengeUI() { const today = new Date().toISOString().slice(0, 10); if (localStorage.getItem('sportiq_challenge_date') === today) { const st = document.getElementById('quickChallengeStatus'); if (st) { st.classList.remove('hidden'); st.textContent = '✅ 오늘 챌린지 완료 (+20P 지급됨)'; } ['quickChallengeHomeBtn','quickChallengeDrawBtn','quickChallengeAwayBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.classList.add('opacity-60'); }); } } function quickChallenge(pick) { const today = new Date().toISOString().slice(0, 10); if (localStorage.getItem('sportiq_challenge_date') === today) { showToast('오늘의 승부예측 챌린지는 이미 참여 완료했습니다!'); return; } localStorage.setItem('sportiq_challenge_date', today); localStorage.setItem('sportiq_challenge_pick', pick); lockQuickChallengeUI();
       state.points += 20;
       updatePointsUI();
       showToast(`'${pick}' 승부예측 챌린지 참여 완료! (+20P)`);
@@ -1186,7 +1187,7 @@
     async function submitPartnerInquiry() {
       const company = document.getElementById('partnerCompany').value.trim();
       const contact_name = document.getElementById('partnerName').value.trim();
-      const contact_info = document.getElementById('partnerContact').value.trim();
+      const contact_info = document.getElementById('partnerContact').value.trim(); const isEmail = contact_info.includes('@') && contact_info.includes('.'); const digits = contact_info.replace(/\D/g, ''); if (!isEmail && digits.length < 8) { showToast('올바른 이메일(@, . 포함) 또는 전화번호(숫자 8자리 이상)를 입력해 주세요.'); return; }
       const tier = document.getElementById('partnerTier').value;
       const message = document.getElementById('partnerMsg').value.trim();
       try {
@@ -1286,7 +1287,7 @@ async function runAutoAnalystNow() {
 }
 
 loadAutoAnalystPosts();
-setRole('GUEST');
+setRole(state.role); lockQuickChallengeUI();
     switchTab('feed');
     renderFeed();
     renderMatches();
@@ -1407,7 +1408,7 @@ setRole('GUEST');
       const data = await res.json();
       globalMatchesData = data.matches || [];
       renderGlobalTop10();
-      renderSidebarGlobalTop5();
+      function lockQrenderSidebarGlobalTop5(); if (globalMatchesData && globalMatchesData.length) { const m = globalMatchesData[0]; const t = document.getElementById('quickChallengeTitle'); if (t) t.textContent = `${m.matchup} 예상 승자는?`; const parts = (m.matchup || '').split(/\s+vs\s+/i); const hb = document.getElementById('quickChallengeHomeBtn'); const ab = document.getElementById('quickChallengeAwayBtn'); if (parts.length === 2) { if (hb) { hb.textContent = `${parts[0]} 승`; hb.dataset.pick = `${parts[0]} 승`; } if (ab) { ab.textContent = `${parts[1]} 승`; ab.dataset.pick = `${parts[1]} 승`; } } }uickChallengeUI() { const today = new Date().toISOString().slice(0, 10); if (localStorage.getItem('sportiq_challenge_date') === today) { const st = document.getElementById('quickChallengeStatus'); if (st) { st.classList.remove('hidden'); st.textContent = '✅ 오늘 챌린지 완료 (+20P 지급됨)'; } ['quickChallengeHomeBtn','quickChallengeDrawBtn','quickChallengeAwayBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.classList.add('opacity-60'); }); } } function quickChallenge(pick) { const today = new Date().toISOString().slice(0, 10); if (localStorage.getItem('sportiq_challenge_date') === today) { showToast('오늘의 승부예측 챌린지는 이미 참여 완료했습니다!'); return; } localStorage.setItem('sportiq_challenge_date', today); localStorage.setItem('sportiq_challenge_pick', pick); lockQuickChallengeUI();
     } catch (e) {}
   }
 
@@ -2922,5 +2923,5 @@ renderRanking();
 syncMemberLeaderboard();
 setInterval(loadCheers, 10000);
 </script>
-</body>
+<nav class="fixed bottom-0 inset-x-0 z-40 lg:hidden border-t border-slate-800 bg-slate-950/95 backdrop-blur"><div class="grid grid-cols-5"><button data-mobile-tab="feed" onclick="switchTab('feed')" class="flex flex-col items-center justify-center py-1.5 text-[11px] font-bold text-emerald-400"><span>📰</span><span>피드</span></button><button data-mobile-tab="matches" onclick="switchTab('matches')" class="flex flex-col items-center justify-center py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-200"><span>🗳️</span><span>일정</span></button><button data-mobile-tab="shorts" onclick="switchTab('shorts')" class="flex flex-col items-center justify-center py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-200"><span>🎬</span><span>숏츠</span></button><button data-mobile-tab="cheers" onclick="switchTab('cheers')" class="flex flex-col items-center justify-center py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-200"><span>🔥</span><span>이슈/톡</span></button><button data-mobile-tab="ranking" onclick="switchTab('ranking')" class="flex flex-col items-center justify-center py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-200"><span>🏆</span><span>랭킹</span></button></div></nav></body>
 </html>
