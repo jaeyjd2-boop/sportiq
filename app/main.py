@@ -1,4 +1,9 @@
 from datetime import date
+import time
+from collections import defaultdict, deque
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from app.sportiq_autonomous_sec import router as autonomous_router
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -20,7 +25,51 @@ app.include_router(auto_analyst_router)
 app.include_router(lounge_router)
 app.include_router(issues_ranking_router)
 app.include_router(pro_lab_router)
+app.include_router(autonomous_router)
 app.add_middleware(CORSMiddleware,allow_origins=list(dict.fromkeys([*settings.allowed_origins,"https://billnojay.com","https://www.billnojay.com","http://billnojay.com","http://www.billnojay.com"])),allow_credentials=False,allow_methods=["GET","POST","PUT","DELETE","OPTIONS"],allow_headers=["*"])
+_RATE_LIMIT_PATHS = {
+    "/api/pro-lab/tactics",
+    "/api/shorts/submit",
+    "/api/auto-analyst/run-now",
+    "/api/partner-inquiries",
+    "/api/posts",
+}
+_RATE_LIMIT_BUCKETS: dict[str, deque[float]] = defaultdict(deque)
+_RATE_LIMIT_WINDOW_SEC = 60.0
+_RATE_LIMIT_MAX_REQ = 8
+
+
+@app.middleware("http")
+async def sportiq_security_and_ratelimit_middleware(request: Request, call_next):
+    if request.method == "POST" and request.url.path in _RATE_LIMIT_PATHS:
+        fwd = request.headers.get("x-forwarded-for", "")
+        client_ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "unknown")
+        now_ts = time.monotonic()
+        bucket = _RATE_LIMIT_BUCKETS[f"{client_ip}:{request.url.path}"]
+        while bucket and (now_ts - bucket[0]) > _RATE_LIMIT_WINDOW_SEC:
+            bucket.popleft()
+        if len(bucket) >= _RATE_LIMIT_MAX_REQ:
+            resp_429 = JSONResponse(
+                status_code=429,
+                content={"detail": "요청이 너무 빠릅니다. 잠시 후 다시 시도해 주세요."},
+            )
+            resp_429.headers["X-Content-Type-Options"] = "nosniff"
+            resp_429.headers["X-Frame-Options"] = "SAMEORIGIN"
+            resp_429.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+            resp_429.headers["X-XSS-Protection"] = "1; mode=block"
+            resp_429.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+            return resp_429
+        bucket.append(now_ts)
+
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
+
+
 @app.get("/health")
 def health():
     with engine.connect() as c: c.execute(text("SELECT 1"))
