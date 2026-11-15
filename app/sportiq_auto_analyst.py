@@ -883,6 +883,8 @@ def post_shorts_interact(req: ShortsInteractReq, request: Request):
         "like": "likes",
         "vote_a": "opt_a_votes",
         "vote_b": "opt_b_votes",
+        "opt_a": "opt_a_votes",
+        "opt_b": "opt_b_votes",
     }
     if action == "react":
         rkey = (req.reaction or "").strip().lower()
