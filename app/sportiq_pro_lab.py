@@ -665,7 +665,7 @@ def get_tactics() -> Dict[str, Any]:
 @router.post("/tactics")
 def create_tactic(payload: TacticCreateRequest) -> Dict[str, Any]:
     _init_pro_lab_db()
-    title = payload.title.strip()
+    title = payload.title.strip().replace("<", "").replace(">", "")
     if not title:
         raise HTTPException(status_code=400, detail="전술 제목을 입력해 주세요.")
 
@@ -683,8 +683,8 @@ def create_tactic(payload: TacticCreateRequest) -> Dict[str, Any]:
                 title,
                 payload.sport.strip(),
                 payload.formation.strip(),
-                (payload.author or "SportIQ_Member").strip(),
-                payload.memo.strip(),
+               (payload.author or "SportIQ_Member").strip().replace("<", "").replace(">", ""), 
+                payload.memo.strip).replace("<", "").replace(">", ""),
                 players_json,
                 created_at,
             ),
