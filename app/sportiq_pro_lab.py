@@ -372,7 +372,7 @@ def _build_match_model(
     }
 
 
-def live_ticker() -> List[Dict[str, Any]]:
+def _fetch_espn_scoreboard() -> List[Dict[str, Any]]:
     collected: List[Dict[str, Any]] = []
     for league_code, sport_code, url in ESPN_ENDPOINTS:
         try:
