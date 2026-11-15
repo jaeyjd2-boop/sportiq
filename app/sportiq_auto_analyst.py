@@ -884,7 +884,7 @@ def post_shorts_interact(req: ShortsInteractReq, request: Request):
         "vote_a": "opt_a_votes",
         "vote_b": "opt_b_votes",
         "opt_a": "opt_a_votes",
-        "opt_b": "opt_b_votes",
+        "opt_b": "opt_b_votes", "fire": "react_fire", "legend": "react_legend", "genius": "react_genius", "chills": "react_chills", "clap": "react_clap",
     }
     if action == "react":
         rkey = (req.reaction or "").strip().lower()
@@ -898,7 +898,7 @@ def post_shorts_interact(req: ShortsInteractReq, request: Request):
     actor = (req.actor_key or "").strip() or (request.client.host if request.client else "unknown")
     with _get_conn() as conn:
         _ensure_shorts_stat_row(conn, cid)
-        if action != "react":
+        if action in ("like", "vote_a", "vote_b", "opt_a", "opt_b"):
             action_group = "like" if action == "like" else "balance"
             existing = conn.execute("SELECT choice FROM shorts_user_actions WHERE clip_id = ? AND action_group = ? AND actor_key = ?", (cid, action_group, actor)).fetchone()
             if existing:
@@ -911,7 +911,7 @@ def post_shorts_interact(req: ShortsInteractReq, request: Request):
         )
         row = conn.execute("SELECT * FROM shorts_clip_stats WHERE clip_id = ?", (cid,)).fetchone()
         conn.commit()
-    _backup_tables_to_pg("shorts_clip_stats") if action == "react" else _backup_tables_to_pg("shorts_clip_stats", "shorts_user_actions")
+    _backup_tables_to_pg("shorts_clip_stats", "shorts_user_actions")
     return {"ok": True, "clip_id": cid, "stats": _format_stat_row(row)}
 
 
