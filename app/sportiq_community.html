@@ -2421,7 +2421,7 @@ async function sendShortsReaction(emoji) {
   const clip = getActiveShortClip();
   if (!clip) return;
   const actionMap = { '\u{1F525}': 'fire', '\u{26A1}': 'legend', '\u{1F9E0}': 'genius', '\u{1F631}': 'chills', '\u{1F44F}': 'clap', '🔥': 'fire', '⚡': 'legend', '🧠': 'genius', '😱': 'chills', '👏': 'clap' };
-  const action = actionMap[emoji] || 'fire';
+  const sVal = Array.from(arguments).map(v => String(v || '')).join(' ').toLowerCase(); const action = (sVal.includes('⚡') || sVal.includes('legend') || sVal.includes('bolt')) ? 'legend' : (sVal.includes('🧠') || sVal.includes('genius') || sVal.includes('brain')) ? 'genius' : (sVal.includes('😱') || sVal.includes('chills') || sVal.includes('shock')) ? 'chills' : (sVal.includes('👏') || sVal.includes('clap')) ? 'clap' : 'fire';
   shortsStatsMap[clip.clip_id] = shortsStatsMap[clip.clip_id] || { likes: 0, fire: 0, shock: 0, clap: 0, vote_a: 0, vote_b: 0 };
   try {
     const res = await fetch('/api/shorts/interact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clip_id: clip.clip_id, action: action, actor_key: getSportiqActorKey() }) });
