@@ -77,12 +77,12 @@
     </div>
   </header>
 <div id="proLiveTickerBar" class="border-b border-slate-800 bg-slate-950/90 backdrop-blur">
-  <div class="mx-auto max-w-7xl px-4 py-2 flex items-center gap-3">
+  <div class="mx-auto max-w-7xl px-4 py-2 flex flex-wrap items-center justify-between gap-2">
     <div class="flex items-center gap-2 shrink-0">
       <span class="inline-flex items-center gap-1 rounded-full bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 text-[11px] font-extrabold text-rose-300"><span class="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse"></span>LIVE</span>
-      <span class="text-xs font-bold text-slate-200 hidden sm:inline">실시간 스코어</span>
+      <span class="text-xs font-bold text-slate-200">실시간 스코어</span><span id="proLiveClockKst" class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-300 tabular-nums">🕒 --.--.-- (-) --:--:-- KST</span>
     </div>
-    <div id="proTickerList" class="flex-1 flex items-center gap-2 overflow-x-auto scrollbar-thin py-0.5">
+    <div id="proTickerList" class="order-3 w-full flex items-center gap-2 overflow-x-auto scrollbar-thin py-0.5 pt-1.5 border-t border-slate-800/70">
       <span class="text-xs text-slate-400">실시간 스코어를 불러오는 중...</span>
     </div>
     <div class="flex items-center gap-2 shrink-0 text-[11px] text-slate-400">
@@ -90,7 +90,7 @@
         <input id="proTickerAutoRefresh" type="checkbox" checked onchange="toggleProTickerAutoRefresh()" class="accent-emerald-500 rounded">
         <span>20초 자동갱신</span>
       </label>
-      <span id="proTickerUpdatedAt" class="text-slate-500 hidden md:inline">--:--</span>
+      <span id="proTickerUpdatedAt" class="rounded-md bg-slate-900 border border-slate-800 px-2 py-0.5 text-slate-300 tabular-nums">최근 갱신 --:--:--</span>
     </div>
   </div>
 </div>
@@ -3047,7 +3047,7 @@ setInterval(loadCheers, 10000);
   </div>
 </div>
 <script>
-var proTickerTimer = null;
+var proTickerTimer = null; var proLiveClockTimer = null; function updateProLiveClockKst() { var el = document.getElementById('proLiveClockKst'); if (!el) return; try { var now = new Date(); var parts = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(now); var map = {}; for (var i = 0; i < parts.length; i++) { map[parts[i].type] = parts[i].value; } var hh = map.hour === '24' ? '00' : map.hour; el.textContent = '🕒 ' + map.year + '.' + map.month + '.' + map.day + ' (' + map.weekday + ') ' + hh + ':' + map.minute + ':' + map.second + ' KST'; } catch (e) { el.textContent = '🕒 KST'; } }
 var proTickerItems = [];
 var proMatchInsightsList = [];
 var proFavMatches = JSON.parse(localStorage.getItem('sportiq_fav_matches') || '[]');
@@ -3075,17 +3075,17 @@ function loadProLiveTicker() {
   fetch('/api/pro-lab/live-ticker').then(function(r){ return r.json(); }).then(function(data) {
     proTickerItems = data.items || [];
     var upd = document.getElementById('proTickerUpdatedAt');
-    if (upd) upd.textContent = data.updated_at_kst || '방금';
+    if (upd) upd.textContent = '최근 갱신 ' + (data.updated_at_kst || '방금');
     var box = document.getElementById('proTickerList');
     if (!box) return;
     if (!proTickerItems.length) { box.innerHTML = '<span class="text-xs text-slate-400">진행 중인 경기가 없습니다.</span>'; return; }
     box.innerHTML = proTickerItems.map(function(it, idx) {
-      var liveTag = it.is_live ? '<span class="text-rose-400 font-extrabold">● ' + (it.status_text || 'LIVE') + '</span>' : '<span class="text-slate-400">' + (it.status_text || '예정') + '</span>';
-      var badge = it.value_badge ? '<span class="ml-1 rounded bg-emerald-500/20 px-1 py-0.5 text-[10px] text-emerald-300 font-bold">' + it.value_badge + '</span>' : '';
+      var rawStatus = String(it.status_text || (it.is_live ? 'LIVE' : '예정')); var cleanStatus = rawStatus; if (it.match_dt_kst && rawStatus.indexOf(it.match_dt_kst) !== -1) { cleanStatus = rawStatus.replace(it.match_dt_kst, '').replace(/KST/g, '').trim() || '예정'; } else if (!it.is_live && rawStatus.slice(-2) === '예정') { cleanStatus = '예정'; } else if (rawStatus.indexOf('종료') !== -1) { cleanStatus = '종료'; } var liveTag = it.is_live ? '<span class="inline-flex items-center gap-1 rounded bg-rose-500/20 border border-rose-500/40 px-1.5 py-0.5 text-[10px] text-rose-300 font-extrabold">• ' + escHtml(cleanStatus.indexOf('LIVE') === 0 ? cleanStatus : 'LIVE ' + cleanStatus) + '</span>' : '<span class="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 font-semibold">' + escHtml(cleanStatus) + '</span>'; var dtBadge = it.match_dt_kst ? '<div class="text-[10px] text-amber-300/95 font-semibold flex items-center gap-1"><span>📅 ' + escHtml(it.match_dt_kst) + '</span></div>' : '';
+      var badge = it.value_badge ? '<span class="ml-1 rounded bg-emerald-500/20 px-1 py-0.5 text-[10px] text-emerald-300 font-bold">' + escHtml(it.value_badge) + '</span>' : '';
       var h = Math.round(it.ai_home_pct || 40), d = Math.round(it.ai_draw_pct || 20), a = Math.max(0, 100 - h - d);
       return '<div onmouseenter="showProQuickStat(' + idx + ', event)" onmouseleave="hideProQuickStat()" onclick="showProQuickStat(' + idx + ', event)" class="shrink-0 cursor-pointer rounded-xl border border-slate-800 bg-slate-900/90 hover:border-emerald-500/50 px-2.5 py-1.5 min-w-[205px] space-y-1">' +
-        '<div class="flex items-center justify-between text-[10px]"><span class="text-cyan-300 font-bold">' + (it.league || '') + '</span>' + liveTag + '</div>' +
-        '<div class="flex items-center justify-between text-xs font-bold text-white"><span>' + it.home + ' <b class="text-emerald-400">' + (it.home_score != null ? it.home_score : '-') + '</b></span><span class="text-slate-500 mx-1">:</span><span><b class="text-rose-400">' + (it.away_score != null ? it.away_score : '-') + '</b> ' + it.away + '</span></div>' +
+        '<div class="flex items-center justify-between gap-2 text-[10px]"><span class="text-cyan-300 font-bold">' + escHtml(it.league || '') + '</span>' + liveTag + '</div>' + dtBadge +
+        '<div class="flex items-center justify-between text-xs font-bold text-white"><span>' + escHtml(it.home || '') + ' <b class="text-emerald-400">' + (it.home_score != null ? escHtml(String(it.home_score)) : '-') + '</b></span><span class="text-slate-500 mx-1">:</span><span><b class="text-rose-400">' + (it.away_score != null ? escHtml(String(it.away_score)) : '-') + '</b> ' + escHtml(it.away || '') + '</span></div>' +
         '<div class="h-1 w-full rounded-full overflow-hidden flex bg-slate-800"><div style="width:' + h + '%" class="bg-emerald-500"></div><div style="width:' + d + '%" class="bg-slate-500"></div><div style="width:' + a + '%" class="bg-rose-500"></div></div>' +
         '<div class="text-[10px] text-slate-400 flex justify-between"><span>AI ' + h + '/' + d + '/' + a + '%</span>' + badge + '</div></div>';
     }).join('');
@@ -3097,7 +3097,7 @@ function showProQuickStat(idx, ev) {
   var pop = document.getElementById('proQuickStatPopup');
   if (!it || !pop) return;
   var qs = it.quick_stats || {};
-  pop.innerHTML = '<div class="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-2"><span class="font-extrabold text-white">' + it.home + ' vs ' + it.away + '</span><button type="button" onclick="hideProQuickStat()" class="text-slate-400 hover:text-white">×</button></div>' +
+  pop.innerHTML = '<div class="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-1.5"><span class="font-extrabold text-white">' + escHtml(it.home || '') + ' vs ' + escHtml(it.away || '') + '</span><button type="button" onclick="hideProQuickStat()" class="text-slate-400 hover:text-white">✕</button></div><div class="mb-2 rounded-lg bg-slate-800/80 px-2 py-1 text-[11px] font-semibold text-amber-300">📅 경기 일시: ' + escHtml(it.match_dt_full_kst || it.match_dt_kst || '-') + '</div>' +
     '<div class="space-y-1 text-[11px]"><div><b class="text-emerald-300">최근 폼:</b> ' + (qs.recent_form || '데이터 집계 중') + '</div>' +
     '<div><b class="text-cyan-300">핵심 스탯:</b> ' + (qs.expected_metric || '-') + '</div>' +
     '<div><b class="text-amber-300">관전 요약:</b> ' + (qs.h2h_summary || '-') + '</div></div>';
@@ -3365,7 +3365,7 @@ function renderLabInjuryBoard(sport) {
 (function initProLabFeatures() {
   saveProFavMatches();
   loadProLiveTicker();
-  toggleProTickerAutoRefresh();
+  toggleProTickerAutoRefresh(); updateProLiveClockKst(); if (!proLiveClockTimer) proLiveClockTimer = setInterval(updateProLiveClockKst, 1000);
   loadProMatchInsights();
   if (typeof window.switchTab === 'function') {
     var _origSwitchTab = window.switchTab;
