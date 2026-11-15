@@ -893,7 +893,7 @@ def post_shorts_interact(req: ShortsInteractReq, request: Request):
         col = col_map[action]
     else:
         raise HTTPException(status_code=400, detail="invalid action")
-      actor = (req.actor_key or "").strip() or (request.client.host if request.client else "unknown")
+     actor = (req.actor_key or "").strip() or (request.client.host if request.client else "unknown")
     with _get_conn() as conn:
         _ensure_shorts_stat_row(conn, cid)
         if action != "react":
