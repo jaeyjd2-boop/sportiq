@@ -288,7 +288,7 @@ def create_partner_inquiry(payload: PartnerInquiryIn):
         try:
             from app.sportiq_auto_analyst import _backup_tables_to_pg
             _backup_tables_to_pg("partner_inquiries")
-    except Exception: pass
+        except Exception: pass
     return {"ok": True, "id": new_id, "message": "파트너 입점 및 제휴 문의가 정상 접수되었습니다."}
 
 
