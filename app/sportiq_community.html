@@ -1992,10 +1992,10 @@ async function reportCustomShort(clipId, event) {
     try {
       const res = await fetch('/api/shorts/interact', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clip_id: clip.clip_id, action: 'react', reaction: key })
+        body: JSON.stringify({ clip_id: clip.clip_id, action: key, actor_key: getSportiqActorKey() })
       });
       const data = await res.json();
-      if (data && data.ok && data.stats) {
+      if (res.ok && data && data.stats) {
         shortsStatsMap[clip.clip_id] = data.stats;
         renderShortsStatsUI();
       }
