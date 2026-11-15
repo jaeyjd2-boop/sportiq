@@ -2496,9 +2496,9 @@ function openYoutubeShortsSearch() {
   fetchShortsHub();
   requestAnimationFrame(drawShortsCanvasFrame);
 // );
-</script
+</script>
 <script>
-const ISSUE_DATA = [
+var ISSUE_DATA = [
   { id: 'iss-1', sport: 'soccer', sportLabel: '⚽ 축구', title: '안필드 빅매치: 리버풀 하이프레싱 우세 vs 맨유 포체티노 쓰리백 역습', optA: '리버풀 하이프레싱 압도', optB: '맨유 쓰리백 역습 적중', briefing: '리버풀의 90분 전방 압박 xThreat 지표와 맨유 스리백 전환 시 측면 뒷공간 침투 속도가 승부처입니다.', aVotes: 142, bVotes: 98 },
   { id: 'iss-2', sport: 'baseball', sportLabel: '⚾ 야구', title: '한일전 도쿄돔 결승: 선발 5이닝 승부 vs 필승조 불펜 총력전', optA: '선발 5이닝 정면 승부', optB: '필승조 조기 가동 총력전', briefing: '도쿄돔 타자 친화 구장 특성과 타순 2바퀴째 피안타율 급등 데이터를 고려한 투수 운용 전략 대결입니다.', aVotes: 118, bVotes: 164 },
   { id: 'iss-3', sport: 'soccer', sportLabel: '⚽ 축구', title: '유로 리턴매치: 스페인 야말 측면 크랙 vs 잉글랜드 중원 피지컬', optA: '스페인 야말 측면 파괴', optB: '잉글랜드 중원 피지컬 제압', briefing: '라민 야말의 우측 하프스페이스 1대1 돌파 성공률과 벨링엄·라이스의 중원 경합 승률 충돌이 핵심입니다.', aVotes: 155, bVotes: 121 },
@@ -2508,8 +2508,8 @@ const ISSUE_DATA = [
   { id: 'iss-7', sport: 'soccer', sportLabel: '⚽ 축구', title: '라리가 화력전: 바르셀로나 캄 노우 다득점 vs 비야레알 카운터', optA: '바르사 3골+ 다득점', optB: '비야레알 실리 카운터', briefing: '바르셀로나의 높은 수비라인 오프사이드 트랩과 비야레알의 뒷공간 직선 패스 타이밍이 흐름을 가릅니다.', aVotes: 168, bVotes: 77 },
   { id: 'iss-8', sport: 'nfl', sportLabel: '🏈 미식축구(NFL)', title: '뮌헨 글로벌 게임: 라이온스 러싱 어택 vs 패트리어츠 수비 플랜', optA: '라이온스 러싱 야드 장악', optB: '패트리어츠 수비 플랜 저지', briefing: '디트로이트의 더블 러닝백 러싱 공세와 뉴잉글랜드의 박스 8인 수비 시프트 대결입니다.', aVotes: 88, bVotes: 64 }
 ];
-let activeIssueSport = 'all';
-const openBriefingIds = new Set();
+var activeIssueSport = 'all';
+var openBriefingIds = new Set();
 function getVotedIssuesMap() {
   try { return JSON.parse(localStorage.getItem('sportiq_issue_voted') || '{}'); } catch (e) { return {}; }
 }
@@ -2605,7 +2605,7 @@ async function voteIssue(issueId, choice) {
     renderHotIssues();
   } catch (e) { showToast('네트워크 오류로 투표에 실패했습니다.'); }
 }
-const CHEER_BADGE_COLORS = {
+var CHEER_BADGE_COLORS = {
   '리버풀': 'bg-red-500/20 text-red-300 border-red-500/30',
   '맨유': 'bg-rose-500/20 text-rose-300 border-rose-500/30',
   '대한민국⚾': 'bg-blue-500/20 text-blue-300 border-blue-500/30',
@@ -2619,8 +2619,8 @@ const CHEER_BADGE_COLORS = {
   'KIA⚾': 'bg-pink-500/20 text-pink-300 border-pink-500/30',
   '전체응원🔥': 'bg-amber-500/20 text-amber-300 border-amber-500/30'
 };
-const reportedCheerIds = new Set();
-let cachedCheers = [];
+var reportedCheerIds = new Set();
+var cachedCheers = [];
 function renderCheersList() {
   const el = document.getElementById('cheersList');
   if (!el) return;
@@ -2703,8 +2703,8 @@ var PRO_ANALYSTS = [
   { rank: 9, name: '림프로텍터', sport: 'basketball', sportLabel: '🏀 농구', hitRate: '63.0%', roi: '+7.5%', streak: '2연승', form: ['W','W','L','L','W'], tactic: '페인트존 수비 효율 및 리바운드 세컨드찬스 분석', recentHits: ['덴버 승 (적중)', '미네소타 언더 (적중)'] },
   { rank: 10, name: '레드존스카우터', sport: 'soccer', sportLabel: '⚽ 축구', hitRate: '61.5%', roi: '+6.2%', streak: '1연승', form: ['W','L','L','W','W'], tactic: '유럽 대항전 원정 체력 변수 및 로테이션 추적', recentHits: ['도르트문트 +1.0 (적중)', '토트넘 BTTS (적중)'] }
 ];
-let activeAnalystSport = 'all';
-let activeRankingMode = 'pro';
+var activeAnalystSport = 'all';
+var activeRankingMode = 'pro';
 window.filterFollowedOnly = false;
 function getFollowedAnalysts() {
   try { return JSON.parse(localStorage.getItem('sportiq_followed_analysts') || '[]'); } catch (e) { return []; }
@@ -2835,7 +2835,7 @@ function saveMyNickname() {
   showToast(`닉네임이 '${val}'(으)로 반영되었습니다!`);
   syncMemberLeaderboard();
 }
-let _syncingLb = false;
+var _syncingLb = false;
 async function syncMemberLeaderboard() {
   if (_syncingLb) return;
   _syncingLb = true;
