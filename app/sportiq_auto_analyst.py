@@ -559,4 +559,252 @@ def vote_match_prediction(match_key: str, req: PredictionVoteRequest) -> Dict[st
 
 start_auto_analyst_scheduler()    
 
+# --- Shorts Hub API ---
+class ShortsInteractReq(BaseModel):
+    clip_id: str
+    action: str
+    reaction: Optional[str] = None
 
+
+class ShortsCommentReq(BaseModel):
+    clip_id: str
+    time_sec: int = 0
+    nickname: str = "SportIQ 팬"
+    comment: str
+
+
+class ShortsSubmitReq(BaseModel):
+    title: str
+    sport: str = "soccer"
+    youtube_url: str
+    point_note: str = ""
+    nickname: str = "회원 제보"
+
+
+SHORTS_DEFAULT_SEEDS = {
+    "clip_1": (128, 42, 31, 25, 19, 28, 64, 36),
+    "clip_2": (154, 58, 44, 19, 37, 33, 72, 28),
+    "clip_3": (96, 29, 22, 41, 15, 24, 58, 42),
+    "clip_4": (182, 74, 52, 28, 61, 45, 69, 31),
+    "clip_5": (119, 38, 29, 36, 33, 21, 53, 47),
+    "clip_6": (165, 63, 49, 27, 44, 39, 61, 39),
+    "clip_7": (108, 34, 26, 22, 18, 27, 55, 45),
+    "clip_8": (137, 49, 38, 19, 42, 31, 67, 33),
+}
+
+
+def init_shorts_hub_db():
+    with _get_conn() as conn:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS shorts_clip_stats (
+                clip_id TEXT PRIMARY KEY,
+                likes INTEGER NOT NULL DEFAULT 0,
+                react_fire INTEGER NOT NULL DEFAULT 0,
+                react_legend INTEGER NOT NULL DEFAULT 0,
+                react_genius INTEGER NOT NULL DEFAULT 0,
+                react_chills INTEGER NOT NULL DEFAULT 0,
+                react_clap INTEGER NOT NULL DEFAULT 0,
+                opt_a_votes INTEGER NOT NULL DEFAULT 0,
+                opt_b_votes INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS shorts_comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                clip_id TEXT NOT NULL,
+                time_sec INTEGER NOT NULL DEFAULT 0,
+                nickname TEXT NOT NULL,
+                comment TEXT NOT NULL,
+                created_at REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS shorts_custom_clips (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                clip_id TEXT UNIQUE NOT NULL,
+                title TEXT NOT NULL,
+                sport TEXT NOT NULL,
+                youtube_url TEXT NOT NULL,
+                point_note TEXT NOT NULL DEFAULT '',
+                nickname TEXT NOT NULL DEFAULT '회원 제보',
+                created_at REAL NOT NULL
+            );
+            """
+        )
+        now = time.time()
+        for cid, vals in SHORTS_DEFAULT_SEEDS.items():
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO shorts_clip_stats
+                (clip_id, likes, react_fire, react_legend, react_genius, react_chills, react_clap, opt_a_votes, opt_b_votes, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (cid, vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], vals[7], now),
+            )
+        cnt = conn.execute("SELECT COUNT(*) FROM shorts_comments").fetchone()[0]
+        if cnt == 0:
+            seed_comments = [
+                ("clip_1", 5, "안필드코프", "아놀드 전환 패스 각도 실화냐", now),
+                ("clip_1", 12, "전술덕후", "하프스페이스 3자 패스 타이밍 완벽!", now),
+                ("clip_4", 6, "도쿄돔직관", "156km 하이패스트볼 터널링 미쳤다", now),
+                ("clip_6", 8, "셀틱스팬", "스텝백 보폭이랑 릴리즈 속도 대박", now),
+                ("clip_8", 9, "오일러스97", "164km 원타이머 소리까지 들리네", now),
+            ]
+            conn.executemany(
+                "INSERT INTO shorts_comments (clip_id, time_sec, nickname, comment, created_at) VALUES (?, ?, ?, ?, ?)",
+                seed_comments,
+            )
+        conn.commit()
+      
+
+def _ensure_shorts_stat_row(conn: sqlite3.Connection, clip_id: str):
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO shorts_clip_stats
+        (clip_id, likes, react_fire, react_legend, react_genius, react_chills, react_clap, opt_a_votes, opt_b_votes, updated_at)
+        VALUES (?, 0, 0, 0, 0, 0, 0, 0, 0, ?)
+        """,
+        (clip_id, time.time()),
+    )
+
+
+def _format_stat_row(row: sqlite3.Row) -> Dict[str, Any]:
+    return {
+        "likes": int(row["likes"]),
+        "fire": int(row["react_fire"]),
+        "legend": int(row["react_legend"]),
+        "genius": int(row["react_genius"]),
+        "chills": int(row["react_chills"]),
+        "clap": int(row["react_clap"]),
+        "opt_a_votes": int(row["opt_a_votes"]),
+        "opt_b_votes": int(row["opt_b_votes"]),
+    }
+
+
+@router.get("/api/shorts/hub")
+def get_shorts_hub():
+    init_shorts_hub_db()
+    with _get_conn() as conn:
+        stat_rows = conn.execute("SELECT * FROM shorts_clip_stats").fetchall()
+        stats = {r["clip_id"]: _format_stat_row(r) for r in stat_rows}
+        comment_rows = conn.execute(
+            "SELECT id, clip_id, time_sec, nickname, comment, created_at FROM shorts_comments ORDER BY time_sec ASC, id ASC"
+        ).fetchall()
+        comments: Dict[str, List[Dict[str, Any]]] = {}
+        for r in comment_rows:
+            cid = r["clip_id"]
+            comments.setdefault(cid, []).append(
+                {
+                    "id": int(r["id"]),
+                    "clip_id": cid,
+                    "time_sec": int(r["time_sec"]),
+                    "nickname": r["nickname"],
+                    "comment": r["comment"],
+                    "created_at": r["created_at"],
+                }
+            )
+        clip_rows = conn.execute(
+            "SELECT id, clip_id, title, sport, youtube_url, point_note, nickname, created_at FROM shorts_custom_clips ORDER BY id DESC"
+        ).fetchall()
+        custom_clips = [dict(r) for r in clip_rows]
+    return {"ok": True, "stats": stats, "comments": comments, "custom_clips": custom_clips}
+
+
+@router.post("/api/shorts/interact")
+def post_shorts_interact(req: ShortsInteractReq):
+    init_shorts_hub_db()
+    cid = (req.clip_id or "").strip()
+    if not cid:
+        raise HTTPException(status_code=400, detail="clip_id required")
+    action = (req.action or "").strip().lower()
+    col_map = {
+        "like": "likes",
+        "vote_a": "opt_a_votes",
+        "vote_b": "opt_b_votes",
+    }
+    if action == "react":
+        rkey = (req.reaction or "").strip().lower()
+        if rkey not in ("fire", "legend", "genius", "chills", "clap"):
+            raise HTTPException(status_code=400, detail="invalid reaction")
+        col = f"react_{rkey}"
+    elif action in col_map:
+        col = col_map[action]
+    else:
+        raise HTTPException(status_code=400, detail="invalid action")
+    with _get_conn() as conn:
+        _ensure_shorts_stat_row(conn, cid)
+        conn.execute(
+            f"UPDATE shorts_clip_stats SET {col} = {col} + 1, updated_at = ? WHERE clip_id = ?",
+            (time.time(), cid),
+        )
+        row = conn.execute("SELECT * FROM shorts_clip_stats WHERE clip_id = ?", (cid,)).fetchone()
+        conn.commit()
+    return {"ok": True, "clip_id": cid, "stats": _format_stat_row(row)}
+
+
+@router.post("/api/shorts/comment")
+def post_shorts_comment(req: ShortsCommentReq):
+    init_shorts_hub_db()
+    cid = (req.clip_id or "").strip()
+    text = (req.comment or "").strip()
+    if not cid or not text:
+        raise HTTPException(status_code=400, detail="clip_id and comment required")
+    nick = (req.nickname or "SportIQ 팬").strip() or "SportIQ 팬"
+    tsec = max(0, int(req.time_sec or 0))
+    now = time.time()
+    with _get_conn() as conn:
+        _ensure_shorts_stat_row(conn, cid)
+        cur = conn.execute(
+            "INSERT INTO shorts_comments (clip_id, time_sec, nickname, comment, created_at) VALUES (?, ?, ?, ?, ?)",
+            (cid, tsec, nick[:24], text[:140], now),
+        )
+        conn.commit()
+        new_id = cur.lastrowid
+    return {
+        "ok": True,
+        "comment": {
+            "id": new_id,
+            "clip_id": cid,
+            "time_sec": tsec,
+            "nickname": nick[:24],
+            "comment": text[:140],
+            "created_at": now,
+        },
+    }
+
+
+@router.post("/api/shorts/submit")
+def post_shorts_submit(req: ShortsSubmitReq):
+    init_shorts_hub_db()
+    title = (req.title or "").strip()
+    yt = (req.youtube_url or "").strip()
+    if not title or not yt:
+        raise HTTPException(status_code=400, detail="title and youtube_url required")
+    sport = (req.sport or "soccer").strip().lower()
+    if sport not in ("soccer", "baseball", "basketball", "hockey"):
+        sport = "soccer"
+    note = (req.point_note or "").strip()
+    nick = (req.nickname or "회원 제보").strip() or "회원 제보"
+    now = time.time()
+    cid = f"custom_{int(now * 1000)}"
+    with _get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO shorts_custom_clips (clip_id, title, sport, youtube_url, point_note, nickname, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (cid, title[:80], sport, yt[:300], note[:160], nick[:24], now),
+        )
+        _ensure_shorts_stat_row(conn, cid)
+        conn.commit()
+    return {
+        "ok": True,
+        "clip": {
+            "clip_id": cid,
+            "title": title[:80],
+            "sport": sport,
+            "youtube_url": yt[:300],
+            "point_note": note[:160],
+            "nickname": nick[:24],
+            "created_at": now,
+        },
+    }
+    
