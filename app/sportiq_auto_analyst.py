@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
-
+from pydantic import BaseModel
 router = APIRouter(tags=["auto-analyst"])
 
 KST = timezone(timedelta(hours=9))
@@ -444,6 +444,119 @@ def like_auto_analyst_post(post_id: int) -> Dict[str, Any]:
         conn.commit()
     return {"id": post_id, "likes": new_likes}
 
+class PredictionVoteRequest(BaseModel):
+    choice: str
 
-start_auto_analyst_scheduler()
+def init_match_predictions_db() -> None:
+    with _get_conn() as conn:
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS match_predictions (
+            match_key TEXT PRIMARY KEY,
+            home_votes INTEGER NOT NULL DEFAULT 0,
+            draw_votes INTEGER NOT NULL DEFAULT 0,
+            away_votes INTEGER NOT NULL DEFAULT 0,
+            updated_at REAL NOT NULL DEFAULT 0
+        );
+        """)
+        conn.commit()
+
+
+def _ensure_prediction_row(conn: sqlite3.Connection, match_row: Dict[str, Any]) -> Dict[str, int]:
+    match_key = str(match_row["match_key"])
+    row = conn.execute(
+        "SELECT home_votes, draw_votes, away_votes FROM match_predictions WHERE match_key = ?",
+        (match_key,),
+    ).fetchone()
+    if not row:
+        base = max(40, int(match_row.get("votes") or 100) // 10)
+        sport = str(match_row.get("sport") or "")
+        if sport in ("야구", "농구", "하키"):
+            h = max(12, int(base * 0.46))
+            d = max(4, int(base * 0.12))
+            a = max(10, base - h - d)
+        else:
+            h = max(12, int(base * 0.42))
+            d = max(8, int(base * 0.22))
+            a = max(10, base - h - d)
+        conn.execute(
+            "INSERT OR IGNORE INTO match_predictions (match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
+            (match_key, h, d, a, time.time()),
+        )
+        row = conn.execute(
+            "SELECT home_votes, draw_votes, away_votes FROM match_predictions WHERE match_key = ?",
+            (match_key,),
+        ).fetchone()
+    h = int(row["home_votes"])
+    d = int(row["draw_votes"])
+    a = int(row["away_votes"])
+    return {"home_votes": h, "draw_votes": d, "away_votes": a, "total_votes": h + d + a}
+
+
+@router.get("/api/matches/predictions")
+def get_match_predictions() -> Dict[str, Any]:
+    init_match_predictions_db()
+    with _get_conn() as conn:
+        top_matches = _fetch_top_20_matches(conn)
+        items: List[Dict[str, Any]] = []
+        for idx, m in enumerate(top_matches, start=1):
+            pred = _ensure_prediction_row(conn, m)
+            items.append({
+                "rank": idx,
+                "match_key": m["match_key"],
+                "sport": m["sport"],
+                "league": m["league"],
+                "league_color": m["league_color"],
+                "matchup": m["matchup"],
+                "schedule_venue": m["schedule_venue"],
+                "votes": m["votes"],
+                "buzz_score": m["buzz_score"],
+                "rank_change": m["rank_change"],
+                "home_votes": pred["home_votes"],
+                "draw_votes": pred["draw_votes"],
+                "away_votes": pred["away_votes"],
+                "total_votes": pred["total_votes"],
+            })
+        conn.commit()
+    return {"ok": True, "count": len(items), "matches": items}
+
+
+@router.post("/api/matches/predictions/{match_key}/vote")
+def vote_match_prediction(match_key: str, req: PredictionVoteRequest) -> Dict[str, Any]:
+    choice = (req.choice or "").strip().lower()
+    if choice not in ("home", "draw", "away"):
+        raise HTTPException(status_code=400, detail="choice must be home, draw, or away")
+    init_match_predictions_db()
+    with _get_conn() as conn:
+        m_row = conn.execute(
+            "SELECT * FROM global_match_rankings WHERE match_key = ?",
+            (match_key,),
+        ).fetchone()
+        m_dict = dict(m_row) if m_row else {"match_key": match_key, "sport": "", "votes": 100}
+        _ensure_prediction_row(conn, m_dict)
+        col = f"{choice}_votes"
+        conn.execute(
+            f"UPDATE match_predictions SET {col} = {col} + 1, updated_at = ? WHERE match_key = ?",
+            (time.time(), match_key),
+        )
+        row = conn.execute(
+            "SELECT home_votes, draw_votes, away_votes FROM match_predictions WHERE match_key = ?",
+            (match_key,),
+        ).fetchone()
+        conn.commit()
+    h = int(row["home_votes"])
+    d = int(row["draw_votes"])
+    a = int(row["away_votes"])
+    return {
+        "ok": True,
+        "match_key": match_key,
+        "choice": choice,
+        "home_votes": h,
+        "draw_votes": d,
+        "away_votes": a,
+        "total_votes": h + d + a,
+    }
+
+
+start_auto_analyst_scheduler()    
+
 
