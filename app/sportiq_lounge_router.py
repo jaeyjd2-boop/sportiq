@@ -232,8 +232,24 @@ def register_hashtag(payload: HashtagIn):
         rows = conn.execute(
             "SELECT tag, count, updated_at FROM daily_hashtags ORDER BY count DESC, updated_at DESC LIMIT 24"
         ).fetchall()
-    return {"ok": True, "tag": tag, "hashtags": [dict(r) for r in rows]}
+    try:
+        from app.sportiq_auto_analyst import _backup_tables_to_pg
+        _backup_tables_to_pg("daily_hashtags")
+    except Exception:
+        pass
+        return {"ok": True, "tag": tag, "hashtags": [dict(r) for r in rows]}
 
+
+def _mask_contact(val: str) -> str:
+    s = (val or "").strip()
+    if not s:
+        return ""
+    if "@" in s:
+        local, domain = s.split("@", 1)
+        return f"{local[:2]}***@{domain}"
+    if len(s) <= 6:
+        return s[:2] + "****"
+    return f"{s[:3]}****{s[-3:]}"
 
 @router.get("/api/partner-inquiries")
 def list_partner_inquiries():
@@ -241,14 +257,21 @@ def list_partner_inquiries():
         rows = conn.execute(
             "SELECT id, company, contact_name, contact_info, tier, message, created_at FROM partner_inquiries ORDER BY id DESC LIMIT 50"
         ).fetchall()
-    return {"inquiries": [dict(r) for r in rows]}
-
+    items = []
+    for r in rows:
+        d = dict(r)
+        d["contact_info"] = _mask_contact(d.get("contact_info", ""))
+        items.append(d)
+    return {"inquiries": items}        
 
 @router.post("/api/partner-inquiries")
 def create_partner_inquiry(payload: PartnerInquiryIn):
+    _c = payload.contact_info.strip()
     if not payload.company.strip() or not payload.contact_name.strip() or not payload.contact_info.strip():
         raise HTTPException(status_code=400, detail="업체명, 담당자명, 연락처를 모두 입력해 주세요.")
-    now = time.time()
+    if not (("@" in _c and "." in _c.split("@", 1)[-1]) or sum(ch.isdigit() for ch in _c) >= 8):
+        raise HTTPException(status_code=400, detail="연락처는 유효한 이메일 또는 전화번호 형식으로 입력해 주세요.")
+        now = time.time()
     with _get_conn() as conn:
         cur = conn.execute(
             "INSERT INTO partner_inquiries(company, contact_name, contact_info, tier, message, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -262,6 +285,10 @@ def create_partner_inquiry(payload: PartnerInquiryIn):
             ),
         )
         new_id = cur.lastrowid
+        try:
+        from app.sportiq_auto_analyst import _backup_tables_to_pg
+        _backup_tables_to_pg("partner_inquiries")
+    except Exception: pass
     return {"ok": True, "id": new_id, "message": "파트너 입점 및 제휴 문의가 정상 접수되었습니다."}
 
 
@@ -347,5 +374,12 @@ def vote_global_match(match_id: int):
             raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
         rows = conn.execute("SELECT id, match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC").fetchall()
         items = [{"rank": i + 1, "id": r["id"], "match_key": r["match_key"], "sport": r["sport"], "league": r["league"], "league_color": r["league_color"], "matchup": r["matchup"], "schedule_venue": r["schedule_venue"], "votes": r["votes"], "buzz_score": r["buzz_score"], "rank_change": r["rank_change"]} for i, r in enumerate(rows)]
-        voted = next((m for m in items if m["id"] == match_id), None)
+
+    
+    voted = next((m for m in items if m["id"] == match_id), None)
+    try:
+    from app.sportiq_auto_analyst import _backup_tables_to_pg
+    _backup_tables_to_pg("global_match_rankings")
+    except Exception:
+        pass
     return {"ok": True, "match": voted, "matches": items}
