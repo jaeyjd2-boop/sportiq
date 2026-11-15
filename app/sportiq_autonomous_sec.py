@@ -660,11 +660,11 @@ def run_overseas_rss_collector() -> int:
 def _rotation_daemon_loop() -> None:
         time.sleep(2)
         while True:
-        try:
-            run_top20_auto_rotation_and_grading()
-        except Exception:
-            pass
-        time.sleep(1800)
+            try:
+                run_top20_auto_rotation_and_grading()
+            except Exception:
+                pass
+            time.sleep(1800)
 
 
 def _rss_daemon_loop() -> None:
