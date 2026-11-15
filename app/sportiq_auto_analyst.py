@@ -2,10 +2,16 @@ import os
 import sqlite3
 import threading
 import time
+import json
+import re
+try:
+    import psycopg2
+except Exception:
+    psycopg2 = None
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 router = APIRouter(tags=["auto-analyst"])
 
@@ -23,6 +29,142 @@ def _get_conn() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL;")
     return conn
+
+_PG_SNAPSHOT_TABLES = (
+    "shorts_clip_stats",
+    "shorts_comments",
+    "shorts_custom_clips",
+    "shorts_user_actions",
+    "global_match_rankings",
+    "match_predictions",
+)
+_PG_RESTORED_TABLES = set()
+_PG_PERSISTENT_OK = False
+
+
+def _get_pg_dsn() -> str:
+    raw = (os.environ.get("DATABASE_URL") or "").strip()
+    if not raw:
+        return ""
+    if raw.startswith("postgres://"):
+        raw = "postgresql://" + raw[len("postgres://"):]
+    elif raw.startswith("postgresql+psycopg2://"):
+        raw = "postgresql://" + raw[len("postgresql+psycopg2://"):]
+    return raw
+
+
+def _pg_connect():
+    dsn = _get_pg_dsn()
+    if not dsn or psycopg2 is None:
+        return None
+    return psycopg2.connect(dsn, connect_timeout=5)
+
+
+def _ensure_pg_snapshot_table(pg_conn) -> None:
+    with pg_conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sportiq_lounge_snapshots (
+                table_name TEXT PRIMARY KEY,
+                rows_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+    pg_conn.commit()
+
+
+def _backup_tables_to_pg(*table_names: str) -> None:
+    global _PG_PERSISTENT_OK
+    targets = [t for t in table_names if t in _PG_SNAPSHOT_TABLES]
+    if not targets:
+        targets = list(_PG_SNAPSHOT_TABLES)
+    try:
+        pg_conn = _pg_connect()
+        if pg_conn is None:
+            return
+        try:
+            _ensure_pg_snapshot_table(pg_conn)
+            now_iso = _now_kst().isoformat()
+            with _get_conn() as sconn:
+                for tname in targets:
+                    rows = sconn.execute(f"SELECT * FROM {tname}").fetchall()
+                    payload = json.dumps([dict(r) for r in rows], ensure_ascii=False)
+                    with pg_conn.cursor() as cur:
+                        cur.execute(
+                            """
+                            INSERT INTO sportiq_lounge_snapshots (table_name, rows_json, updated_at)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (table_name)
+                            DO UPDATE SET rows_json = EXCLUDED.rows_json, updated_at = EXCLUDED.updated_at
+                            """,
+                            (tname, payload, now_iso),
+                        )
+            pg_conn.commit()
+            _PG_PERSISTENT_OK = True
+        finally:
+            pg_conn.close()
+    except Exception:
+        pass
+
+
+def _restore_snapshots_from_pg() -> None:
+    global _PG_PERSISTENT_OK
+    try:
+        pg_conn = _pg_connect()
+        if pg_conn is None:
+            return
+        try:
+            _ensure_pg_snapshot_table(pg_conn)
+            _PG_PERSISTENT_OK = True
+            with _get_conn() as sconn:
+                existing_tables = {
+                    r[0]
+                    for r in sconn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    ).fetchall()
+                }
+                pending = [
+                    t for t in _PG_SNAPSHOT_TABLES
+                    if t in existing_tables and t not in _PG_RESTORED_TABLES
+                ]
+                if not pending:
+                    return
+                with pg_conn.cursor() as cur:
+                    cur.execute("SELECT table_name, rows_json FROM sportiq_lounge_snapshots")
+                    snap_rows = cur.fetchall()
+                snap_map = {tname: rows_json for tname, rows_json in snap_rows}
+                for tname in pending:
+                    _PG_RESTORED_TABLES.add(tname)
+                    rows_json = snap_map.get(tname)
+                    if not rows_json:
+                        continue
+                    try:
+                        items = json.loads(rows_json)
+                    except Exception:
+                        items = []
+                    if not isinstance(items, list) or not items:
+                        continue
+                    cols_info = sconn.execute(f"PRAGMA table_info({tname})").fetchall()
+                    valid_cols = [c[1] for c in cols_info]
+                    for item in items:
+                        if not isinstance(item, dict):
+                            continue
+                        cols = [c for c in valid_cols if c in item]
+                        if not cols:
+                            continue
+                        placeholders = ", ".join("?" for _ in cols)
+                        col_sql = ", ".join(cols)
+                        vals = [item[c] for c in cols]
+                        sconn.execute(
+                            f"INSERT OR REPLACE INTO {tname} ({col_sql}) VALUES ({placeholders})",
+                            vals,
+                        )
+                sconn.commit()
+        finally:
+            pg_conn.close()
+    except Exception:
+        pass
 
 
 def init_auto_analyst_db() -> None:
@@ -459,6 +601,7 @@ def init_match_predictions_db() -> None:
         );
         """)
         conn.commit()
+    _restore_snapshots_from_pg()
 
 
 def _ensure_prediction_row(conn: sqlite3.Connection, match_row: Dict[str, Any]) -> Dict[str, int]:
@@ -546,6 +689,7 @@ def vote_match_prediction(match_key: str, req: PredictionVoteRequest) -> Dict[st
     h = int(row["home_votes"])
     d = int(row["draw_votes"])
     a = int(row["away_votes"])
+    _backup_tables_to_pg("match_predictions")
     return {
         "ok": True,
         "match_key": match_key,
@@ -564,6 +708,7 @@ class ShortsInteractReq(BaseModel):
     clip_id: str
     action: str
     reaction: Optional[str] = None
+    actor_key: Optional[str] = None
 
 
 class ShortsCommentReq(BaseModel):
@@ -625,7 +770,17 @@ def init_shorts_hub_db():
                 youtube_url TEXT NOT NULL,
                 point_note TEXT NOT NULL DEFAULT '',
                 nickname TEXT NOT NULL DEFAULT '회원 제보',
-                created_at REAL NOT NULL
+                created_at REAL NOT NULL,
+                report_count INTEGER NOT NULL DEFAULT 0,
+                is_hidden INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS shorts_user_actions (
+                clip_id TEXT NOT NULL,
+                action_group TEXT NOT NULL,
+                actor_key TEXT NOT NULL,
+                choice TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY(clip_id, action_group, actor_key)
             );
             """
         )
@@ -652,7 +807,16 @@ def init_shorts_hub_db():
                 "INSERT INTO shorts_comments (clip_id, time_sec, nickname, comment, created_at) VALUES (?, ?, ?, ?, ?)",
                 seed_comments,
             )
+        for alter_sql in (
+            "ALTER TABLE shorts_custom_clips ADD COLUMN report_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE shorts_custom_clips ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0",
+        ):
+            try:
+                conn.execute(alter_sql)
+            except Exception:
+                pass
         conn.commit()
+    _restore_snapshots_from_pg()
       
 
 def _ensure_shorts_stat_row(conn: sqlite3.Connection, clip_id: str):
@@ -702,14 +866,14 @@ def get_shorts_hub():
                 }
             )
         clip_rows = conn.execute(
-            "SELECT id, clip_id, title, sport, youtube_url, point_note, nickname, created_at FROM shorts_custom_clips ORDER BY id DESC"
+            "SELECT id, clip_id, title, sport, youtube_url, point_note, nickname, created_at FROM shorts_custom_clips WHERE COALESCE(is_hidden, 0) = 0 ORDER BY id DESC"
         ).fetchall()
         custom_clips = [dict(r) for r in clip_rows]
-    return {"ok": True, "stats": stats, "comments": comments, "custom_clips": custom_clips}
+    return {"ok": True, "stats": stats, "comments": comments, "custom_clips": custom_clips}, "persistent_db": bool(_PG_PERSISTENT_OK)
 
 
 @router.post("/api/shorts/interact")
-def post_shorts_interact(req: ShortsInteractReq):
+def post_shorts_interact(req: ShortsInteractReq), request: Request:
     init_shorts_hub_db()
     cid = (req.clip_id or "").strip()
     if not cid:
@@ -729,14 +893,23 @@ def post_shorts_interact(req: ShortsInteractReq):
         col = col_map[action]
     else:
         raise HTTPException(status_code=400, detail="invalid action")
+      actor = (req.actor_key or "").strip() or (request.client.host if request.client else "unknown")
     with _get_conn() as conn:
         _ensure_shorts_stat_row(conn, cid)
-        conn.execute(
+        if action != "react":
+            action_group = "like" if action == "like" else "balance"
+            existing = conn.execute("SELECT choice FROM shorts_user_actions WHERE clip_id = ? AND action_group = ? AND actor_key = ?", (cid, action_group, actor)).fetchone()
+            if existing:
+                row = conn.execute("SELECT * FROM shorts_clip_stats WHERE clip_id = ?", (cid,)).fetchone()
+                return {"ok": True, "already_participated": True, "clip_id": cid, "stats": _format_stat_row(row)}
+                conn.execute("INSERT INTO shorts_user_actions (clip_id, action_group, actor_key, choice, created_at) VALUES (?, ?, ?, ?, ?)", (cid, action_group, actor, action, _now_kst().isoformat()))
+            conn.execute(
             f"UPDATE shorts_clip_stats SET {col} = {col} + 1, updated_at = ? WHERE clip_id = ?",
             (time.time(), cid),
         )
         row = conn.execute("SELECT * FROM shorts_clip_stats WHERE clip_id = ?", (cid,)).fetchone()
         conn.commit()
+    _backup_tables_to_pg("shorts_clip_stats") if action == "react" else _backup_tables_to_pg("shorts_clip_stats", "shorts_user_actions")
     return {"ok": True, "clip_id": cid, "stats": _format_stat_row(row)}
 
 
@@ -758,7 +931,8 @@ def post_shorts_comment(req: ShortsCommentReq):
         )
         conn.commit()
         new_id = cur.lastrowid
-    return {
+    _backup_tables_to_pg("shorts_comments")
+        return {
         "ok": True,
         "comment": {
             "id": new_id,
@@ -778,6 +952,10 @@ def post_shorts_submit(req: ShortsSubmitReq):
     yt = (req.youtube_url or "").strip()
     if not title or not yt:
         raise HTTPException(status_code=400, detail="title and youtube_url required")
+    m = re.search(r"(?:youtube\.com/(?:shorts/|watch\?(?:[^#&]*&)*v=|embed/)|youtu\.be/)([A-Za-z0-9_-]{11})", yt)
+    if not m:
+        raise HTTPException(status_code=400, detail="유효한 유튜브(youtube.com 또는 youtu.be) 링크만 등록할 수 있습니다.")
+    vid = m.group(1)
     sport = (req.sport or "soccer").strip().lower()
     if sport not in ("soccer", "baseball", "basketball", "hockey"):
         sport = "soccer"
@@ -795,6 +973,7 @@ def post_shorts_submit(req: ShortsSubmitReq):
         )
         _ensure_shorts_stat_row(conn, cid)
         conn.commit()
+    _backup_tables_to_pg("shorts_custom_clips", "shorts_clip_stats")
     return {
         "ok": True,
         "clip": {
@@ -805,6 +984,22 @@ def post_shorts_submit(req: ShortsSubmitReq):
             "point_note": note[:160],
             "nickname": nick[:24],
             "created_at": now,
+            "video_id": vid,
+            "thumbnail_url": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
         },
     }
+@router.post("/api/shorts/{clip_id}/report")
+def post_shorts_report(clip_id: str):
+    init_shorts_hub_db()
+    cid = (clip_id or "").strip()
+    if not cid:
+        raise HTTPException(status_code=400, detail="clip_id required")
+    with _get_conn() as conn:
+        cur = conn.execute("UPDATE shorts_custom_clips SET report_count = COALESCE(report_count, 0) + 1, is_hidden = 1 WHERE clip_id = ?", (cid,))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="clip not found")
+        row = conn.execute("SELECT clip_id, report_count, is_hidden FROM shorts_custom_clips WHERE clip_id = ?", (cid,)).fetchone()
+        conn.commit()
+    _backup_tables_to_pg("shorts_custom_clips")
+    return {"ok": True, "clip_id": cid, "report_count": row["report_count"], "is_hidden": row["is_hidden"]}
     
