@@ -1188,12 +1188,12 @@ setRole('GUEST');
 let currentMatchSportFilter = 'ALL';
 let matchCompareChartInstance = null;
 
-function getSportMetrics(sport) {
-  const s = String(sport || '');
-  if (s.includes('야구')) return ['팀 OPS', '선발 ERA 안정도', '불펜 방어력', '득점권 타율', '수비 효율'];
-  if (s.includes('농구')) return ['공격 레이팅', '수비 레이팅', '3점슛 성공률', '리바운드 장악', '클러치 효율'];
-  if (s.includes('하키')) return ['골 기대값(xG)', '파워플레이', '페널티 킬', '골리 세이브율', '유효슈팅'];
-  if (s.includes('미식축구') || s.includes('NFL')) return ['패싱 야드', '러싱 효율', '3rd 다운 성공', '턴오버 마진', '레드존 득점'];
+function detectMatchSport(item) { const s = String((item && item.sport) || item || '').toLowerCase(); const l = String((item && item.league) || '').toLowerCase(); if (s.includes('baseball') || s.includes('야구') || l.includes('야구') || l.includes('apbc') || l.includes('lidom') || l.includes('abl')) return '야구'; if (s.includes('nba') || s.includes('basketball') || s.includes('농구') || l.includes('nba') || l.includes('농구')) return '농구'; if (s.includes('hockey') || s.includes('nhl') || s.includes('하키') || l.includes('nhl') || l.includes('하키')) return '하키'; if (s.includes('nfl') || s.includes('미식축구') || l.includes('nfl') || l.includes('미식축구')) return '미식축구'; if (s.includes('football') || s.includes('soccer') || s.includes('축구') || l.includes('epl') || l.includes('챔피언스') || l.includes('네이션스') || l.includes('라리가') || l.includes('세리에')) return '축구'; return '축구'; } function getSportMetrics(item) {
+  const s = detectMatchSport(item);
+  if (s.includes('야구')) return ['선발 제구력', '불펜 안정감', '타선 장타력', '득점권 집중력', '수비 조직력'];
+  if (s.includes('농구')) return ['3점슛 효율', '페인트존 득점', '스위치 수비', '리바운드 우위', '클러치 결정력'];
+  if (s.includes('하키')) return ['파워플레이', '페널티킬', '포체킹 압박', '골텐딩 선방', '유효슈팅 우위'];
+  if (s.includes('미식축구') || s.includes('NFL')) return ['패싱 효율', '러싱 야드', '레드존 결정력', '패스 러시', '턴오버 관리'];
   return ['공격 화력(xG)', '수비 조직력', '중원 점유율', '전환 속도', '세트피스 위협'];
 }
 
@@ -1248,9 +1248,9 @@ function renderMatches() {
   const container = document.getElementById('matchesList');
   if (!container) return;
   const all = getActiveMatchList();
-  const filtered = currentMatchSportFilter === 'ALL'
+  const sportLabels = { 'ALL': '전체 TOP 20', '축구': '⚽ 축구', '야구': '⚾ 야구', '농구': '🏀 농구(NBA)', '하키': '🏒 하키(NHL)', '미식축구': '🏈 미식축구(NFL)' }; document.querySelectorAll('.match-sport-btn').forEach(btn => { const f = btn.getAttribute('data-sport-filter'); const cnt = f === 'ALL' ? all.length : all.filter(m => detectMatchSport(m) === f).length; btn.textContent = (sportLabels[f] || f) + ' (' + cnt + ')'; }); const filtered = currentMatchSportFilter === 'ALL'
     ? all
-    : all.filter(m => String(m.sport || '').includes(currentMatchSportFilter) || (currentMatchSportFilter === '미식축구' && String(m.league || '').includes('NFL')));
+    : all.filter(m => detectMatchSport(m) === currentMatchSportFilter);
   if (!filtered.length) {
     container.innerHTML = '<div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center text-sm text-slate-400">해당 종목의 글로벌 TOP 20 경기가 없습니다.</div>';
     return;
@@ -1389,7 +1389,7 @@ function openMatchCompareModal(matchKey) {
     matchCompareChartInstance = new Chart(canvas.getContext('2d'), {
       type: 'radar',
       data: {
-        labels: getSportMetrics(m.sport),
+        labels: getSportMetrics(m),
         datasets: [
           { label: homeTeam, data: getDeterministicStats(m.match_key, 1), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.2)', borderWidth: 2 },
           { label: awayTeam, data: getDeterministicStats(m.match_key, 2), borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,0.2)', borderWidth: 2 }
