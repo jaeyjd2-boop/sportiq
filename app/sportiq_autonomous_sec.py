@@ -541,7 +541,7 @@ def run_top20_auto_rotation_and_grading() -> Dict[str, Any]:
         }
 
     return {"removed": removed_count, "added": added_count, "recorded_pre": recorded_pre, "graded_final": graded_final}
-)
+
 
 CURATED_FALLBACK_NEWS: List[Dict[str, str]] = [
     {"guid": "fallback_epl_1", "title": "Manchester City midfield rotation update ahead of weekend Premier League clash", "link": "https://www.bbc.com/sport/football", "source": "BBC Sport", "sport": "soccer", "summary_tag": "[해외속보 · 전술/라인업]"},
