@@ -817,6 +817,9 @@ def init_shorts_hub_db():
                 pass
         conn.commit()
     _restore_snapshots_from_pg()
+    with _get_conn() as conn:
+        if not {"clip_id", "action_group", "actor_key", "choice"}.issubset({r[1] for r in conn.execute("PRAGMA table_info(shorts_user_actions)").fetchall()}):
+            conn.execute("DROP TABLE IF EXISTS shorts_user_actions"); conn.execute("CREATE TABLE shorts_user_actions (clip_id TEXT NOT NULL, action_group TEXT NOT NULL, actor_key TEXT NOT NULL, choice TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(clip_id, action_group, actor_key))"); conn.commit()
       
 
 def _ensure_shorts_stat_row(conn: sqlite3.Connection, clip_id: str):
