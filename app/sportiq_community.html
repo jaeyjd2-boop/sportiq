@@ -439,8 +439,8 @@
         <button type="button" onclick="submitCustomShort()" class="rounded-xl bg-emerald-500 px-4 py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-400">DB에 제보 등록</button>
       </div>
     </div>
-  </div>>
-      n>
+  </div>
+    
 
       <!-- TAB 4: ISSUES & LIVE CHEERS -->
       <section id="tab-cheers" class="tab-panel hidden space-y-4">
@@ -1909,7 +1909,7 @@ loadMatchPredictions();
     const comment = textEl.value.trim();
     if (!comment) { if (typeof showToast === 'function') showToast('한줄평 내용을 입력해 주세요.'); return; }
     const time_sec = Math.max(0, parseInt(tsEl?.value || '0', 10) || 0);
-    const nickname = (nickEl?.value || 'SportIQ 팬').trim() || 'SportIQ 팬';
+    const nickname = (nickEl?.value || 'SportIQ 팬').trim() || 'SportIQ 팬'; const localComment = { id: 'local_' + Date.now(), clip_id: clip.clip_id, time_sec, nickname, comment, created_at: new Date().toISOString() }; shortsCommentsMap[clip.clip_id] = shortsCommentsMap[clip.clip_id] || []; shortsCommentsMap[clip.clip_id].push(localComment); shortsCommentsMap[clip.clip_id].sort((a, b) => a.time_sec - b.time_sec); textEl.value = ''; renderShortsComments(); if (typeof showToast === 'function') showToast('⏱️ 타임스탬프 한줄평이 등록되었습니다!');
     try {
       const res = await fetch('/api/shorts/comment', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1918,11 +1918,11 @@ loadMatchPredictions();
       const data = await res.json();
       if (data && data.ok && data.comment) {
         shortsCommentsMap[clip.clip_id] = shortsCommentsMap[clip.clip_id] || [];
-        shortsCommentsMap[clip.clip_id].push(data.comment);
+        const idx = shortsCommentsMap[clip.clip_id].indexOf(localComment); if (idx !== -1) shortsCommentsMap[clip.clip_id][idx] = data.comment; else shortsCommentsMap[clip.clip_id].push(data.comment);
         shortsCommentsMap[clip.clip_id].sort((a, b) => a.time_sec - b.time_sec);
         textEl.value = '';
         renderShortsComments();
-        if (typeof showToast === 'function') showToast('⏱️ 타임스탬프 한줄평이 등록되었습니다!');
+
       }
     } catch (e) {}
   }
@@ -1948,13 +1948,13 @@ loadMatchPredictions();
       return;
     }
     try {
-      const res = await fetch('/api/shorts/submit', {
+      const localClip = { clip_id: 'local_' + Date.now(), title, sport, youtube_url, point_note, nickname, created_at: new Date().toISOString() }; shortsCustomClips.unshift(localClip); shortsStatsMap[localClip.clip_id] = { views: 1, likes: 0, bookmarks: 0 }; const tEl = document.getElementById('submitShortTitle'); if (tEl) tEl.value = ''; const uEl = document.getElementById('submitShortUrl'); if (uEl) uEl.value = ''; const nEl = document.getElementById('submitShortNote'); if (nEl) nEl.value = ''; closeShortsSubmitModal(); setShortsFilter('all'); selectShortClip(localClip.clip_id); if (typeof showToast === 'function') showToast('🎬 제보한 숏츠가 등록되었습니다!'); const res = await fetch('/api/shorts/submit', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, sport, youtube_url, point_note, nickname })
       });
       const data = await res.json();
       if (data && data.ok && data.clip) {
-        shortsCustomClips.unshift(data.clip);
+        const cIdx = shortsCustomClips.indexOf(localClip); if (cIdx !== -1) shortsCustomClips[cIdx] = data.clip; else shortsCustomClips.unshift(data.clip);
         shortsStatsMap[data.clip.clip_id] = { likes: 1, fire: 0, legend: 0, genius: 0, chills: 0, clap: 0, opt_a_votes: 0, opt_b_votes: 0 };
         closeShortsSubmitModal();
         document.getElementById('submitShortTitle').value = '';
