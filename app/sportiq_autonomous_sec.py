@@ -185,7 +185,7 @@ def _init_autonomous_db() -> None:
         conn.commit()
     finally:
         conn.close()
-router = APIRouter(prefix="/api/autonomous", tags=["sportiq-autonomous"]
+router = APIRouter(prefix="/api/autonomous", tags=["sportiq-autonomous"])
 
 
 def _is_past_kst_date(schedule_venue: str, now_kst: Optional[datetime] = None) -> bool:
