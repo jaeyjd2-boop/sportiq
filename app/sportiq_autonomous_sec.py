@@ -388,7 +388,8 @@ def run_top20_auto_rotation_and_grading() -> Dict[str, Any]:
                 existing_matchups.add(cand["matchup"])
                 current_count += 1
                 added_count += 1
-
+            conn.execute("DELETE FROM global_match_rankings WHERE match_key NOT IN (SELECT match_key FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC LIMIT 20)")
+    
         for g in pre_games:
             metrics = _stable_match_metrics(g["match_key"], g["sport"], 91)
             pick_side = g["home_team"] if metrics["ai_prob_pct"] >= 50.0 else g["away_team"]
@@ -657,7 +658,8 @@ def run_overseas_rss_collector() -> int:
 
 
 def _rotation_daemon_loop() -> None:
-    while True:
+        time.sleep(2)
+        while True:
         try:
             run_top20_auto_rotation_and_grading()
         except Exception:
@@ -910,6 +912,8 @@ def ask_sportiq_scoby(payload: AskAIRequest) -> Dict[str, Any]:
 @router.get("/status")
 def get_autonomous_status() -> Dict[str, Any]:
     _init_autonomous_db()
+    chk = _get_conn(); rows = chk.execute("SELECT schedule_venue FROM global_match_rankings").fetchall(); chk.close()
+    if len(rows) != 20 or any(_is_past_kst_date(r["schedule_venue"], _now_kst()) for r in rows): run_top20_auto_rotation_and_grading()
     analyst_last = None
     conn = _get_conn()
     try:
