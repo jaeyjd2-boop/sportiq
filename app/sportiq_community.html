@@ -1607,9 +1607,9 @@ function renderMatches() {
   const container = document.getElementById('matchesList');
   if (!container) return;
   const all = getActiveMatchList();
-  const sportLabels = { 'ALL': '전체 TOP 20', '축구': '⚽ 축구', '야구': '⚾ 야구', '농구': '🏀 농구(NBA)', '하키': '🏒 하키(NHL)', '미식축구': '🏈 미식축구(NFL)' }; document.querySelectorAll('.match-sport-btn').forEach(btn => { const f = btn.getAttribute('data-sport-filter'); const cnt = f === 'ALL' ? all.length : all.filter(m => detectMatchSport(m) === f).length; btn.textContent = (sportLabels[f] || f) + ' (' + cnt + ')'; }); const filtered = currentMatchSportFilter === 'ALL'
+  const sportLabels = { 'ALL': '전체 TOP 20', '축구': '⚽ 축구', '야구': '⚾ 야구', '농구': '🏀 농구(NBA)', '하키': '🏒 하키(NHL)', '미식축구': '🏈 미식축구(NFL)', 'FAV': '⭐ 마이매치' }; document.querySelectorAll('.match-sport-btn').forEach(btn => { const f = btn.getAttribute('data-sport-filter'); const cnt = f === 'ALL' ? all.length : f === 'FAV' ? (Array.isArray(window.proFavMatches) ? window.proFavMatches.length : 0) : all.filter(m => detectMatchSport(m) === f).length; btn.textContent = (sportLabels[f] || f) + ' (' + cnt + ')'; }); const filtered = currentMatchSportFilter === 'ALL'
     ? all
-    : all.filter(m => detectMatchSport(m) === currentMatchSportFilter);
+    : currentMatchSportFilter === 'FAV' ? all.filter((m, i) => Array.isArray(window.proFavMatches) && window.proFavMatches.includes(String(m.match_key || ('match_' + (m.rank || (i + 1)))))) : all.filter(m => detectMatchSport(m) === currentMatchSportFilter);
   if (!filtered.length) {
     container.innerHTML = '<div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center text-sm text-slate-400">해당 종목의 글로벌 TOP 20 경기가 없습니다.</div>';
     return;
@@ -1630,7 +1630,7 @@ function renderMatches() {
     const hp = Math.round((hv / total) * 100);
     const dp = Math.round((dv / total) * 100);
     const ap = Math.max(0, 100 - hp - dp);
-    const mk = String(m.match_key || ('match_' + rank)).replace(/'/g, "\\'");
+    const rawMk = String(m.match_key || ('match_' + rank)); const isFav = Array.isArray(window.proFavMatches) && window.proFavMatches.includes(rawMk); const insList = Array.isArray(window.proMatchInsightsList) ? window.proMatchInsightsList : []; const ins = insList.find(it => (it.match_key && it.match_key === rawMk) || (it.home && it.away && (matchup.includes(it.home) || homeTeam.includes(it.home) || it.home.includes(homeTeam)) && (matchup.includes(it.away) || awayTeam.includes(it.away) || it.away.includes(awayTeam)))); const aiHp = ins ? Number(ins.ai_home_pct || 0) : null; const mktHp = ins ? Number(ins.mkt_home_pct || 0) : null; const mktDiff = (aiHp !== null && mktHp !== null) ? Number((aiHp - mktHp).toFixed(1)) : 0; const fanDiff = (aiHp !== null) ? Number((aiHp - hp).toFixed(1)) : 0; const hasVal = ins && (ins.is_value || Math.abs(mktDiff) >= 4 || Math.abs(fanDiff) >= 6); const mk = rawMk.replace(/'/g, "\\'");
     return `
       <div class="glass-card rounded-2xl border border-slate-800 p-5 space-y-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -1643,9 +1643,9 @@ function renderMatches() {
             <h3 class="text-lg font-bold text-white">${matchup}</h3>
             <p class="text-xs text-slate-400">📅 ${m.schedule_venue || '일정 추후 공지'}</p>
           </div>
-          <button type="button" onclick="openMatchCompareModal('${mk}')" class="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-2 text-xs font-bold text-cyan-300 hover:bg-cyan-500/20">📊 Chart.js 지표 비교</button>
+          <button type="button" onclick="toggleFavMatch('${mk}')" title="마이매치 즐겨찾기" class="rounded-xl border ${isFav ? 'border-amber-400/60 bg-amber-500/20 text-amber-300' : 'border-slate-700 bg-slate-800/80 text-slate-300 hover:border-amber-400/50'} px-3 py-2 text-xs font-bold transition">${isFav ? '⭐' : '☆'}</button>${hasVal ? `<span class="rounded-full border border-cyan-400/40 bg-cyan-500/15 px-2.5 py-1 text-[11px] font-bold text-cyan-300">💎 AI 밸류 포착 (${mktDiff >= 0 ? '+' : ''}${mktDiff}%p)</span>` : ''}<button type="button" onclick="openMatchCompareModal('${mk}')" class="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-2 text-xs font-bold text-cyan-300 hover:bg-cyan-500/20">📊 Chart.js 지표 비교</button>
         </div>
-        <div class="space-y-2">
+        ${ins ? `<div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-2 text-xs"><div class="flex flex-wrap items-center justify-between gap-2"><span class="font-bold text-cyan-300">🤖 AI 모델 승률 vs 팬·시장 확률 비교</span><span class="text-[11px] text-slate-400">AI ${aiHp}% · 시장 ${mktHp}% · 팬 ${hp}%</span></div><div class="grid grid-cols-3 gap-2 text-[11px]"><div><div class="mb-1 text-cyan-300">AI ${aiHp}%</div><div class="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden"><div class="h-full bg-cyan-400" style="width:${Math.min(100, Math.max(0, aiHp))}%"></div></div></div><div><div class="mb-1 text-indigo-300">시장 ${mktHp}%</div><div class="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden"><div class="h-full bg-indigo-400" style="width:${Math.min(100, Math.max(0, mktHp))}%"></div></div></div><div><div class="mb-1 text-emerald-300">팬 ${hp}%</div><div class="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden"><div class="h-full bg-emerald-400" style="width:${Math.min(100, Math.max(0, hp))}%"></div></div></div></div>${(ins.injury_note || ins.risk_note) ? `<div class="border-t border-slate-800/80 pt-2 text-[11px] text-slate-300 space-y-0.5"><div class="font-semibold text-amber-300">🏥 결장 · 리스크 브리핑</div>${ins.injury_note ? `<div>• 결장: ${ins.injury_note}</div>` : ''}${ins.risk_note ? `<div>• 리스크: ${ins.risk_note}</div>` : ''}</div>` : ''}</div>` : ''}<div class="space-y-2">
           <div class="grid grid-cols-3 gap-2">
             <button type="button" onclick="voteMatchPrediction('${mk}','home')" class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/20">${homeTeam} 승 (${hp}%)</button>
             <button type="button" onclick="voteMatchPrediction('${mk}','draw')" class="rounded-xl border border-slate-600/50 bg-slate-800/80 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-700">${drawLabel} (${dp}%)</button>
@@ -3344,7 +3344,7 @@ function loadTacticFromGallery(idx) {
   if (!t) return;
   proTacticSport = t.sport || '축구';
   proTacticFormation = t.formation || '4-3-3';
-  proTacticPlayers = JSON.parse(JSON.stringify(t.players || []));
+  var rawP = JSON.parse(JSON.stringify(t.players || [])); var mx = 0, my = 0; rawP.forEach(function(p){ if (Number(p.x) > mx) mx = Number(p.x); if (Number(p.y) > my) my = Number(p.y); }); var cv = document.getElementById('tacticalBoardCanvas'); var cw = cv ? cv.width : 520, ch = cv ? cv.height : 360; if (rawP.length && mx <= 1.5 && my <= 1.5) { rawP = rawP.map(function(p){ return Object.assign({}, p, { x: Math.round(Number(p.x) * cw), y: Math.round(Number(p.y) * ch) }); }); } else if (rawP.length && mx <= 105 && my <= 105) { rawP = rawP.map(function(p){ return Object.assign({}, p, { x: Math.round((Number(p.x) / 100) * cw), y: Math.round((Number(p.y) / 100) * ch) }); }); } proTacticPlayers = rawP;
   document.getElementById('tacticTitleInput').value = t.title || '';
   document.getElementById('tacticMemoInput').value = t.memo || '';
   drawTacticBoard();
