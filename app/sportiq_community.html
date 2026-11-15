@@ -180,7 +180,7 @@
             <select id="sortFilter" onchange="renderFeed()" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200">
               <option value="popular">인기순</option>
               <option value="trust">신뢰도순</option>
-              <option value="latest">최신순</option>
+              <option value="latest" selected>최신순</option>
             </select>
           </div>
           <div class="flex flex-1 min-w-[200px] items-center gap-2">
@@ -557,7 +557,7 @@
       }
       if (sort === 'popular') items.sort((a, b) => b.likes - a.likes);
       if (sort === 'trust') items.sort((a, b) => b.trust - a.trust);
-      if (sort === 'latest') items.sort((a, b) => a.time - b.time);
+      if (sort === 'latest') items.sort((a, b) => (b.isAutoAnalyst ? 1 : 0) - (a.isAutoAnalyst ? 1 : 0) || a.time - b.time);
 
       const box = document.getElementById('feedList');
       if (!items.length) {
@@ -585,7 +585,7 @@
           <div class="flex items-center gap-3 pt-2 border-t border-slate-800/80 text-xs">
             <button onclick="toggleLike('${p.id}')" class="rounded-lg px-2.5 py-1 ${p.liked ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'bg-slate-800 text-slate-300'}">♥ 좋아요 ${p.likes}</button>
             <button onclick="toggleBookmark('${p.id}')" class="rounded-lg px-2.5 py-1 ${p.bookmarked ? 'bg-amber-500/20 text-amber-300 font-bold' : 'bg-slate-800 text-slate-300'}">★ ${p.bookmarked ? '저장됨' : '북마크'}</button>
-            <button onclick="openComments('${p.id}')" class="rounded-lg bg-slate-800 px-2.5 py-1 text-slate-300 hover:text-white">💬 댓글 ${p.comments.length}</button>
+            <button onclick="openComments('${p.id}')" class="rounded-lg bg-slate-800 px-2.5 py-1 text-slate-300 hover:text-white">💬 댓글 ${(p.comments ? p.comments.length : 0)}</button>
           </div>
         </article>
       `).join('');
@@ -643,7 +643,7 @@
 
     function renderCommentModalList(p) {
       const list = document.getElementById('commentModalList');
-      list.innerHTML = p.comments.length
+      list.innerHTML = (p.comments ? p.comments.length : 0)
         ? p.comments.map(c => `<div class="rounded-lg bg-slate-950 p-2.5 text-xs"><strong class="text-emerald-400">${c.user}</strong><p class="mt-0.5 text-slate-300">${c.text}</p></div>`).join('')
         : '<p class="text-xs text-slate-500">첫 댓글을 남겨보세요.</p>';
     }
@@ -994,7 +994,7 @@ function mergeAutoAnalystPosts(data) {
     tags: (item.hashtags || '').split(/\s+/).filter(Boolean),
     likes: item.likes || 0,
     liked: false,
-    comments: 0,
+    comments: Array.isArray(item.comments) ? item.comments : [],
     hidden: false
   }));
   state.posts = [...mapped, ...state.posts.filter(p => !p.isAutoAnalyst)];
