@@ -684,7 +684,7 @@ def create_tactic(payload: TacticCreateRequest) -> Dict[str, Any]:
                 payload.sport.strip(),
                 payload.formation.strip(),
                (payload.author or "SportIQ_Member").strip().replace("<", "").replace(">", ""), 
-                payload.memo.strip).replace("<", "").replace(">", ""),
+                payload.memo.strip().replace("<", "").replace(">", ""),
                 players_json,
                 created_at,
             ),
