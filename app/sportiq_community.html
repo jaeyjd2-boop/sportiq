@@ -580,11 +580,11 @@
             <span class="text-xs font-bold text-emerald-400">무료 승부예측 1클릭 챌린지</span>
             <span class="text-[11px] text-slate-400">보상 +20P</span>
           </div>
-          <p id="quickChallengeTitle" class="text-xs text-slate-300 mb-2.5">아스널 vs 첼시 예상 승자는?</p>
+          <p id="quickChallengeTitle" class="text-xs text-slate-300 mb-2.5">리버풀 vs 맨체스터 유나이티드 예상 승자는?</p>
           <p id="quickChallengeStatus" class="hidden text-[11px] font-bold text-emerald-300 mb-2"></p><div id="quickChallengeCard" class="grid grid-cols-3 gap-2">
-            <button id="quickChallengeHomeBtn" onclick="quickChallenge(this.dataset.pick || '홈승')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">아스널</button>
+            <button id="quickChallengeHomeBtn" onclick="quickChallenge(this.dataset.pick || '홈승')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">리버풀</button>
             <button id="quickChallengeDrawBtn" onclick="quickChallenge('무승부')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">무승부</button>
-            <button id="quickChallengeAwayBtn" onclick="quickChallenge(this.dataset.pick || '원정승')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">첼시</button>
+            <button id="quickChallengeAwayBtn" onclick="quickChallenge(this.dataset.pick || '원정승')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">맨유</button>
           </div>
         </div>
       </div>
@@ -1408,8 +1408,8 @@ setRole(state.role); lockQuickChallengeUI();
       const data = await res.json();
       globalMatchesData = data.matches || [];
       renderGlobalTop10();
-      function lockQrenderSidebarGlobalTop5(); if (globalMatchesData && globalMatchesData.length) { const m = globalMatchesData[0]; const t = document.getElementById('quickChallengeTitle'); if (t) t.textContent = `${m.matchup} 예상 승자는?`; const parts = (m.matchup || '').split(/\s+vs\s+/i); const hb = document.getElementById('quickChallengeHomeBtn'); const ab = document.getElementById('quickChallengeAwayBtn'); if (parts.length === 2) { if (hb) { hb.textContent = `${parts[0]} 승`; hb.dataset.pick = `${parts[0]} 승`; } if (ab) { ab.textContent = `${parts[1]} 승`; ab.dataset.pick = `${parts[1]} 승`; } } }uickChallengeUI() { const today = new Date().toISOString().slice(0, 10); if (localStorage.getItem('sportiq_challenge_date') === today) { const st = document.getElementById('quickChallengeStatus'); if (st) { st.classList.remove('hidden'); st.textContent = '✅ 오늘 챌린지 완료 (+20P 지급됨)'; } ['quickChallengeHomeBtn','quickChallengeDrawBtn','quickChallengeAwayBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.classList.add('opacity-60'); }); } } function quickChallenge(pick) { const today = new Date().toISOString().slice(0, 10); if (localStorage.getItem('sportiq_challenge_date') === today) { showToast('오늘의 승부예측 챌린지는 이미 참여 완료했습니다!'); return; } localStorage.setItem('sportiq_challenge_date', today); localStorage.setItem('sportiq_challenge_pick', pick); lockQuickChallengeUI();
-    } catch (e) {}
+      renderSidebarGlobalTop5(); if (globalMatchesData && globalMatchesData.length) { const top = globalMatchesData[0]; const topTitle = top.matchup || top.match_title || ''; const t = document.getElementById('quickChallengeTitle'); if (t && topTitle) t.textContent = `${topTitle} 예상 승자는?`; const parts = topTitle.split(/\s+vs\s+/i); const hb = document.getElementById('quickChallengeHomeBtn'); const ab = document.getElementById('quickChallengeAwayBtn'); if (parts.length === 2) { if (hb) { hb.textContent = `${parts[0]} 승`; hb.dataset.pick = `${parts[0]} 승`; } if (ab) { ab.textContent = `${parts[1]} 승`; ab.dataset.pick = `${parts[1]} 승`; } } } } catch (e) {} } function lockQuickChallengeUI() { const today = new Date().toISOString().slice(0, 10); if (localStorage.getItem('sportiq_challenge_date') === today) { const st = document.getElementById('quickChallengeStatus'); if (st) { st.classList.remove('hidden'); st.textContent = '✅ 오늘 챌린지 완료 (+20P 지급됨)'; } ['quickChallengeHomeBtn','quickChallengeDrawBtn','quickChallengeAwayBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.classList.add('opacity-60'); }); } } function quickChallenge(pick) { const today = new Date().toISOString().slice(0, 10); if (localStorage.getItem('sportiq_challenge_date') === today) { showToast('오늘의 승부예측 챌린지는 이미 참여 완료했습니다!'); return; } localStorage.setItem('sportiq_challenge_date', today); localStorage.setItem('sportiq_challenge_pick', pick); lockQuickChallengeUI();
+    
   }
 
   async function voteGlobalMatch(matchId) {
