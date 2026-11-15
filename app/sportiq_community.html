@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SportIQ 오픈 스포츠 인사이트 라운지</title>
+  <meta name="description" content="실시간 스포츠 데이터 분석, 승부 투표, 9:16 전술 숏츠, 응원톡을 한곳에서 즐기는 SportIQ 오픈 스포츠 인사이트 라운지입니다." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="SportIQ 오픈 스포츠 인사이트 라운지" />
+  <meta property="og:description" content="누구나 열람 가능한 PRO 데이터 분석 피드, 실시간 승부 투표 및 Chart.js 지표 비교, 24시간 트렌드 해시태그 라운지" />
+  <meta property="og:url" content="https://billnojay.com/" />
+  <link rel="canonical" href="https://billnojay.com/" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Pretendard', 'Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body { font-family: 'Pretendard', 'Inter', system-ui, sans-serif; }
+    .glass-card { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.7); }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased">
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 hidden items-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 shadow-2xl transition-all"></div>
+
+  <!-- Top Header -->
+  <header class="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
+    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div class="flex items-center gap-3">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 font-extrabold text-slate-950 shadow-lg shadow-emerald-500/20">IQ</div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-lg font-extrabold tracking-tight text-white">SportIQ</span>
+            <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-400 border border-emerald-500/30">OPEN LOUNGE</span>
+          </div>
+          <p class="text-xs text-slate-400">billnojay.com 오픈 스포츠 인사이트</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs">
+          <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400"></span>
+          <span class="text-slate-300">접속 <strong id="activeCount" class="text-emerald-400">1</strong>명</span>
+          <span class="text-slate-600">|</span>
+          <span class="text-slate-300">오늘 <strong id="todayCount" class="text-white">1</strong>명</span>
+        </div>
+
+        <div class="flex rounded-lg border border-slate-800 bg-slate-900 p-0.5 text-xs" id="roleSwitcher">
+          <button onclick="setRole('GUEST')" data-role="GUEST" class="role-btn rounded-md px-2.5 py-1 font-semibold transition">오픈 게스트</button>
+          <button onclick="setRole('MEMBER')" data-role="MEMBER" class="role-btn rounded-md px-2.5 py-1 font-semibold transition">정회원 MEMBER</button>
+          <button onclick="setRole('PRO')" data-role="PRO" class="role-btn rounded-md px-2.5 py-1 font-semibold transition">PRO 분석가</button>
+        </div>
+
+        <button onclick="copyInviteLink()" class="rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:border-emerald-500/60 hover:text-emerald-300 transition">
+          초대 링크 복사
+        </button>
+        <button onclick="openModal('writeModal')" class="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-xs font-bold text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20">
+          + 분석 작성
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Banner -->
+  <section class="border-b border-slate-800/70 bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/40">
+    <div class="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-4 py-6 md:flex-row md:items-center">
+      <div>
+        <div class="mb-1.5 inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400 border border-emerald-500/20">
+          실시간 SQLite-WAL 영구 저장 · 모든 PRO 분석 오픈 열람
+        </div>
+        <h1 class="text-2xl font-extrabold tracking-tight text-white md:text-3xl">SportIQ 오픈 스포츠 인사이트 라운지</h1>
+        <p class="mt-1 text-sm text-slate-300">오픈 게스트도 제한 없이 모든 PRO 분석글과 전술 지표 비교, 실시간 응원톡을 바로 이용할 수 있습니다.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-2.5 text-center">
+          <div class="text-[11px] text-slate-400">현재 내 권한</div>
+          <div id="currentRoleBadge" class="text-sm font-bold text-emerald-400">오픈 게스트</div>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-2.5 text-center">
+          <div class="text-[11px] text-slate-400">보유 포인트</div>
+          <div id="pointsBadge" class="text-sm font-bold text-amber-400">120 P</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Tabs -->
+  <nav class="border-b border-slate-800 bg-slate-950/70">
+    <div class="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-2.5 scrollbar-thin">
+      <button onclick="switchTab('feed')" data-tab="feed" class="tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition">실시간 분석 피드</button>
+      <button onclick="switchTab('matches')" data-tab="matches" class="tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition">경기 일정 및 승부 투표</button>
+      <button onclick="switchTab('shorts')" data-tab="shorts" class="tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition">9:16 전술 하이라이트 숏츠</button>
+      <button onclick="switchTab('cheers')" data-tab="cheers" class="tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition">스포츠 이슈 & 응원톡</button>
+      <button onclick="switchTab('ranking')" data-tab="ranking" class="tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition">분석가 랭킹</button>
+    </div>
+  </nav>
+
+  <!-- Main Content + Sidebar -->
+  <main class="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-12">
+    <div class="lg:col-span-8 space-y-5">
+      <!-- TAB 1: FEED -->
+      <section id="tab-feed" class="tab-panel space-y-4">
+        <div class="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <select id="leagueFilter" onchange="renderFeed()" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200">
+              <option value="ALL">전체 리그/게시판</option>
+              <option value="EPL">EPL / 해외축구</option>
+              <option value="KBO">KBO / 프로야구</option>
+              <option value="NBA">NBA / 농구</option>
+              <option value="ESPORTS">LCK / e스포츠</option>
+            </select>
+            <select id="sortFilter" onchange="renderFeed()" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200">
+              <option value="popular">인기순</option>
+              <option value="trust">신뢰도순</option>
+              <option value="latest">최신순</option>
+            </select>
+          </div>
+          <div class="flex flex-1 min-w-[200px] items-center gap-2">
+            <input id="feedSearch" oninput="renderFeed()" type="text" placeholder="제목, 팀, #해시태그 검색..." class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none" />
+            <button onclick="clearSearch()" class="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-400 hover:text-white">초기화</button>
+          </div>
+        </div>
+        <div id="feedList" class="space-y-4"></div>
+      </section>
+
+      <!-- TAB 2: MATCHES & POLLS -->
+      <section id="tab-matches" class="tab-panel hidden space-y-4">
+        <div id="matchesList" class="space-y-4"></div>
+      </section>
+
+      <!-- TAB 3: SHORTS -->
+      <section id="tab-shorts" class="tab-panel hidden">
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-12">
+          <div class="md:col-span-5 flex justify-center">
+            <div class="relative aspect-[9/16] w-full max-w-[300px] overflow-hidden rounded-3xl border-2 border-emerald-500/40 bg-gradient-to-b from-slate-900 via-emerald-950/50 to-slate-950 p-5 flex flex-col justify-between shadow-2xl">
+              <div class="flex items-center justify-between">
+                <span class="rounded-full bg-emerald-500 px-2.5 py-0.5 text-[11px] font-bold text-slate-950">9:16 TACTICAL</span>
+                <span id="shortTimeBadge" class="rounded-full bg-slate-900/80 px-2.5 py-0.5 text-xs font-mono text-emerald-300">00:42</span>
+              </div>
+              <div class="space-y-3 text-center my-auto">
+                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-400/40 text-2xl">▶</div>
+                <h3 id="shortTitle" class="text-lg font-extrabold text-white">하프스페이스 3자 패스 패턴 분석</h3>
+                <p id="shortDesc" class="text-xs text-slate-300 leading-relaxed">측면 풀백 오버래핑 시 중앙 미드필더의 2선 침투 타이밍과 xG 상승 구간을 45초로 요약합니다.</p>
+                <div class="flex justify-center gap-2 pt-2">
+                  <button onclick="selectShort(0)" class="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-semibold hover:bg-emerald-500 hover:text-slate-950">클립 #1</button>
+                  <button onclick="selectShort(1)" class="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-semibold hover:bg-emerald-500 hover:text-slate-950">클립 #2</button>
+                  <button onclick="selectShort(2)" class="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-semibold hover:bg-emerald-500 hover:text-slate-950">클립 #3</button>
+                </div>
+              </div>
+              <div class="rounded-xl bg-slate-900/80 p-2.5 text-[11px] text-slate-300 border border-slate-800">
+                타임스탬프 클릭 시 해당 구간 피드백이 바로 입력됩니다.
+              </div>
+            </div>
+          </div>
+          <div class="md:col-span-7 glass-card rounded-2xl p-5 flex flex-col justify-between space-y-4">
+            <div>
+              <h3 class="text-base font-bold text-white">타임스탬프 전술 피드백</h3>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button onclick="setShortTimestamp('00:12')" class="rounded-md bg-slate-800 px-2.5 py-1 text-xs font-mono text-emerald-400 hover:bg-slate-700">00:12 압박 트리거</button>
+                <button onclick="setShortTimestamp('00:28')" class="rounded-md bg-slate-800 px-2.5 py-1 text-xs font-mono text-emerald-400 hover:bg-slate-700">00:28 하프스페이스</button>
+                <button onclick="setShortTimestamp('00:42')" class="rounded-md bg-slate-800 px-2.5 py-1 text-xs font-mono text-emerald-400 hover:bg-slate-700">00:42 결정적 슈팅</button>
+              </div>
+              <div id="shortFeedbackList" class="mt-4 space-y-2.5 max-h-72 overflow-y-auto scrollbar-thin"></div>
+            </div>
+            <div class="flex gap-2">
+              <input id="shortTsInput" type="text" value="00:42" class="w-20 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs font-mono text-emerald-400 text-center" />
+              <input id="shortCommentInput" type="text" placeholder="전술 구간 피드백을 남기세요..." class="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white" />
+              <button onclick="addShortFeedback()" class="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-400">등록</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: ISSUES & LIVE CHEERS -->
+      <section id="tab-cheers" class="tab-panel hidden space-y-4">
+        <div class="glass-card rounded-2xl p-5 space-y-3">
+          <h3 class="text-base font-bold text-white">오늘의 스포츠 핫이슈</h3>
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5">
+              <span class="text-[11px] font-bold text-emerald-400">EPL 브리핑</span>
+              <p class="mt-1 text-sm font-semibold text-white">주말 빅매치 앞두고 핵심 윙어 라인업 복귀 임박</p>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5">
+              <span class="text-[11px] font-bold text-amber-400">KBO 브리핑</span>
+              <p class="mt-1 text-sm font-semibold text-white">상위권 3팀 불펜 ERA 2점대 접전, 주말 시리즈 분수령</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-bold text-white">실시간 응원톡 (SQLite 영구 저장)</h3>
+              <p class="text-xs text-slate-400">건전한 응원 문화를 위해 5초 도배 방지 쿨다운이 적용됩니다.</p>
+            </div>
+            <button onclick="loadCheers()" class="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:text-white">새로고침</button>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <input id="cheerAuthor" type="text" placeholder="닉네임" value="스포츠팬" class="w-28 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white" />
+            <select id="cheerTeam" class="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs text-slate-200">
+              <option value="토트넘">토트넘</option>
+              <option value="KIA">KIA</option>
+              <option value="NBA">NBA</option>
+              <option value="T1">T1</option>
+              <option value="ALL">전체응원</option>
+            </select>
+            <input id="cheerMessage" type="text" placeholder="응원 메시지를 입력하세요 (5초 도배 방지)..." class="flex-1 min-w-[200px] rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white" onkeydown="if(event.key==='Enter') submitCheer()" />
+            <button onclick="submitCheer()" class="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-400">전송</button>
+          </div>
+          <div id="cheersList" class="space-y-2 max-h-96 overflow-y-auto scrollbar-thin"></div>
+        </div>
+      </section>
+
+      <!-- TAB 5: ANALYST RANKING -->
+      <section id="tab-ranking" class="tab-panel hidden space-y-4">
+        <div id="rankingList" class="space-y-3"></div>
+      </section>
+    </div>
+
+    <!-- Right Sidebar -->
+    <aside class="lg:col-span-4 space-y-5">
+      <!-- Attendance & 1-click Challenge -->
+      <div class="glass-card rounded-2xl p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-white">오늘의 출석 체크</h3>
+            <p class="text-xs text-slate-400">매일 출석 시 +10P 적립</p>
+          </div>
+          <span class="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-bold text-amber-400">연속 <span id="streakDays">3</span>일째</span>
+        </div>
+        <button id="attendanceBtn" onclick="checkAttendance()" class="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-slate-950 hover:bg-emerald-400 transition">
+          출석 체크하고 +10P 받기
+        </button>
+
+        <div class="border-t border-slate-800 pt-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-emerald-400">무료 승부예측 1클릭 챌린지</span>
+            <span class="text-[11px] text-slate-400">보상 +20P</span>
+          </div>
+          <p class="text-xs text-slate-300 mb-2.5">아스널 vs 첼시 예상 승자는?</p>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="quickChallenge('아스널 승')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">아스널</button>
+            <button onclick="quickChallenge('무승부')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">무승부</button>
+            <button onclick="quickChallenge('첼시 승')" class="rounded-lg border border-slate-700 bg-slate-900 py-2 text-xs font-semibold hover:border-emerald-500 hover:text-emerald-300">첼시</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1-Second Free MEMBER Conversion -->
+      <div class="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/60 to-slate-900 p-5 space-y-3">
+        <div class="text-xs font-bold text-emerald-400">MEMBER BENEFIT</div>
+        <h3 class="text-base font-extrabold text-white">정회원(MEMBER) 1초 무료 전환</h3>
+        <p class="text-xs text-slate-300 leading-relaxed">복잡한 절차 없이 버튼 한 번으로 정회원으로 전환하고 분석글 북마크 및 챌린지 보상을 받으세요.</p>
+        <button onclick="setRole('MEMBER', true)" class="w-full rounded-xl bg-white py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-300 transition">
+          1초 만에 정회원(MEMBER) 무료 전환
+        </button>
+      </div>
+
+      <!-- 24h Hashtags -->
+      <div class="glass-card rounded-2xl p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-white">24시간 # 누적 인기 해시태그</h3>
+          <span class="text-[11px] text-slate-400">클릭 시 피드 필터</span>
+        </div>
+        <div id="hashtagList" class="flex flex-wrap gap-2"></div>
+        <div class="flex gap-2 pt-2">
+          <input id="newTagInput" type="text" placeholder="#새태그 입력" class="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-white" onkeydown="if(event.key==='Enter') registerHashtag()" />
+          <button onclick="registerHashtag()" class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-bold text-emerald-400 hover:bg-slate-700">등록</button>
+        </div>
+      </div>
+
+      <!-- Partner Sponsor Banner -->
+      <div class="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-slate-900 to-amber-950/30 p-5 space-y-3">
+        <div class="text-[11px] font-bold text-amber-400">PARTNER SPONSOR</div>
+        <h3 class="text-sm font-extrabold text-white">SportIQ 공식 데이터·커머스 파트너 모집</h3>
+        <p class="text-xs text-slate-300">월간 스포츠 팬덤과 만나는 프리미엄 스폰서 배너 및 제휴 입점을 지금 신청하세요.</p>
+        <button onclick="openModal('partnerModal')" class="w-full rounded-xl border border-amber-400/50 bg-amber-500/15 py-2 text-xs font-bold text-amber-300 hover:bg-amber-500 hover:text-slate-950 transition">
+          입점·제휴 문의 접수하기
+        </button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Write Post Modal -->
+  <div id="writeModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
+    <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white">새 스포츠 분석 작성</h3>
+        <button onclick="closeModal('writeModal')" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div class="space-y-3">
+        <select id="postLeague" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white">
+          <option value="EPL">EPL / 해외축구</option>
+          <option value="KBO">KBO / 프로야구</option>
+          <option value="NBA">NBA / 농구</option>
+          <option value="ESPORTS">LCK / e스포츠</option>
+        </select>
+        <input id="postTitle" type="text" placeholder="분석 제목을 입력하세요" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" />
+        <textarea id="postContent" rows="4" placeholder="전술 포인트와 데이터 근거를 입력하세요..." class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"></textarea>
+        <input id="postTags" type="text" placeholder="해시태그 (예: #EPL전술 #손흥민)" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" />
+      </div>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeModal('writeModal')" class="rounded-lg border border-slate-700 px-4 py-2 text-xs text-slate-300">취소</button>
+        <button onclick="submitNewPost()" class="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-slate-950">등록하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comment Modal -->
+  <div id="commentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
+    <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 id="commentModalTitle" class="text-sm font-bold text-white">분석 댓글</h3>
+        <button onclick="closeModal('commentModal')" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div id="commentModalList" class="space-y-2 max-h-60 overflow-y-auto scrollbar-thin"></div>
+      <div class="flex gap-2">
+        <input id="commentModalInput" type="text" placeholder="의견을 남겨보세요..." class="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" />
+        <button onclick="submitComment()" class="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-slate-950">등록</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart.js Match Comparison Modal -->
+  <div id="chartModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
+    <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 id="chartModalTitle" class="text-base font-bold text-white">경기 지표 비교</h3>
+        <button onclick="closeModal('chartModal')" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div class="h-64">
+        <canvas id="matchChartCanvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Partner Inquiry Modal -->
+  <div id="partnerModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
+    <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white">파트너 입점·제휴 문의</h3>
+        <button onclick="closeModal('partnerModal')" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div class="space-y-3">
+        <input id="partnerCompany" type="text" placeholder="업체/브랜드명" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" />
+        <input id="partnerName" type="text" placeholder="담당자 성함" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" />
+        <input id="partnerContact" type="text" placeholder="이메일 또는 연락처" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" />
+        <select id="partnerTier" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white">
+          <option value="PREMIUM_SPONSOR">프리미엄 스폰서 배너</option>
+          <option value="DATA_API">스포츠 데이터 API 제휴</option>
+          <option value="COMMERCE">굿즈·커머스 입점</option>
+        </select>
+        <textarea id="partnerMsg" rows="3" placeholder="제휴 제안 내용을 입력해 주세요" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"></textarea>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeModal('partnerModal')" class="rounded-lg border border-slate-700 px-4 py-2 text-xs text-slate-300">닫기</button>
+        <button onclick="submitPartnerInquiry()" class="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950">문의 접수</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const sessionId = localStorage.getItem('sportiq_sid') || ('sid_' + Math.random().toString(36).slice(2, 10));
+    localStorage.setItem('sportiq_sid', sessionId);
+
+    let state = {
+      role: 'GUEST',
+      points: Number(localStorage.getItem('sportiq_pts') || 120),
+      streak: Number(localStorage.getItem('sportiq_streak') || 3),
+      checkedToday: localStorage.getItem('sportiq_checked') === new Date().toISOString().slice(0, 10),
+      activeTab: 'feed',
+      activePostId: null,
+      chartInstance: null,
+      posts: [
+        {
+          id: 'p1', league: 'EPL', isPro: true, author: '데이터헌터 PRO', trust: 94, likes: 128, bookmarked: false, liked: false, hidden: false,
+          time: 10, title: '[PRO] 아스널 vs 첼시: 하프스페이스 압박 효율과 예상 xG 격차',
+          body: '최근 5경기 PPDA 수치와 측면 전환 빈도를 분석하면 아스널의 우측 하프스페이스 침투 확률이 64%로 높게 나타납니다. 오픈 게스트도 전체 전문 열람이 가능합니다.',
+          tags: ['#EPL전술', '#xG데이터', '#UCL결승'],
+          comments: [{ user: '축덕민수', text: '우측 빌드업 지표가 정말 정확하네요!' }]
+        },
+        {
+          id: 'p2', league: 'KBO', isPro: true, author: '세이버매니아 PRO', trust: 91, likes: 96, bookmarked: false, liked: false, hidden: false,
+          time: 25, title: '[PRO] KIA vs LG: 선발 투수 구속·회전수 변화로 본 5이닝 승부처',
+          body: '직구 수직 무브먼트 편차와 좌타자 상대 체인지업 헛스윙률(31.4%)을 기준으로 초반 3이닝 득점 기대값을 산출했습니다.',
+          tags: ['#KBO리그', '#데이터분석'],
+          comments: [{ user: '타이거즈팬', text: '불펜 소모도 변수일 듯합니다.' }]
+        },
+        {
+          id: 'p3', league: 'NBA', isPro: false, author: '클러치랩', trust: 87, likes: 74, bookmarked: false, liked: false, hidden: false,
+          time: 40, title: '보스턴 vs 덴버: 코너 3점 허용률과 페인트존 수비 로테이션',
+          body: '스위치 디펜스 구간에서 외곽 3점 기대득점이 1.18점까지 상승하는 패턴이 포착되었습니다.',
+          tags: ['#NBA플레이오프', '#손흥민'],
+          comments: []
+        }
+      ],
+      matches: [
+        { id: 'm1', league: 'EPL', title: '아스널 vs 첼시', time: '오늘 23:30 KST', home: '아스널', away: '첼시', votesH: 58, votesD: 19, votesA: 23, voted: null, metrics: [82, 76, 85, 79, 88], awayMetrics: [75, 80, 74, 81, 72] },
+        { id: 'm2', league: 'KBO', title: 'KIA vs LG', time: '오늘 18:30 KST', home: 'KIA', away: 'LG', votesH: 52, votesD: 8, votesA: 40, voted: null, metrics: [84, 79, 81, 86, 80], awayMetrics: [79, 83, 77, 82, 78] }
+      ],
+      shorts: [
+        { title: '하프스페이스 3자 패스 패턴 분석', desc: '측면 풀백 오버래핑 시 중앙 미드필더의 2선 침투 타이밍과 xG 상승 구간을 45초로 요약합니다.' },
+        { title: 'KBO 하이패스트볼 헛스윙 메커니즘', desc: '릴리스 포인트 12cm 상승에 따른 타자 체감 구속 차이를 슬로우 모션으로 비교합니다.' },
+        { title: 'NBA 4쿼터 혼스(Horns) 세트 오펜스', desc: '더블 하이 스크린 이후 롤맨과 팝아웃 슈터의 스페이싱 선택지를 분석합니다.' }
+      ],
+      shortFeedbacks: [
+        { ts: '00:12', user: '전술노트', text: '여기서 수비형 미드필더 시선이 완전히 끌리네요.' },
+        { ts: '00:28', user: '데이터헌터', text: '하프스페이스 공간 열리는 타이밍이 완벽합니다.' }
+      ],
+      analysts: [
+        { name: '데이터헌터 PRO', specialty: 'EPL · UCL', hitRate: '78.4%', followers: 1420, followed: false },
+        { name: '세이버매니아 PRO', specialty: 'KBO · MLB', hitRate: '75.9%', followers: 1180, followed: false },
+        { name: '클러치랩', specialty: 'NBA', hitRate: '73.2%', followers: 890, followed: false }
+      ]
+    };
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+      }, 2800);
+    }
+
+    function setRole(role, notify = false) {
+      state.role = role;
+      const labels = { GUEST: '오픈 게스트', MEMBER: '정회원 MEMBER', PRO: 'PRO 분석가' };
+      document.getElementById('currentRoleBadge').textContent = labels[role] || role;
+      document.querySelectorAll('.role-btn').forEach(btn => {
+        const active = btn.dataset.role === role;
+        btn.className = active
+          ? 'role-btn rounded-md px-2.5 py-1 font-bold bg-emerald-500 text-slate-950 transition'
+          : 'role-btn rounded-md px-2.5 py-1 font-semibold text-slate-300 hover:text-white transition';
+      });
+      if (notify) showToast(`${labels[role]} 권한으로 전환되었습니다!`);
+      pingPresence();
+    }
+
+    function copyInviteLink() {
+      const url = 'https://billnojay.com/';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).catch(() => {});
+      }
+      showToast('billnojay.com 초대 링크가 복사되었습니다!');
+    }
+
+    function switchTab(tab) {
+      state.activeTab = tab;
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      document.getElementById('tab-' + tab).classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        const active = b.dataset.tab === tab;
+        b.className = active
+          ? 'tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold bg-emerald-500 text-slate-950 transition'
+          : 'tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition';
+      });
+    }
+
+    function renderFeed() {
+      const league = document.getElementById('leagueFilter').value;
+      const sort = document.getElementById('sortFilter').value;
+      const q = document.getElementById('feedSearch').value.trim().toLowerCase();
+      let items = state.posts.filter(p => !p.hidden);
+      if (league !== 'ALL') items = items.filter(p => p.league === league);
+      if (q) {
+        items = items.filter(p =>
+          p.title.toLowerCase().includes(q) ||
+          p.body.toLowerCase().includes(q) ||
+          p.tags.some(t => t.toLowerCase().includes(q))
+        );
+      }
+      if (sort === 'popular') items.sort((a, b) => b.likes - a.likes);
+      if (sort === 'trust') items.sort((a, b) => b.trust - a.trust);
+      if (sort === 'latest') items.sort((a, b) => a.time - b.time);
+
+      const box = document.getElementById('feedList');
+      if (!items.length) {
+        box.innerHTML = '<div class="glass-card rounded-2xl p-8 text-center text-sm text-slate-400">조건에 맞는 분석글이 없습니다.</div>';
+        return;
+      }
+      box.innerHTML = items.map(p => `
+        <article class="glass-card rounded-2xl p-5 space-y-3 hover:border-emerald-500/40 transition">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="rounded-md bg-slate-800 px-2 py-0.5 text-[11px] font-bold text-emerald-400">${p.league}</span>
+              ${p.isPro ? '<span class="rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-bold text-emerald-300">PRO 무료열람</span>' : ''}
+              <span class="text-xs font-semibold text-slate-200">${p.author}</span>
+              <span class="text-[11px] text-amber-400">신뢰도 ${p.trust}%</span>
+            </div>
+            <button onclick="reportPost('${p.id}')" class="text-[11px] text-slate-500 hover:text-rose-400 transition">신고·숨김</button>
+          </div>
+          <h3 class="text-base font-bold text-white">${p.title}</h3>
+          <p class="text-xs leading-relaxed text-slate-300">${p.body}</p>
+          <div class="flex flex-wrap gap-1.5">
+            ${p.tags.map(t => `<button onclick="filterByTag('${t}')" class="rounded-full bg-slate-800/90 px-2.5 py-0.5 text-[11px] text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 transition">${t}</button>`).join('')}
+          </div>
+          <div class="flex items-center gap-3 pt-2 border-t border-slate-800/80 text-xs">
+            <button onclick="toggleLike('${p.id}')" class="rounded-lg px-2.5 py-1 ${p.liked ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'bg-slate-800 text-slate-300'}">♥ 좋아요 ${p.likes}</button>
+            <button onclick="toggleBookmark('${p.id}')" class="rounded-lg px-2.5 py-1 ${p.bookmarked ? 'bg-amber-500/20 text-amber-300 font-bold' : 'bg-slate-800 text-slate-300'}">★ ${p.bookmarked ? '저장됨' : '북마크'}</button>
+            <button onclick="openComments('${p.id}')" class="rounded-lg bg-slate-800 px-2.5 py-1 text-slate-300 hover:text-white">💬 댓글 ${p.comments.length}</button>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function clearSearch() {
+      document.getElementById('feedSearch').value = '';
+      renderFeed();
+    }
+
+    function filterByTag(tag) {
+      switchTab('feed');
+      document.getElementById('feedSearch').value = tag;
+      renderFeed();
+      showToast(`${tag} 태그로 피드를 필터링했습니다.`);
+    }
+
+    function toggleLike(id) {
+      const p = state.posts.find(x => x.id === id);
+      if (!p) return;
+      p.liked = !p.liked;
+      p.likes += p.liked ? 1 : -1;
+      renderFeed();
+    }
+
+    function toggleBookmark(id) {
+      const p = state.posts.find(x => x.id === id);
+      if (!p) return;
+      p.bookmarked = !p.bookmarked;
+      renderFeed();
+      showToast(p.bookmarked ? '분석글을 북마크했습니다.' : '북마크를 해제했습니다.');
+    }
+
+    async function reportPost(id) {
+      const p = state.posts.find(x => x.id === id);
+      if (p) p.hidden = true;
+      renderFeed();
+      try {
+        await fetch(`/api/posts/${encodeURIComponent(id)}/report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId, reason: '사용자 단일 신고 숨김' })
+        });
+      } catch (e) {}
+      showToast('신고가 접수되어 해당 게시글을 숨겼습니다.');
+    }
+
+    function openComments(id) {
+      state.activePostId = id;
+      const p = state.posts.find(x => x.id === id);
+      document.getElementById('commentModalTitle').textContent = p.title;
+      renderCommentModalList(p);
+      openModal('commentModal');
+    }
+
+    function renderCommentModalList(p) {
+      const list = document.getElementById('commentModalList');
+      list.innerHTML = p.comments.length
+        ? p.comments.map(c => `<div class="rounded-lg bg-slate-950 p-2.5 text-xs"><strong class="text-emerald-400">${c.user}</strong><p class="mt-0.5 text-slate-300">${c.text}</p></div>`).join('')
+        : '<p class="text-xs text-slate-500">첫 댓글을 남겨보세요.</p>';
+    }
+
+    function submitComment() {
+      const input = document.getElementById('commentModalInput');
+      const text = input.value.trim();
+      if (!text) return;
+      const p = state.posts.find(x => x.id === state.activePostId);
+      if (!p) return;
+      p.comments.push({ user: state.role === 'PRO' ? 'PRO분석가' : (state.role === 'MEMBER' ? '정회원' : '오픈게스트'), text });
+      input.value = '';
+      renderCommentModalList(p);
+      renderFeed();
+    }
+
+    function submitNewPost() {
+      const title = document.getElementById('postTitle').value.trim();
+      const body = document.getElementById('postContent').value.trim();
+      const league = document.getElementById('postLeague').value;
+      const tagsRaw = document.getElementById('postTags').value.trim();
+      if (!title || !body) { showToast('제목과 내용을 입력해 주세요.'); return; }
+      const tags = tagsRaw ? tagsRaw.split(/\s+/).map(t => t.startsWith('#') ? t : '#' + t) : ['#' + league];
+      state.posts.unshift({
+        id: 'p_' + Date.now(), league, isPro: state.role === 'PRO', author: state.role + ' 작성자',
+        trust: 89, likes: 1, bookmarked: false, liked: false, hidden: false, time: 0, title, body, tags, comments: []
+      });
+      document.getElementById('postTitle').value = '';
+      document.getElementById('postContent').value = '';
+      closeModal('writeModal');
+      switchTab('feed');
+      renderFeed();
+      showToast('새 분석글이 피드에 등록되었습니다.');
+    }
+
+    function renderMatches() {
+      const box = document.getElementById('matchesList');
+      box.innerHTML = state.matches.map(m => {
+        const total = m.votesH + m.votesD + m.votesA;
+        const pH = Math.round((m.votesH / total) * 100);
+        const pD = Math.round((m.votesD / total) * 100);
+        const pA = 100 - pH - pD;
+        return `
+          <div class="glass-card rounded-2xl p-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span class="rounded-md bg-slate-800 px-2 py-0.5 text-[11px] font-bold text-emerald-400">${m.league}</span>
+                <span class="ml-2 text-xs text-slate-400">${m.time}</span>
+                <h3 class="mt-1 text-base font-extrabold text-white">${m.title}</h3>
+              </div>
+              <button onclick="openChartModal('${m.id}')" class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 transition">
+                Chart.js 지표 비교
+              </button>
+            </div>
+            <div class="h-3 w-full overflow-hidden rounded-full bg-slate-800 flex">
+              <div style="width:${pH}%" class="bg-emerald-500 transition-all"></div>
+              <div style="width:${pD}%" class="bg-slate-500 transition-all"></div>
+              <div style="width:${pA}%" class="bg-sky-500 transition-all"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-xs">
+              <button onclick="voteMatch('${m.id}','H')" class="rounded-xl border ${m.voted==='H'?'border-emerald-400 bg-emerald-500/20':'border-slate-700 bg-slate-900'} py-2 font-bold">${m.home} 승 (${pH}%)</button>
+              <button onclick="voteMatch('${m.id}','D')" class="rounded-xl border ${m.voted==='D'?'border-slate-300 bg-slate-700':'border-slate-700 bg-slate-900'} py-2 font-bold">무승부 (${pD}%)</button>
+              <button onclick="voteMatch('${m.id}','A')" class="rounded-xl border ${m.voted==='A'?'border-sky-400 bg-sky-500/20':'border-slate-700 bg-slate-900'} py-2 font-bold">${m.away} 승 (${pA}%)</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function voteMatch(id, side) {
+      const m = state.matches.find(x => x.id === id);
+      if (!m) return;
+      if (!m.voted) {
+        if (side === 'H') m.votesH += 1;
+        if (side === 'D') m.votesD += 1;
+        if (side === 'A') m.votesA += 1;
+        m.voted = side;
+        showToast('승부 투표가 반영되었습니다!');
+      } else {
+        showToast('이미 투표에 참여하셨습니다.');
+      }
+      renderMatches();
+    }
+
+    function openChartModal(id) {
+      const m = state.matches.find(x => x.id === id);
+      if (!m) return;
+      document.getElementById('chartModalTitle').textContent = `${m.title} 핵심 지표 비교`;
+      openModal('chartModal');
+      const ctx = document.getElementById('matchChartCanvas').getContext('2d');
+      if (state.chartInstance) state.chartInstance.destroy();
+      state.chartInstance = new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels: ['공격 효율', '수비 안정성', '점유율/전환', '최근 5경기 폼', '클러치 지표'],
+          datasets: [
+            { label: m.home, data: m.metrics, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.2)' },
+            { label: m.away, data: m.awayMetrics, borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.2)' }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { r: { suggestedMin: 50, suggestedMax: 100, grid: { color: '#334155' }, pointLabels: { color: '#cbd5e1' } } },
+          plugins: { legend: { labels: { color: '#f8fafc' } } }
+        }
+      });
+    }
+
+    function selectShort(idx) {
+      const s = state.shorts[idx];
+      document.getElementById('shortTitle').textContent = s.title;
+      document.getElementById('shortDesc').textContent = s.desc;
+    }
+
+    function setShortTimestamp(ts) {
+      document.getElementById('shortTsInput').value = ts;
+      document.getElementById('shortTimeBadge').textContent = ts;
+    }
+
+    function renderShortFeedback() {
+      const box = document.getElementById('shortFeedbackList');
+      box.innerHTML = state.shortFeedbacks.map(f => `
+        <div class="rounded-lg bg-slate-900/90 border border-slate-800 px-3 py-2 text-xs flex items-start gap-2">
+          <span class="rounded bg-emerald-500/20 px-1.5 py-0.5 font-mono text-[11px] text-emerald-300">${f.ts}</span>
+          <div><strong class="text-white">${f.user}</strong><p class="text-slate-300 mt-0.5">${f.text}</p></div>
+        </div>
+      `).join('');
+    }
+
+    function addShortFeedback() {
+      const ts = document.getElementById('shortTsInput').value.trim() || '00:42';
+      const text = document.getElementById('shortCommentInput').value.trim();
+      if (!text) return;
+      state.shortFeedbacks.unshift({ ts, user: state.role, text });
+      document.getElementById('shortCommentInput').value = '';
+      renderShortFeedback();
+      showToast('타임스탬프 피드백이 등록되었습니다.');
+    }
+
+    function renderRanking() {
+      const box = document.getElementById('rankingList');
+      box.innerHTML = state.analysts.map((a, i) => `
+        <div class="glass-card rounded-2xl p-4 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 font-extrabold text-emerald-400">#${i + 1}</div>
+            <div>
+              <div class="text-sm font-bold text-white">${a.name}</div>
+              <div class="text-xs text-slate-400">${a.specialty} · 적중률 <strong class="text-emerald-400">${a.hitRate}</strong> · 팔로워 ${a.followers}</div>
+            </div>
+          </div>
+          <button onclick="toggleFollow(${i})" class="rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${a.followed ? 'bg-slate-800 text-emerald-400 border border-emerald-500/40' : 'bg-emerald-500 text-slate-950'}">
+            ${a.followed ? '팔로잉' : '+ 팔로우'}
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function toggleFollow(idx) {
+      const a = state.analysts[idx];
+      a.followed = !a.followed;
+      a.followers += a.followed ? 1 : -1;
+      renderRanking();
+    }
+
+    function updatePointsUI() {
+      localStorage.setItem('sportiq_pts', state.points);
+      localStorage.setItem('sportiq_streak', state.streak);
+      document.getElementById('pointsBadge').textContent = state.points + ' P';
+      document.getElementById('streakDays').textContent = state.streak;
+      const btn = document.getElementById('attendanceBtn');
+      if (state.checkedToday) {
+        btn.textContent = '오늘 출석 완료 (+10P 지급됨)';
+        btn.className = 'w-full rounded-xl bg-slate-800 py-2.5 text-sm font-bold text-emerald-400 cursor-default';
+      }
+    }
+
+    function checkAttendance() {
+      if (state.checkedToday) { showToast('오늘은 이미 출석 체크를 완료했습니다.'); return; }
+      state.checkedToday = true;
+      state.points += 10;
+      state.streak += 1;
+      localStorage.setItem('sportiq_checked', new Date().toISOString().slice(0, 10));
+      updatePointsUI();
+      showToast('출석 체크 완료! +10P가 적립되었습니다.');
+    }
+
+    function quickChallenge(pick) {
+      state.points += 20;
+      updatePointsUI();
+      showToast(`'${pick}' 승부예측 챌린지 참여 완료! (+20P)`);
+    }
+
+    async function pingPresence() {
+      try {
+        const res = await fetch('/api/presence/ping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId, role: state.role })
+        });
+        const data = await res.json();
+        if (data.active_now) document.getElementById('activeCount').textContent = data.active_now;
+        if (data.today_visitors) document.getElementById('todayCount').textContent = data.today_visitors;
+      } catch (e) {}
+    }
+
+    async function loadHashtags() {
+      try {
+        const res = await fetch('/api/hashtags/daily');
+        const data = await res.json();
+        renderHashtags(data.hashtags || []);
+      } catch (e) {}
+    }
+
+    function renderHashtags(list) {
+      const box = document.getElementById('hashtagList');
+      box.innerHTML = list.map(h => `
+        <button onclick="filterByTag('${h.tag}')" class="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold text-emerald-300 hover:border-emerald-400 hover:bg-emerald-500/15 transition">
+          ${h.tag} <span class="text-slate-500 ml-1">${h.count}</span>
+        </button>
+      `).join('');
+    }
+
+    async function registerHashtag() {
+      const input = document.getElementById('newTagInput');
+      const tag = input.value.trim();
+      if (!tag) return;
+      try {
+        const res = await fetch('/api/hashtags/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tag })
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.detail || '태그 등록 실패'); return; }
+        input.value = '';
+        renderHashtags(data.hashtags || []);
+        showToast(`${data.tag} 해시태그가 등록되었습니다!`);
+      } catch (e) { showToast('태그 등록 중 오류가 발생했습니다.'); }
+    }
+
+    async function loadCheers() {
+      try {
+        const res = await fetch('/api/cheers');
+        const data = await res.json();
+        const box = document.getElementById('cheersList');
+        box.innerHTML = (data.cheers || []).map(c => `
+          <div class="rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2.5 text-xs flex items-center justify-between gap-2">
+            <div>
+              <span class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-400">${c.team}</span>
+              <strong class="ml-1.5 text-white">${c.author}</strong>
+              <span class="ml-2 text-slate-300">${c.message}</span>
+            </div>
+            <span class="text-[10px] text-slate-500 whitespace-nowrap">${c.time_label || ''}</span>
+          </div>
+        `).join('');
+      } catch (e) {}
+    }
+
+    async function submitCheer() {
+      const author = document.getElementById('cheerAuthor').value.trim() || '익명팬';
+      const team = document.getElementById('cheerTeam').value;
+      const msgEl = document.getElementById('cheerMessage');
+      const message = msgEl.value.trim();
+      if (!message) return;
+      try {
+        const res = await fetch('/api/cheers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId, author, role: state.role, team, message })
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.detail || '잠시 후 다시 시도해 주세요.'); return; }
+        msgEl.value = '';
+        await loadCheers();
+        showToast('응원톡이 등록되었습니다!');
+      } catch (e) { showToast('응원톡 전송 오류'); }
+    }
+
+    async function submitPartnerInquiry() {
+      const company = document.getElementById('partnerCompany').value.trim();
+      const contact_name = document.getElementById('partnerName').value.trim();
+      const contact_info = document.getElementById('partnerContact').value.trim();
+      const tier = document.getElementById('partnerTier').value;
+      const message = document.getElementById('partnerMsg').value.trim();
+      try {
+        const res = await fetch('/api/partner-inquiries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company, contact_name, contact_info, tier, message })
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.detail || '입력 내용을 확인해 주세요.'); return; }
+        closeModal('partnerModal');
+        showToast(data.message || '입점·제휴 문의가 접수되었습니다!');
+      } catch (e) { showToast('문의 접수 중 오류가 발생했습니다.'); }
+    }
+
+    function openModal(id) {
+      const el = document.getElementById(id);
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+    }
+
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      el.classList.add('hidden');
+      el.classList.remove('flex');
+    }
+
+    setRole('GUEST');
+    switchTab('feed');
+    renderFeed();
+    renderMatches();
+    renderShortFeedback();
+    renderRanking();
+    updatePointsUI();
+    pingPresence();
+    loadHashtags();
+    loadCheers();
+    setInterval(pingPresence, 30000);
+  </script>
+</body>
+</html>
