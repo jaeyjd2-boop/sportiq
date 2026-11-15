@@ -211,7 +211,7 @@
       </section>
 
       <!-- TAB 3: SHORTS -->
-      <section id="tab-shorts" class="tab-panel hidden">
+    <!--   <section id="tab-shorts" class="tab-panel hidden">
         <div class="grid grid-cols-1 gap-6 md:grid-cols-12">
           <div class="md:col-span-5 flex justify-center">
             <div class="relative aspect-[9/16] w-full max-w-[300px] overflow-hidden rounded-3xl border-2 border-emerald-500/40 bg-gradient-to-b from-slate-900 via-emerald-950/50 to-slate-950 p-5 flex flex-col justify-between shadow-2xl"><canvas id="shortPitchCanvas" width="300" height="533" class="pointer-events-none absolute inset-0 h-full w-full z-0"></canvas>
@@ -251,7 +251,196 @@
             </div>
           </div>
         </div>
-      </section>
+      </sectio -->
+  <section id="tab-shorts" class="tab-panel hidden space-y-5">
+    <div class="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+      <div id="shortsFilterBar" class="flex flex-wrap items-center gap-2">
+        <button type="button" onclick="setShortsFilter('all')" data-shorts-filter="all" class="shorts-filter-btn rounded-xl px-3.5 py-1.5 text-xs font-bold bg-emerald-500 text-slate-950 transition">전체</button>
+        <button type="button" onclick="setShortsFilter('soccer')" data-shorts-filter="soccer" class="shorts-filter-btn rounded-xl px-3.5 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">⚽ 축구</button>
+        <button type="button" onclick="setShortsFilter('baseball')" data-shorts-filter="baseball" class="shorts-filter-btn rounded-xl px-3.5 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">⚾ 야구</button>
+        <button type="button" onclick="setShortsFilter('basketball')" data-shorts-filter="basketball" class="shorts-filter-btn rounded-xl px-3.5 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">🏀 농구(NBA)</button>
+        <button type="button" onclick="setShortsFilter('hockey')" data-shorts-filter="hockey" class="shorts-filter-btn rounded-xl px-3.5 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">🏒 하키(NHL)</button>
+      </div>
+      <button type="button" onclick="openShortsSubmitModal()" class="rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-2 text-xs font-extrabold text-slate-950 shadow-lg hover:opacity-95 transition">➕ 숏츠 제보하기</button>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+      <div class="lg:col-span-5 flex flex-col items-center space-y-3">
+        <div class="flex items-center justify-center gap-3 w-full">
+          <div id="shortsPlayerStage" ondblclick="handleShortsDoubleTap(event)" class="relative aspect-[9/16] w-full max-w-[320px] overflow-hidden rounded-3xl border-2 border-emerald-500/40 bg-slate-950 shadow-2xl select-none cursor-pointer">
+            <canvas id="shortsHubCanvas" width="360" height="640" class="absolute inset-0 w-full h-full"></canvas>
+            <div id="shortsLiveOverlay" class="pointer-events-none absolute top-12 left-3 right-3 z-20 flex flex-col gap-1.5"></div>
+            <div id="shortsEmojiLayer" class="pointer-events-none absolute inset-0 z-30 overflow-hidden"></div>
+            <div id="shortsHeartPopup" class="pointer-events-none absolute inset-0 z-40 flex items-center justify-center opacity-0 scale-50 transition-all duration-300">
+              <span class="text-7xl drop-shadow-2xl">❤️</span>
+            </div>
+            <div class="relative z-20 flex items-center justify-between p-3 pointer-events-none">
+              <span id="shortsSportBadge" class="rounded-full bg-emerald-500 px-2.5 py-0.5 text-[11px] font-extrabold text-slate-950">⚽ 축구 TACTICAL</span>
+              <span id="shortsTimeBadge" class="rounded-full bg-slate-900/85 px-2.5 py-0.5 text-xs font-mono text-emerald-300 border border-slate-700">00:00 / 00:20</span>
+            </div>
+            <div class="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-slate-950 via-slate-950/85 to-transparent p-3.5 space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <button id="shortsPlayBtn" type="button" onclick="toggleShortsPlay()" class="rounded-lg bg-emerald-500 px-3 py-1 text-[11px] font-extrabold text-slate-950 hover:bg-emerald-400 transition">⏸ 일시정지</button>
+                <div class="flex items-center gap-1">
+                  <button type="button" onclick="setShortsSpeed(0.5)" data-shorts-speed="0.5" class="shorts-speed-btn rounded-md bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-slate-700">0.5x 슬로모션</button>
+                  <button type="button" onclick="setShortsSpeed(1)" data-shorts-speed="1" class="shorts-speed-btn rounded-md bg-emerald-500 px-2 py-1 text-[10px] font-bold text-slate-950">1.0x</button>
+                  <button type="button" onclick="setShortsSpeed(1.5)" data-shorts-speed="1.5" class="shorts-speed-btn rounded-md bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-slate-700">1.5x</button>
+                </div>
+              </div>
+              <div>
+                <div id="shortsTop20Tag" class="text-[10px] font-bold text-cyan-300">GLOBAL TOP 20 연동</div>
+                <h3 id="shortsActiveTitle" class="text-sm font-extrabold text-white leading-snug">리버풀 안필드 역습 3자 패스</h3>
+                <p id="shortsActiveDesc" class="text-[11px] text-slate-300 line-clamp-2">더블클릭으로 ❤️ 좋아요 · 하단 이모지로 탄막 리액션을 보내보세요!</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col items-center gap-2.5">
+            <button type="button" onclick="likeActiveShort()" class="flex flex-col items-center justify-center w-14 h-14 rounded-2xl bg-slate-900 border border-slate-700 hover:border-rose-500/60 transition">
+              <span class="text-lg">❤️</span>
+              <span id="shortsLikeCount" class="text-[10px] font-bold text-slate-200">0</span>
+            </button>
+            <button type="button" onclick="focusShortsComment()" class="flex flex-col items-center justify-center w-14 h-14 rounded-2xl bg-slate-900 border border-slate-700 hover:border-emerald-500/60 transition">
+              <span class="text-lg">💬</span>
+              <span id="shortsCommentCount" class="text-[10px] font-bold text-slate-200">0</span>
+            </button>
+            <button type="button" onclick="navShortsClip(-1)" title="이전 클립" class="flex flex-col items-center justify-center w-14 h-12 rounded-2xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-xs font-bold text-slate-200 transition">▲ 이전</button>
+            <button type="button" onclick="navShortsClip(1)" title="다음 클립" class="flex flex-col items-center justify-center w-14 h-12 rounded-2xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-xs font-bold text-slate-200 transition">▼ 다음</button>
+            <button type="button" onclick="openYoutubeShortsSearch()" class="flex flex-col items-center justify-center w-14 py-2 px-1 rounded-2xl bg-rose-600/90 hover:bg-rose-500 text-white text-[10px] font-extrabold leading-tight text-center shadow-lg transition">
+              <span class="text-sm">📺</span>
+              <span>유튜브<br>실영상</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="w-full max-w-[380px] glass-card rounded-2xl p-3">
+          <div class="text-[11px] font-bold text-slate-400 mb-2">🎉 실시간 플로팅 이모지 탄막 리액션</div>
+          <div class="grid grid-cols-5 gap-1.5">
+            <button type="button" onclick="triggerShortsReaction('fire', '🔥')" class="rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 py-1.5 px-1 text-center transition">
+              <div class="text-sm">🔥</div>
+              <div class="text-[10px] font-bold text-slate-200">미쳤다</div>
+              <div id="reactCount_fire" class="text-[10px] font-mono text-amber-400">0</div>
+            </button>
+            <button type="button" onclick="triggerShortsReaction('legend', '⚡')" class="rounded-xl bg-slate-900 border border-slate-700 hover:border-cyan-400 py-1.5 px-1 text-center transition">
+              <div class="text-sm">⚡</div>
+              <div class="text-[10px] font-bold text-slate-200">레전드</div>
+              <div id="reactCount_legend" class="text-[10px] font-mono text-cyan-400">0</div>
+            </button>
+            <button type="button" onclick="triggerShortsReaction('genius', '🧠')" class="rounded-xl bg-slate-900 border border-slate-700 hover:border-emerald-400 py-1.5 px-1 text-center transition">
+              <div class="text-sm">🧠</div>
+              <div class="text-[10px] font-bold text-slate-200">전술천재</div>
+              <div id="reactCount_genius" class="text-[10px] font-mono text-emerald-400">0</div>
+            </button>
+            <button type="button" onclick="triggerShortsReaction('chills', '😱')" class="rounded-xl bg-slate-900 border border-slate-700 hover:border-purple-400 py-1.5 px-1 text-center transition">
+              <div class="text-sm">😱</div>
+              <div class="text-[10px] font-bold text-slate-200">소름</div>
+              <div id="reactCount_chills" class="text-[10px] font-mono text-purple-400">0</div>
+            </button>
+            <button type="button" onclick="triggerShortsReaction('clap', '👏')" class="rounded-xl bg-slate-900 border border-slate-700 hover:border-rose-400 py-1.5 px-1 text-center transition">
+              <div class="text-sm">👏</div>
+              <div class="text-[10px] font-bold text-slate-200">박수</div>
+              <div id="reactCount_clap" class="text-[10px] font-mono text-rose-400">0</div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-7 space-y-4">
+        <div class="glass-card rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-2.5">
+            <h4 class="text-sm font-extrabold text-white">🔥 글로벌 TOP 20 연동 핫 숏츠 클립</h4>
+            <span id="shortsClipCounter" class="text-xs font-mono text-emerald-400">8개 클립</span>
+          </div>
+          <div id="shortsClipGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1"></div>
+        </div>
+
+        <div class="glass-card rounded-2xl p-4 space-y-2.5 border border-amber-500/30">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-amber-400">🎯 다음 장면 맞히기 미니 예측 퀴즈</span>
+            <span class="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-bold text-amber-300">+15P 포인트 보상</span>
+          </div>
+          <p id="shortsQuizQuestion" class="text-sm font-bold text-white"></p>
+          <div id="shortsQuizOptions" class="grid grid-cols-1 sm:grid-cols-3 gap-2"></div>
+          <div id="shortsQuizResult" class="hidden rounded-xl bg-slate-900/90 border border-slate-700 p-2.5 text-xs text-slate-200"></div>
+        </div>
+
+        <div class="glass-card rounded-2xl p-4 space-y-2.5 border border-cyan-500/30">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-cyan-400">⚖️ 실시간 명장면 / VAR 팬 판정 밸런스 투표</span>
+            <span id="shortsVoteTotal" class="text-[11px] font-mono text-slate-400">0표 참여</span>
+          </div>
+          <p id="shortsVoteTopic" class="text-sm font-bold text-white"></p>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="shortsVoteBtnA" type="button" onclick="voteShortsBalance('vote_a')" class="rounded-xl bg-slate-900 border border-emerald-500/40 hover:bg-emerald-500/15 px-3 py-2 text-xs font-bold text-emerald-300 transition text-left"></button>
+            <button id="shortsVoteBtnB" type="button" onclick="voteShortsBalance('vote_b')" class="rounded-xl bg-slate-900 border border-rose-500/40 hover:bg-rose-500/15 px-3 py-2 text-xs font-bold text-rose-300 transition text-right"></button>
+          </div>
+          <div class="w-full h-3 rounded-full bg-slate-800 overflow-hidden flex">
+            <div id="shortsVoteBarA" class="h-full bg-emerald-500 transition-all duration-300" style="width:50%"></div>
+            <div id="shortsVoteBarB" class="h-full bg-rose-500 transition-all duration-300" style="width:50%"></div>
+          </div>
+          <div class="flex justify-between text-[11px] font-mono">
+            <span id="shortsVotePctA" class="text-emerald-400">A 50%</span>
+            <span id="shortsVotePctB" class="text-rose-400">B 50%</span>
+          </div>
+        </div>
+
+        <div class="glass-card rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-extrabold text-white">⏱️ 실시간 타임스탬프 한줄평</h4>
+            <button type="button" onclick="captureCurrentShortTime()" class="rounded-lg bg-slate-800 hover:bg-slate-700 px-2.5 py-1 text-[11px] font-mono text-emerald-300 transition">현재 시간 입력</button>
+          </div>
+          <div id="shortsCommentsList" class="space-y-2 max-h-44 overflow-y-auto pr-1"></div>
+          <div class="flex flex-wrap gap-2">
+            <input id="shortsTsInput" type="number" min="0" max="60" value="5" class="w-16 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-xs font-mono text-emerald-300" title="초(sec)" />
+            <input id="shortsNickInput" type="text" placeholder="닉네임" value="SportIQ 팬" class="w-24 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs text-slate-200" />
+            <input id="shortsCommentInput" type="text" placeholder="이 순간의 한줄평을 남기세요 (영상 위 자막으로 뜹니다!)" class="flex-1 min-w-[160px] rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100" />
+            <button type="button" onclick="submitShortsComment()" class="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-400 transition">등록</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="shortsSubmitModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 p-4">
+    <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-extrabold text-white">➕ 나만의 유튜브 숏츠 제보하기</h3>
+        <button type="button" onclick="closeShortsSubmitModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-400 mb-1">제목</label>
+          <input id="submitShortTitle" type="text" placeholder="예: 손흥민 북런던 더비 감아차기" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100" />
+        </div>
+        <div>
+          <label class="block text-slate-400 mb-1">종목</label>
+          <select id="submitShortSport" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100">
+            <option value="soccer">⚽ 축구</option>
+            <option value="baseball">⚾ 야구</option>
+            <option value="basketball">🏀 농구(NBA)</option>
+            <option value="hockey">🏒 하키(NHL)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-slate-400 mb-1">유튜브 숏츠 URL</label>
+          <input id="submitShortUrl" type="text" placeholder="https://www.youtube.com/shorts/..." class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100" />
+        </div>
+        <div>
+          <label class="block text-slate-400 mb-1">한줄 관전 포인트</label>
+          <input id="submitShortNote" type="text" placeholder="예: 수비 2명 사이를 뚫는 궤적 분석" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100" />
+        </div>
+        <div>
+          <label class="block text-slate-400 mb-1">제보자 닉네임</label>
+          <input id="submitShortNick" type="text" value="SportIQ 제보자" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="closeShortsSubmitModal()" class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-700">취소</button>
+        <button type="button" onclick="submitCustomShort()" class="rounded-xl bg-emerald-500 px-4 py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-400">DB에 제보 등록</button>
+      </div>
+    </div>
+  </div>>
+      n>
 
       <!-- TAB 4: ISSUES & LIVE CHEERS -->
       <section id="tab-cheers" class="tab-panel hidden space-y-4">
@@ -1406,6 +1595,622 @@ function openMatchCompareModal(matchKey) {
 }
 loadMatchPredictions();
   loadGlobalMatches();
+  const SHORTS_DEFAULT_CLIPS = [
+    {
+      clip_id: 'clip_1', sport: 'soccer', sportLabel: '⚽ 축구 TACTICAL',
+      title: '리버풀 안필드 역습 3자 패스', top20Tag: 'GLOBAL TOP 20 #1 · EPL',
+      desc: '하프스페이스 침투 후 원터치 3자 패스로 수비 블록 붕괴',
+      youtubeQuery: 'Liverpool Anfield counter attack goal',
+      quiz: { q: '00:14 하프스페이스 3자 패스 직후 결과는?', options: ['파포스트 감아차기 골', '골대 강타 아웃', 'PK 유도'], answerIdx: 0, explain: '전방 압박 탈압박 후 3자 패스로 열린 공간에서 파포스트 감아차기 득점!' },
+      vote: { topic: '이 장면의 결정적 요인은?', optA: '공격수 3자 패스 전술', optB: '상대 수비 라인 실책' }
+    },
+    {
+      clip_id: 'clip_2', sport: 'soccer', sportLabel: '⚽ 축구 TACTICAL',
+      title: '스페인 라민 야말 측면 아이솔레이션', top20Tag: 'GLOBAL TOP 20 #2 · EURO/UCL',
+      desc: '측면 1대1 드리블 페인팅 후 인사이드 커트인 슈팅',
+      youtubeQuery: 'Lamine Yamal dribbling curl goal',
+      quiz: { q: '측면 수비수 2명을 벗겨낸 직후 선택은?', options: ['크로스 선택', '왼발 감아차기', '백패스'], answerIdx: 1, explain: '안쪽으로 꺾어 들어오며 수비 시야를 가린 뒤 왼발 감아차기 마무리!' },
+      vote: { topic: '라민 야말 돌파 팬 판정!', optA: '개인기 클래스 압승', optB: '더블팀 커버 지연' }
+    },
+    {
+      clip_id: 'clip_3', sport: 'soccer', sportLabel: '⚽ 축구 TACTICAL',
+      title: '아스널 세트피스 패턴', top20Tag: 'GLOBAL TOP 20 #3 · EPL',
+      desc: '니어포스트 스크린 블록 후 세컨드 볼 헤더 마무리',
+      youtubeQuery: 'Arsenal corner set piece goal',
+      quiz: { q: '코너킥 키커의 인스윙 궤적 타겟 지점은?', options: ['골키퍼 정면', '니어포스트 6야드 박스', '아크 정면'], answerIdx: 1, explain: '골키퍼 동선을 막는 스크린 후 니어포스트로 쇄도해 헤더 득점!' },
+      vote: { topic: '아스널 세트피스 VAR 판정!', optA: '완벽한 전술 블록', optB: '골키퍼 차징 파울' }
+    },
+    {
+      clip_id: 'clip_4', sport: 'baseball', sportLabel: '⚾ 야구 PITCH TUNNEL',
+      title: '한일전 도쿄돔 156km 하이패스트볼 삼진 터널', top20Tag: 'GLOBAL TOP 20 #4 · KBO/NPB',
+      desc: '동일 릴리즈 포인트에서 솟아오르는 156km 포심 피치 터널링',
+      youtubeQuery: '156km fastball strikeout pitch tunnel',
+      quiz: { q: '풀카운트 승부구 하이패스트볼의 결과는?', options: ['헛스윙 삼진', '파울 커트', '좌익수 플라이'], answerIdx: 0, explain: '떨어지는 스플리터와 같은 터널에서 솟아오른 156km 하이패스트볼로 헛스윙 삼진!' },
+      vote: { topic: '한일전 승부구 팬 판정!', optA: '투수 구위·터널링 압승', optB: '타자 노림수 실패' }
+    },
+    {
+      clip_id: 'clip_5', sport: 'baseball', sportLabel: '⚾ 야구 PITCH TUNNEL',
+      title: '만루 스플리터 볼배합 승부', top20Tag: 'GLOBAL TOP 20 #5 · MLB/KBO',
+      desc: '주자 만루 위기에서 존 하단으로 급낙하하는 결정구 스플리터',
+      youtubeQuery: 'bases loaded splitter strikeout',
+      quiz: { q: '2사 만루 2스트라이크 이후 결정구 코스는?', options: ['몸쪽 직구', '스트라이크존 하단 스플리터', '바깥쪽 슬라이더'], answerIdx: 1, explain: '직구와 같은 궤적으로 오다 홈플레이트 앞에서 급낙하한 스플리터!' },
+      vote: { topic: '만루 위기 볼배합 판정!', optA: '포수 볼배합 신의 한수', optB: '타자 선구안 아쉬움' }
+    },
+    {
+      clip_id: 'clip_6', sport: 'basketball', sportLabel: '🏀 농구 NBA',
+      title: '보스턴 vs 댈러스 클러치 스텝백 3점', top20Tag: 'GLOBAL TOP 20 #6 · NBA',
+      desc: '샷클락 4초 남기고 스위치 미스매치 유도 후 스텝백 3점',
+      youtubeQuery: 'Boston Dallas clutch stepback 3 pointer',
+      quiz: { q: '샷클락 2초 전 스텝백 3점 릴리즈 결과는?', options: ['클러치 스위치 3점 성공', '림 맞고 리바운드', '트래블링 콜'], answerIdx: 0, explain: '수비수의 무게 중심을 무너뜨린 스텝백 직후 클린 3점 슛 성공!' },
+      vote: { topic: '클러치 스텝백 판정!', optA: '슈퍼스타 클러치 본능', optB: '스위치 수비 미스' }
+    },
+    {
+      clip_id: 'clip_7', sport: 'basketball', sportLabel: '🏀 농구 NBA',
+      title: '레이커스 얼리 오펜스', top20Tag: 'GLOBAL TOP 20 #7 · NBA',
+      desc: '수비 리바운드 직후 3초 만에 전개되는 코스트 투 코스트 속공',
+      youtubeQuery: 'Lakers early offense fastbreak dunk',
+      quiz: { q: '아울렛 패스를 받은 윙맨의 마무리 선택은?', options: ['원핸드 앨리웁 덩크', '미드레인지 점퍼', '코너 킥아웃'], answerIdx: 0, explain: '트랜지션 수비가 정돈되기 전 원핸드 앨리웁 덩크로 마무리!' },
+      vote: { topic: '얼리 오펜스 MVP는?', optA: '장거리 아울렛 패서', optB: '스피드 피니셔' }
+    },
+    {
+      clip_id: 'clip_8', sport: 'hockey', sportLabel: '🏒 하키 NHL',
+      title: '오일러스 파워플레이 164km 원타이머 슬랩샷', top20Tag: 'GLOBAL TOP 20 #8 · NHL',
+      desc: '5대4 파워플레이에서 블루라인 크로스 패스 직후 164km 원타이머',
+      youtubeQuery: 'Oilers powerplay one timer slapshot',
+      quiz: { q: '오른쪽 서클에서 날린 164km 원타이머 방향은?', options: ['골리 글러브 사이드 상단', '블루라인 리바운드', '골포스트 강타'], answerIdx: 0, explain: '스크린으로 골리 시야가 가려진 틈을 타 글러브 사이드 상단 그물을 흔듦!' },
+      vote: { topic: '파워플레이 득점 핵심은?', optA: '164km 원타이머 슈팅', optB: '크로스 패스 시야' }
+    }
+  ];
+
+  let shortsCustomClips = [];
+  let shortsStatsMap = {};
+  let shortsCommentsMap = {};
+  let shortsFilter = 'all';
+  let shortsActiveId = 'clip_1';
+  let shortsPlaying = true;
+  let shortsSpeed = 1.0;
+  let shortsTime = 0;
+  let shortsQuizAnswered = {};
+  let shortsLastFrameTs = 0;
+
+  window.renderShortFeedback = function() {};
+
+  function getAllShortsClips() {
+    const customs = (shortsCustomClips || []).map(c => ({
+      clip_id: c.clip_id,
+      sport: c.sport || 'soccer',
+      sportLabel: c.sport === 'baseball' ? '⚾ 야구 제보' : c.sport === 'basketball' ? '🏀 농구 제보' : c.sport === 'hockey' ? '🏒 하키 제보' : '⚽ 축구 제보',
+      title: c.title,
+      top20Tag: '회원 제보 클립 · ' + (c.nickname || '팬'),
+      desc: c.point_note || '회원이 직접 제보한 하이라이트 숏츠입니다.',
+      youtubeQuery: c.title,
+      youtubeUrl: c.youtube_url,
+      quiz: { q: '이 제보 클립의 핵심 관전 포인트는?', options: ['전술적 움직임 & 타이밍', '개인 기량 돌파', '클러치 집중력'], answerIdx: 0, explain: c.point_note || '회원이 제보한 핵심 하이라이트 포인트입니다!' },
+      vote: { topic: '이 제보 클립 팬 평가는?', optA: '🔥 레전드 명장면', optB: '🧠 전술 교과서' }
+    }));
+    return [...customs, ...SHORTS_DEFAULT_CLIPS];
+  }
+
+  function getFilteredShortsClips() {
+    const all = getAllShortsClips();
+    if (shortsFilter === 'all') return all;
+    return all.filter(c => c.sport === shortsFilter);
+  }
+
+  function getActiveShortClip() {
+    const all = getAllShortsClips();
+    return all.find(c => c.clip_id === shortsActiveId) || all[0];
+  }
+
+  async function fetchShortsHub() {
+    try {
+      const res = await fetch('/api/shorts/hub');
+      const data = await res.json();
+      if (data && data.ok) {
+        shortsStatsMap = data.stats || {};
+        shortsCommentsMap = data.comments || {};
+        shortsCustomClips = data.custom_clips || [];
+      }
+    } catch (e) {
+      console.warn('shorts hub fetch fallback', e);
+    }
+    renderShortsClipGrid();
+    renderActiveShortUI();
+  }
+
+  function setShortsFilter(sport) {
+    shortsFilter = sport;
+    document.querySelectorAll('.shorts-filter-btn').forEach(btn => {
+      const active = btn.dataset.shortsFilter === sport;
+      btn.className = active
+        ? 'shorts-filter-btn rounded-xl px-3.5 py-1.5 text-xs font-bold bg-emerald-500 text-slate-950 transition'
+        : 'shorts-filter-btn rounded-xl px-3.5 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition';
+    });
+    const list = getFilteredShortsClips();
+    if (list.length && !list.some(c => c.clip_id === shortsActiveId)) {
+      shortsActiveId = list[0].clip_id;
+      shortsTime = 0;
+    }
+    renderShortsClipGrid();
+    renderActiveShortUI();
+  }
+
+  function selectShortClip(clipId) {
+    shortsActiveId = clipId;
+    shortsTime = 0;
+    shortsPlaying = true;
+    const playBtn = document.getElementById('shortsPlayBtn');
+    if (playBtn) playBtn.textContent = '⏸ 일시정지';
+    renderShortsClipGrid();
+    renderActiveShortUI();
+  }
+
+  function navShortsClip(dir) {
+    const list = getFilteredShortsClips();
+    if (!list.length) return;
+    const idx = list.findIndex(c => c.clip_id === shortsActiveId);
+    const nextIdx = (idx + dir + list.length) % list.length;
+    selectShortClip(list[nextIdx].clip_id);
+  }
+
+  function toggleShortsPlay() {
+    shortsPlaying = !shortsPlaying;
+    const btn = document.getElementById('shortsPlayBtn');
+    if (btn) btn.textContent = shortsPlaying ? '⏸ 일시정지' : '▶ 재생';
+  }
+
+  function setShortsSpeed(spd) {
+    shortsSpeed = spd;
+    document.querySelectorAll('.shorts-speed-btn').forEach(btn => {
+      const active = Number(btn.dataset.shortsSpeed) === spd;
+      btn.className = active
+        ? 'shorts-speed-btn rounded-md bg-emerald-500 px-2 py-1 text-[10px] font-bold text-slate-950'
+        : 'shorts-speed-btn rounded-md bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-slate-700';
+    });
+  }
+
+  function handleShortsDoubleTap() {
+    const popup = document.getElementById('shortsHeartPopup');
+    if (popup) {
+      popup.classList.remove('opacity-0', 'scale-50');
+      popup.classList.add('opacity-100', 'scale-125');
+      setTimeout(() => {
+        popup.classList.remove('opacity-100', 'scale-125');
+        popup.classList.add('opacity-0', 'scale-50');
+      }, 550);
+    }
+    likeActiveShort();
+  }
+
+  async function likeActiveShort() {
+    const clip = getActiveShortClip();
+    if (!clip) return;
+    shortsStatsMap[clip.clip_id] = shortsStatsMap[clip.clip_id] || { likes: 0, fire: 0, legend: 0, genius: 0, chills: 0, clap: 0, opt_a_votes: 0, opt_b_votes: 0 };
+    shortsStatsMap[clip.clip_id].likes += 1;
+    renderShortsStatsUI();
+    try {
+      const res = await fetch('/api/shorts/interact', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clip_id: clip.clip_id, action: 'like' })
+      });
+      const data = await res.json();
+      if (data && data.ok && data.stats) {
+        shortsStatsMap[clip.clip_id] = data.stats;
+        renderShortsStatsUI();
+      }
+    } catch (e) {}
+  }
+
+  function spawnFloatingEmoji(emoji) {
+    const layer = document.getElementById('shortsEmojiLayer');
+    if (!layer) return;
+    for (let i = 0; i < 4; i++) {
+      const el = document.createElement('span');
+      el.textContent = emoji;
+      el.style.position = 'absolute';
+      el.style.left = (15 + Math.random() * 70) + '%';
+      el.style.bottom = '64px';
+      el.style.fontSize = (22 + Math.random() * 14) + 'px';
+      el.style.transition = 'transform 1.4s ease-out, opacity 1.4s ease-out';
+      el.style.opacity = '1';
+      layer.appendChild(el);
+      requestAnimationFrame(() => {
+        el.style.transform = `translateY(-${260 + Math.random() * 160}px) translateX(${(Math.random() - 0.5) * 60}px) scale(1.25)`;
+        el.style.opacity = '0';
+      });
+      setTimeout(() => el.remove(), 1450);
+    }
+  }
+
+  async function triggerShortsReaction(key, emoji) {
+    spawnFloatingEmoji(emoji);
+    const clip = getActiveShortClip();
+    if (!clip) return;
+    shortsStatsMap[clip.clip_id] = shortsStatsMap[clip.clip_id] || { likes: 0, fire: 0, legend: 0, genius: 0, chills: 0, clap: 0, opt_a_votes: 0, opt_b_votes: 0 };
+    shortsStatsMap[clip.clip_id][key] = (shortsStatsMap[clip.clip_id][key] || 0) + 1;
+    renderShortsStatsUI();
+    try {
+      const res = await fetch('/api/shorts/interact', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clip_id: clip.clip_id, action: 'react', reaction: key })
+      });
+      const data = await res.json();
+      if (data && data.ok && data.stats) {
+        shortsStatsMap[clip.clip_id] = data.stats;
+        renderShortsStatsUI();
+      }
+    } catch (e) {}
+  }
+
+  function answerShortsQuiz(idx) {
+    const clip = getActiveShortClip();
+    if (!clip || !clip.quiz) return;
+    const resBox = document.getElementById('shortsQuizResult');
+    const isCorrect = idx === clip.quiz.answerIdx;
+    if (isCorrect) {
+      if (!shortsQuizAnswered[clip.clip_id]) {
+        shortsQuizAnswered[clip.clip_id] = true;
+        if (typeof points === 'number') points += 15;
+        if (typeof updatePointsUI === 'function') updatePointsUI();
+        if (typeof showToast === 'function') showToast('🎯 정답! +15P 포인트가 적립되었습니다!');
+      } else if (typeof showToast === 'function') {
+        showToast('🎯 이미 +15P 적립 완료된 퀴즈입니다!');
+      }
+      if (resBox) {
+        resBox.className = 'rounded-xl bg-emerald-500/15 border border-emerald-500/40 p-2.5 text-xs text-emerald-200';
+        resBox.textContent = '✅ 정답 (+15P 적립)! ' + clip.quiz.explain;
+      }
+    } else {
+      if (resBox) {
+        resBox.className = 'rounded-xl bg-rose-500/15 border border-rose-500/40 p-2.5 text-xs text-rose-200';
+        resBox.textContent = '❌ 아쉽습니다! 다시 한번 예측해 보세요.';
+      }
+    }
+    if (resBox) resBox.classList.remove('hidden');
+  }
+
+  async function voteShortsBalance(action) {
+    const clip = getActiveShortClip();
+    if (!clip) return;
+    shortsStatsMap[clip.clip_id] = shortsStatsMap[clip.clip_id] || { likes: 0, fire: 0, legend: 0, genius: 0, chills: 0, clap: 0, opt_a_votes: 0, opt_b_votes: 0 };
+    if (action === 'vote_a') shortsStatsMap[clip.clip_id].opt_a_votes += 1;
+    else shortsStatsMap[clip.clip_id].opt_b_votes += 1;
+    renderShortsStatsUI();
+    if (typeof showToast === 'function') showToast('⚖️ 팬 판정 투표가 DB에 반영되었습니다!');
+    try {
+      const res = await fetch('/api/shorts/interact', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clip_id: clip.clip_id, action })
+      });
+      const data = await res.json();
+      if (data && data.ok && data.stats) {
+        shortsStatsMap[clip.clip_id] = data.stats;
+        renderShortsStatsUI();
+      }
+    } catch (e) {}
+  }
+
+  function focusShortsComment() {
+    const el = document.getElementById('shortsCommentInput');
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); }
+  }
+
+  function captureCurrentShortTime() {
+    const ts = document.getElementById('shortsTsInput');
+    if (ts) ts.value = Math.floor(shortsTime);
+  }
+
+  async function submitShortsComment() {
+    const clip = getActiveShortClip();
+    const tsEl = document.getElementById('shortsTsInput');
+    const nickEl = document.getElementById('shortsNickInput');
+    const textEl = document.getElementById('shortsCommentInput');
+    if (!clip || !textEl) return;
+    const comment = textEl.value.trim();
+    if (!comment) { if (typeof showToast === 'function') showToast('한줄평 내용을 입력해 주세요.'); return; }
+    const time_sec = Math.max(0, parseInt(tsEl?.value || '0', 10) || 0);
+    const nickname = (nickEl?.value || 'SportIQ 팬').trim() || 'SportIQ 팬';
+    try {
+      const res = await fetch('/api/shorts/comment', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clip_id: clip.clip_id, time_sec, nickname, comment })
+      });
+      const data = await res.json();
+      if (data && data.ok && data.comment) {
+        shortsCommentsMap[clip.clip_id] = shortsCommentsMap[clip.clip_id] || [];
+        shortsCommentsMap[clip.clip_id].push(data.comment);
+        shortsCommentsMap[clip.clip_id].sort((a, b) => a.time_sec - b.time_sec);
+        textEl.value = '';
+        renderShortsComments();
+        if (typeof showToast === 'function') showToast('⏱️ 타임스탬프 한줄평이 등록되었습니다!');
+      }
+    } catch (e) {}
+  }
+
+  function openShortsSubmitModal() {
+    const m = document.getElementById('shortsSubmitModal');
+    if (m) { m.classList.remove('hidden'); m.classList.add('flex'); }
+  }
+
+  function closeShortsSubmitModal() {
+    const m = document.getElementById('shortsSubmitModal');
+    if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+  }
+
+  async function submitCustomShort() {
+    const title = document.getElementById('submitShortTitle')?.value.trim();
+    const sport = document.getElementById('submitShortSport')?.value || 'soccer';
+    const youtube_url = document.getElementById('submitShortUrl')?.value.trim();
+    const point_note = document.getElementById('submitShortNote')?.value.trim() || '';
+    const nickname = document.getElementById('submitShortNick')?.value.trim() || '회원 제보';
+    if (!title || !youtube_url) {
+      if (typeof showToast === 'function') showToast('제목과 유튜브 URL을 입력해 주세요.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/shorts/submit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, sport, youtube_url, point_note, nickname })
+      });
+      const data = await res.json();
+      if (data && data.ok && data.clip) {
+        shortsCustomClips.unshift(data.clip);
+        shortsStatsMap[data.clip.clip_id] = { likes: 1, fire: 0, legend: 0, genius: 0, chills: 0, clap: 0, opt_a_votes: 0, opt_b_votes: 0 };
+        closeShortsSubmitModal();
+        document.getElementById('submitShortTitle').value = '';
+        document.getElementById('submitShortUrl').value = '';
+        document.getElementById('submitShortNote').value = '';
+        setShortsFilter('all');
+        selectShortClip(data.clip.clip_id);
+        if (typeof showToast === 'function') showToast('🎬 제보한 숏츠가 DB에 등록되었습니다!');
+      }
+    } catch (e) {}
+  }
+
+  function openYoutubeShortsSearch() {
+    const clip = getActiveShortClip();
+    if (!clip) return;
+    const url = clip.youtubeUrl && clip.youtubeUrl.startsWith('http')
+      ? clip.youtubeUrl
+      : 'https://www.youtube.com/results?search_query=' + encodeURIComponent(clip.youtubeQuery + ' shorts');
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  function renderShortsClipGrid() {
+    const grid = document.getElementById('shortsClipGrid');
+    const counter = document.getElementById('shortsClipCounter');
+    if (!grid) return;
+    const list = getFilteredShortsClips();
+    if (counter) counter.textContent = list.length + '개 클립';
+    grid.innerHTML = list.map(c => {
+      const active = c.clip_id === shortsActiveId;
+      return `<button type="button" onclick="selectShortClip('${c.clip_id}')" class="text-left rounded-xl p-2.5 border transition ${active ? 'bg-emerald-500/15 border-emerald-500 text-white' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-600'}">
+        <div class="text-[10px] font-bold ${active ? 'text-emerald-400' : 'text-slate-400'}">${c.sportLabel}</div>
+        <div class="text-xs font-extrabold truncate mt-0.5">${c.title}</div>
+      </button>`;
+    }).join('');
+  }
+
+  function renderShortsStatsUI() {
+    const clip = getActiveShortClip();
+    if (!clip) return;
+    const s = shortsStatsMap[clip.clip_id] || { likes: 0, fire: 0, legend: 0, genius: 0, chills: 0, clap: 0, opt_a_votes: 0, opt_b_votes: 0 };
+    const likeEl = document.getElementById('shortsLikeCount');
+    if (likeEl) likeEl.textContent = s.likes || 0;
+    ['fire', 'legend', 'genius', 'chills', 'clap'].forEach(k => {
+      const el = document.getElementById('reactCount_' + k);
+      if (el) el.textContent = s[k] || 0;
+    });
+    const a = s.opt_a_votes || 0;
+    const b = s.opt_b_votes || 0;
+    const tot = a + b;
+    const pctA = tot ? Math.round((a / tot) * 100) : 50;
+    const pctB = 100 - pctA;
+    const barA = document.getElementById('shortsVoteBarA');
+    const barB = document.getElementById('shortsVoteBarB');
+    const txtA = document.getElementById('shortsVotePctA');
+    const txtB = document.getElementById('shortsVotePctB');
+    const totEl = document.getElementById('shortsVoteTotal');
+    if (barA) barA.style.width = pctA + '%';
+    if (barB) barB.style.width = pctB + '%';
+    if (txtA) txtA.textContent = `A ${pctA}% (${a}표)`;
+    if (txtB) txtB.textContent = `B ${pctB}% (${b}표)`;
+    if (totEl) totEl.textContent = `${tot}표 참여`;
+  }
+
+  function renderShortsComments() {
+    const clip = getActiveShortClip();
+    const listEl = document.getElementById('shortsCommentsList');
+    const cntEl = document.getElementById('shortsCommentCount');
+    if (!clip || !listEl) return;
+    const arr = shortsCommentsMap[clip.clip_id] || [];
+    if (cntEl) cntEl.textContent = arr.length;
+    if (!arr.length) {
+      listEl.innerHTML = '<div class="text-xs text-slate-500">첫 타임스탬프 한줄평을 남겨보세요!</div>';
+      return;
+    }
+    listEl.innerHTML = arr.map(c => {
+      const sec = String(c.time_sec).padStart(2, '0');
+      return `<div class="flex items-center gap-2 rounded-lg bg-slate-900/90 border border-slate-800 px-3 py-1.5 text-xs">
+        <span class="rounded bg-emerald-500/20 px-1.5 py-0.5 font-mono text-[10px] font-bold text-emerald-300">00:${sec}</span>
+        <span class="font-bold text-cyan-300">${c.nickname}</span>
+        <span class="text-slate-200 flex-1">${c.comment}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function renderActiveShortUI() {
+    const clip = getActiveShortClip();
+    if (!clip) return;
+    const badge = document.getElementById('shortsSportBadge');
+    const topTag = document.getElementById('shortsTop20Tag');
+    const title = document.getElementById('shortsActiveTitle');
+    const desc = document.getElementById('shortsActiveDesc');
+    if (badge) badge.textContent = clip.sportLabel;
+    if (topTag) topTag.textContent = clip.top20Tag;
+    if (title) title.textContent = clip.title;
+    if (desc) desc.textContent = clip.desc;
+
+    const qEl = document.getElementById('shortsQuizQuestion');
+    const optsEl = document.getElementById('shortsQuizOptions');
+    const resBox = document.getElementById('shortsQuizResult');
+    if (qEl) qEl.textContent = clip.quiz.q;
+    if (optsEl) {
+      optsEl.innerHTML = clip.quiz.options.map((opt, idx) =>
+        `<button type="button" onclick="answerShortsQuiz(${idx})" class="rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 px-3 py-2 text-xs font-bold text-slate-200 transition text-left">${idx + 1}. ${opt}</button>`
+      ).join('');
+    }
+    if (resBox) resBox.classList.add('hidden');
+
+    const vTopic = document.getElementById('shortsVoteTopic');
+    const vA = document.getElementById('shortsVoteBtnA');
+    const vB = document.getElementById('shortsVoteBtnB');
+    if (vTopic) vTopic.textContent = clip.vote.topic;
+    if (vA) vA.textContent = 'A. ' + clip.vote.optA;
+    if (vB) vB.textContent = 'B. ' + clip.vote.optB;
+
+    renderShortsStatsUI();
+    renderShortsComments();
+  }
+
+  function drawShortsCanvasFrame(ts) {
+    const canvas = document.getElementById('shortsHubCanvas');
+    if (canvas) {
+      if (!shortsLastFrameTs) shortsLastFrameTs = ts;
+      const dt = Math.min(0.1, (ts - shortsLastFrameTs) / 1000);
+      shortsLastFrameTs = ts;
+      if (shortsPlaying) {
+        shortsTime = (shortsTime + dt * shortsSpeed) % 20;
+      }
+      const secStr = String(Math.floor(shortsTime)).padStart(2, '0');
+      const timeBadge = document.getElementById('shortsTimeBadge');
+      if (timeBadge) timeBadge.textContent = `00:${secStr} / 00:20`;
+
+      const clip = getActiveShortClip();
+      const overlay = document.getElementById('shortsLiveOverlay');
+      if (overlay && clip) {
+        const activeComments = (shortsCommentsMap[clip.clip_id] || []).filter(c => shortsTime >= c.time_sec && shortsTime <= c.time_sec + 3.2);
+        overlay.innerHTML = activeComments.slice(-2).map(c =>
+          `<div class="rounded-full bg-slate-950/85 border border-emerald-400/50 px-3 py-1 text-[11px] text-white shadow-lg backdrop-blur">
+            <span class="font-mono text-emerald-300">[00:${String(c.time_sec).padStart(2, '0')} ${c.nickname}]</span> ${c.comment}
+          </div>`
+        ).join('');
+      }
+
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      const p = shortsTime / 20;
+      const sport = clip ? clip.sport : 'soccer';
+
+      if (sport === 'soccer') {
+        ctx.fillStyle = '#064e3b';
+        ctx.fillRect(0, 0, w, h);
+        for (let i = 0; i < 8; i++) {
+          ctx.fillStyle = i % 2 === 0 ? 'rgba(16,185,129,0.08)' : 'rgba(6,78,59,0.2)';
+          ctx.fillRect(0, i * (h / 8), w, h / 8);
+        }
+        ctx.fillStyle = 'rgba(6,182,212,0.12)';
+        ctx.fillRect(55, 90, 65, 340);
+        ctx.fillRect(240, 90, 65, 340);
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(24, 75, w - 48, 390);
+        ctx.strokeRect(90, 75, 180, 75);
+        ctx.beginPath(); ctx.arc(w / 2, 270, 48, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = 'rgba(15,23,42,0.88)';
+        ctx.fillRect(24, 48, 170, 22);
+        ctx.fillStyle = '#34d399';
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText('LIV 2 - 1 MCI  |  xG 0.42', 32, 63);
+        const px = 85 + Math.sin(p * Math.PI * 2) * 35 + p * 140;
+        const py = 360 - p * 235;
+        ctx.strokeStyle = 'rgba(244,63,94,0.6)';
+        ctx.beginPath(); ctx.arc(px + 30, py - 20, 26 + (shortsTime % 2) * 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(85, 360); ctx.quadraticCurveTo(230, 240, 185, 92); ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill();
+      } else if (sport === 'baseball') {
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(30,41,59,0.9)';
+        ctx.fillRect(22, 52, w - 44, 52);
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText('156 km/h · 2,480 RPM · TUNNEL', 34, 74);
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillText('BSO ●●○ | 1B◆ 2B◇ 3B◆', 34, 94);
+        const zx = 105, zy = 185, zw = 150, zh = 190;
+        ctx.strokeStyle = 'rgba(148,163,184,0.5)';
+        ctx.lineWidth = 2;
+        for (let r = 0; r < 3; r++) {
+          for (let c = 0; c < 3; c++) {
+            ctx.strokeRect(zx + c * (zw / 3), zy + r * (zh / 3), zw / 3, zh / 3);
+          }
+        }
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(180, 118); ctx.quadraticCurveTo(182, 165, 195, 225); ctx.stroke();
+        ctx.strokeStyle = '#f43f5e';
+        ctx.beginPath(); ctx.moveTo(180, 118); ctx.quadraticCurveTo(178, 215, 168, 355); ctx.stroke();
+        const by = 118 + ((p * 2.5) % 1) * 235;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(178, by, 8, 0, Math.PI * 2); ctx.fill();
+      } else if (sport === 'basketball') {
+        ctx.fillStyle = '#451a03';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = 'rgba(251,191,36,0.55)';
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(24, 70, w - 48, 380);
+        ctx.strokeRect(120, 70, 120, 150);
+        ctx.beginPath(); ctx.arc(180, 95, 145, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+        ctx.fillStyle = 'rgba(15,23,42,0.9)';
+        ctx.fillRect(240, 48, 96, 24);
+        ctx.fillStyle = '#f43f5e';
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText('SHOT ' + (4.8 - (shortsTime % 4.8)).toFixed(1) + 's', 248, 64);
+        ctx.strokeStyle = '#34d399';
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath(); ctx.moveTo(95, 275); ctx.lineTo(180, 210); ctx.lineTo(255, 255); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#fb923c';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(255, 255); ctx.quadraticCurveTo(215, 110, 180, 96); ctx.stroke();
+        const t = (p * 2) % 1;
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath(); ctx.arc(255 - t * 75, 255 - Math.sin(t * Math.PI) * 140 - t * 159, 9, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.fillStyle = '#0c4a6e';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(224,242,254,0.12)';
+        ctx.fillRect(24, 65, w - 48, 390);
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(24, 210); ctx.lineTo(w - 24, 210); ctx.stroke();
+        ctx.strokeStyle = '#f43f5e';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(24, 115); ctx.lineTo(w - 24, 115); ctx.stroke();
+        ctx.beginPath(); ctx.arc(105, 160, 32, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(255, 160, 32, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#fde047';
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText('164 km/h ONE-TIMER · PP 5v4', 34, 56);
+        ctx.strokeStyle = '#22d3ee';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(95, 185); ctx.lineTo(265, 175); ctx.lineTo(180, 102); ctx.stroke();
+        const t = (p * 3) % 1;
+        ctx.fillStyle = '#020617';
+        ctx.beginPath(); ctx.arc(265 - t * 85, 175 - t * 73, 6, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    requestAnimationFrame(drawShortsCanvasFrame);
+  }
+
+  fetchShortsHub();
+  requestAnimationFrame(drawShortsCanvasFrame);
+// );
 </script>
 </body>
 </html>
