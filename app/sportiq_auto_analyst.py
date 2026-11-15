@@ -910,10 +910,10 @@ def post_shorts_interact(req: ShortsInteractReq, request: Request):
                 row = conn.execute("SELECT * FROM shorts_clip_stats WHERE clip_id = ?", (cid,)).fetchone()
                 return {"ok": True, "already_participated": True, "clip_id": cid, "stats": _format_stat_row(row)}
                 conn.execute("INSERT INTO shorts_user_actions (clip_id, action_group, actor_key, choice, created_at) VALUES (?, ?, ?, ?, ?)", (cid, action_group, actor, action, _now_kst().isoformat()))
-            conn.execute(
-            f"UPDATE shorts_clip_stats SET {col} = COALESCE({col} , 0)+ 1, updated_at = ? WHERE clip_id = ?",
-            (time.time(), cid),
-        )
+        conn.execute(
+        f"UPDATE shorts_clip_stats SET {col} = COALESCE({col} , 0)+ 1, updated_at = ? WHERE clip_id = ?",
+        (time.time(), cid),
+    )
         row = conn.execute("SELECT * FROM shorts_clip_stats WHERE clip_id = ?", (cid,)).fetchone()
         conn.commit()
     _backup_tables_to_pg("shorts_clip_stats", "shorts_user_actions")
