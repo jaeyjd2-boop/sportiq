@@ -869,7 +869,7 @@ def get_shorts_hub():
             "SELECT id, clip_id, title, sport, youtube_url, point_note, nickname, created_at FROM shorts_custom_clips WHERE COALESCE(is_hidden, 0) = 0 ORDER BY id DESC"
         ).fetchall()
         custom_clips = [dict(r) for r in clip_rows]
-    return {"ok": True, "stats": stats, "comments": comments, "custom_clips": custom_clips}, "persistent_db": bool(_PG_PERSISTENT_OK)
+    return {"ok": True, "stats": stats, "comments": comments, "custom_clips": custom_clips, "persistent_db": bool(_PG_PERSISTENT_OK)}
 
 
 @router.post("/api/shorts/interact")
