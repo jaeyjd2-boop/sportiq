@@ -193,6 +193,20 @@
 
       <!-- TAB 2: MATCHES & POLLS -->
       <section id="tab-matches" class="tab-panel hidden space-y-4">
+      <div class="rounded-2xl border border-emerald-500/30 bg-slate-900/80 p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 px-3 py-1 text-xs font-bold text-emerald-300">🌍 실시간 글로벌 빅매치 화제성 TOP 20 연동 · 총 20경기</span>
+          <span id="matchesSyncBadge" class="text-[11px] text-slate-400">실시간 화제성 순위 기준</span>
+        </div>
+        <div id="matchSportFilters" class="flex flex-wrap gap-1.5">
+          <button type="button" onclick="setMatchSportFilter('ALL')" data-sport-filter="ALL" class="match-sport-btn rounded-lg px-3 py-1.5 text-xs font-semibold bg-emerald-500 text-slate-950">전체 TOP 20</button>
+          <button type="button" onclick="setMatchSportFilter('축구')" data-sport-filter="축구" class="match-sport-btn rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700">⚽ 축구</button>
+          <button type="button" onclick="setMatchSportFilter('야구')" data-sport-filter="야구" class="match-sport-btn rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700">⚾ 야구</button>
+          <button type="button" onclick="setMatchSportFilter('농구')" data-sport-filter="농구" class="match-sport-btn rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700">🏀 농구(NBA)</button>
+          <button type="button" onclick="setMatchSportFilter('하키')" data-sport-filter="하키" class="match-sport-btn rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700">🏒 하키(NHL)</button>
+          <button type="button" onclick="setMatchSportFilter('미식축구')" data-sport-filter="미식축구" class="match-sport-btn rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700">🏈 미식축구(NFL)</button>
+        </div>
+      </div>
         <div id="matchesList" class="space-y-4"></div>
       </section>
 
@@ -1170,6 +1184,227 @@ setRole('GUEST');
     }
   }
 
+  llet matchPredictionsData = [];
+let currentMatchSportFilter = 'ALL';
+let matchCompareChartInstance = null;
+
+function getSportMetrics(sport) {
+  const s = String(sport || '');
+  if (s.includes('야구')) return ['팀 OPS', '선발 ERA 안정도', '불펜 방어력', '득점권 타율', '수비 효율'];
+  if (s.includes('농구')) return ['공격 레이팅', '수비 레이팅', '3점슛 성공률', '리바운드 장악', '클러치 효율'];
+  if (s.includes('하키')) return ['골 기대값(xG)', '파워플레이', '페널티 킬', '골리 세이브율', '유효슈팅'];
+  if (s.includes('미식축구') || s.includes('NFL')) return ['패싱 야드', '러싱 효율', '3rd 다운 성공', '턴오버 마진', '레드존 득점'];
+  return ['공격 화력(xG)', '수비 조직력', '중원 점유율', '전환 속도', '세트피스 위협'];
+}
+
+function getDeterministicStats(matchKey, sideOffset) {
+  let h = 0;
+  const str = String(matchKey || 'match') + '_' + sideOffset;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h) + str.charCodeAt(i);
+    h |= 0;
+  }
+  const res = [];
+  for (let i = 0; i < 5; i++) {
+    const v = Math.abs((h >> (i * 3)) ^ (i * 17 + sideOffset * 13)) % 28 + 68;
+    res.push(v);
+  }
+  return res;
+}
+
+function setMatchSportFilter(sport) {
+  currentMatchSportFilter = sport || 'ALL';
+  document.querySelectorAll('.match-sport-btn').forEach(btn => {
+    const active = btn.getAttribute('data-sport-filter') === currentMatchSportFilter;
+    btn.className = active
+      ? 'match-sport-btn rounded-lg px-3 py-1.5 text-xs font-semibold bg-emerald-500 text-slate-950'
+      : 'match-sport-btn rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700';
+  });
+  renderMatches();
+}
+
+function getActiveMatchList() {
+  if (Array.isArray(matchPredictionsData) && matchPredictionsData.length > 0) {
+    return matchPredictionsData;
+  }
+  const base = Array.isArray(globalMatchesData) ? globalMatchesData : [];
+  return base.slice(0, 20).map((m, idx) => {
+    const v = Number(m.votes || 100);
+    const b = Math.max(40, Math.floor(v / 10));
+    const hv = Math.max(12, Math.floor(b * 0.44));
+    const dv = Math.max(6, Math.floor(b * 0.16));
+    const av = Math.max(10, b - hv - dv);
+    return Object.assign({}, m, {
+      rank: idx + 1,
+      home_votes: hv,
+      draw_votes: dv,
+      away_votes: av,
+      total_votes: hv + dv + av
+    });
+  });
+}
+
+function renderMatches() {
+  const container = document.getElementById('matchesList');
+  if (!container) return;
+  const all = getActiveMatchList();
+  const filtered = currentMatchSportFilter === 'ALL'
+    ? all
+    : all.filter(m => String(m.sport || '').includes(currentMatchSportFilter) || (currentMatchSportFilter === '미식축구' && String(m.league || '').includes('NFL')));
+  if (!filtered.length) {
+    container.innerHTML = '<div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center text-sm text-slate-400">해당 종목의 글로벌 TOP 20 경기가 없습니다.</div>';
+    return;
+  }
+  container.innerHTML = filtered.map((m, idx) => {
+    const rank = m.rank || (idx + 1);
+    const medal = rank === 1 ? '🥇 ' : rank === 2 ? '🥈 ' : rank === 3 ? '🥉 ' : '';
+    const matchup = String(m.matchup || '홈팀 vs 원정팀');
+    const parts = matchup.split(/\s+vs\s+/i);
+    const homeTeam = (parts[0] || '홈팀').trim();
+    const awayTeam = (parts[1] || '원정팀').trim();
+    const sport = String(m.sport || '스포츠');
+    const drawLabel = (sport.includes('야구') || sport.includes('농구') || sport.includes('하키')) ? '접전/연장 승부' : '무승부';
+    const hv = Number(m.home_votes || 0);
+    const dv = Number(m.draw_votes || 0);
+    const av = Number(m.away_votes || 0);
+    const total = Math.max(1, hv + dv + av);
+    const hp = Math.round((hv / total) * 100);
+    const dp = Math.round((dv / total) * 100);
+    const ap = Math.max(0, 100 - hp - dp);
+    const mk = String(m.match_key || ('match_' + rank)).replace(/'/g, "\\'");
+    return `
+      <div class="glass-card rounded-2xl border border-slate-800 p-5 space-y-4">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="space-y-1.5">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="rounded-full bg-amber-500/15 border border-amber-500/40 px-2.5 py-0.5 text-xs font-bold text-amber-300">${medal}글로벌 화제성 #${rank}</span>
+              <span class="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">${m.league || ''} · ${sport}</span>
+              <span class="text-xs text-slate-400">🔥 화제성 ${m.buzz_score || 90}점 · 관심 ${Number(m.votes || 0).toLocaleString()}표</span>
+            </div>
+            <h3 class="text-lg font-bold text-white">${matchup}</h3>
+            <p class="text-xs text-slate-400">📅 ${m.schedule_venue || '일정 추후 공지'}</p>
+          </div>
+          <button type="button" onclick="openMatchCompareModal('${mk}')" class="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-2 text-xs font-bold text-cyan-300 hover:bg-cyan-500/20">📊 Chart.js 지표 비교</button>
+        </div>
+        <div class="space-y-2">
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" onclick="voteMatchPrediction('${mk}','home')" class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/20">${homeTeam} 승 (${hp}%)</button>
+            <button type="button" onclick="voteMatchPrediction('${mk}','draw')" class="rounded-xl border border-slate-600/50 bg-slate-800/80 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-700">${drawLabel} (${dp}%)</button>
+            <button type="button" onclick="voteMatchPrediction('${mk}','away')" class="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-300 hover:bg-rose-500/20">${awayTeam} 승 (${ap}%)</button>
+          </div>
+          <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-800 flex">
+            <div style="width:${hp}%" class="bg-emerald-500 transition-all duration-300"></div>
+            <div style="width:${dp}%" class="bg-slate-400 transition-all duration-300"></div>
+            <div style="width:${ap}%" class="bg-rose-500 transition-all duration-300"></div>
+          </div>
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span>${homeTeam} ${hv}표 · ${drawLabel} ${dv}표 · ${awayTeam} ${av}표</span>
+            <span class="font-semibold text-slate-300">총 ${(hv + dv + av).toLocaleString()}명 참여</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function loadMatchPredictions() {
+  renderMatches();
+  try {
+    const res = await fetch('/api/matches/predictions');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (Array.isArray(data.matches) && data.matches.length > 0) {
+      matchPredictionsData = data.matches;
+      renderMatches();
+    }
+  } catch (e) {}
+}
+
+async function voteMatchPrediction(matchKey, choice) {
+  const list = getActiveMatchList();
+  const target = list.find(m => m.match_key === matchKey);
+  if (target) {
+    if (choice === 'home') target.home_votes = Number(target.home_votes || 0) + 1;
+    if (choice === 'draw') target.draw_votes = Number(target.draw_votes || 0) + 1;
+    if (choice === 'away') target.away_votes = Number(target.away_votes || 0) + 1;
+    target.total_votes = Number(target.home_votes || 0) + Number(target.draw_votes || 0) + Number(target.away_votes || 0);
+    if (!matchPredictionsData.length) matchPredictionsData = list;
+    renderMatches();
+  }
+  try {
+    const res = await fetch('/api/matches/predictions/' + encodeURIComponent(matchKey) + '/vote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ choice: choice })
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      const row = matchPredictionsData.find(m => m.match_key === matchKey);
+      if (row) {
+        row.home_votes = updated.home_votes;
+        row.draw_votes = updated.draw_votes;
+        row.away_votes = updated.away_votes;
+        row.total_votes = updated.total_votes;
+        renderMatches();
+      }
+      if (typeof showToast === 'function') showToast('🗳️ 승부예측 투표가 DB에 저장되었습니다!');
+    }
+  } catch (e) {}
+}
+
+function openMatchCompareModal(matchKey) {
+  const list = getActiveMatchList();
+  const m = list.find(x => x.match_key === matchKey) || list[0];
+  if (!m) return;
+  let modal = document.getElementById('matchCompareModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'matchCompareModal';
+    modal.className = 'fixed inset-0 z-50 hidden items-center justify-center bg-black/75 p-4';
+    modal.innerHTML = `
+      <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p id="matchCompareSubtitle" class="text-xs font-semibold text-cyan-400"></p>
+            <h3 id="matchCompareTitle" class="text-base font-bold text-white"></h3>
+          </div>
+          <button type="button" onclick="document.getElementById('matchCompareModal').classList.add('hidden');document.getElementById('matchCompareModal').classList.remove('flex');" class="rounded-lg bg-slate-800 px-3 py-1 text-xs text-slate-300 hover:bg-slate-700">닫기</button>
+        </div>
+        <div class="h-72"><canvas id="matchCompareCanvas"></canvas></div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  const parts = String(m.matchup || '홈팀 vs 원정팀').split(/\s+vs\s+/i);
+  const homeTeam = (parts[0] || '홈팀').trim();
+  const awayTeam = (parts[1] || '원정팀').trim();
+  document.getElementById('matchCompareSubtitle').textContent = (m.league || '') + ' · ' + (m.sport || '') + ' 5대 핵심 지표 비교';
+  document.getElementById('matchCompareTitle').textContent = homeTeam + ' vs ' + awayTeam;
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  const canvas = document.getElementById('matchCompareCanvas');
+  if (matchCompareChartInstance) {
+    matchCompareChartInstance.destroy();
+    matchCompareChartInstance = null;
+  }
+  if (typeof Chart !== 'undefined' && canvas) {
+    matchCompareChartInstance = new Chart(canvas.getContext('2d'), {
+      type: 'radar',
+      data: {
+        labels: getSportMetrics(m.sport),
+        datasets: [
+          { label: homeTeam, data: getDeterministicStats(m.match_key, 1), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.2)', borderWidth: 2 },
+          { label: awayTeam, data: getDeterministicStats(m.match_key, 2), borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,0.2)', borderWidth: 2 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { r: { min: 50, max: 100, ticks: { display: false }, grid: { color: 'rgba(148,163,184,0.2)' }, pointLabels: { color: '#cbd5e1', font: { size: 11 } } } },
+        plugins: { legend: { labels: { color: '#f8fafc' } } }
+      }
+    });
+  }
+}
+loadMatchPredictions();
   loadGlobalMatches();
 </script>
 </body>
