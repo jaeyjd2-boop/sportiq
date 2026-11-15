@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS global_match_rankings (
                 "INSERT INTO cheers(session_id, author, role, team, message, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 cseeds,
             )
-       grow = conn.execute("SELECT COUNT(*) AS cnt FROM global_match_rankings").fetchone()
+        grow = conn.execute("SELECT COUNT(*) AS cnt FROM global_match_rankings").fetchone()
      if grow["cnt"] == 0:
        gseeds = [
             ("epl-liv-mun", "football", "EPL", "#38003c", "리버풀 vs 맨체스터 유나이티드", "11.22 · 안필드 노스웨스트 더비", 2840, 99, "-"),
