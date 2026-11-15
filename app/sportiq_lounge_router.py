@@ -286,8 +286,8 @@ def create_partner_inquiry(payload: PartnerInquiryIn):
         )
         new_id = cur.lastrowid
         try:
-        from app.sportiq_auto_analyst import _backup_tables_to_pg
-        _backup_tables_to_pg("partner_inquiries")
+            from app.sportiq_auto_analyst import _backup_tables_to_pg
+            _backup_tables_to_pg("partner_inquiries")
     except Exception: pass
     return {"ok": True, "id": new_id, "message": "파트너 입점 및 제휴 문의가 정상 접수되었습니다."}
 
@@ -378,8 +378,8 @@ def vote_global_match(match_id: int):
     
     voted = next((m for m in items if m["id"] == match_id), None)
     try:
-    from app.sportiq_auto_analyst import _backup_tables_to_pg
-    _backup_tables_to_pg("global_match_rankings")
+        from app.sportiq_auto_analyst import _backup_tables_to_pg
+        _backup_tables_to_pg("global_match_rankings")
     except Exception:
         pass
     return {"ok": True, "match": voted, "matches": items}
