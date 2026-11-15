@@ -19,6 +19,8 @@ _ISSUE_RANKING_PG_TABLES = (
     "cheer_hidden",
     "hot_issue_votes",
     "member_leaderboard",
+    "daily_hashtags",
+    "partner_inquiries",
 )
 
 try:
