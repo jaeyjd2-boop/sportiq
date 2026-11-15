@@ -796,7 +796,7 @@
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
       document.getElementById('tab-' + tab).classList.remove('hidden');
       document.querySelectorAll('.tab-btn').forEach(b => {
-        const active = b.dataset.tab === tab;
+        b.classList.remove('bg-emerald-500', 'bg-emerald-500/15', 'bg-emerald-500/20', 'text-slate-950', 'text-emerald-300', 'text-emerald-400', 'border-emerald-500/30', 'border-emerald-500/40', 'font-bold'); const active = b.dataset.tab === tab;
         b.className = active
           ? 'tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold bg-emerald-500 text-slate-950 transition'
           : 'tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition';
@@ -2161,8 +2161,8 @@ async function reportCustomShort(clipId, event) {
       const el = document.getElementById('reactCount_' + k);
       if (el) el.textContent = s[k] || 0;
     });
-    const a = s.opt_a_votes || 0;
-    const b = s.opt_b_votes || 0;
+    const a = s.opt_a_votes ?? s.vote_a ?? 0;
+    const b = s.opt_b_votes ?? s.vote_b ?? 0;
     const tot = a + b;
     const pctA = tot ? Math.round((a / tot) * 100) : 50;
     const pctB = 100 - pctA;
@@ -2279,10 +2279,10 @@ async function reportCustomShort(clipId, event) {
         ctx.strokeRect(90, 75, 180, 75);
         ctx.beginPath(); ctx.arc(w / 2, 270, 48, 0, Math.PI * 2); ctx.stroke();
         ctx.fillStyle = 'rgba(15,23,42,0.88)';
-        ctx.fillRect(24, 48, 170, 22);
+        ctx.fillRect(24, 82, 170, 22);
         ctx.fillStyle = '#34d399';
         ctx.font = 'bold 11px monospace';
-        ctx.fillText((clip && (clip.hudText || ((clip.league || 'CUSTOM') + ' | ' + (clip.title || '').slice(0, 22)))) || 'SPORTIQ LIVE', 32, 63);
+        ctx.fillText((clip && (clip.hudText || ((clip.league || 'CUSTOM') + ' | ' + (clip.title || '').slice(0, 22)))) || 'SPORTIQ LIVE', 32, 97);
         const px = 85 + Math.sin(p * Math.PI * 2) * 35 + p * 140;
         const py = 360 - p * 235;
         ctx.strokeStyle = 'rgba(244,63,94,0.6)';
@@ -2296,12 +2296,12 @@ async function reportCustomShort(clipId, event) {
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(0, 0, w, h);
         ctx.fillStyle = 'rgba(30,41,59,0.9)';
-        ctx.fillRect(22, 52, w - 44, 52);
+        ctx.fillRect(22, 82, w - 44, 52);
         ctx.fillStyle = '#38bdf8';
         ctx.font = 'bold 12px monospace';
-        ctx.fillText('156 km/h · 2,480 RPM · TUNNEL', 34, 74);
+        ctx.fillText('156 km/h · 2,480 RPM · TUNNEL', 34, 104);
         ctx.fillStyle = '#fbbf24';
-        ctx.fillText('BSO ●●○ | 1B◆ 2B◇ 3B◆', 34, 94);
+        ctx.fillText('BSO ●●○ | 1B◆ 2B◇ 3B◆', 34, 124);
         const zx = 105, zy = 185, zw = 150, zh = 190;
         ctx.strokeStyle = 'rgba(148,163,184,0.5)';
         ctx.lineWidth = 2;
@@ -2327,10 +2327,10 @@ async function reportCustomShort(clipId, event) {
         ctx.strokeRect(120, 70, 120, 150);
         ctx.beginPath(); ctx.arc(180, 95, 145, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
         ctx.fillStyle = 'rgba(15,23,42,0.9)';
-        ctx.fillRect(240, 48, 96, 24);
+        ctx.fillRect(240, 82, 96, 24);
         ctx.fillStyle = '#f43f5e';
         ctx.font = 'bold 12px monospace';
-        ctx.fillText('SHOT ' + (4.8 - (shortsTime % 4.8)).toFixed(1) + 's', 248, 64);
+        ctx.fillText('SHOT ' + (4.8 - (shortsTime % 4.8)).toFixed(1) + 's', 248, 98);
         ctx.strokeStyle = '#34d399';
         ctx.setLineDash([5, 4]);
         ctx.beginPath(); ctx.moveTo(95, 275); ctx.lineTo(180, 210); ctx.lineTo(255, 255); ctx.stroke();
@@ -2356,7 +2356,7 @@ async function reportCustomShort(clipId, event) {
         ctx.beginPath(); ctx.arc(255, 160, 32, 0, Math.PI * 2); ctx.stroke();
         ctx.fillStyle = '#fde047';
         ctx.font = 'bold 12px monospace';
-        ctx.fillText('164 km/h ONE-TIMER · PP 5v4', 34, 56);
+        ctx.fillText('164 km/h ONE-TIMER · PP 5v4', 34, 96);
         ctx.strokeStyle = '#22d3ee';
         ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(95, 185); ctx.lineTo(265, 175); ctx.lineTo(180, 102); ctx.stroke();
@@ -2396,9 +2396,9 @@ function renderShortsClipGrid() {
     const st = shortsStatsMap[c.clip_id] || { likes: 0 };
     const isActive = c.clip_id === shortsActiveId;
     const isCustom = !!(c.is_custom || String(c.clip_id).startsWith('custom-'));
-    const topBadge = (c.clip_id === topClipId && maxPop > 0) ? '<span class="rounded bg-amber-500/20 border border-amber-400/50 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-300">\u{1F451} 금주의 숏츠 1위</span>' : '';
+    const topBadge = (c.clip_id === topClipId && maxPop > 0) ? '<span class="rounded bg-amber-500/20 border border-amber-400/50 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-300 whitespace-nowrap shrink-0">\u{1F451} 금주의 숏츠 1위</span>' : '';
     const reportBtn = isCustom ? `<button type="button" onclick="reportCustomShort('${c.clip_id}', event)" class="rounded bg-rose-500/20 border border-rose-500/40 px-1.5 py-0.5 text-[10px] font-bold text-rose-300 hover:bg-rose-500/30">\u{1F6A8} 신고</button>` : '';
-    return `<div onclick="selectShortsClip('${c.clip_id}')" role="button" tabindex="0" class="cursor-pointer text-left rounded-xl p-2.5 border transition ${isActive ? 'bg-emerald-500/15 border-emerald-400 text-white' : 'bg-slate-900/70 border-slate-800 text-slate-300 hover:border-slate-700'}"><div class="flex items-center justify-between gap-2 mb-1"><span class="text-[11px] font-bold text-emerald-400 truncate">${c.sportLabel || c.sport}</span><div class="flex items-center gap-1">${topBadge}${reportBtn}<span class="text-[11px] font-mono text-slate-400">\u2764\uFE0F ${st.likes || 0}</span></div></div><div class="text-xs font-extrabold truncate">${c.title}</div></div>`;
+    return `<div onclick="selectShortClip('${c.clip_id}')" role="button" tabindex="0" class="cursor-pointer text-left rounded-xl p-2.5 border transition ${isActive ? 'bg-emerald-500/15 border-emerald-400 text-white' : 'bg-slate-900/70 border-slate-800 text-slate-300 hover:border-slate-700'}"><div class="flex items-center justify-between gap-2 mb-1"><span class="text-[11px] font-bold text-emerald-400 truncate">${c.sportLabel || c.sport}</span><div class="flex items-center gap-1">${topBadge}${reportBtn}<span class="text-[11px] font-mono text-slate-400">\u2764\uFE0F ${st.likes || 0}</span></div></div><div class="text-xs font-extrabold truncate">${c.title}</div></div>`;
   }).join('');
 }
 async function likeActiveShort() {
@@ -2420,11 +2420,11 @@ async function likeActiveShort() {
 async function sendShortsReaction(emoji) {
   const clip = getActiveShortClip();
   if (!clip) return;
-  const actionMap = { '\u{1F525}': 'fire', '\u{1F631}': 'shock', '\u{1F44F}': 'clap' };
+  const actionMap = { '\u{1F525}': 'fire', '\u{26A1}': 'legend', '\u{1F9E0}': 'genius', '\u{1F631}': 'chills', '\u{1F44F}': 'clap', '🔥': 'fire', '⚡': 'legend', '🧠': 'genius', '😱': 'chills', '👏': 'clap' };
   const action = actionMap[emoji] || 'fire';
   shortsStatsMap[clip.clip_id] = shortsStatsMap[clip.clip_id] || { likes: 0, fire: 0, shock: 0, clap: 0, vote_a: 0, vote_b: 0 };
   try {
-    const res = await fetch('/api/shorts/interact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clip_id: clip.clip_id, action, actor_key: getSportiqActorKey() }) });
+    const res = await fetch('/api/shorts/interact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clip_id: clip.clip_id, action: 'react', reaction: action, actor_key: getSportiqActorKey() }) });
     const data = await res.json().catch(() => ({}));
     if (data && data.stats) shortsStatsMap[clip.clip_id] = data.stats;
     else shortsStatsMap[clip.clip_id][action] = (shortsStatsMap[clip.clip_id][action] || 0) + 1;
@@ -2447,15 +2447,15 @@ async function voteShortsBalance(side) {
   const clip = getActiveShortClip();
   if (!clip) return;
   if (shortsVotedMap[clip.clip_id]) { showToast('이미 참여한 클립입니다!'); return; }
-  const action = side === 'A' ? 'vote_a' : 'vote_b';
-  shortsStatsMap[clip.clip_id] = shortsStatsMap[clip.clip_id] || { likes: 0, fire: 0, shock: 0, clap: 0, vote_a: 0, vote_b: 0 };
+  const action = side === 'A' ? 'vote_a' : 'vote_b'; const statKey = side === 'A' ? 'opt_a_votes' : 'opt_b_votes';
+  shortsStatsMap[clip.clip_id] = shortsStatsMap[clip.clip_id] || { likes: 0, fire: 0, legend: 0, genius: 0, chills: 0, clap: 0, opt_a_votes: 0, opt_b_votes: 0 };
   try {
     const res = await fetch('/api/shorts/interact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clip_id: clip.clip_id, action, actor_key: getSportiqActorKey() }) });
     const data = await res.json().catch(() => ({}));
     if (data && data.already_participated) { shortsVotedMap[clip.clip_id] = side; localStorage.setItem('sportiq_shorts_voted', JSON.stringify(shortsVotedMap)); showToast('이미 참여한 클립입니다!'); return; }
     if (data && data.stats) shortsStatsMap[clip.clip_id] = data.stats;
-    else shortsStatsMap[clip.clip_id][action] = (shortsStatsMap[clip.clip_id][action] || 0) + 1;
-  } catch (e) { shortsStatsMap[clip.clip_id][action] = (shortsStatsMap[clip.clip_id][action] || 0) + 1; }
+    else shortsStatsMap[clip.clip_id][statKey] = (shortsStatsMap[clip.clip_id][statKey] || 0) + 1;
+  } catch (e) { shortsStatsMap[clip.clip_id][statKey] = (shortsStatsMap[clip.clip_id][statKey] || 0) + 1; }
   shortsVotedMap[clip.clip_id] = side;
   localStorage.setItem('sportiq_shorts_voted', JSON.stringify(shortsVotedMap));
   playShortsSfx('vote'); renderShortsStatsUI(); renderShortsClipGrid();
