@@ -1734,7 +1734,7 @@ function playShortsSfx(type) {
     osc.start(now); osc.stop(now + 0.17);
   } catch (e) {}
 }
-function stepShortsClip(dir) { navShortsClip(dir); playShortsSfx('step'); }
+function navShortsClip(dir) { navShortsClip(dir); playShortsSfx('step'); }
 function extractYoutubeVideoId(url) {
   const m = String(url || '').trim().match(/(?:youtube\.com\/(?:shorts\/|watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : '';
@@ -1764,7 +1764,7 @@ async function reportCustomShort(clipId, event) {
     cvs.addEventListener('touchend', e => {
       if (!e.changedTouches || !e.changedTouches[0]) return;
       const dy = touchStartY - e.changedTouches[0].clientY;
-      if (Math.abs(dy) >= 45) stepShortsClip(dy > 0 ? 1 : -1);
+      if (Math.abs(dy) >= 45) navShortsClip(dy > 0 ? 1 : -1);
     }, { passive: true });
   }
   window.addEventListener('keydown', e => {
@@ -1773,8 +1773,8 @@ async function reportCustomShort(clipId, event) {
     const shortsSec = document.getElementById('tab-shorts');
     if (!shortsSec || shortsSec.classList.contains('hidden')) return;
     if (e.code === 'Space') { e.preventDefault(); toggleShortsPlay(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); stepShortsClip(-1); }
-    else if (e.key === 'ArrowDown') { e.preventDefault(); stepShortsClip(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); navShortsClip(-1); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); navShortsClip(1); }
   });
 })();
 
@@ -2185,7 +2185,7 @@ async function reportCustomShort(clipId, event) {
       const dt = Math.min(0.1, (ts - shortsLastFrameTs) / 1000);
       shortsLastFrameTs = ts;
       if (shortsPlaying) {
-        shortsTime += dt * shortsSpeed; if (shortsTime >= 20) { if (shortsAutoNext) { shortsTime = 0; stepShortsClip(1); } else { shortsTime = shortsTime % 20; } }
+        shortsTime += dt * shortsSpeed; if (shortsTime >= 20) { if (shortsAutoNext) { shortsTime = 0; navShortsClip(1); } else { shortsTime = shortsTime % 20; } }
       }
       const secStr = String(Math.floor(shortsTime)).padStart(2, '0');
       const timeBadge = document.getElementById('shortsTimeBadge');
