@@ -2691,7 +2691,7 @@ async function reportCheer(id) {
     showToast('신고가 접수되어 목록에서 숨김 처리되었습니다.');
   } catch (e) { showToast('목록에서 숨김 처리되었습니다.'); }
 }
->const PRO_ANALYSTS = [
+var PRO_ANALYSTS = [
   { rank: 1, name: '데이터헌터 PRO', sport: 'soccer', sportLabel: '⚽ 축구', hitRate: '74.2%', roi: '+18.4%', streak: '5연승', form: ['W','W','W','W','W'], tactic: 'EPL 하이프레싱 PPDA & xThreat 역습 전술 분석', recentHits: ['리버풀 승 (적중)', '아스널 -1.0 핸디 (적중)', '바르사 2.5 오버 (적중)'] },
   { rank: 2, name: '세이버매니아 PRO', sport: 'baseball', sportLabel: '⚾ 야구', hitRate: '71.8%', roi: '+15.9%', streak: '4연승', form: ['W','W','W','W','L'], tactic: 'KBO/WBC 불펜 피로도 및 좌우 스플릿 wOBA 매칭', recentHits: ['대한민국 승 (적중)', 'KIA 1.5 언더 (적중)', '도쿄돔 7.5 오버 (적중)'] },
   { rank: 3, name: '클러치랩 PRO', sport: 'basketball', sportLabel: '🏀 농구', hitRate: '70.5%', roi: '+14.2%', streak: '3연승', form: ['W','W','W','L','W'], tactic: 'NBA 5-아웃 3점 볼륨 및 4쿼터 클러치 넷레이팅', recentHits: ['셀틱스 승 (적중)', '매버릭스 +4.5 (적중)', '레이커스 오버 (적중)'] },
