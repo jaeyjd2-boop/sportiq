@@ -261,7 +261,8 @@
         <button type="button" onclick="setShortsFilter('basketball')" data-shorts-filter="basketball" class="shorts-filter-btn rounded-xl px-3.5 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">🏀 농구(NBA)</button>
         <button type="button" onclick="setShortsFilter('hockey')" data-shorts-filter="hockey" class="shorts-filter-btn rounded-xl px-3.5 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">🏒 하키(NHL)</button>
       </div>
-      <button type="button" onclick="openShortsSubmitModal()" class="rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-2 text-xs font-extrabold text-slate-950 shadow-lg hover:opacity-95 transition">➕ 숏츠 제보하기</button>
+      <select id="shortsSortSelect" onchange="setShortsSort(this.value)" class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-200 focus:outline-none focus:border-emerald-400"><option value="popular">&#x1F525; 인기순</option><option value="hotvote">&#x2696;&#xFE0F; 투표 과열순</option><option value="latest">&#x1F195; 최신·제보순</option></select>
+        <button type="button" onclick="openShortsSubmitModal()" class="rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-2 text-xs font-extrabold text-slate-950 shadow-lg hover:opacity-95 transition">➕ 숏츠 제보하기</button>
     </div>
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
@@ -287,6 +288,7 @@
                   <button type="button" onclick="setShortsSpeed(1.5)" data-shorts-speed="1.5" class="shorts-speed-btn rounded-md bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-slate-700">1.5x</button>
                 </div>
               </div>
+            <div class="flex items-center justify-between gap-1.5"><button id="shortsAutoNextBtn" type="button" onclick="toggleShortsAutoNext()" class="flex-1 rounded-lg bg-slate-800/90 px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-slate-700">&#x1F501; 자동넘김 OFF</button><button id="shortsSoundBtn" type="button" onclick="toggleShortsSound()" class="flex-1 rounded-lg bg-slate-800/90 px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-slate-700">&#x1F507; 효과음 OFF</button></div>
               <div>
                 <div id="shortsTop20Tag" class="text-[10px] font-bold text-cyan-300">GLOBAL TOP 20 연동</div>
                 <h3 id="shortsActiveTitle" class="text-sm font-extrabold text-white leading-snug">리버풀 안필드 역습 3자 패스</h3>
@@ -351,7 +353,7 @@
             <h4 class="text-sm font-extrabold text-white">🔥 글로벌 TOP 20 연동 핫 숏츠 클립</h4>
             <span id="shortsClipCounter" class="text-xs font-mono text-emerald-400">8개 클립</span>
           </div>
-          <div id="shortsClipGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1"></div>
+          <div id="shortsClipGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1 pb-5"></div>
         </div>
 
         <div class="glass-card rounded-2xl p-4 space-y-2.5 border border-amber-500/30">
@@ -393,7 +395,7 @@
           <div class="flex flex-wrap gap-2">
             <input id="shortsTsInput" type="number" min="0" max="60" value="5" class="w-16 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-xs font-mono text-emerald-300" title="초(sec)" />
             <input id="shortsNickInput" type="text" placeholder="닉네임" value="SportIQ 팬" class="w-24 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs text-slate-200" />
-            <input id="shortsCommentInput" type="text" placeholder="이 순간의 한줄평을 남기세요 (영상 위 자막으로 뜹니다!)" class="flex-1 min-w-[160px] rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100" />
+            <input id="shortsCommentInput" type="text" placeholder="한줄평 입력..." class="flex-1 min-w-[160px] rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100" />
             <button type="button" onclick="submitShortsComment()" class="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-400 transition">등록</button>
           </div>
         </div>
@@ -405,7 +407,7 @@
     <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between">
         <h3 class="text-base font-extrabold text-white">➕ 나만의 유튜브 숏츠 제보하기</h3>
-        <button type="button" onclick="closeShortsSubmitModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
+        <button type="button" onclick="closeShortsSubmitModal()" class="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 rounded-lg bg-slate-800">닫기 &times;</button>
       </div>
       <div class="space-y-3 text-xs">
         <div>
@@ -423,7 +425,8 @@
         </div>
         <div>
           <label class="block text-slate-400 mb-1">유튜브 숏츠 URL</label>
-          <input id="submitShortUrl" type="text" placeholder="https://www.youtube.com/shorts/..." class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100" />
+          <input id="submitShortUrl" type="text" oninput="previewSubmitYoutubeUrl(this.value)" placeholder="https://www.youtube.com/shorts/..." class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100" />
+          <div id="submitShortPreview" class="hidden mt-2 rounded-xl border border-slate-700 bg-slate-900/80 p-2.5 text-xs"></div>
         </div>
         <div>
           <label class="block text-slate-400 mb-1">한줄 관전 포인트</label>
@@ -734,7 +737,7 @@
     }
 
     function switchTab(tab) {
-      state.activeTab = tab;
+      state.activeTab = tab; if (typeof setGlobalTop10Collapsed === 'function') setGlobalTop10Collapsed(tab !== 'feed');
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
       document.getElementById('tab-' + tab).classList.remove('hidden');
       document.querySelectorAll('.tab-btn').forEach(b => {
@@ -1013,7 +1016,7 @@
     }
 
     function updatePointsUI() {
-      localStorage.setItem('sportiq_pts', state.points);
+      localStorage.setItem('sportiq_pts', state.points); localStorage.setItem('sportiq_user_points', String(state.points));
       localStorage.setItem('sportiq_streak', state.streak);
       document.getElementById('pointsBadge').textContent = state.points + ' P';
       document.getElementById('streakDays').textContent = state.streak;
@@ -1261,7 +1264,7 @@ setRole('GUEST');
     return '<span class="rounded-md border border-sky-400/40 bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-extrabold text-sky-300">' + rc + '</span>';
   }
 
-  function toggleGlobalTop10() {
+  function setGlobalTop10Collapsed(c) { globalTop10Collapsed = !!c; const body = document.getElementById('globalTop10Body'); const btn = document.getElementById('globalTop10ToggleBtn'); if (body) body.classList.toggle('hidden', globalTop10Collapsed); if (btn) btn.textContent = globalTop10Collapsed ? '펼치기 ▼' : '접기 ▲'; } function toggleGlobalTop10() {
     globalTop10Collapsed = !globalTop10Collapsed;
     const body = document.getElementById('globalTop10Body');
     const btn = document.getElementById('globalTop10ToggleBtn');
@@ -1672,6 +1675,108 @@ loadMatchPredictions();
   let shortsTime = 0;
   let shortsQuizAnswered = {};
   let shortsLastFrameTs = 0;
+const SHORTS_HUD_MAP = { clip_1: "LIV 2-1 MUN 78' | xG 0.68", clip_2: "ESP 2-1 ENG 64' | 돌파 91%", clip_3: "ARS 1-0 BVB 52' | 코너 xG 0.49", clip_4: "KOR 5-4 JPN 9회 | 156km\u00B72540RPM", clip_5: "KOR 6-4 TPE 8회 만루 | 낙차 34cm", clip_6: "BOS 108-105 DAL 4Q 3.2s | 3PT 44%", clip_7: "LAL 112-109 PHX | 속공 +14", clip_8: "EDM 4-3 FLA 3P | 164km 원타이머" };
+SHORTS_DEFAULT_CLIPS.forEach(c => { if (SHORTS_HUD_MAP[c.clip_id]) c.hudText = SHORTS_HUD_MAP[c.clip_id]; });
+let shortsSort = 'popular';
+let shortsAutoNext = false;
+let shortsSoundOn = false;
+let shortsAudioCtx = null;
+function getSportiqActorKey() {
+  let k = localStorage.getItem('sportiq_actor_key');
+  if (!k) { k = 'act_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now().toString(36); localStorage.setItem('sportiq_actor_key', k); }
+  return k;
+}
+function loadJsonStorage(key, fallback) {
+  try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v && typeof v === 'object' ? v : fallback; } catch (e) { return fallback; }
+}
+let shortsLikedMap = loadJsonStorage('sportiq_shorts_liked', {});
+let shortsVotedMap = loadJsonStorage('sportiq_shorts_voted', {});
+shortsQuizAnswered = loadJsonStorage('sportiq_shorts_quiz_answered', {});
+(function restoreUserPoints() {
+  const saved = localStorage.getItem('sportiq_user_points');
+  if (saved !== null && !isNaN(Number(saved)) && typeof state === 'object') { state.points = Number(saved); if (typeof updatePointsUI === 'function') updatePointsUI(); }
+})();
+function setShortsSort(val) { shortsSort = val || 'popular'; renderShortsClipGrid(); }
+function toggleShortsAutoNext() {
+  shortsAutoNext = !shortsAutoNext;
+  const btn = document.getElementById('shortsAutoNextBtn');
+  if (btn) {
+    btn.textContent = '\u{1F501} 자동넘김 ' + (shortsAutoNext ? 'ON' : 'OFF');
+    btn.className = 'flex-1 rounded-lg px-2 py-1 text-[10px] font-bold ' + (shortsAutoNext ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700');
+  }
+}
+function toggleShortsSound() {
+  shortsSoundOn = !shortsSoundOn;
+  const btn = document.getElementById('shortsSoundBtn');
+  if (btn) {
+    btn.textContent = (shortsSoundOn ? '\u{1F50A} 효과음 ON' : '\u{1F507} 효과음 OFF');
+    btn.className = 'flex-1 rounded-lg px-2 py-1 text-[10px] font-bold ' + (shortsSoundOn ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700');
+  }
+  if (shortsSoundOn) playShortsSfx('step');
+}
+function playShortsSfx(type) {
+  if (!shortsSoundOn) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!shortsAudioCtx) shortsAudioCtx = new AC();
+    if (shortsAudioCtx.state === 'suspended') shortsAudioCtx.resume();
+    const now = shortsAudioCtx.currentTime;
+    const osc = shortsAudioCtx.createOscillator();
+    const gain = shortsAudioCtx.createGain();
+    osc.connect(gain); gain.connect(shortsAudioCtx.destination);
+    const freqMap = { like: 660, react: 520, vote: 440, quiz: 880, step: 360 };
+    osc.type = type === 'quiz' ? 'triangle' : 'sine';
+    osc.frequency.setValueAtTime(freqMap[type] || 500, now);
+    if (type === 'quiz') osc.frequency.exponentialRampToValueAtTime(1180, now + 0.14);
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+    osc.start(now); osc.stop(now + 0.17);
+  } catch (e) {}
+}
+function stepShortsClip(dir) { navShortsClip(dir); playShortsSfx('step'); }
+function extractYoutubeVideoId(url) {
+  const m = String(url || '').trim().match(/(?:youtube\.com\/(?:shorts\/|watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : '';
+}
+function previewSubmitYoutubeUrl(val) {
+  const box = document.getElementById('submitShortPreview');
+  if (!box) return;
+  const raw = String(val || '').trim();
+  if (!raw) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  const vid = extractYoutubeVideoId(raw);
+  box.classList.remove('hidden');
+  if (!vid) { box.innerHTML = '<div class="text-rose-400 font-bold">유효한 YouTube / Shorts URL만 제보할 수 있습니다. (11자리 영상 ID 필요)</div>'; return; }
+  box.innerHTML = '<div class="flex items-center gap-3"><img src="https://i.ytimg.com/vi/' + vid + '/hqdefault.jpg" alt="preview" class="w-20 h-12 rounded-lg object-cover border border-emerald-500/40"><div class="text-emerald-300 font-bold">YouTube 영상 확인됨 (' + vid + ')</div></div>';
+}
+async function reportCustomShort(clipId, event) {
+  if (event) event.stopPropagation();
+  try { await fetch('/api/shorts/' + encodeURIComponent(clipId) + '/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actor_key: getSportiqActorKey() }) }); } catch (e) {}
+  shortsCustomClips = shortsCustomClips.filter(c => c.clip_id !== clipId);
+  if (shortsActiveId === clipId) { const rem = getFilteredShortsClips(); if (rem.length) shortsActiveId = rem[0].clip_id; }
+  renderShortsClipGrid(); renderShortsActive(); showToast('신고가 접수되어 목록에서 제거되었습니다.');
+}
+(function bindShortsInputEvents() {
+  let touchStartY = 0;
+  const cvs = document.getElementById('shortsCanvas');
+  if (cvs) {
+    cvs.addEventListener('touchstart', e => { if (e.changedTouches && e.changedTouches[0]) touchStartY = e.changedTouches[0].clientY; }, { passive: true });
+    cvs.addEventListener('touchend', e => {
+      if (!e.changedTouches || !e.changedTouches[0]) return;
+      const dy = touchStartY - e.changedTouches[0].clientY;
+      if (Math.abs(dy) >= 45) stepShortsClip(dy > 0 ? 1 : -1);
+    }, { passive: true });
+  }
+  document.addEventListener('keydown', e => {
+    const tag = (document.activeElement && document.activeElement.tagName || '').toUpperCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    const cvsEl = document.getElementById('shortsCanvas');
+    if (!cvsEl || cvsEl.offsetParent === null) return;
+    if (e.code === 'Space') { e.preventDefault(); toggleShortsPlay(); }
+    else if (e.code === 'ArrowUp') { e.preventDefault(); stepShortsClip(-1); }
+    else if (e.code === 'ArrowDown') { e.preventDefault(); stepShortsClip(1); }
+  });
+})();
 
   window.renderShortFeedback = function() {};
 
@@ -2080,7 +2185,7 @@ loadMatchPredictions();
       const dt = Math.min(0.1, (ts - shortsLastFrameTs) / 1000);
       shortsLastFrameTs = ts;
       if (shortsPlaying) {
-        shortsTime = (shortsTime + dt * shortsSpeed) % 20;
+        shortsTime += dt * shortsSpeed; if (shortsTime >= 20) { if (shortsAutoNext) { shortsTime = 0; stepShortsClip(1); } else { shortsTime = shortsTime % 20; } }
       }
       const secStr = String(Math.floor(shortsTime)).padStart(2, '0');
       const timeBadge = document.getElementById('shortsTimeBadge');
@@ -2122,7 +2227,7 @@ loadMatchPredictions();
         ctx.fillRect(24, 48, 170, 22);
         ctx.fillStyle = '#34d399';
         ctx.font = 'bold 11px monospace';
-        ctx.fillText('LIV 2 - 1 MCI  |  xG 0.42', 32, 63);
+        ctx.fillText((clip && (clip.hudText || ((clip.league || 'CUSTOM') + ' | ' + (clip.title || '').slice(0, 22)))) || 'SPORTIQ LIVE', 32, 63);
         const px = 85 + Math.sin(p * Math.PI * 2) * 35 + p * 140;
         const py = 360 - p * 235;
         ctx.strokeStyle = 'rgba(244,63,94,0.6)';
@@ -2208,6 +2313,132 @@ loadMatchPredictions();
     requestAnimationFrame(drawShortsCanvasFrame);
   }
 
+function getFilteredShortsClips() {
+  const all = getAllShortsClips();
+  const list = shortsFilter === 'all' ? all.slice() : all.filter(c => c.sport === shortsFilter);
+  const pop = c => { const s = shortsStatsMap[c.clip_id] || {}; return (s.likes || 0) + (s.fire || 0) + (s.shock || 0) + (s.clap || 0); };
+  const vot = c => { const s = shortsStatsMap[c.clip_id] || {}; return (s.vote_a || 0) + (s.vote_b || 0); };
+  if (shortsSort === 'popular') list.sort((a, b) => pop(b) - pop(a));
+  else if (shortsSort === 'hotvote') list.sort((a, b) => vot(b) - vot(a));
+  else if (shortsSort === 'latest') list.sort((a, b) => ((b.is_custom || String(b.clip_id).startsWith('custom-')) ? 1 : 0) - ((a.is_custom || String(a.clip_id).startsWith('custom-')) ? 1 : 0));
+  return list;
+}
+function renderShortsClipGrid() {
+  const grid = document.getElementById('shortsClipGrid');
+  const counter = document.getElementById('shortsClipCounter');
+  if (!grid) return;
+  const all = getAllShortsClips();
+  let topClipId = '';
+  let maxPop = -1;
+  all.forEach(c => {
+    const s = shortsStatsMap[c.clip_id] || {};
+    const p = (s.likes || 0) + (s.fire || 0) + (s.shock || 0) + (s.clap || 0);
+    if (p > maxPop) { maxPop = p; topClipId = c.clip_id; }
+  });
+  const list = getFilteredShortsClips();
+  if (counter) counter.textContent = list.length + '개 클립';
+  grid.innerHTML = list.map(c => {
+    const st = shortsStatsMap[c.clip_id] || { likes: 0 };
+    const isActive = c.clip_id === shortsActiveId;
+    const isCustom = !!(c.is_custom || String(c.clip_id).startsWith('custom-'));
+    const topBadge = (c.clip_id === topClipId && maxPop > 0) ? '<span class="rounded bg-amber-500/20 border border-amber-400/50 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-300">\u{1F451} 금주의 숏츠 1위</span>' : '';
+    const reportBtn = isCustom ? `<button type="button" onclick="reportCustomShort('${c.clip_id}', event)" class="rounded bg-rose-500/20 border border-rose-500/40 px-1.5 py-0.5 text-[10px] font-bold text-rose-300 hover:bg-rose-500/30">\u{1F6A8} 신고</button>` : '';
+    return `<div onclick="selectShortsClip('${c.clip_id}')" role="button" tabindex="0" class="cursor-pointer text-left rounded-xl p-2.5 border transition ${isActive ? 'bg-emerald-500/15 border-emerald-400 text-white' : 'bg-slate-900/70 border-slate-800 text-slate-300 hover:border-slate-700'}"><div class="flex items-center justify-between gap-2 mb-1"><span class="text-[11px] font-bold text-emerald-400 truncate">${c.sportLabel || c.sport}</span><div class="flex items-center gap-1">${topBadge}${reportBtn}<span class="text-[11px] font-mono text-slate-400">\u2764\uFE0F ${st.likes || 0}</span></div></div><div class="text-xs font-extrabold truncate">${c.title}</div></div>`;
+  }).join('');
+}
+async function likeActiveShort() {
+  const clip = getActiveShortClip();
+  if (!clip) return;
+  if (shortsLikedMap[clip.clip_id]) { showToast('이미 참여한 클립입니다!'); return; }
+  shortsStatsMap[clip.clip_id] = shortsStatsMap[clip.clip_id] || { likes: 0, fire: 0, shock: 0, clap: 0, vote_a: 0, vote_b: 0 };
+  try {
+    const res = await fetch('/api/shorts/interact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clip_id: clip.clip_id, action: 'like', actor_key: getSportiqActorKey() }) });
+    const data = await res.json().catch(() => ({}));
+    if (data && data.already_participated) { shortsLikedMap[clip.clip_id] = true; localStorage.setItem('sportiq_shorts_liked', JSON.stringify(shortsLikedMap)); showToast('이미 참여한 클립입니다!'); return; }
+    if (data && data.stats) shortsStatsMap[clip.clip_id] = data.stats;
+    else shortsStatsMap[clip.clip_id].likes = (shortsStatsMap[clip.clip_id].likes || 0) + 1;
+  } catch (e) { shortsStatsMap[clip.clip_id].likes = (shortsStatsMap[clip.clip_id].likes || 0) + 1; }
+  shortsLikedMap[clip.clip_id] = true;
+  localStorage.setItem('sportiq_shorts_liked', JSON.stringify(shortsLikedMap));
+  playShortsSfx('like'); renderShortsStatsUI(); renderShortsClipGrid();
+}
+async function sendShortsReaction(emoji) {
+  const clip = getActiveShortClip();
+  if (!clip) return;
+  const actionMap = { '\u{1F525}': 'fire', '\u{1F631}': 'shock', '\u{1F44F}': 'clap' };
+  const action = actionMap[emoji] || 'fire';
+  shortsStatsMap[clip.clip_id] = shortsStatsMap[clip.clip_id] || { likes: 0, fire: 0, shock: 0, clap: 0, vote_a: 0, vote_b: 0 };
+  try {
+    const res = await fetch('/api/shorts/interact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clip_id: clip.clip_id, action, actor_key: getSportiqActorKey() }) });
+    const data = await res.json().catch(() => ({}));
+    if (data && data.stats) shortsStatsMap[clip.clip_id] = data.stats;
+    else shortsStatsMap[clip.clip_id][action] = (shortsStatsMap[clip.clip_id][action] || 0) + 1;
+  } catch (e) { shortsStatsMap[clip.clip_id][action] = (shortsStatsMap[clip.clip_id][action] || 0) + 1; }
+  playShortsSfx('react'); renderShortsStatsUI(); renderShortsClipGrid();
+}
+function answerShortsQuiz(idx) {
+  const clip = getActiveShortClip();
+  if (!clip) return;
+  if (shortsQuizAnswered[clip.clip_id] !== undefined) { showToast('이미 참여한 클립입니다!'); return; }
+  shortsQuizAnswered[clip.clip_id] = idx;
+  localStorage.setItem('sportiq_shorts_quiz_answered', JSON.stringify(shortsQuizAnswered));
+  if (idx === clip.quiz.ans) {
+    if (typeof state === 'object' && typeof state.points === 'number') { state.points += 15; if (typeof updatePointsUI === 'function') updatePointsUI(); }
+    playShortsSfx('quiz'); showToast('정답입니다! +15P 적립!');
+  } else { showToast('아쉽네요! 정답을 확인해보세요.'); }
+  renderShortsActive();
+}
+async function voteShortsBalance(side) {
+  const clip = getActiveShortClip();
+  if (!clip) return;
+  if (shortsVotedMap[clip.clip_id]) { showToast('이미 참여한 클립입니다!'); return; }
+  const action = side === 'A' ? 'vote_a' : 'vote_b';
+  shortsStatsMap[clip.clip_id] = shortsStatsMap[clip.clip_id] || { likes: 0, fire: 0, shock: 0, clap: 0, vote_a: 0, vote_b: 0 };
+  try {
+    const res = await fetch('/api/shorts/interact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clip_id: clip.clip_id, action, actor_key: getSportiqActorKey() }) });
+    const data = await res.json().catch(() => ({}));
+    if (data && data.already_participated) { shortsVotedMap[clip.clip_id] = side; localStorage.setItem('sportiq_shorts_voted', JSON.stringify(shortsVotedMap)); showToast('이미 참여한 클립입니다!'); return; }
+    if (data && data.stats) shortsStatsMap[clip.clip_id] = data.stats;
+    else shortsStatsMap[clip.clip_id][action] = (shortsStatsMap[clip.clip_id][action] || 0) + 1;
+  } catch (e) { shortsStatsMap[clip.clip_id][action] = (shortsStatsMap[clip.clip_id][action] || 0) + 1; }
+  shortsVotedMap[clip.clip_id] = side;
+  localStorage.setItem('sportiq_shorts_voted', JSON.stringify(shortsVotedMap));
+  playShortsSfx('vote'); renderShortsStatsUI(); renderShortsClipGrid();
+}
+async function submitCustomShort() {
+  const title = document.getElementById('submitShortTitle')?.value.trim();
+  const sport = document.getElementById('submitShortSport')?.value || 'soccer';
+  const youtube_url = document.getElementById('submitShortUrl')?.value.trim();
+  const point_note = document.getElementById('submitShortNote')?.value.trim() || '';
+  const nickname = document.getElementById('submitShortNick')?.value.trim() || '회원 제보';
+  if (!title || !youtube_url) { showToast('제목과 유튜브 URL을 입력해 주세요.'); return; }
+  if (!extractYoutubeVideoId(youtube_url)) { showToast('유효한 YouTube / Shorts URL만 제보할 수 있습니다.'); return; }
+  try {
+    const res = await fetch('/api/shorts/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, sport, youtube_url, point_note, nickname, actor_key: getSportiqActorKey() }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { showToast(data.detail || '숏츠 제보에 실패했습니다.'); return; }
+    const newClip = (data && data.clip) ? data.clip : { clip_id: 'custom-' + Date.now(), title, sport, youtube_url, point_note, nickname, is_custom: true, created_at: new Date().toISOString() };
+    shortsCustomClips.unshift(newClip);
+    shortsActiveId = newClip.clip_id;
+    if (!localStorage.getItem('sportiq_first_short_bonus')) {
+      localStorage.setItem('sportiq_first_short_bonus', '1');
+      if (typeof state === 'object' && typeof state.points === 'number') { state.points += 20; if (typeof updatePointsUI === 'function') updatePointsUI(); }
+      showToast('첫 숏츠 제보 보너스 +20P 적립!');
+    } else { showToast('숏츠 클립이 등록되었습니다!'); }
+    closeShortsSubmitModal(); renderShortsClipGrid(); renderShortsActive();
+  } catch (e) { showToast('네트워크 오류로 숏츠 제보에 실패했습니다.'); }
+}
+function openYoutubeShortsSearch() {
+  const clip = getActiveShortClip();
+  if (!clip) return;
+  if (clip.youtube_url) {
+    try {
+      const u = new URL(clip.youtube_url);
+      if (/(^|\.)(youtube\.com|youtu\.be)$/.test(u.hostname)) { window.open(u.href, '_blank', 'noopener'); return; }
+    } catch (e) {}
+  }
+  window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent((clip.title || '') + ' shorts'), '_blank', 'noopener');
+}
   fetchShortsHub();
   requestAnimationFrame(drawShortsCanvasFrame);
 // );
