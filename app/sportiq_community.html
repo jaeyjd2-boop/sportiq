@@ -76,6 +76,25 @@
       </div>
     </div>
   </header>
+<div id="proLiveTickerBar" class="border-b border-slate-800 bg-slate-950/90 backdrop-blur">
+  <div class="mx-auto max-w-7xl px-4 py-2 flex items-center gap-3">
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="inline-flex items-center gap-1 rounded-full bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 text-[11px] font-extrabold text-rose-300"><span class="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse"></span>LIVE</span>
+      <span class="text-xs font-bold text-slate-200 hidden sm:inline">실시간 스코어</span>
+    </div>
+    <div id="proTickerList" class="flex-1 flex items-center gap-2 overflow-x-auto scrollbar-thin py-0.5">
+      <span class="text-xs text-slate-400">실시간 스코어를 불러오는 중...</span>
+    </div>
+    <div class="flex items-center gap-2 shrink-0 text-[11px] text-slate-400">
+      <label class="inline-flex items-center gap-1 cursor-pointer select-none">
+        <input id="proTickerAutoRefresh" type="checkbox" checked onchange="toggleProTickerAutoRefresh()" class="accent-emerald-500 rounded">
+        <span>20초 자동갱신</span>
+      </label>
+      <span id="proTickerUpdatedAt" class="text-slate-500 hidden md:inline">--:--</span>
+    </div>
+  </div>
+</div>
+<div id="proQuickStatPopup" class="fixed z-50 hidden w-80 max-w-[92vw] rounded-2xl border border-emerald-500/40 bg-slate-900/95 p-3.5 shadow-2xl backdrop-blur text-xs text-slate-200 pointer-events-auto"></div>
 
   <!-- Hero Banner -->
   <section class="border-b border-slate-800/70 bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/40">
@@ -108,6 +127,7 @@
       <button onclick="switchTab('shorts')" data-tab="shorts" class="tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition">하이라이트 유튜브 숏츠</button>
       <button onclick="switchTab('cheers')" data-tab="cheers" class="tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition">스포츠 이슈 & 응원톡</button>
       <button onclick="switchTab('ranking')" data-tab="ranking" class="tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition">분석가 랭킹</button>
+    <button onclick="switchTab('lab')" data-tab="lab" class="tab-btn whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition">🧪 AI 실험실 · 전술판</button>
     </div>
   </nav><div class="lg:hidden border-b border-slate-800/80 bg-slate-900/90 px-3 py-2"><div class="mx-auto flex max-w-7xl items-center justify-between gap-2 text-xs"><div class="flex items-center gap-1.5 font-bold text-slate-200 truncate"><span>🎁 빠른 출석 · 내 포인트</span><span id="mobilePointsBadge" class="rounded-full bg-amber-500/20 px-2 py-0.5 text-amber-300 font-extrabold">120 P</span></div><div class="flex items-center gap-1.5 shrink-0"><button id="mobileAttendanceBtn" onclick="checkAttendance()" class="rounded-lg bg-emerald-500 px-2.5 py-1 text-[11px] font-bold text-slate-950 hover:bg-emerald-400 transition">출석체크 +10P</button><button onclick="document.getElementById('quickChallengeCard')?.scrollIntoView({behavior:'smooth',block:'center'})" class="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-bold text-slate-200 hover:bg-slate-700 transition">챌린지 이동 ↓</button></div></div></div>
   
@@ -163,7 +183,8 @@
               <span>분석 대상: <strong id="autoAnalystCount" class="text-amber-300">TOP 20</strong></span>
             </div>
           </div>
-          <button id="btnRunAutoAnalyst" onclick="runAutoAnalystNow()" class="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-3.5 py-2 transition shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
+          <button type="button" onclick="openAiScorecardModal()" class="rounded-xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-200 font-bold text-xs px-3 py-2 transition">📊 AI 적중 성적표</button>
+        <button id="btnRunAutoAnalyst" onclick="runAutoAnalystNow()" class="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-3.5 py-2 transition shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
             <span>⚡ 지금 TOP 20 분석 갱신</span>
           </button>
         </div>
@@ -200,6 +221,7 @@
           <span id="matchesSyncBadge" class="text-[11px] text-slate-400">실시간 화제성 순위 기준</span>
         </div>
         <div id="matchSportFilters" class="flex flex-wrap gap-1.5">
+      <button type="button" onclick="setMatchSportFilter('FAV')" data-sport-filter="FAV" class="match-sport-btn rounded-lg px-3 py-1.5 text-xs font-semibold border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">⭐ 마이매치 (<span id="myMatchFavCount">0</span>)</button>
           <button type="button" onclick="setMatchSportFilter('ALL')" data-sport-filter="ALL" class="match-sport-btn rounded-lg px-3 py-1.5 text-xs font-semibold bg-emerald-500 text-slate-950">전체 TOP 20</button>
           <button type="button" onclick="setMatchSportFilter('축구')" data-sport-filter="축구" class="match-sport-btn rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700">⚽ 축구</button>
           <button type="button" onclick="setMatchSportFilter('야구')" data-sport-filter="야구" class="match-sport-btn rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700">⚾ 야구</button>
@@ -506,7 +528,8 @@
       <button id="rankModeBtnPro" onclick="switchRankingMode('pro')" class="rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-extrabold text-slate-950">🏆 PRO 분석가 랭킹 (TOP 10)</button>
       <button id="rankModeBtnMembers" onclick="switchRankingMode('members')" class="rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800">👑 실시간 회원 포인트 · 예측왕 랭킹</button>
     </div>
-    <button id="followFeedBtn" onclick="openFollowedFeed()" class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-300 hover:bg-amber-500/20">⭐ 팔로우 분석가 글만 피드에서 보기</button>
+    <button type="button" onclick="openAiScorecardModal()" class="rounded-xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-200 font-bold text-xs px-3 py-2 transition">📊 AI 적중 성적표</button>
+        <button id="followFeedBtn" onclick="openFollowedFeed()" class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-300 hover:bg-amber-500/20">⭐ 팔로우 분석가 글만 피드에서 보기</button>
   </div>
   <div id="rankingProView" class="space-y-3">
     <div id="analystSportFilters" class="flex flex-wrap gap-1.5"></div>
@@ -544,6 +567,95 @@
     <div id="analystModalContent" class="space-y-3 text-xs text-slate-200"></div>
   </div>
 </div>
+    <section id="tab-lab" class="tab-panel hidden space-y-6">
+  <div class="glass-card rounded-2xl p-5 border border-emerald-500/30 space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+      <div>
+        <h2 class="text-base font-extrabold text-white">🎛️ 나만의 승률 시뮬레이터 (5대 신호 가중치 실험실)</h2>
+        <p class="text-xs text-slate-400">5가지 핵심 변수 가중치를 조절해 커스텀 AI 승률·예상 스코어·밸류 격차를 실시간 산출하세요.</p>
+      </div>
+      <button type="button" onclick="shareLabSimToFeed()" class="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 transition">📢 시뮬레이션 결과 전체 게시판에 공유</button>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+      <div class="md:col-span-6 space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1">TOP 20 빅매치 선택</label>
+          <select id="labSimMatchSelect" onchange="recalcLabSim()" class="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"></select>
+        </div>
+        <div class="space-y-2 text-xs">
+          <div><div class="flex justify-between text-slate-300"><span>최근 5경기 폼</span><span id="labWFormVal" class="font-mono text-emerald-400">50</span></div><input id="labWForm" type="range" min="0" max="100" value="50" oninput="recalcLabSim()" class="w-full accent-emerald-500"></div>
+          <div><div class="flex justify-between text-slate-300"><span>홈구장 이점</span><span id="labWHomeVal" class="font-mono text-emerald-400">50</span></div><input id="labWHome" type="range" min="0" max="100" value="50" oninput="recalcLabSim()" class="w-full accent-emerald-500"></div>
+          <div><div class="flex justify-between text-slate-300"><span>공격 화력</span><span id="labWOffenseVal" class="font-mono text-emerald-400">50</span></div><input id="labWOffense" type="range" min="0" max="100" value="50" oninput="recalcLabSim()" class="w-full accent-emerald-500"></div>
+          <div><div class="flex justify-between text-slate-300"><span>수비·불펜 안정감</span><span id="labWDefenseVal" class="font-mono text-emerald-400">50</span></div><input id="labWDefense" type="range" min="0" max="100" value="50" oninput="recalcLabSim()" class="w-full accent-emerald-500"></div>
+          <div><div class="flex justify-between text-slate-300"><span>체력·결장 변수</span><span id="labWInjuryVal" class="font-mono text-emerald-400">50</span></div><input id="labWInjury" type="range" min="0" max="100" value="50" oninput="recalcLabSim()" class="w-full accent-emerald-500"></div>
+        </div>
+      </div>
+      <div class="md:col-span-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 flex flex-col justify-between space-y-3">
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-xs font-bold text-slate-300"><span id="labSimHomeLabel">홈</span><span id="labSimDrawLabel">무</span><span id="labSimAwayLabel">원정</span></div>
+          <div class="h-3 w-full rounded-full overflow-hidden flex bg-slate-800">
+            <div id="labSimBarHome" class="bg-emerald-500 transition-all" style="width:40%"></div>
+            <div id="labSimBarDraw" class="bg-slate-500 transition-all" style="width:25%"></div>
+            <div id="labSimBarAway" class="bg-rose-500 transition-all" style="width:35%"></div>
+          </div>
+          <div class="flex items-center justify-between text-sm font-extrabold"><span id="labSimHomePct" class="text-emerald-400">40%</span><span id="labSimDrawPct" class="text-slate-300">25%</span><span id="labSimAwayPct" class="text-rose-400">35%</span></div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-center text-xs">
+          <div class="rounded-xl bg-slate-950/80 p-2.5 border border-slate-800"><div class="text-slate-400">예상 스코어</div><div id="labSimScore" class="text-sm font-extrabold text-white mt-0.5">-</div></div>
+          <div class="rounded-xl bg-slate-950/80 p-2.5 border border-slate-800"><div class="text-slate-400">시장 대비 밸류</div><div id="labSimEdge" class="text-sm font-extrabold text-cyan-300 mt-0.5">-</div></div>
+          <div class="rounded-xl bg-slate-950/80 p-2.5 border border-slate-800"><div class="text-slate-400">추천 픽</div><div id="labSimPick" class="text-sm font-extrabold text-amber-300 mt-0.5">-</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="glass-card rounded-2xl p-5 border border-slate-800 space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+      <h2 class="text-base font-extrabold text-white">📋 인터랙티브 라인업 전술판 (드래그 배치 · DB 공유 · 이미지 저장)</h2>
+      <div class="flex flex-wrap gap-1.5 text-xs">
+        <button type="button" onclick="setTacticPreset('soccer_433')" class="rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 px-2.5 py-1 text-slate-200 font-semibold">⚽ 축구 4-3-3</button>
+        <button type="button" onclick="setTacticPreset('soccer_4231')" class="rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 px-2.5 py-1 text-slate-200 font-semibold">⚽ 축구 4-2-3-1</button>
+        <button type="button" onclick="setTacticPreset('soccer_3421')" class="rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 px-2.5 py-1 text-slate-200 font-semibold">⚽ 축구 3-4-2-1</button>
+        <button type="button" onclick="setTacticPreset('baseball')" class="rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 px-2.5 py-1 text-slate-200 font-semibold">⚾ 야구 다이아몬드</button>
+        <button type="button" onclick="setTacticPreset('basketball')" class="rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 px-2.5 py-1 text-slate-200 font-semibold">🏀 농구 5-Out</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div class="lg:col-span-8 space-y-3">
+        <canvas id="tacticalBoardCanvas" width="720" height="440" class="w-full rounded-2xl border border-slate-700 bg-slate-950 cursor-grab touch-none"></canvas>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+          <input id="tacticPlayerNameInput" type="text" placeholder="선택 선수 이름 수정" oninput="updateSelectedTacticPlayerName(this.value)" class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white">
+          <input id="tacticTitleInput" type="text" placeholder="전술 제목 (예: 4-3-3 하프스페이스 압박)" class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white">
+          <input id="tacticAuthorInput" type="text" placeholder="작성자 닉네임" value="전술분석가" class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white">
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="tacticMemoInput" type="text" placeholder="핵심 전술 메모를 입력하세요..." class="flex-1 min-w-[200px] rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white">
+          <button type="button" onclick="saveTacticToDb()" class="rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 transition">💾 전술판 DB 공유</button>
+          <button type="button" onclick="downloadTacticPng()" class="rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-3.5 py-2 transition">🖼️ PNG 이미지 다운로드</button>
+        </div>
+      </div>
+      <div class="lg:col-span-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-3 flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-extrabold text-emerald-300">공유된 전술판 갤러리</h3>
+          <button type="button" onclick="loadTacticsGallery()" class="text-[11px] text-slate-400 hover:text-white">새로고침</button>
+        </div>
+        <div id="tacticGalleryList" class="space-y-2 max-h-[430px] overflow-y-auto text-xs text-slate-300">불러오는 중...</div>
+      </div>
+    </div>
+  </div>
+  <div class="glass-card rounded-2xl p-5 border border-slate-800 space-y-3">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h2 class="text-base font-extrabold text-white">🏥 글로벌 빅매치 부상 · 결장 &amp; 라인업 체크 보드</h2>
+      <div class="flex flex-wrap gap-1.5 text-xs">
+        <button type="button" onclick="renderLabInjuryBoard('ALL')" class="rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 px-2.5 py-1 text-slate-200">전체</button>
+        <button type="button" onclick="renderLabInjuryBoard('축구')" class="rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 px-2.5 py-1 text-slate-200">⚽ 축구</button>
+        <button type="button" onclick="renderLabInjuryBoard('야구')" class="rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 px-2.5 py-1 text-slate-200">⚾ 야구</button>
+        <button type="button" onclick="renderLabInjuryBoard('농구')" class="rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 px-2.5 py-1 text-slate-200">🏀 농구</button>
+        <button type="button" onclick="renderLabInjuryBoard('하키')" class="rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 px-2.5 py-1 text-slate-200">🏒 하키</button>
+      </div>
+    </div>
+    <div id="labInjuryBoard" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs"></div>
+  </div>
+</section>
     </div>
 
     <!-- Right Sidebar -->
@@ -2924,4 +3036,379 @@ syncMemberLeaderboard();
 setInterval(loadCheers, 10000);
 </script>
 <nav class="fixed bottom-0 inset-x-0 z-40 lg:hidden border-t border-slate-800 bg-slate-950/95 backdrop-blur"><div class="grid grid-cols-5"><button data-mobile-tab="feed" onclick="switchTab('feed')" class="flex flex-col items-center justify-center py-1.5 text-[11px] font-bold text-emerald-400"><span>📰</span><span>피드</span></button><button data-mobile-tab="matches" onclick="switchTab('matches')" class="flex flex-col items-center justify-center py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-200"><span>🗳️</span><span>일정</span></button><button data-mobile-tab="shorts" onclick="switchTab('shorts')" class="flex flex-col items-center justify-center py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-200"><span>🎬</span><span>숏츠</span></button><button data-mobile-tab="cheers" onclick="switchTab('cheers')" class="flex flex-col items-center justify-center py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-200"><span>🔥</span><span>이슈/톡</span></button><button data-mobile-tab="ranking" onclick="switchTab('ranking')" class="flex flex-col items-center justify-center py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-200"><span>🏆</span><span>랭킹</span></button></div></nav></body>
+<div id="aiScorecardModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm" onclick="if(event.target===this) closeAiScorecardModal()">
+  <div class="w-full max-w-4xl rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <h3 class="text-base font-extrabold text-white">📊 AI 자동분석 적중 성적표 (투명 공개)</h3>
+      <button type="button" onclick="closeAiScorecardModal()" class="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:text-white">닫기 ×</button>
+    </div>
+    <div id="aiScorecardKpis" class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center text-xs"></div>
+    <div id="aiScorecardTable" class="overflow-x-auto text-xs"></div>
+  </div>
+</div>
+<script>
+var proTickerTimer = null;
+var proTickerItems = [];
+var proMatchInsightsList = [];
+var proFavMatches = JSON.parse(localStorage.getItem('sportiq_fav_matches') || '[]');
+var proTacticPlayers = [];
+var proTacticSport = '축구';
+var proTacticFormation = '4-3-3';
+var proTacticSelectedIdx = -1;
+var proTacticDraggingIdx = -1;
+
+function saveProFavMatches() {
+  localStorage.setItem('sportiq_fav_matches', JSON.stringify(proFavMatches));
+  var cntEl = document.getElementById('myMatchFavCount');
+  if (cntEl) cntEl.textContent = String(proFavMatches.length);
+}
+
+function toggleFavMatch(key) {
+  var idx = proFavMatches.indexOf(key);
+  if (idx >= 0) proFavMatches.splice(idx, 1);
+  else proFavMatches.push(key);
+  saveProFavMatches();
+  if (typeof window.renderMatches === 'function') window.renderMatches();
+}
+
+function loadProLiveTicker() {
+  fetch('/api/pro-lab/live-ticker').then(function(r){ return r.json(); }).then(function(data) {
+    proTickerItems = data.items || [];
+    var upd = document.getElementById('proTickerUpdatedAt');
+    if (upd) upd.textContent = data.updated_at_kst || '방금';
+    var box = document.getElementById('proTickerList');
+    if (!box) return;
+    if (!proTickerItems.length) { box.innerHTML = '<span class="text-xs text-slate-400">진행 중인 경기가 없습니다.</span>'; return; }
+    box.innerHTML = proTickerItems.map(function(it, idx) {
+      var liveTag = it.is_live ? '<span class="text-rose-400 font-extrabold">● ' + (it.status_text || 'LIVE') + '</span>' : '<span class="text-slate-400">' + (it.status_text || '예정') + '</span>';
+      var badge = it.value_badge ? '<span class="ml-1 rounded bg-emerald-500/20 px-1 py-0.5 text-[10px] text-emerald-300 font-bold">' + it.value_badge + '</span>' : '';
+      var h = Math.round(it.ai_home_pct || 40), d = Math.round(it.ai_draw_pct || 20), a = Math.max(0, 100 - h - d);
+      return '<div onmouseenter="showProQuickStat(' + idx + ', event)" onmouseleave="hideProQuickStat()" onclick="showProQuickStat(' + idx + ', event)" class="shrink-0 cursor-pointer rounded-xl border border-slate-800 bg-slate-900/90 hover:border-emerald-500/50 px-2.5 py-1.5 min-w-[205px] space-y-1">' +
+        '<div class="flex items-center justify-between text-[10px]"><span class="text-cyan-300 font-bold">' + (it.league || '') + '</span>' + liveTag + '</div>' +
+        '<div class="flex items-center justify-between text-xs font-bold text-white"><span>' + it.home + ' <b class="text-emerald-400">' + (it.home_score != null ? it.home_score : '-') + '</b></span><span class="text-slate-500 mx-1">:</span><span><b class="text-rose-400">' + (it.away_score != null ? it.away_score : '-') + '</b> ' + it.away + '</span></div>' +
+        '<div class="h-1 w-full rounded-full overflow-hidden flex bg-slate-800"><div style="width:' + h + '%" class="bg-emerald-500"></div><div style="width:' + d + '%" class="bg-slate-500"></div><div style="width:' + a + '%" class="bg-rose-500"></div></div>' +
+        '<div class="text-[10px] text-slate-400 flex justify-between"><span>AI ' + h + '/' + d + '/' + a + '%</span>' + badge + '</div></div>';
+    }).join('');
+  }).catch(function(){});
+}
+
+function showProQuickStat(idx, ev) {
+  var it = proTickerItems[idx];
+  var pop = document.getElementById('proQuickStatPopup');
+  if (!it || !pop) return;
+  var qs = it.quick_stats || {};
+  pop.innerHTML = '<div class="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-2"><span class="font-extrabold text-white">' + it.home + ' vs ' + it.away + '</span><button type="button" onclick="hideProQuickStat()" class="text-slate-400 hover:text-white">×</button></div>' +
+    '<div class="space-y-1 text-[11px]"><div><b class="text-emerald-300">최근 폼:</b> ' + (qs.recent_form || '데이터 집계 중') + '</div>' +
+    '<div><b class="text-cyan-300">핵심 스탯:</b> ' + (qs.expected_metric || '-') + '</div>' +
+    '<div><b class="text-amber-300">관전 요약:</b> ' + (qs.h2h_summary || '-') + '</div></div>';
+  var x = Math.min(window.innerWidth - 335, Math.max(12, (ev && ev.clientX ? ev.clientX : 80) - 40));
+  var y = Math.min(window.innerHeight - 170, Math.max(60, (ev && ev.clientY ? ev.clientY + 14 : 110)));
+  pop.style.left = x + 'px';
+  pop.style.top = y + 'px';
+  pop.classList.remove('hidden');
+}
+
+function hideProQuickStat() {
+  var pop = document.getElementById('proQuickStatPopup');
+  if (pop) pop.classList.add('hidden');
+}
+
+function toggleProTickerAutoRefresh() {
+  if (proTickerTimer) { clearInterval(proTickerTimer); proTickerTimer = null; }
+  var chk = document.getElementById('proTickerAutoRefresh');
+  if (chk && chk.checked) proTickerTimer = setInterval(loadProLiveTicker, 20000);
+}
+
+function loadProMatchInsights() {
+  return fetch('/api/pro-lab/match-insights').then(function(r){ return r.json(); }).then(function(data) {
+    proMatchInsightsList = data.items || [];
+    populateLabSimSelect();
+    renderLabInjuryBoard('ALL');
+    if (typeof window.renderMatches === 'function') window.renderMatches();
+  }).catch(function(){});
+}
+
+function openAiScorecardModal() {
+  var modal = document.getElementById('aiScorecardModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  fetch('/api/pro-lab/ai-scorecard').then(function(r){ return r.json(); }).then(function(d) {
+    var kpiEl = document.getElementById('aiScorecardKpis');
+    if (kpiEl) {
+      kpiEl.innerHTML = '<div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3"><div class="text-slate-400">누적 적중률</div><div class="text-lg font-extrabold text-emerald-400">' + (d.accuracy_pct || 0) + '%</div><div class="text-[11px] text-slate-400">' + (d.hits || 0) + ' / ' + (d.total_matches || 0) + ' 경기</div></div>' +
+        '<div class="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-3"><div class="text-slate-400">밸류 픽 수익률</div><div class="text-lg font-extrabold text-cyan-300">' + (d.roi_pct || 0) + '%</div><div class="text-[11px] text-slate-400">누적 ' + (d.total_unit_pnl || 0) + 'u</div></div>' +
+        '<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3"><div class="text-slate-400">평균 보정 오차</div><div class="text-lg font-extrabold text-amber-300">' + (d.avg_brier || 0) + '</div><div class="text-[11px] text-slate-400">' + (d.brier_note || 'Brier Score') + '</div></div>';
+    }
+    var tblEl = document.getElementById('aiScorecardTable');
+    if (tblEl) {
+      var rows = (d.records || []).slice(0, 12).map(function(rec) {
+        var icon = rec.hit ? '✅' : '❌';
+        return '<tr class="border-b border-slate-800/80"><td class="py-2 pr-2 text-slate-400">' + (rec.match_date || '') + '</td><td class="py-2 pr-2 font-bold text-white">' + (rec.matchup || '') + '<div class="text-[10px] text-slate-400">' + (rec.league || '') + '</div></td><td class="py-2 pr-2 text-cyan-300">' + (rec.pick_side || '') + ' (' + (rec.ai_prob_pct || 0) + '%)</td><td class="py-2 pr-2">' + (rec.result_score || '-') + '</td><td class="py-2 pr-2 font-bold">' + icon + ' ' + (rec.unit_pnl || 0) + 'u</td><td class="py-2 text-slate-300">' + (rec.review_note || '') + '</td></tr>';
+      }).join('');
+      tblEl.innerHTML = '<table class="w-full text-left"><thead><tr class="border-b border-slate-700 text-slate-400"><th class="py-2 pr-2">일시</th><th class="py-2 pr-2">매치업</th><th class="py-2 pr-2">AI 픽</th><th class="py-2 pr-2">스코어</th><th class="py-2 pr-2">적중/손익</th><th class="py-2">검증 코멘트</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+  }).catch(function(){});
+}
+
+function closeAiScorecardModal() {
+  var modal = document.getElementById('aiScorecardModal');
+  if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+}
+
+function populateLabSimSelect() {
+  var sel = document.getElementById('labSimMatchSelect');
+  if (!sel) return;
+  var list = proMatchInsightsList.length ? proMatchInsightsList : [];
+  sel.innerHTML = list.map(function(m, i) {
+    return '<option value="' + i + '">' + (m.league || '') + ' | ' + m.home + ' vs ' + m.away + '</option>';
+  }).join('');
+  recalcLabSim();
+}
+
+function recalcLabSim() {
+  var sel = document.getElementById('labSimMatchSelect');
+  if (!sel || !proMatchInsightsList.length) return;
+  var m = proMatchInsightsList[parseInt(sel.value || '0', 10)] || proMatchInsightsList[0];
+  var wf = parseInt(document.getElementById('labWForm').value || '50', 10);
+  var wh = parseInt(document.getElementById('labWHome').value || '50', 10);
+  var wo = parseInt(document.getElementById('labWOffense').value || '50', 10);
+  var wd = parseInt(document.getElementById('labWDefense').value || '50', 10);
+  var wi = parseInt(document.getElementById('labWInjury').value || '50', 10);
+  document.getElementById('labWFormVal').textContent = wf;
+  document.getElementById('labWHomeVal').textContent = wh;
+  document.getElementById('labWOffenseVal').textContent = wo;
+  document.getElementById('labWDefenseVal').textContent = wd;
+  document.getElementById('labWInjuryVal').textContent = wi;
+  var shift = ((wf - 50) * 0.12) + ((wh - 50) * 0.15) + ((wo - 50) * 0.1) - ((wd - 50) * 0.06) - ((wi - 50) * 0.11);
+  var h = Math.max(10, Math.min(80, Math.round((m.ai_home_pct || 45) + shift)));
+  var d = Math.max(5, Math.min(35, Math.round(m.ai_draw_pct || 25)));
+  var a = Math.max(10, 100 - h - d);
+  if (h + d + a !== 100) h = 100 - d - a;
+  document.getElementById('labSimHomeLabel').textContent = m.home;
+  document.getElementById('labSimAwayLabel').textContent = m.away;
+  document.getElementById('labSimBarHome').style.width = h + '%';
+  document.getElementById('labSimBarDraw').style.width = d + '%';
+  document.getElementById('labSimBarAway').style.width = a + '%';
+  document.getElementById('labSimHomePct').textContent = h + '%';
+  document.getElementById('labSimDrawPct').textContent = d + '%';
+  document.getElementById('labSimAwayPct').textContent = a + '%';
+  var hs = h >= a ? 2 : 1, as = a > h ? 2 : 1;
+  document.getElementById('labSimScore').textContent = hs + ' : ' + as;
+  var edge = (h - (m.mkt_home_pct || h)).toFixed(1);
+  document.getElementById('labSimEdge').textContent = (edge > 0 ? '+' : '') + edge + '%p';
+  document.getElementById('labSimPick').textContent = h >= a ? (m.home + ' 승') : (m.away + ' 승');
+}
+
+function shareLabSimToFeed() {
+  var sel = document.getElementById('labSimMatchSelect');
+  if (!sel || !proMatchInsightsList.length || typeof state === 'undefined') return;
+  var m = proMatchInsightsList[parseInt(sel.value || '0', 10)] || proMatchInsightsList[0];
+  var hp = document.getElementById('labSimHomePct').textContent;
+  var dp = document.getElementById('labSimDrawPct').textContent;
+  var ap = document.getElementById('labSimAwayPct').textContent;
+  var pk = document.getElementById('labSimPick').textContent;
+  var ed = document.getElementById('labSimEdge').textContent;
+  state.posts.unshift({
+    id: 'lab_' + Date.now(), league: m.league || 'PRO LAB', isPro: true, author: 'AI 실험실 시뮬레이터',
+    trust: 94, likes: 1, bookmarked: false, liked: false, hidden: false, time: 0,
+    title: '[시뮬레이션] ' + m.home + ' vs ' + m.away + ' 추천: ' + pk,
+    body: '커스텀 승률: 홈 ' + hp + ' / 무 ' + dp + ' / 원정 ' + ap + ' (시장 대비 밸류 ' + ed + ')',
+    tags: ['AI실험실', '승률시뮬레이터'], comments: []
+  });
+  if (typeof window.renderFeed === 'function') window.renderFeed();
+  if (typeof window.showToast === 'function') window.showToast('시뮬레이션 결과가 실시간 분석 피드 최상단에 공유되었습니다!');
+  else alert('시뮬레이션 결과가 실시간 분석 피드 최상단에 공유되었습니다!');
+}
+
+function setTacticPreset(preset) {
+  if (preset === 'soccer_433') { proTacticSport = '축구'; proTacticFormation = '4-3-3'; proTacticPlayers = [{name:'GK',x:70,y:220},{name:'LB',x:190,y:70},{name:'CB1',x:180,y:165},{name:'CB2',x:180,y:275},{name:'RB',x:190,y:370},{name:'LCM',x:340,y:120},{name:'CDM',x:310,y:220},{name:'RCM',x:340,y:320},{name:'LW',x:520,y:85},{name:'ST',x:560,y:220},{name:'RW',x:520,y:355}]; }
+  else if (preset === 'soccer_4231') { proTacticSport = '축구'; proTacticFormation = '4-2-3-1'; proTacticPlayers = [{name:'GK',x:70,y:220},{name:'LB',x:185,y:70},{name:'CB1',x:180,y:165},{name:'CB2',x:180,y:275},{name:'RB',x:185,y:370},{name:'LDM',x:300,y:165},{name:'RDM',x:300,y:275},{name:'LAM',x:440,y:95},{name:'CAM',x:450,y:220},{name:'RAM',x:440,y:345},{name:'ST',x:575,y:220}]; }
+  else if (preset === 'soccer_3421') { proTacticSport = '축구'; proTacticFormation = '3-4-2-1'; proTacticPlayers = [{name:'GK',x:70,y:220},{name:'LCB',x:185,y:115},{name:'CB',x:175,y:220},{name:'RCB',x:185,y:325},{name:'LWB',x:320,y:65},{name:'LCM',x:315,y:170},{name:'RCM',x:315,y:270},{name:'RWB',x:320,y:375},{name:'LAM',x:470,y:145},{name:'RAM',x:470,y:295},{name:'ST',x:580,y:220}]; }
+  else if (preset === 'baseball') { proTacticSport = '야구'; proTacticFormation = '다이아몬드'; proTacticPlayers = [{name:'P',x:360,y:255},{name:'C',x:360,y:385},{name:'1B',x:490,y:255},{name:'2B',x:425,y:165},{name:'SS',x:295,y:165},{name:'3B',x:230,y:255},{name:'LF',x:170,y:95},{name:'CF',x:360,y:65},{name:'RF',x:550,y:95}]; }
+  else { proTacticSport = '농구'; proTacticFormation = '5-Out'; proTacticPlayers = [{name:'PG',x:180,y:220},{name:'SG',x:310,y:85},{name:'SF',x:510,y:85},{name:'PF',x:510,y:355},{name:'C',x:310,y:355}]; }
+  proTacticSelectedIdx = -1;
+  drawTacticBoard();
+}
+
+function drawTacticBoard() {
+  var c = document.getElementById('tacticalBoardCanvas');
+  if (!c) return;
+  var ctx = c.getContext('2d');
+  ctx.fillStyle = proTacticSport === '농구' ? '#3b2414' : (proTacticSport === '야구' ? '#14452f' : '#0b3b24');
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(20, 20, c.width - 40, c.height - 40);
+  if (proTacticSport === '축구') {
+    ctx.beginPath(); ctx.moveTo(c.width / 2, 20); ctx.lineTo(c.width / 2, c.height - 20); ctx.stroke();
+    ctx.beginPath(); ctx.arc(c.width / 2, c.height / 2, 55, 0, Math.PI * 2); ctx.stroke();
+  }
+  proTacticPlayers.forEach(function(p, idx) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 18, 0, Math.PI * 2);
+    ctx.fillStyle = idx === proTacticSelectedIdx ? '#f59e0b' : '#10b981';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.name || ('P' + (idx + 1)), p.x, p.y + 30);
+  });
+}
+
+function updateSelectedTacticPlayerName(val) {
+  if (proTacticSelectedIdx >= 0 && proTacticPlayers[proTacticSelectedIdx]) {
+    proTacticPlayers[proTacticSelectedIdx].name = val;
+    drawTacticBoard();
+  }
+}
+
+function initTacticCanvasEvents() {
+  var c = document.getElementById('tacticalBoardCanvas');
+  if (!c || c.dataset.bound) return;
+  c.dataset.bound = '1';
+  function getPos(e) {
+    var r = c.getBoundingClientRect();
+    var pt = e.touches ? e.touches[0] : e;
+    return { x: (pt.clientX - r.left) * (c.width / r.width), y: (pt.clientY - r.top) * (c.height / r.height) };
+  }
+  function start(e) {
+    var pos = getPos(e);
+    for (var i = proTacticPlayers.length - 1; i >= 0; i--) {
+      var dx = proTacticPlayers[i].x - pos.x, dy = proTacticPlayers[i].y - pos.y;
+      if (dx * dx + dy * dy <= 400) {
+        proTacticDraggingIdx = i; proTacticSelectedIdx = i;
+        var inp = document.getElementById('tacticPlayerNameInput');
+        if (inp) inp.value = proTacticPlayers[i].name || '';
+        drawTacticBoard();
+        break;
+      }
+    }
+  }
+  function move(e) {
+    if (proTacticDraggingIdx < 0) return;
+    if (e.cancelable) e.preventDefault();
+    var pos = getPos(e);
+    proTacticPlayers[proTacticDraggingIdx].x = Math.max(25, Math.min(c.width - 25, Math.round(pos.x)));
+    proTacticPlayers[proTacticDraggingIdx].y = Math.max(25, Math.min(c.height - 25, Math.round(pos.y)));
+    drawTacticBoard();
+  }
+  function end() { proTacticDraggingIdx = -1; }
+  c.addEventListener('mousedown', start); window.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+  c.addEventListener('touchstart', start, {passive:false}); window.addEventListener('touchmove', move, {passive:false}); window.addEventListener('touchend', end);
+  setTacticPreset('soccer_433');
+}
+
+function saveTacticToDb() {
+  var title = (document.getElementById('tacticTitleInput').value || '').trim() || (proTacticSport + ' ' + proTacticFormation + ' 전술');
+  var author = (document.getElementById('tacticAuthorInput').value || '').trim() || '전술분석가';
+  var memo = (document.getElementById('tacticMemoInput').value || '').trim();
+  fetch('/api/pro-lab/tactics', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({title: title, sport: proTacticSport, formation: proTacticFormation, author: author, memo: memo, players: proTacticPlayers})
+  }).then(function(r){ return r.json(); }).then(function() {
+    loadTacticsGallery();
+    if (typeof window.showToast === 'function') window.showToast('전술판이 DB에 저장 및 공유되었습니다!');
+  }).catch(function(){});
+}
+
+function downloadTacticPng() {
+  var c = document.getElementById('tacticalBoardCanvas');
+  if (!c) return;
+  var a = document.createElement('a');
+  a.download = 'sportiq-tactic-' + Date.now() + '.png';
+  a.href = c.toDataURL('image/png');
+  a.click();
+}
+
+function loadTacticsGallery() {
+  fetch('/api/pro-lab/tactics').then(function(r){ return r.json(); }).then(function(d) {
+    var box = document.getElementById('tacticGalleryList');
+    if (!box) return;
+    window._proTacticsGallery = d.items || [];
+    if (!window._proTacticsGallery.length) { box.innerHTML = '<div class="text-slate-500">아직 공유된 전술판이 없습니다.</div>'; return; }
+    box.innerHTML = window._proTacticsGallery.map(function(t, i) {
+      return '<div onclick="loadTacticFromGallery(' + i + ')" class="cursor-pointer rounded-xl border border-slate-800 bg-slate-950/80 hover:border-emerald-500/50 p-2.5 space-y-1">' +
+        '<div class="font-bold text-white">' + (t.title || '전술') + '</div>' +
+        '<div class="text-[11px] text-emerald-300">' + (t.sport || '') + ' · ' + (t.formation || '') + ' · ' + (t.author || '') + '</div>' +
+        '<div class="text-[11px] text-slate-400 truncate">' + (t.memo || '') + '</div></div>';
+    }).join('');
+  }).catch(function(){});
+}
+
+function loadTacticFromGallery(idx) {
+  var t = (window._proTacticsGallery || [])[idx];
+  if (!t) return;
+  proTacticSport = t.sport || '축구';
+  proTacticFormation = t.formation || '4-3-3';
+  proTacticPlayers = JSON.parse(JSON.stringify(t.players || []));
+  document.getElementById('tacticTitleInput').value = t.title || '';
+  document.getElementById('tacticMemoInput').value = t.memo || '';
+  drawTacticBoard();
+}
+
+function renderLabInjuryBoard(sport) {
+  var box = document.getElementById('labInjuryBoard');
+  if (!box) return;
+  var items = proMatchInsightsList.filter(function(m){ return sport === 'ALL' || (m.sport || '').indexOf(sport) >= 0; });
+  box.innerHTML = items.map(function(m) {
+    return '<div class="rounded-xl border border-slate-800 bg-slate-900/80 p-3 space-y-1">' +
+      '<div class="flex justify-between"><span class="font-bold text-white">' + m.home + ' vs ' + m.away + '</span><span class="text-[11px] text-cyan-300">' + (m.league || '') + '</span></div>' +
+      '<div class="text-rose-300">🏥 ' + (m.injury_note || '특이 결장 없음') + '</div>' +
+      '<div class="text-amber-300">⚠️ ' + (m.risk_note || '안정') + '</div></div>';
+  }).join('');
+}
+
+(function initProLabFeatures() {
+  saveProFavMatches();
+  loadProLiveTicker();
+  toggleProTickerAutoRefresh();
+  loadProMatchInsights();
+  if (typeof window.switchTab === 'function') {
+    var _origSwitchTab = window.switchTab;
+    window.switchTab = function(tab) {
+      _origSwitchTab(tab);
+      if (tab === 'lab') { initTacticCanvasEvents(); loadTacticsGallery(); populateLabSimSelect(); }
+    };
+  }
+  if (typeof window.renderMatches === 'function') {
+    var _origRenderMatches = window.renderMatches;
+    window.renderMatches = function() {
+      _origRenderMatches();
+      var listEl = document.getElementById('matchList');
+      if (!listEl) return;
+      var cards = Array.prototype.slice.call(listEl.children);
+      cards.forEach(function(card) {
+        var txt = card.textContent || '';
+        var ins = null;
+        for (var i = 0; i < proMatchInsightsList.length; i++) {
+          var m = proMatchInsightsList[i];
+          if (txt.indexOf(m.home) >= 0 || txt.indexOf(m.away) >= 0) { ins = m; break; }
+        }
+        var key = ins ? (ins.match_id || (ins.home + '_' + ins.away)) : txt.slice(0, 28);
+        var isFav = proFavMatches.indexOf(key) >= 0;
+        if (typeof currentMatchSportFilter !== 'undefined' && currentMatchSportFilter === 'FAV' && !isFav) { card.style.display = 'none'; return; }
+        if (!card.querySelector('.pro-fav-btn')) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'pro-fav-btn float-right rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300';
+          btn.textContent = isFav ? '⭐' : '☆';
+          btn.onclick = function() { toggleFavMatch(key); };
+          card.prepend(btn);
+        }
+        if (ins && !card.querySelector('.pro-insight-box')) {
+          var box = document.createElement('div');
+          box.className = 'pro-insight-box mt-2 rounded-xl border border-emerald-500/25 bg-slate-950/70 p-2.5 text-[11px] space-y-1';
+          box.innerHTML = '<div class="flex flex-wrap items-center justify-between gap-1"><span class="text-emerald-300 font-bold">🤖 AI 모델 승률 ' + ins.ai_home_pct + '/' + ins.ai_draw_pct + '/' + ins.ai_away_pct + '% vs 팬·시장 ' + ins.mkt_home_pct + '/' + ins.mkt_draw_pct + '/' + ins.mkt_away_pct + '%</span><span class="rounded bg-cyan-500/20 px-1.5 py-0.5 text-cyan-300 font-bold">💎 AI 밸류 포착 (+' + ins.edge_pct + '%p)</span></div>' +
+            '<div class="text-slate-300">🏥 ' + (ins.injury_note || '-') + ' · ⚠️ ' + (ins.risk_note || '-') + '</div>';
+          card.appendChild(box);
+        }
+      });
+    };
+  }
+})();
+</script>
 </html>
