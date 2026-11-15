@@ -148,6 +148,24 @@
     <div class="lg:col-span-8 space-y-5">
       <!-- TAB 1: FEED -->
       <section id="tab-feed" class="tab-panel space-y-4">
+        <div id="autoAnalystBar" class="glass-card rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-4 flex flex-wrap items-center justify-between gap-3">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2 text-sm font-bold text-emerald-300">
+              <span>🤖 00:00 KST 글로벌 TOP 20 커뮤니티 자동 분석 엔진 가동 중</span>
+              <span class="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-300 border border-emerald-500/30">LIVE</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 text-xs text-slate-300">
+              <span>마지막 자동 탐색: <strong id="autoAnalystLastRun" class="text-white">오늘 00:00 KST</strong></span>
+              <span>·</span>
+              <span>다음 예정: <strong id="autoAnalystNextRun" class="text-cyan-300">내일 00:00 KST</strong></span>
+              <span>·</span>
+              <span>분석 대상: <strong id="autoAnalystCount" class="text-amber-300">TOP 20</strong></span>
+            </div>
+          </div>
+          <button id="btnRunAutoAnalyst" onclick="runAutoAnalystNow()" class="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-3.5 py-2 transition shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
+            <span>⚡ 지금 TOP 20 분석 갱신</span>
+          </button>
+        </div>
         <div class="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
           <div class="flex flex-wrap items-center gap-2">
             <select id="leagueFilter" onchange="renderFeed()" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200">
@@ -156,6 +174,8 @@
               <option value="KBO">KBO / 프로야구</option>
               <option value="NBA">NBA / 농구</option>
               <option value="ESPORTS">LCK / e스포츠</option>
+            <option value="NHL">NHL / 하키</option>
+            <option value="NFL">NFL / 미식축구</option>
             </select>
             <select id="sortFilter" onchange="renderFeed()" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200">
               <option value="popular">인기순</option>
@@ -549,6 +569,7 @@
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-2">
               <span class="rounded-md bg-slate-800 px-2 py-0.5 text-[11px] font-bold text-emerald-400">${p.league}</span>
+            ${p.isAutoAnalyst ? `<span class="rounded-md bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 text-[11px] font-bold text-cyan-300">${p.autoBadge}</span>` : ''}
               ${p.isPro ? '<span class="rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-bold text-emerald-300">PRO 무료열람</span>' : ''}
               <span class="text-xs font-semibold text-slate-200">${p.author}</span>
               <span class="text-[11px] text-amber-400">신뢰도 ${p.trust}%</span>
@@ -557,6 +578,7 @@
           </div>
           <h3 class="text-base font-bold text-white">${p.title}</h3>
           <p class="text-xs leading-relaxed text-slate-300">${p.body}</p>
+          ${p.isAutoAnalyst ? `<div class="rounded-xl bg-slate-900/80 border border-slate-700/70 p-3 space-y-2"><div class="flex items-center justify-between text-[11px] font-semibold"><span class="text-emerald-300">${p.homeLabel} ${p.homePct}%</span><span class="text-slate-400">커뮤니티 여론 게이지</span><span class="text-rose-300">${p.awayPct}% ${p.awayLabel}</span></div><div class="h-2 w-full rounded-full bg-rose-500/40 overflow-hidden flex"><div class="h-full bg-emerald-400 transition-all" style="width:${p.homePct}%"></div></div><div class="flex flex-wrap items-center justify-between gap-2 text-[11px] pt-1"><span class="text-slate-300">🎯 <strong>핵심 전술:</strong> ${p.tacticalPoints}</span><span class="rounded-md bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 font-bold text-amber-300">⭐ 추천 픽: ${p.recommendedPick}</span></div></div>` : ''}
           <div class="flex flex-wrap gap-1.5">
             ${p.tags.map(t => `<button onclick="filterByTag('${t}')" class="rounded-full bg-slate-800/90 px-2.5 py-0.5 text-[11px] text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 transition">${t}</button>`).join('')}
           </div>
@@ -932,7 +954,79 @@
       el.classList.remove('flex');
     }
 
-    setRole('GUEST');
+    sfunction mapAutoLeague(rawLeague, sport) {
+  const s = (rawLeague || '') + ' ' + (sport || '');
+  if (rawLeague === 'TOP 20 종합' || sport === '전체') return 'TOP 20 종합';
+  if (['EPL', '네이션스리그', 'UCL', '챔피언스리그', '라리가', '축구'].some(k => s.includes(k))) return 'EPL';
+  if (['APBC', 'KBO', 'MLB', '야구'].some(k => s.includes(k))) return 'KBO';
+  if (['NBA', 'KBL', '농구'].some(k => s.includes(k))) return 'NBA';
+  if (['NHL', '하키'].some(k => s.includes(k))) return 'NHL';
+  if (['NFL', '미식축구'].some(k => s.includes(k))) return 'NFL';
+  return rawLeague || 'EPL';
+}
+
+function mergeAutoAnalystPosts(data) {
+  if (!data || !Array.isArray(data.posts)) return;
+  const lastEl = document.getElementById('autoAnalystLastRun');
+  const nextEl = document.getElementById('autoAnalystNextRun');
+  const cntEl = document.getElementById('autoAnalystCount');
+  if (lastEl) lastEl.textContent = data.last_run_label || data.last_run_kst || '오늘 00:00 KST';
+  if (nextEl) nextEl.textContent = data.next_run_label || data.next_run_kst || '내일 00:00 KST';
+  if (cntEl) cntEl.textContent = 'TOP ' + (data.analyzed_top_count || 20);
+  const mapped = data.posts.map(item => ({
+    id: 'auto-' + item.id,
+    autoPostId: item.id,
+    isAutoAnalyst: true,
+    league: mapAutoLeague(item.league, item.sport),
+    autoBadge: item.badge_text,
+    isPro: true,
+    author: 'SportIQ 00:00 자동분석 AI',
+    trust: item.confidence_score || 85,
+    time: item.is_summary ? 0 : (item.rank_num || 1),
+    title: item.title,
+    body: item.content,
+    homeLabel: item.sentiment_home_label || '홈/정배 여론',
+    awayLabel: item.sentiment_away_label || '원정/역배 여론',
+    homePct: item.sentiment_home_pct || 55,
+    awayPct: item.sentiment_away_pct || 45,
+    tacticalPoints: item.tactical_points || '',
+    recommendedPick: item.recommended_pick || '',
+    tags: (item.hashtags || '').split(/\s+/).filter(Boolean),
+    likes: item.likes || 0,
+    liked: false,
+    comments: 0,
+    hidden: false
+  }));
+  state.posts = [...mapped, ...state.posts.filter(p => !p.isAutoAnalyst)];
+  renderFeed();
+}
+
+async function loadAutoAnalystPosts() {
+  try {
+    const res = await fetch('/api/auto-analyst/posts');
+    if (!res.ok) return;
+    const data = await res.json();
+    mergeAutoAnalystPosts(data);
+  } catch (e) {}
+}
+
+async function runAutoAnalystNow() {
+  const btn = document.getElementById('btnRunAutoAnalyst');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳ TOP 20 분석 갱신 중...</span>'; }
+  try {
+    const res = await fetch('/api/auto-analyst/run-now', { method: 'POST' });
+    const data = await res.json();
+    mergeAutoAnalystPosts(data);
+    showToast('⚡ 실시간 TOP 20 순위를 반영해 커뮤니티 자동 분석이 갱신되었습니다!');
+  } catch (e) {
+    showToast('분석 갱신 중 오류가 발생했습니다.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span>⚡ 지금 TOP 20 분석 갱신</span>'; }
+  }
+}
+
+loadAutoAnalystPosts();
+setRole('GUEST');
     switchTab('feed');
     renderFeed();
     renderMatches();
