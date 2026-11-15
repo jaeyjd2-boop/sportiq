@@ -2447,7 +2447,7 @@ async function voteShortsBalance(side) {
   const clip = getActiveShortClip();
   if (!clip) return;
   if (shortsVotedMap[clip.clip_id]) { showToast('이미 참여한 클립입니다!'); return; }
-  const isA = String(side).toLowerCase() === 'a'; const action = isA ? 'vote_a' : 'vote_b'; const statKey = isA ? 'opt_a_votes' : 'opt_b_votes';
+  const s = String(side).toLowerCase(); const isA = (s === 'a' || s === 'opt_a' || s === 'vote_a'); const action = isA ? 'vote_a' : 'vote_b'; const statKey = isA ? 'opt_a_votes' : 'opt_b_votes';
   shortsStatsMap[clip.clip_id] = shortsStatsMap[clip.clip_id] || { likes: 0, fire: 0, legend: 0, genius: 0, chills: 0, clap: 0, opt_a_votes: 0, opt_b_votes: 0 };
   try {
     const res = await fetch('/api/shorts/interact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clip_id: clip.clip_id, action, actor_key: getSportiqActorKey() }) });
