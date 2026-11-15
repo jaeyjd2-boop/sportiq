@@ -820,14 +820,9 @@ def init_shorts_hub_db():
     with _get_conn() as conn:
         if not {"clip_id", "action_group", "actor_key", "choice"}.issubset({r[1] for r in conn.execute("PRAGMA table_info(shorts_user_actions)").fetchall()}):
             conn.execute("DROP TABLE IF EXISTS shorts_user_actions"); conn.execute("CREATE TABLE shorts_user_actions (clip_id TEXT NOT NULL, action_group TEXT NOT NULL, actor_key TEXT NOT NULL, choice TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(clip_id, action_group, actor_key))"); conn.commit()
-         fixed_null = False
-            for cid, vals in SHORTS_DEFAULT_SEEDS.items():
-                cur = conn.execute("UPDATE shorts_clip_stats SET likes=COALESCE(likes,?), react_fire=COALESCE(react_fire,?), react_legend=COALESCE(react_legend,?), react_genius=COALESCE(react_genius,?), react_chills=COALESCE(react_chills,?), react_clap=COALESCE(react_clap,?), opt_a_votes=COALESCE(opt_a_votes,?), opt_b_votes=COALESCE(opt_b_votes,?) WHERE clip_id=? AND (likes IS NULL OR react_fire IS NULL OR react_legend IS NULL OR react_genius IS NULL OR react_chills IS NULL OR react_clap IS NULL OR opt_a_votes IS NULL OR opt_b_votes IS NULL)", (*vals, cid))
-                if cur.rowcount: fixed_null = True
-                cur = conn.execute("UPDATE shorts_clip_stats SET likes=COALESCE(likes,0), react_fire=COALESCE(react_fire,0), react_legend=COALESCE(react_legend,0), react_genius=COALESCE(react_genius,0), react_chills=COALESCE(react_chills,0), react_clap=COALESCE(react_clap,0), opt_a_votes=COALESCE(opt_a_votes,0), opt_b_votes=COALESCE(opt_b_votes,0) WHERE likes IS NULL OR react_fire IS NULL OR react_legend IS NULL OR react_genius IS NULL OR react_chills IS NULL OR react_clap IS NULL OR opt_a_votes IS NULL OR opt_b_votes IS NULL")
-                if cur.rowcount: fixed_null = True
-                    conn.commit()
-        if fixed_null: _backup_tables_to_pg("shorts_clip_stats")
+         conn.execute("UPDATE shorts_clip_stats SET likes=COALESCE(likes,120), react_fire=COALESCE(react_fire,30), react_legend=COALESCE(react_legend,31), react_genius=COALESCE(react_genius,25), react_chills=COALESCE(react_chills,19), react_clap=COALESCE(react_clap,28), opt_a_votes=COALESCE(opt_a_votes,50), opt_b_votes=COALESCE(opt_b_votes,50)")
+        conn.commit()
+    _backup_tables_to_pg("shorts_clip_stats")
 
 def _ensure_shorts_stat_row(conn: sqlite3.Connection, clip_id: str):
     conn.execute(
