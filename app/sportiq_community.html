@@ -2159,7 +2159,7 @@ async function reportCustomShort(clipId, event) {
     if (likeEl) likeEl.textContent = s.likes || 0;
     ['fire', 'legend', 'genius', 'chills', 'clap'].forEach(k => {
       const el = document.getElementById('reactCount_' + k);
-      if (el) el.textContent = s[k] || 0;
+      if (el) el.textContent = s[k] ?? (s.reactions && s.reactions[k]) ?? s['react_' + k] ?? 0;
     });
     const a = s.opt_a_votes ?? s.vote_a ?? 0;
     const b = s.opt_b_votes ?? s.vote_b ?? 0;
