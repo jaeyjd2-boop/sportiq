@@ -954,7 +954,7 @@
       el.classList.remove('flex');
     }
 
-    sfunction mapAutoLeague(rawLeague, sport) {
+   function mapAutoLeague(rawLeague, sport) {
   const s = (rawLeague || '') + ' ' + (sport || '');
   if (rawLeague === 'TOP 20 종합' || sport === '전체') return 'TOP 20 종합';
   if (['EPL', '네이션스리그', 'UCL', '챔피언스리그', '라리가', '축구'].some(k => s.includes(k))) return 'EPL';
