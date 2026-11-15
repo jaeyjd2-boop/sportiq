@@ -873,7 +873,7 @@ def get_shorts_hub():
 
 
 @router.post("/api/shorts/interact")
-def post_shorts_interact(req: ShortsInteractReq), request: Request:
+def post_shorts_interact(req: ShortsInteractReq, request: Request):
     init_shorts_hub_db()
     cid = (req.clip_id or "").strip()
     if not cid:
