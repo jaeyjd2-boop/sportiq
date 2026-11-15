@@ -148,22 +148,22 @@
       <section id="tab-shorts" class="tab-panel hidden">
         <div class="grid grid-cols-1 gap-6 md:grid-cols-12">
           <div class="md:col-span-5 flex justify-center">
-            <div class="relative aspect-[9/16] w-full max-w-[300px] overflow-hidden rounded-3xl border-2 border-emerald-500/40 bg-gradient-to-b from-slate-900 via-emerald-950/50 to-slate-950 p-5 flex flex-col justify-between shadow-2xl">
+            <div class="relative aspect-[9/16] w-full max-w-[300px] overflow-hidden rounded-3xl border-2 border-emerald-500/40 bg-gradient-to-b from-slate-900 via-emerald-950/50 to-slate-950 p-5 flex flex-col justify-between shadow-2xl"><canvas id="shortPitchCanvas" width="300" height="533" class="pointer-events-none absolute inset-0 h-full w-full z-0"></canvas>
               <div class="flex items-center justify-between">
                 <span class="rounded-full bg-emerald-500 px-2.5 py-0.5 text-[11px] font-bold text-slate-950">9:16 TACTICAL</span>
-                <span id="shortTimeBadge" class="rounded-full bg-slate-900/80 px-2.5 py-0.5 text-xs font-mono text-emerald-300">00:42</span>
+                <span id="shortTimeBadge" class="relative z-20 pointer-events-none rounded-full bg-slate-900/80 px-2.5 py-0.5 text-xs font-mono text-emerald-300">00:00 / 00:45</span>
               </div>
-              <div class="space-y-3 text-center my-auto">
-                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-400/40 text-2xl">▶</div>
+              <div class="relative z-20 space-y-2 text-center my-auto pointer-events-auto">
+                <button id="shortCenterPlayBtn" type="button" onclick="toggleShortPlay()" aria-label="전술 하이라이트 재생" class="relative z-30 pointer-events-auto mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/30 hover:bg-emerald-500/50 border-2 border-emerald-400/80 text-2xl text-white shadow-lg transition cursor-pointer">▶</button>
                 <h3 id="shortTitle" class="text-lg font-extrabold text-white">하프스페이스 3자 패스 패턴 분석</h3>
                 <p id="shortDesc" class="text-xs text-slate-300 leading-relaxed">측면 풀백 오버래핑 시 중앙 미드필더의 2선 침투 타이밍과 xG 상승 구간을 45초로 요약합니다.</p>
-                <div class="flex justify-center gap-2 pt-2">
+                <div class="relative z-30 pointer-events-auto flex justify-center gap-2 pt-2">
                   <button onclick="selectShort(0)" class="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-semibold hover:bg-emerald-500 hover:text-slate-950">클립 #1</button>
                   <button onclick="selectShort(1)" class="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-semibold hover:bg-emerald-500 hover:text-slate-950">클립 #2</button>
                   <button onclick="selectShort(2)" class="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-semibold hover:bg-emerald-500 hover:text-slate-950">클립 #3</button>
                 </div>
               </div>
-              <div class="rounded-xl bg-slate-900/80 p-2.5 text-[11px] text-slate-300 border border-slate-800">
+              <div class="relative z-20 pointer-events-auto space-y-2 rounded-xl bg-slate-900/90 p-2.5 text-[11px] text-slate-200 border border-slate-800"><div id="shortSubtitle" class="font-medium text-emerald-300 min-h-[16px]">▶ 재생 버튼을 눌러 전술 애니메이션을 시작하세요.</div><div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden cursor-pointer" onclick="seekShortByBar(event)"><div id="shortProgressBar" class="h-full bg-emerald-400 transition-all duration-100" style="width:0%"></div></div><div class="flex items-center justify-between gap-2"><button id="shortBottomPlayBtn" type="button" onclick="toggleShortPlay()" class="relative z-30 pointer-events-auto rounded-lg bg-emerald-500 hover:bg-emerald-400 px-2.5 py-1 text-[11px] font-bold text-slate-950 cursor-pointer">▶ 재생</button><span id="shortTimerText" class="font-mono text-[11px] text-slate-300">00:00 / 00:45</span></div>
                 타임스탬프 클릭 시 해당 구간 피드백이 바로 입력됩니다.
               </div>
             </div>
@@ -685,15 +685,15 @@
       });
     }
 
-    function selectShort(idx) {
+    let shortIdx=0,shortPlaying=false,shortSec=0,shortRaf=null,shortLastTs=0;const SHORT_DUR=45;const shortSubs=[['[00:00] 하프스페이스 유인 빌드업','[00:12] 압박 트리거 발동 · 3자 패스','[00:24] 2선 침투 및 컷백 (xG 0.42)','[00:36] 파이널 서드 슈팅 마무리'],['[00:00] 하이패스트볼 릴리스 포인트','[00:12] 수직 무브먼트 상승 구간','[00:24] 배트 스윙 궤적 교차','[00:36] 헛스윙 삼진 데이터 확정'],['[00:00] 스위치 수비 타이밍 포착','[00:12] 45도 엘보우 컷인 압박','[00:24] 윙 코너 킥아웃 패스','[00:36] 오픈 캐치앤슛 릴리스']];function fmtShortSec(s){const n=Math.max(0,Math.min(SHORT_DUR,Math.floor(s)));return '00:'+String(n).padStart(2,'0');}function parseShortTs(ts){const p=String(ts||'00:00').split(':');const m=parseInt(p[0],10)||0,s=parseInt(p[1],10)||0;return Math.max(0,Math.min(SHORT_DUR,m*60+s));}function updateShortUI(){const cur=fmtShortSec(shortSec),txt=cur+' / 00:45';const b=document.getElementById('shortTimeBadge');if(b)b.textContent=txt;const t=document.getElementById('shortTimerText');if(t)t.textContent=txt;const bar=document.getElementById('shortProgressBar');if(bar)bar.style.width=((shortSec/SHORT_DUR)*100).toFixed(1)+'%';const cb=document.getElementById('shortCenterPlayBtn');if(cb)cb.textContent=shortPlaying?'⏸':'▶';const bb=document.getElementById('shortBottomPlayBtn');if(bb)bb.textContent=shortPlaying?'⏸ 일시정지':'▶ 재생';const sub=document.getElementById('shortSubtitle');if(sub){const arr=shortSubs[shortIdx]||shortSubs[0];const si=shortSec<12?0:shortSec<24?1:shortSec<36?2:3;sub.textContent=arr[si];}}function drawShortPitch(){const c=document.getElementById('shortPitchCanvas');if(!c)return;const ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.strokeStyle='rgba(52,211,153,0.22)';ctx.lineWidth=1.5;ctx.strokeRect(18,24,w-36,h-48);ctx.beginPath();ctx.moveTo(18,h/2);ctx.lineTo(w-18,h/2);ctx.stroke();ctx.beginPath();ctx.arc(w/2,h/2,38,0,Math.PI*2);ctx.stroke();ctx.strokeRect(w/2-55,24,110,64);ctx.strokeRect(w/2-55,h-88,110,64);const p=(shortSec%SHORT_DUR)/SHORT_DUR;const ax=70+Math.sin(p*Math.PI*2)*45,ay=390-p*210;const bx=220-Math.cos(p*Math.PI*2)*35,by=340-p*180;const cx=150+Math.sin(p*Math.PI*4)*25,cy=250-p*130;ctx.save();ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(250,204,21,0.75)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.lineTo(cx,cy);ctx.stroke();ctx.restore();const ballX=p<0.5?ax+(bx-ax)*(p*2):bx+(cx-bx)*((p-0.5)*2);const ballY=p<0.5?ay+(by-ay)*(p*2):by+(cy-by)*((p-0.5)*2);[[ax,ay,'#10b981'],[bx,by,'#10b981'],[cx,cy,'#10b981'],[ax+35,ay-55,'#f43f5e'],[bx-30,by-45,'#f43f5e'],[150,150,'#f43f5e']].forEach(([x,y,col])=>{ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();ctx.strokeStyle='#0f172a';ctx.lineWidth=1.5;ctx.stroke();});if(shortSec>=12){ctx.beginPath();ctx.arc(ballX,ballY,12+Math.sin(shortSec*6)*3,0,Math.PI*2);ctx.strokeStyle='rgba(244,63,94,0.6)';ctx.lineWidth=2;ctx.stroke();}ctx.beginPath();ctx.arc(ballX,ballY,5,0,Math.PI*2);ctx.fillStyle='#facc15';ctx.fill();}function shortLoop(ts){if(!shortPlaying)return;if(!shortLastTs)shortLastTs=ts;const dt=(ts-shortLastTs)/1000;shortLastTs=ts;shortSec+=dt;if(shortSec>=SHORT_DUR)shortSec=0;updateShortUI();drawShortPitch();shortRaf=requestAnimationFrame(shortLoop);}function toggleShortPlay(){shortPlaying=!shortPlaying;if(shortPlaying){shortLastTs=0;cancelAnimationFrame(shortRaf);shortRaf=requestAnimationFrame(shortLoop);}else{cancelAnimationFrame(shortRaf);}updateShortUI();drawShortPitch();}function seekShortByBar(e){const r=e.currentTarget.getBoundingClientRect();const ratio=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));shortSec=ratio*SHORT_DUR;updateShortUI();drawShortPitch();}setTimeout(()=>{updateShortUI();drawShortPitch();},100);function selectShort(idx) {
       const s = state.shorts[idx];
       document.getElementById('shortTitle').textContent = s.title;
-      document.getElementById('shortDesc').textContent = s.desc;
+      document.getElementById('shortDesc').textContent = s.desc; shortIdx = idx; shortSec = 0; shortPlaying = true; shortLastTs = 0; cancelAnimationFrame(shortRaf); shortRaf = requestAnimationFrame(shortLoop); updateShortUI(); drawShortPitch();
     }
 
     function setShortTimestamp(ts) {
       document.getElementById('shortTsInput').value = ts;
-      document.getElementById('shortTimeBadge').textContent = ts;
+      shortSec = parseShortTs(ts); shortPlaying = true; shortLastTs = 0; cancelAnimationFrame(shortRaf); shortRaf = requestAnimationFrame(shortLoop); updateShortUI(); drawShortPitch();
     }
 
     function renderShortFeedback() {
