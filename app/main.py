@@ -8,11 +8,13 @@ from app.details import router as details_router
 from app.diagnostics import router as diagnostics_router
 from app.security.wp_bridge_router import router as wp_bridge_router
 from app.scheduler import web_backfill_lifespan
+from app.sportiq_lounge_router import router as lounge_router
 app=FastAPI(title="SportIQ API",version="1.0.0",lifespan=web_backfill_lifespan)
 app.include_router(details_router)
 app.include_router(diagnostics_router)
 app.include_router(wp_bridge_router)
-app.add_middleware(CORSMiddleware,allow_origins=settings.allowed_origins,allow_credentials=False,allow_methods=["GET"],allow_headers=["*"])
+app.include_router(lounge_router)
+app.add_middleware(CORSMiddleware,allow_origins=list(dict.fromkeys([*settings.allowed_origins,"https://billnojay.com","https://www.billnojay.com","http://billnojay.com","http://www.billnojay.com"])),allow_credentials=False,allow_methods=["GET","POST","PUT","DELETE","OPTIONS"],allow_headers=["*"])
 @app.get("/health")
 def health():
     with engine.connect() as c: c.execute(text("SELECT 1"))
