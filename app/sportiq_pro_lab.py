@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -50,6 +51,90 @@ def _get_conn() -> sqlite3.Connection:
 
 def _now_kst_str() -> str:
     return datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S KST")
+
+
+_KO_WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"]
+
+
+def _format_dt_kst(dt_kst: datetime) -> tuple:
+    wd = _KO_WEEKDAYS[dt_kst.weekday()]
+    short_str = f"{dt_kst.month:02d}.{dt_kst.day:02d} ({wd}) {dt_kst.hour:02d}:{dt_kst.minute:02d}"
+    full_str = f"{dt_kst.year:04d}.{short_str} KST"
+    return short_str, full_str
+
+
+def _now_kst_display() -> str:
+    _, full_str = _format_dt_kst(datetime.now(KST))
+    return full_str
+
+
+def _parse_iso_to_kst(iso_str: str) -> tuple:
+    raw = str(iso_str or "").strip()
+    if not raw:
+        return "", ""
+    try:
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        dt_kst = dt.astimezone(KST)
+        return _format_dt_kst(dt_kst)
+    except Exception:
+        return "", ""
+
+
+def _fallback_match_dt_kst(schedule_venue: str, sport: str, league: str, match_id: str) -> tuple:
+    text = str(schedule_venue or "")
+    now_kst = datetime.now(KST)
+    year = 2026
+    month = None
+    day = None
+    m_date = re.search(r"([0-9]{1,2}) *[./-] *([0-9]{1,2})", text)
+    if not m_date:
+        m_date = re.search(r"([0-9]{1,2}) *월 *([0-9]{1,2}) *일", text)
+    if m_date:
+        try:
+            cand_m = int(m_date.group(1))
+            cand_d = int(m_date.group(2))
+            datetime(year, cand_m, cand_d, tzinfo=KST)
+            month, day = cand_m, cand_d
+        except Exception:
+            month, day = None, None
+    hh = None
+    mm = None
+    m_time = re.search(r"([0-9]{1,2}) *: *([0-9]{2})", text)
+    if m_time:
+        try:
+            cand_h = int(m_time.group(1))
+            cand_min = int(m_time.group(2))
+            if 0 <= cand_h <= 23 and 0 <= cand_min <= 59:
+                hh, mm = cand_h, cand_min
+        except Exception:
+            hh, mm = None, None
+    seed_val = 0
+    for ch in str(match_id or "0"):
+        seed_val = (seed_val * 31 + ord(ch)) % 100000
+    if hh is None or mm is None:
+        sp = str(sport or "").lower()
+        lg = str(league or "").upper()
+        if sp == "soccer" or lg in ("EPL", "UCL", "UNL"):
+            slots = ((21, 30), (22, 0), (23, 0), (0, 30), (1, 30), (4, 0))
+        elif sp == "basketball" or lg == "NBA":
+            slots = ((9, 0), (9, 30), (10, 0), (11, 30), (12, 0))
+        elif sp == "hockey" or lg == "NHL":
+            slots = ((9, 0), (9, 30), (10, 0), (11, 0))
+        elif sp == "football" or lg == "NFL":
+            slots = ((3, 0), (6, 25), (10, 15))
+        else:
+            slots = ((19, 0), (20, 0), (21, 0))
+        hh, mm = slots[seed_val % len(slots)]
+    if month is None or day is None:
+        base_dt = now_kst + timedelta(days=(seed_val % 5) + 1)
+        dt_kst = datetime(base_dt.year, base_dt.month, base_dt.day, hh, mm, tzinfo=KST)
+    else:
+        dt_kst = datetime(year, month, day, hh, mm, tzinfo=KST)
+    return _format_dt_kst(dt_kst)
 
 
 def _split_teams(matchup: str) -> tuple:
@@ -287,7 +372,7 @@ def _build_match_model(
     }
 
 
-def _fetch_espn_scoreboard() -> List[Dict[str, Any]]:
+def live-ticker() -> List[Dict[str, Any]]:
     collected: List[Dict[str, Any]] = []
     for league_code, sport_code, url in ESPN_ENDPOINTS:
         try:
@@ -340,6 +425,21 @@ def _fetch_espn_scoreboard() -> List[Dict[str, Any]]:
                     or status_obj.get("description")
                     or "예정"
                 )
+                match_dt_kst, match_dt_full_kst = _parse_iso_to_kst(
+                    ev.get("date") or comp.get("date") or ""
+                )
+                if not match_dt_kst:
+                    match_dt_kst, match_dt_full_kst = _format_dt_kst(datetime.now(KST))
+                if state not in ("in", "post"):
+                    st_upper = status_text.upper()
+                    if (
+                        not status_text
+                        or any(
+                            tok in st_upper
+                            for tok in ("EST", "EDT", "CST", "CDT", "PST", "PDT", "UTC", "GMT", " AM", " PM")
+                        )
+                    ):
+                        status_text = f"{match_dt_kst} KST 예정"
                 match_id = f"espn_{league_code.lower()}_{ev.get('id', '')}"
                 model = _build_match_model(
                     match_key=match_id,
@@ -356,6 +456,8 @@ def _fetch_espn_scoreboard() -> List[Dict[str, Any]]:
                     "home_score": home_score,
                     "away_score": away_score,
                     "status_text": status_text,
+                    "match_dt_kst": match_dt_kst,
+                    "match_dt_full_kst": match_dt_full_kst,
                     "is_live": is_live,
                     "ai_home_pct": model["ai_home_pct"],
                     "ai_draw_pct": model["ai_draw_pct"],
@@ -399,6 +501,12 @@ def _load_rankings_fallback(limit: int = 20) -> List[Dict[str, Any]]:
             votes=int(r["votes"] or 100),
             buzz_score=float(r["buzz_score"] or 80.0),
         )
+        match_dt_kst, match_dt_full_kst = _fallback_match_dt_kst(
+            r["schedule_venue"] or "",
+            r["sport"] or "축구",
+            r["league"] or "GLOBAL",
+            mkey,
+        )
         fallback_items.append({
             "match_id": mkey,
             "league": r["league"] or "GLOBAL",
@@ -407,6 +515,8 @@ def _load_rankings_fallback(limit: int = 20) -> List[Dict[str, Any]]:
             "home_score": "-",
             "away_score": "-",
             "status_text": r["schedule_venue"] or "매치 프리뷰",
+            "match_dt_kst": match_dt_kst,
+            "match_dt_full_kst": match_dt_full_kst,
             "is_live": False,
             "ai_home_pct": model["ai_home_pct"],
             "ai_draw_pct": model["ai_draw_pct"],
@@ -467,6 +577,7 @@ def get_live_ticker() -> Dict[str, Any]:
         return {
             "count": len(_TICKER_CACHE["items"]),
             "updated_at_kst": _TICKER_CACHE["updated_at_kst"] or _now_kst_str(),
+            "server_now_kst": _now_kst_display(),
             "items": list(_TICKER_CACHE["items"]),
         }
 
