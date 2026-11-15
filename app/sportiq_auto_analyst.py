@@ -820,7 +820,7 @@ def init_shorts_hub_db():
     with _get_conn() as conn:
         if not {"clip_id", "action_group", "actor_key", "choice"}.issubset({r[1] for r in conn.execute("PRAGMA table_info(shorts_user_actions)").fetchall()}):
             conn.execute("DROP TABLE IF EXISTS shorts_user_actions"); conn.execute("CREATE TABLE shorts_user_actions (clip_id TEXT NOT NULL, action_group TEXT NOT NULL, actor_key TEXT NOT NULL, choice TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(clip_id, action_group, actor_key))"); conn.commit()
-         conn.execute("UPDATE shorts_clip_stats SET likes=COALESCE(likes,120), react_fire=COALESCE(react_fire,30), react_legend=COALESCE(react_legend,31), react_genius=COALESCE(react_genius,25), react_chills=COALESCE(react_chills,19), react_clap=COALESCE(react_clap,28), opt_a_votes=COALESCE(opt_a_votes,50), opt_b_votes=COALESCE(opt_b_votes,50)")
+        conn.execute("UPDATE shorts_clip_stats SET likes=COALESCE(likes,120), react_fire=COALESCE(react_fire,30), react_legend=COALESCE(react_legend,31), react_genius=COALESCE(react_genius,25), react_chills=COALESCE(react_chills,19), react_clap=COALESCE(react_clap,28), opt_a_votes=COALESCE(opt_a_votes,50), opt_b_votes=COALESCE(opt_b_votes,50)")
         conn.commit()
     _backup_tables_to_pg("shorts_clip_stats")
 
