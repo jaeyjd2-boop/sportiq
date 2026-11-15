@@ -334,12 +334,12 @@ def get_live_scores(
             "esports": sum(1 for m in matches if m["sport"] == "esports"),
         }
         filtered = matches
-        if sport and sport != "all":
+        if sport and sport.strip().lower() != "all":
             if sport == "live":
                 filtered = [m for m in filtered if m["state"] == "in"]
             else:
                 filtered = [m for m in filtered if m["sport"] == sport]
-        if league and league != "all":
+        if league and league.strip().lower() != "all":
             filtered = [m for m in filtered if m["league"] == league.upper()]
         return {
             "ok": True,
