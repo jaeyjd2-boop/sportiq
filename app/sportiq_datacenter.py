@@ -2514,7 +2514,7 @@ def _ensure_sample_briefings_for_best() -> None:
         pass
 
 @router.get("/best-briefings")
-def get_best_briefings(sort: str = Query("hot"), limit: int = Query(3, ge=1, le=10, user_key: str = Query(""))) -> Dict[str, Any]:
+def get_best_briefings(sort: str = Query("hot"), limit: int = Query(3, ge=1, le=10), user_key: str = Query("")) -> Dict[str, Any]:
     try:
         _init_briefing_votes_table()
         _ensure_sample_briefings_for_best()
