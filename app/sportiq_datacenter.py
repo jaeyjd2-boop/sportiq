@@ -1494,3 +1494,377 @@ def get_widget_js():
             content="console.warn('sportiq_datacenter_ui.js not found');",
             media_type="application/javascript; charset=utf-8",
         )
+
+# --- MyTeam Alerts ---
+from fastapi import Request
+
+DEFAULT_MYTEAM_TEAMS = ["토트넘", "리버풀", "바이에른 뮌헨", "LG 트윈스", "현대캐피탈", "T1"]
+DEFAULT_MYTEAM_SPORTS = ["soccer", "baseball", "volleyball", "esports"]
+
+_MYTEAM_SPORT_LABELS = {
+    "soccer": "축구",
+    "baseball": "야구",
+    "basketball": "농구",
+    "volleyball": "배구",
+    "esports": "e스포츠",
+    "mma": "격투기",
+    "tennis": "테니스",
+    "f1": "F1",
+}
+
+_INJURY_LEAGUE_SPORT = {
+    "EPL": "soccer",
+    "LALIGA": "soccer",
+    "BUNDESLIGA": "soccer",
+    "NBA": "basketball",
+}
+
+
+def _ensure_myteam_table():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS datacenter_myteam_prefs ("
+            "user_key TEXT PRIMARY KEY, "
+            "teams_json TEXT NOT NULL, "
+            "sports_json TEXT NOT NULL, "
+            "only_my_toast INTEGER NOT NULL DEFAULT 0, "
+            "updated_at TEXT NOT NULL)"
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+    try:
+        from app.pg_snapshot import register_snapshot_table
+        register_snapshot_table("datacenter_myteam_prefs", "user_key")
+    except Exception:
+        try:
+            register_snapshot_table("datacenter_myteam_prefs", "user_key")
+        except Exception:
+            pass
+
+
+_ensure_myteam_table()
+
+MYTEAM_ALIASES = {
+    "토트넘": ["토트넘", "tottenham", "spurs", "손흥민"],
+    "바이에른 뮌헨": ["뮌헨", "bayern", "김민재"],
+    "파리 생제르맹": ["파리", "psg", "paris", "이강인"],
+    "울버햄프턴": ["울버햄프턴", "wolves", "wolverhampton", "황희찬"],
+    "맨시티": ["맨시티", "맨체스터 시티", "man city", "manchester city"],
+    "아스널": ["아스널", "arsenal"],
+    "리버풀": ["리버풀", "liverpool"],
+    "첼시": ["첼시", "chelsea"],
+    "맨유": ["맨유", "맨체스터 유나이티드", "man utd", "manchester united"],
+    "레알 마드리드": ["레알", "real madrid"],
+    "바르셀로나": ["바르셀로나", "barcelona", "barca"],
+    "LA 다저스": ["다저스", "dodgers", "오타니"],
+    "LA 레이커스": ["레이커스", "lakers"],
+    "골든스테이트": ["골든스테이트", "워리어스", "warriors"],
+    "LG 트윈스": ["lg 트윈스", "lg", "twins"],
+    "KIA 타이거즈": ["kia 타이거즈", "kia", "기아", "tigers"],
+    "삼성 라이온즈": ["삼성 라이온즈", "삼성", "lions"],
+    "현대캐피탈": ["현대캐피탈", "스카이워커스", "hyundai"],
+    "흥국생명": ["흥국생명", "핑크스파이더스", "heungkuk"],
+    "대한항공": ["대한항공", "점보스", "korean air"],
+    "T1": ["t1"],
+    "Gen.G": ["gen.g", "geng", "젠지"],
+    "존 존스": ["존 존스", "jon jones", "jones"],
+    "사발렌카": ["사발렌카", "sabalenka"],
+    "신네르": ["신네르", "sinner"],
+    "베르스타펜": ["베르스타펜", "verstappen"],
+}
+
+
+def _team_matches(fav_list, text):
+    if not fav_list or not text:
+        return ""
+    low_text = str(text).lower()
+    for fav in fav_list:
+        fav_str = str(fav or "").strip()
+        if not fav_str:
+            continue
+        if fav_str.lower() in low_text:
+            return fav_str
+        aliases = MYTEAM_ALIASES.get(fav_str, [])
+        for alias in aliases:
+            if alias.lower() in low_text:
+                return fav_str
+    return ""
+
+
+def _load_myteam_prefs(user_key):
+    _ensure_myteam_table()
+    uk = (user_key or "guest").strip() or "guest"
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        row = conn.execute(
+            "SELECT teams_json, sports_json, only_my_toast, updated_at "
+            "FROM datacenter_myteam_prefs WHERE user_key = ?",
+            (uk,),
+        ).fetchone()
+        conn.close()
+        if row:
+            return {
+                "user_key": uk,
+                "teams": json.loads(row[0] or "[]"),
+                "sports": json.loads(row[1] or "[]"),
+                "only_my_toast": bool(row[2]),
+                "updated_at": row[3] or "",
+                "is_default": False,
+            }
+    except Exception:
+        pass
+    return {
+        "user_key": uk,
+        "teams": list(DEFAULT_MYTEAM_TEAMS),
+        "sports": list(DEFAULT_MYTEAM_SPORTS),
+        "only_my_toast": False,
+        "updated_at": "",
+        "is_default": True,
+    }
+
+
+@router.post("/my-alerts/prefs")
+async def save_my_alerts_prefs(request: Request):
+    _ensure_myteam_table()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    uk = str(body.get("user_key") or "guest").strip() or "guest"
+    teams = [str(t).strip() for t in (body.get("teams") or []) if str(t).strip()]
+    sports = [str(s).strip().lower() for s in (body.get("sports") or []) if str(s).strip()]
+    only_my_toast = bool(body.get("only_my_toast", False))
+    now_str = _fmt_kst(_now_kst())
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            "INSERT OR REPLACE INTO datacenter_myteam_prefs "
+            "(user_key, teams_json, sports_json, only_my_toast, updated_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                uk,
+                json.dumps(teams, ensure_ascii=False),
+                json.dumps(sports, ensure_ascii=False),
+                1 if only_my_toast else 0,
+                now_str,
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    return {
+        "ok": True,
+        "user_key": uk,
+        "teams": teams,
+        "sports": sports,
+        "only_my_toast": only_my_toast,
+        "updated_at": now_str,
+    }
+
+
+@router.get("/my-alerts/prefs")
+def get_my_alerts_prefs(user_key: str = Query("guest")):
+    prefs = _load_myteam_prefs(user_key)
+    return {"ok": True, **prefs}
+
+@router.get("/my-alerts")
+def get_my_alerts(
+    teams: str = Query(""),
+    sports: str = Query(""),
+    category: str = Query("all"),
+    user_key: str = Query("guest"),
+):
+    cat = (category or "all").strip().lower()
+    if not teams.strip() and not sports.strip():
+        prefs = _load_myteam_prefs(user_key)
+        active_teams = list(prefs.get("teams") or DEFAULT_MYTEAM_TEAMS)
+        active_sports = [
+            str(s).strip().lower()
+            for s in (prefs.get("sports") or DEFAULT_MYTEAM_SPORTS)
+            if str(s).strip()
+        ]
+    else:
+        active_teams = [t.strip() for t in teams.split(",") if t.strip()]
+        active_sports = [s.strip().lower() for s in sports.split(",") if s.strip()]
+
+    all_items = []
+    live_res = {}
+    matches = []
+    try:
+        live_res = get_live_scores("all", "all", 0) or {}
+        matches = live_res.get("matches") or []
+    except Exception:
+        live_res = {}
+        matches = []
+
+    for idx, m in enumerate(matches):
+        sp = str(m.get("sport") or "").lower()
+        lg = str(m.get("league") or sp.upper())
+        home = str(m.get("home") or "")
+        away = str(m.get("away") or "")
+        status_txt = str(m.get("status_text") or m.get("status") or "")
+        blob = f"{lg} {home} {away} {status_txt}"
+        hit_team = _team_matches(active_teams, blob)
+        hit_sport = sp in active_sports
+        if hit_team or hit_sport:
+            hs = m.get("home_score", "")
+            as_ = m.get("away_score", "")
+            score_str = f"{hs}:{as_}" if str(hs) != "" and str(as_) != "" else "예정"
+            title = f"[{lg}] {home} vs {away} ({score_str})"
+            detail = f"{status_txt} · {m.get('start_kst', '')}".strip(" ·")
+            ts = str(m.get("start_kst") or live_res.get("server_now_kst") or _fmt_kst(_now_kst()))
+            reason = (
+                f"⭐ 관심구단: {hit_team}"
+                if hit_team
+                else f"📌 관심종목: {_MYTEAM_SPORT_LABELS.get(sp, sp)}"
+            )
+            all_items.append({
+                "id": f"score-m-{m.get('id', idx)}",
+                "type": "score",
+                "badge": "⚽ 득점·일정",
+                "title": title,
+                "detail": detail,
+                "ts_kst": ts,
+                "target_tab": "live",
+                "league": lg,
+                "is_team_hit": bool(hit_team),
+                "match_reason": reason,
+            })
+
+    for idx, sa in enumerate(live_res.get("score_alerts") or []):
+        sp = str(sa.get("sport") or "").lower()
+        lg = str(sa.get("league") or sp.upper())
+        txt = str(sa.get("text") or "")
+        hit_team = _team_matches(active_teams, f"{lg} {txt}")
+        hit_sport = sp in active_sports
+        if hit_team or hit_sport:
+            reason = (
+                f"⭐ 관심구단: {hit_team}"
+                if hit_team
+                else f"📌 관심종목: {_MYTEAM_SPORT_LABELS.get(sp, sp)}"
+            )
+            all_items.append({
+                "id": f"score-a-{sa.get('id', idx)}",
+                "type": "score",
+                "badge": "⚽ 득점·일정",
+                "title": f"[{lg}] {txt}",
+                "detail": "실시간 득점 속보",
+                "ts_kst": str(sa.get("ts_kst") or _fmt_kst(_now_kst())),
+                "target_tab": "live",
+                "league": lg,
+                "is_team_hit": bool(hit_team),
+                "match_reason": reason,
+            })
+
+    for lg in ("EPL", "LALIGA", "BUNDESLIGA", "NBA"):
+        sp = _INJURY_LEAGUE_SPORT.get(lg, "soccer")
+        inj_res = _cache_get(f"injuries_{lg}", 3600)
+        if not inj_res:
+            try:
+                inj_res = get_injuries(lg, "all", "")
+            except Exception:
+                inj_res = {}
+        inj_list = (inj_res or {}).get("items") or (inj_res or {}).get("injuries") or []
+        for idx, inj in enumerate(inj_list):
+            team_n = str(inj.get("team") or "")
+            player_n = str(inj.get("player") or "")
+            reason_n = str(inj.get("reason") or "")
+            sev_n = str(inj.get("severity") or "")
+            blob = f"{lg} {team_n} {player_n} {reason_n}"
+            hit_team = _team_matches(active_teams, blob)
+            hit_sport = sp in active_sports
+            if hit_team or hit_sport:
+                reason = (
+                    f"⭐ 관심구단: {hit_team}"
+                    if hit_team
+                    else f"📌 관심종목: {_MYTEAM_SPORT_LABELS.get(sp, sp)}"
+                )
+                title = f"[{team_n or lg}] {player_n} — {reason_n} ({sev_n})".strip()
+                detail = f"포지션: {inj.get('pos', '-')} · 등록: {inj.get('since', '-')}".strip()
+                all_items.append({
+                    "id": f"inj-{lg}-{idx}",
+                    "type": "injury",
+                    "badge": "🏥 부상·결장",
+                    "title": title,
+                    "detail": detail,
+                    "ts_kst": str(inj.get("since") or _fmt_kst(_now_kst())),
+                    "target_tab": "injuries",
+                    "league": lg,
+                    "is_team_hit": bool(hit_team),
+                    "match_reason": reason,
+                })
+
+    try:
+        odds_res = _build_dropping_odds(matches, "all", 5.0) or {}
+    except Exception:
+        odds_res = {}
+    odds_list = (
+        odds_res.get("items")
+        or odds_res.get("alerts")
+        or live_res.get("odds_alerts")
+        or []
+    )
+    for idx, od in enumerate(odds_list):
+        sp = str(od.get("sport") or "").lower()
+        lg = str(od.get("league") or sp.upper())
+        match_n = str(
+            od.get("match")
+            or od.get("title")
+            or f"{od.get('home', '')} vs {od.get('away', '')}".strip()
+        )
+        blob = f"{lg} {match_n} {od.get('market', '')} {od.get('reason', '')}"
+        hit_team = _team_matches(active_teams, blob)
+        hit_sport = sp in active_sports
+        if hit_team or hit_sport:
+            reason = (
+                f"⭐ 관심구단: {hit_team}"
+                if hit_team
+                else f"📌 관심종목: {_MYTEAM_SPORT_LABELS.get(sp, sp)}"
+            )
+            drop_pct = od.get("drop_pct") or od.get("drop") or ""
+            side_n = str(od.get("side") or od.get("market") or "배당 급락")
+            pct_str = f" (-{drop_pct}%)" if drop_pct else ""
+            title = f"[{lg}] {match_n} — {side_n}{pct_str}"
+            init_o = od.get("initial_odds") or od.get("open_odds") or ""
+            curr_o = od.get("current_odds") or od.get("now_odds") or ""
+            odds_mv = f"{init_o} → {curr_o}" if init_o and curr_o else ""
+            detail = f"{odds_mv} · {od.get('reason', '')}".strip(" ·") or "배당 급변 감지"
+            all_items.append({
+                "id": f"odds-{lg}-{idx}",
+                "type": "odds",
+                "badge": "📉 드롭오즈",
+                "title": title,
+                "detail": detail,
+                "ts_kst": str(od.get("ts_kst") or _fmt_kst(_now_kst())),
+                "target_tab": "dropping-odds",
+                "league": lg,
+                "is_team_hit": bool(hit_team),
+                "match_reason": reason,
+            })
+
+    all_items.sort(key=lambda x: 0 if x.get("is_team_hit") else 1)
+    counts = {
+        "all": len(all_items),
+        "score": sum(1 for x in all_items if x["type"] == "score"),
+        "injury": sum(1 for x in all_items if x["type"] == "injury"),
+        "odds": sum(1 for x in all_items if x["type"] == "odds"),
+        "team_direct": sum(1 for x in all_items if x.get("is_team_hit")),
+    }
+    filtered = (
+        [x for x in all_items if x["type"] == cat]
+        if cat in ("score", "injury", "odds")
+        else all_items
+    )
+    return {
+        "ok": True,
+        "updated_at_kst": _fmt_kst(_now_kst()),
+        "active_teams": active_teams,
+        "active_sports": active_sports,
+        "counts": counts,
+        "items": filtered[:40],
+    }
+
