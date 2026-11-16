@@ -2160,6 +2160,8 @@ async def share_briefing_to_feed(request: Request):
         card = body.get("card") or {}
         comment = str(body.get("comment") or "").strip()
         nickname = str(body.get("nickname") or "익명분석가").strip()[:20] or "익명분석가"
+        user_key = str(body.get("user_key") or "guest").strip()[:64] or "guest"
+        author_name = str(body.get("author_name") or body.get("nickname") or "마이팀 분석회원").strip()[:30] or "마이팀 분석회원"
         if not comment:
             return {"ok": False, "error": "한줄 코멘트를 입력해주세요."}
         now_kst = _now_kst()
@@ -2201,9 +2203,22 @@ async def share_briefing_to_feed(request: Request):
         conn = sqlite3.connect("/tmp/sportiq_lounge.db", timeout=5)
         cur = conn.cursor()
         cur.execute("INSERT INTO auto_analyst_posts (run_date_kst, match_key, rank_num, is_summary, sport, league, badge_text, title, content, tactical_points, recommended_pick, confidence_score, sentiment_home_pct, sentiment_away_pct, sentiment_home_label, sentiment_away_label, hashtags, likes, created_at_kst) VALUES (?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)", (today_ymd, match_key, sport, league, badge_text, title, content, tactical_points, recommended_pick, confidence_score, sentiment_home_pct, sentiment_away_pct, sentiment_home_label, sentiment_away_label, hashtags, created_at_kst))
-        conn.commit()
+        post_id = cur.lastrowid
+        _ensure_best_analyst_tables(conn)
+        if post_id:
+            cur.execute(
+                "INSERT OR REPLACE INTO datacenter_briefing_authors (post_key, match_key, user_key, author_name, created_at_kst) VALUES (?, ?, ?, ?, ?)",
+                (str(post_id), match_key, user_key, author_name, created_at_kst),
+            )
+        if match_key:
+            cur.execute(
+                "INSERT OR REPLACE INTO datacenter_briefing_authors (post_key, match_key, user_key, author_name, created_at_kst) VALUES (?, ?, ?, ?, ?)",
+                (match_key, match_key, user_key, author_name, created_at_kst),
+            )
+    conn.commit()
         conn.close()
-        return {"ok": True, "title": title, "nickname": nickname, "bonus_points": 10, "created_at_kst": created_at_kst}
+        _safe_trigger_pg()
+        return {"ok": True, "title": title, "nickname": nickname, "bonus_points": 10, "created_at_kst": created_at_kst, "post_id": post_id, "match_key": match_key, "author_name": author_name, "user_key": user_key}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 from typing import Any, Dict
@@ -2242,6 +2257,145 @@ def _safe_trigger_pg() -> None:
         trigger_pg_snapshot()
     except Exception:
         pass
+
+_BEST_REWARD_POLICY = {
+    "rank_1": 50,
+    "rank_2": 30,
+    "rank_3": 20,
+    "badge_name": "🏅 베스트 분석가",
+}
+_BEST_RANK_BONUS = [50, 30, 20]
+_BEST_RANK_LABELS = ["👑 1위 베스트 분석가", "🥈 2위 베스트 분석가", "🥉 3위 베스트 분석가"]
+_SAMPLE_BRIEFING_AUTHORS = {
+    "best-sample-liverpool-southampton": ("sample_liv", "안필드전술가"),
+    "best-sample-bayern-augsburg": ("sample_bay", "분데스인사이드"),
+    "best-sample-hyundai-koreanair": ("sample_vleague", "스카이워커스분석"),
+}
+
+
+def _ensure_best_analyst_tables(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS datacenter_briefing_authors ("
+        "post_key TEXT PRIMARY KEY, "
+        "match_key TEXT NOT NULL DEFAULT '', "
+        "user_key TEXT NOT NULL DEFAULT '', "
+        "author_name TEXT NOT NULL DEFAULT '', "
+        "created_at_kst TEXT NOT NULL DEFAULT '')"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS datacenter_best_analyst_rewards ("
+        "reward_key TEXT PRIMARY KEY, "
+        "post_key TEXT NOT NULL, "
+        "user_key TEXT NOT NULL, "
+        "author_name TEXT NOT NULL, "
+        "best_rank INTEGER NOT NULL, "
+        "bonus_points INTEGER NOT NULL, "
+        "badge_name TEXT NOT NULL, "
+        "post_title TEXT NOT NULL DEFAULT '', "
+        "awarded_at_kst TEXT NOT NULL)"
+    )
+    try:
+        from app.pg_snapshot import register_snapshot_table
+        register_snapshot_table("datacenter_briefing_authors", "post_key")
+        register_snapshot_table("datacenter_best_analyst_rewards", "reward_key")
+    except Exception:
+        pass
+
+
+def _resolve_briefing_author(
+    author_map: Dict[str, tuple],
+    post_key: str,
+    match_key: str,
+) -> tuple:
+    if post_key in author_map:
+        return author_map[post_key]
+    if match_key in author_map:
+        return author_map[match_key]
+    if match_key in _SAMPLE_BRIEFING_AUTHORS:
+        return _SAMPLE_BRIEFING_AUTHORS[match_key]
+    mk_low = (match_key or "").lower()
+    if "best-sample-liv" in mk_low:
+        return ("sample_liv", "안필드전술가")
+    if "best-sample-bay" in mk_low:
+        return ("sample_bay", "분데스인사이드")
+    if "best-sample-vleague" in mk_low or "best-sample-hyundai" in mk_low:
+        return ("sample_vleague", "스카이워커스분석")
+    return ("guest", "마이팀 분석회원")
+
+
+def _build_analyst_reward_summaries(
+    conn: sqlite3.Connection,
+    target_user_key: str = "",
+) -> tuple:
+    rows = conn.execute(
+        "SELECT reward_key, post_key, user_key, author_name, best_rank, bonus_points, badge_name, post_title, awarded_at_kst "
+        "FROM datacenter_best_analyst_rewards ORDER BY awarded_at_kst DESC, best_rank ASC"
+    ).fetchall()
+    grouped: Dict[str, Dict[str, Any]] = {}
+    author_totals: Dict[str, Dict[str, int]] = {}
+    my_rewards_list = []
+    my_total = 0
+    t_uk = (target_user_key or "").strip()
+
+    for reward_key, post_key, uk, aname, brank, bpts, bname, ptitle, awarded_at in rows:
+        uk_s = str(uk or "guest")
+        an_s = str(aname or "마이팀 분석회원")
+        gkey = uk_s if uk_s and uk_s != "guest" else f"name:{an_s}"
+        if gkey not in grouped:
+            grouped[gkey] = {
+                "author_name": an_s,
+                "user_key": uk_s,
+                "badge_name": str(bname or "🏅 베스트 분석가"),
+                "best_rank": int(brank or 1),
+                "total_bonus_points": 0,
+                "best_count": 0,
+                "latest_awarded_at": str(awarded_at or ""),
+            }
+        g = grouped[gkey]
+        g["best_rank"] = min(g["best_rank"], int(brank or 1))
+        g["total_bonus_points"] += int(bpts or 0)
+        g["best_count"] += 1
+        if str(awarded_at or "") > g["latest_awarded_at"]:
+            g["latest_awarded_at"] = str(awarded_at or "")
+
+        author_totals[gkey] = {
+            "total_bonus": g["total_bonus_points"],
+            "best_count": g["best_count"],
+        }
+
+        if t_uk and uk_s == t_uk:
+            my_total += int(bpts or 0)
+            my_rewards_list.append({
+                "reward_key": reward_key,
+                "post_key": post_key,
+                "best_rank": int(brank or 1),
+                "bonus_points": int(bpts or 0),
+                "badge_name": str(bname or "🏅 베스트 분석가"),
+                "post_title": str(ptitle or ""),
+                "awarded_at_kst": str(awarded_at or ""),
+            })
+
+    hall_of_fame = sorted(
+        grouped.values(),
+        key=lambda x: (-x["total_bonus_points"], -x["best_count"], x["best_rank"]),
+    )
+    if t_uk and my_rewards_list:
+        my_reward = {
+            "has_badge": True,
+            "badge_name": "🏅 베스트 분석가",
+            "total_bonus_points": my_total,
+            "best_count": len(my_rewards_list),
+            "rewards": my_rewards_list,
+        }
+    else:
+        my_reward = {
+            "has_badge": False,
+            "badge_name": "",
+            "total_bonus_points": 0,
+            "best_count": 0,
+            "rewards": [],
+        }
+    return hall_of_fame, my_reward, author_totals
 
 @router.get("/briefing-votes")
 def get_briefing_votes() -> Dict[str, Any]:
@@ -2360,7 +2514,7 @@ def _ensure_sample_briefings_for_best() -> None:
         pass
 
 @router.get("/best-briefings")
-def get_best_briefings(sort: str = Query("hot"), limit: int = Query(3, ge=1, le=10)) -> Dict[str, Any]:
+def get_best_briefings(sort: str = Query("hot"), limit: int = Query(3, ge=1, le=10, user_key: str = Query(""))) -> Dict[str, Any]:
     try:
         _init_briefing_votes_table()
         _ensure_sample_briefings_for_best()
@@ -2369,13 +2523,24 @@ def get_best_briefings(sort: str = Query("hot"), limit: int = Query(3, ge=1, le=
             sort_mode = "hot"
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
+        _ensure_best_analyst_tables(conn)
         has_posts = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='auto_analyst_posts'").fetchone()
         if not has_posts:
             conn.close()
             return {"ok": True, "sort": sort_mode, "updated_at_kst": _fmt_kst(_now_kst()), "best_keys": [], "items": []}
         post_rows = conn.execute("SELECT * FROM auto_analyst_posts WHERE title LIKE '%마이팀 브리핑%' OR title LIKE '%마이팀 주간%' OR badge_text LIKE '%마이팀%' ORDER BY id DESC").fetchall()
         vote_rows = conn.execute("SELECT post_key, agree_cnt, oppose_cnt FROM datacenter_briefing_votes").fetchall()
-        conn.close()
+        author_rows = conn.execute("SELECT post_key, match_key, user_key, author_name FROM datacenter_briefing_authors").fetchall()
+        author_map = {}
+        for ar in author_rows:
+            pk_s = str(ar["post_key"] or "")
+            mk_s = str(ar["match_key"] or "")
+            uk_s = str(ar["user_key"] or "guest") or "guest"
+            an_s = str(ar["author_name"] or "마이팀 분석회원") or "마이팀 분석회원"
+            if pk_s:
+                author_map[pk_s] = (uk_s, an_s)
+            if mk_s and mk_s not in author_map:
+                author_map[mk_s] = (uk_s, an_s)
         vote_map = {}
         for vr in vote_rows:
             vote_map[str(vr["post_key"])] = (int(vr["agree_cnt"] or 0), int(vr["oppose_cnt"] or 0))
@@ -2399,6 +2564,31 @@ def get_best_briefings(sort: str = Query("hot"), limit: int = Query(3, ge=1, le=
             first_line = raw_content.splitlines()[0].strip() if raw_content else ""
             comment_preview = (first_line[:87] + "...") if len(first_line) > 90 else first_line
             scored.append({"id": post_id, "post_key": str(post_id), "match_key": match_key, "sport": str(row["sport"] or ""), "league": str(row["league"] or ""), "badge_text": str(row["badge_text"] or ""), "title": title, "comment_preview": comment_preview, "recommended_pick": str(row["recommended_pick"] or ""), "likes": likes, "agree": disp_agree, "oppose": disp_oppose, "total_votes": total, "agree_pct": agree_pct, "oppose_pct": oppose_pct, "hot_score": hot_score, "created_at": str(row["created_at_kst"] or "")})
+            a_uk, a_name = _resolve_briefing_author(author_map, str(post_id), match_key)
+            scored[-1]["author_name"] = a_name
+            scored[-1]["author_user_key"] = a_uk
+        hot_sorted = sorted(scored, key=lambda x: (-x["hot_score"], -x["total_votes"], -x["id"]))
+        now_kst_str = _fmt_kst(_now_kst())
+        hot_rank_map = {}
+        inserted_new = False
+        for rk_idx, hit in enumerate(hot_sorted[:3]):
+            rk = rk_idx + 1
+            b_pts = _BEST_RANK_BONUS[rk_idx]
+            p_key = str(hit["post_key"])
+            hot_rank_map[p_key] = {"rank": rk, "bonus_points": b_pts, "rank_badge": _BEST_RANK_LABELS[rk_idx]}
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO datacenter_best_analyst_rewards "
+                "(reward_key, post_key, user_key, author_name, best_rank, bonus_points, badge_name, post_title, awarded_at_kst) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (f"{p_key}:rank{rk}", p_key, hit["author_user_key"], hit["author_name"], rk, b_pts, "🏅 베스트 분석가", hit["title"][:120], now_kst_str),
+            )
+            if cur.rowcount and cur.rowcount > 0:
+                inserted_new = True
+        if inserted_new:
+            conn.commit()
+            _safe_trigger_pg()
+        hall_of_fame, my_reward, author_totals = _build_analyst_reward_summaries(conn, user_key)
+        conn.close()
         if sort_mode == "agree_pct":
             scored.sort(key=lambda x: (-x["agree_pct"], -x["total_votes"], -x["id"]))
         elif sort_mode == "votes":
@@ -2406,15 +2596,63 @@ def get_best_briefings(sort: str = Query("hot"), limit: int = Query(3, ge=1, le=
         else:
             scored.sort(key=lambda x: (-x["hot_score"], -x["total_votes"], -x["agree_pct"]))
         top_items = scored[:limit]
-        badge_map = {1: "👑 BEST 1위", 2: "🥈 BEST 2위", 3: "🥉 BEST 3위"}
         for idx, item in enumerate(top_items, start=1):
             item["rank"] = idx
-            item["rank_badge"] = badge_map.get(idx, "🔥 베스트 공감")
+            item["rank_badge"] = _BEST_RANK_LABELS[idx - 1] if idx <= 3 else f"🏅 {idx}위"
+            item["analyst_badge"] = "🏅 베스트 분석가"
+            hr_info = hot_rank_map.get(str(item["post_key"]))
+            if hr_info:
+                item["bonus_points"] = hr_info["bonus_points"]
+                item["reward_awarded"] = True
+            else:
+                item["bonus_points"] = _BEST_RANK_BONUS[idx - 1] if idx <= 3 else 0
+                item["reward_awarded"] = idx <= 3
+            uk_s = item["author_user_key"]
+            gkey = uk_s if uk_s and uk_s != "guest" else f"name:{item['author_name']}"
+            tot_info = author_totals.get(gkey, {"total_bonus": item["bonus_points"], "best_count": 1})
+            item["author_total_bonus"] = tot_info["total_bonus"]
+            item["author_best_count"] = tot_info["best_count"]
         best_keys = []
         qual_items = [it for it in scored if it in top_items or it["total_votes"] >= 11 or it["agree_pct"] >= 55]
         for it in qual_items:
             best_keys.extend([k for k in (str(it["id"]), it["match_key"], it["title"]) if k and k not in best_keys])
-        return {"ok": True, "sort": sort_mode, "updated_at_kst": _fmt_kst(_now_kst()), "best_keys": best_keys, "items": top_items}
+        return {
+            "ok": True,
+            "sort": sort_mode,
+            "updated_at_kst": now_kst_str,
+            "best_keys": best_keys,
+            "items": top_items,
+            "reward_policy": _BEST_REWARD_POLICY,
+            "hall_of_fame": hall_of_fame,
+            "my_reward": my_reward,
+        }
     except Exception as exc:
         return {"ok": False, "error": str(exc), "sort": sort, "updated_at_kst": _fmt_kst(_now_kst()), "best_keys": [], "items": []}
+
+@router.get("/best-analysts")
+def get_best_analysts(user_key: str = Query("")) -> Dict[str, Any]:
+    _init_briefing_votes_table()
+    _ensure_sample_briefings_for_best()
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=5)
+        conn.row_factory = sqlite3.Row
+        _ensure_best_analyst_tables(conn)
+        hall_of_fame, my_reward, _ = _build_analyst_reward_summaries(conn, user_key)
+        conn.close()
+        return {
+            "ok": True,
+            "updated_at_kst": _fmt_kst(_now_kst()),
+            "reward_policy": _BEST_REWARD_POLICY,
+            "hall_of_fame": hall_of_fame,
+            "my_reward": my_reward,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+            "updated_at_kst": _fmt_kst(_now_kst()),
+            "reward_policy": _BEST_REWARD_POLICY,
+            "hall_of_fame": [],
+            "my_reward": {"has_badge": False, "badge_name": "", "total_bonus_points": 0, "best_count": 0, "rewards": []},
+        }
         
