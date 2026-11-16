@@ -2215,7 +2215,7 @@ async def share_briefing_to_feed(request: Request):
                 "INSERT OR REPLACE INTO datacenter_briefing_authors (post_key, match_key, user_key, author_name, created_at_kst) VALUES (?, ?, ?, ?, ?)",
                 (match_key, match_key, user_key, author_name, created_at_kst),
             )
-    conn.commit()
+        conn.commit()
         conn.close()
         _safe_trigger_pg()
         return {"ok": True, "title": title, "nickname": nickname, "bonus_points": 10, "created_at_kst": created_at_kst, "post_id": post_id, "match_key": match_key, "author_name": author_name, "user_key": user_key}
