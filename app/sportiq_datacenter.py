@@ -2206,7 +2206,6 @@ async def share_briefing_to_feed(request: Request):
         return {"ok": True, "title": title, "nickname": nickname, "bonus_points": 10, "created_at_kst": created_at_kst}
     except Exception as e:
         return {"ok": False, "error": str(e)}
- from fastapi import Request
 from typing import Any, Dict
 
 def _init_briefing_votes_table() -> None:
