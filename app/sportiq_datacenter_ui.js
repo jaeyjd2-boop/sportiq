@@ -86,7 +86,7 @@
     el.className='dc-toast';
     el.textContent=msg;
     toastWrap.appendChild(el);
-    setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},4500);
+    setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},4500);}function showOddsToast(msg){var el=document.createElement('div');el.className='dc-toast';el.style.cssText='background:linear-gradient(135deg,rgba(124,58,237,0.96),rgba(217,119,6,0.95));color:#fff;border:1px solid rgba(251,191,36,0.6);box-shadow:0 8px 24px rgba(88,28,135,0.45);font-weight:700;';el.textContent=msg;toastWrap.appendChild(el);setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},5200);
   }
   function playBeep(){
     try{
@@ -106,8 +106,8 @@
   }
 
   var state={
-    sport:'ALL',
-    league:'ALL',
+    sport:'all',
+    league:'all',oddsAlertOn:localStorage.getItem('dc_odds_alert')!=='0',seenOddsAlerts:{},counts:{},dropSport:'all',dropMin:5,
     dateOffset:0,
     alertOn:localStorage.getItem('sportiq_dc_score_alert')!=='0',
     prevScores:{},
@@ -125,14 +125,14 @@
   };
 
   var SPORTS=[
-    {id:'ALL',lbl:'🌐 5종목 전체',cntKey:'all'},
+    {id:'all',lbl:'🌐 전체',cntKey:'all'},
     {id:'soccer',lbl:'⚽ 축구',cntKey:'soccer'},
     {id:'baseball',lbl:'⚾ 야구',cntKey:'baseball'},
-    {id:'basketball',lbl:'🏀 농구',cntKey:'basketball'},
+    {id:'basketball',lbl:'🏀 농구',cntKey:'basketball'},{id:'volleyball',lbl:'🏐 배구(V-리그)',cntKey:'volleyball'},
     {id:'hockey',lbl:'🏒 하키',cntKey:'hockey'},
-    {id:'esports',lbl:'🎮 LCK',cntKey:'esports'}
+    {id:'esports',lbl:'🎮 LCK',cntKey:'esports'},{id:'ufc',lbl:'🥊 UFC',cntKey:'ufc'},{id:'tennis',lbl:'🎾 테니스',cntKey:'tennis'},{id:'f1',lbl:'🏎️ F1',cntKey:'f1'}
   ];
-  var LEAGUES18=['ALL','EPL','LALIGA','BUNDESLIGA','SERIEA','LIGUE1','KLEAGUE','JLEAGUE','MLS','UCL','UNL','WC2026','KBO','MLB','NPB','NBA','WNBA','NHL','LCK'];
+  var LEAGUES18=['all','EPL','LALIGA','BUNDESLIGA','SERIEA','LIGUE1','KLEAGUE','JLEAGUE','MLS','UCL','UNL','WC2026','KBO','MLB','NPB','NBA','WNBA','VLEAGUE_M','VLEAGUE_W','NHL','LCK','UFC','ATP','WTA','F1'];
   var LEAGUES11=['EPL','LALIGA','BUNDESLIGA','SERIEA','LIGUE1','KLEAGUE','NBA','KBO','MLB','NHL','LCK'];
 
   var modal=document.createElement('div');
@@ -214,7 +214,7 @@
     html+='<select class="dc-select" id="dcLeagueSel">';
     for(var j=0;j<LEAGUES18.length;j++){
       var lg=LEAGUES18[j];
-      var lbl=lg==='ALL'?'전체 18개 리그':lg;
+      var lbl=lg==='all'?'전체 18개 리그':lg;
       html+='<option value="'+dcEsc(lg)+'"'+(state.league===lg?' selected':'')+'>'+dcEsc(lbl)+'</option>';
     }
     html+='</select>';
@@ -224,7 +224,7 @@
       html+='<button class="dc-pill'+(state.dateOffset===dt.v?' active':'')+'" data-dcdate="'+dt.v+'">'+dcEsc(dt.l)+'</button>';
     }
     html+='<button class="dc-pill'+(state.alertOn?' active':'')+'" id="dcAlertToggleBtn">'+(state.alertOn?'🔔 득점알림 ON':'🔕 득점알림 OFF')+'</button>';
-    ctrl.innerHTML=html;
+    html+='<button class="dc-pill'+(state.oddsAlertOn?' active':'')+'" id="dcOddsAlertToggleBtn">'+(state.oddsAlertOn?'📉 배당급변 알림 ON':'🔕 배당알림 OFF')+'</button>';ctrl.innerHTML=html;
 
     var sBtns=ctrl.querySelectorAll('[data-dcsport]');
     for(var a=0;a<sBtns.length;a++){
@@ -242,6 +242,7 @@
       dBtns[b].onclick=function(){
         state.dateOffset=Number(this.getAttribute('data-dcdate'));
         loadLiveScores();
+       var ob=document.getElementById('dcOddsAlertToggleBtn');if(ob){ob.onclick=function(){state.oddsAlertOn=!state.oddsAlertOn;localStorage.setItem('dc_odds_alert',state.oddsAlertOn?'1':'0');renderTickerControls(counts);if(state.oddsAlertOn){showOddsToast('📉 드롭 오즈 실시간 경보가 켜졌습니다.');playBeep();}else{showToast('🔕 배당급변 알림이 꺼졌습니다.');}};};
       };
     }
     document.getElementById('dcAlertToggleBtn').onclick=function(){
@@ -286,7 +287,7 @@
           }
         }
       }
-      if(alerted)playBeep();
+      var oal=data.odds_alerts||[];for(var oj=0;oj<oal.length;oj++){var oa=oal[oj];if(oa.id&&!state.seenOddsAlerts[oa.id]){state.seenOddsAlerts[oa.id]=true;if(state.oddsAlertOn&&Object.keys(state.seenOddsAlerts).length>1){showOddsToast('📉 ['+(oa.league||oa.sport||'')+'] '+oa.text);alerted=true;}}}if(alerted)playBeep();
 
       var track=document.getElementById('dcLiveTickerTrack');
       if(!track)return;
@@ -301,13 +302,13 @@
         var stTxt=x.status_badge||(x.state==='in'?'LIVE':(x.state==='post'?'종료':'예정'));
         var pstr=(x.period_scores&&x.period_scores.length)?x.period_scores.join(' · '):'세부 스코어 대기';
         var ai=x.ai||{};
-        var odds=ai.odds||{};
+        var odds=ai.odds||{};var oddsTxt=Number(odds.draw)>0?(dcEsc(odds.home)+'/'+dcEsc(odds.draw)+'/'+dcEsc(odds.away)):(dcEsc(odds.home)+' / '+dcEsc(odds.away));var dropB=x.drop_badge?'<span style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:800;background:linear-gradient(135deg,rgba(245,158,11,0.22),rgba(239,68,68,0.25));color:#fbbf24;border:1px solid rgba(245,158,11,0.55);">'+dcEsc(x.drop_badge)+'</span>':'';
         html+='<div class="dc-mcard" data-midx="'+k+'">'
-          +'<div class="dc-mcard-top"><span class="dc-lbadge">'+dcEsc(x.league_code||x.league)+'</span><span>📅 '+dcEsc(x.match_dt_kst)+'</span><span class="dc-sbadge '+stCls+'">'+dcEsc(stTxt)+'</span></div>'
+          +'<div class="dc-mcard-top"><span class="dc-lbadge">'+dcEsc(x.league_code||x.league)+'</span>'+dropB+'<span>📅 '+dcEsc(x.match_dt_kst)+'</span><span class="dc-sbadge '+stCls+'">'+dcEsc(stTxt)+'</span></div>'
           +'<div class="dc-trow"><span>'+dcEsc(x.home)+'</span><span class="dc-score">'+dcEsc(x.home_score)+'</span></div>'
           +'<div class="dc-trow"><span>'+dcEsc(x.away)+'</span><span class="dc-score">'+dcEsc(x.away_score)+'</span></div>'
           +'<div class="dc-periods">📊 '+dcEsc(pstr)+'</div>'
-          +'<div class="dc-airow">🎯 AI '+dcEsc(ai.home_pct)+'% / '+dcEsc(ai.draw_pct)+'% / '+dcEsc(ai.away_pct)+'% · 배당 '+dcEsc(odds.home)+'/'+dcEsc(odds.draw)+'/'+dcEsc(odds.away)+'</div>'
+          +'<div class="dc-airow">🎯 AI '+dcEsc(ai.home_pct)+'% / '+dcEsc(ai.draw_pct)+'% / '+dcEsc(ai.away_pct)+'% · 배당 '+oddsTxt+'</div>'
           +'</div>';
       }
       track.innerHTML=html;
@@ -331,7 +332,7 @@
       +'<div class="dc-hub-head">'
       +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
       +'<span class="dc-live-dot">● AUTO LIVE</span>'
-      +'<h2 style="font-size:17px;font-weight:800;margin:0;color:#f8fafc">📊 SportIQ 자동 업로드 데이터 센터 (LIVE)</h2>'
+      +'<h2 style="font-size:17px;font-weight:800;margin:0;color:#f8fafc">📊 SportIQ 데이터 센터 · 9종목 · 24리그 · 드롭오즈 실시간 연동</h2>'
       +'</div>'
       +'<div style="display:flex;gap:8px;align-items:center">'
       +'<button class="dc-btn dc-btn-primary" id="dcSyncNowBtn">🔄 즉시 자동수집 동기화</button>'
@@ -411,12 +412,12 @@
       {id:'season',t:'📊 AI 시즌 예측',s:'Elo·5,000회 시뮬·FIFA/클럽'},
       {id:'transfers',t:'💶 해외 이적시장',s:'AI 브리핑·유럽/코리안 몸값'},
       {id:'injuries',t:'🏥 부상자 명단',s:'구단별 결장자·전력 타격'},
-      {id:'scorecard',t:'🎯 적중률 투명 공개',s:'4대 AI·회원 승부예측 성적표'}
+      {id:'scorecard',t:'🎯 적중률 투명 공개',s:'4대 AI·회원 승부예측 성적표'},{id:'dropping-odds',t:'📉 배당 급변 · 드롭 오즈',s:'9종목 실시간 스팀·확률 급변'}
     ];
     var html='';
     for(var i=0;i<items.length;i++){
       var it=items[i];
-      html+='<button class="dc-lcard'+(state.tab===it.id?' active':'')+'" data-dctab="'+it.id+'">'
+      html+='<button class="dc-lcard'+(state.tab===it.id?' active':'')+'" data-dctab="'+it.id+'" data-tab="'+it.id+'">'
         +'<div class="dc-lcard-title">'+dcEsc(it.t)+'</div>'
         +'<div class="dc-lcard-sub">'+dcEsc(it.s)+'</div>'
         +'</button>';
@@ -445,7 +446,7 @@
     else if(state.tab==='season')renderSeason(body);
     else if(state.tab==='transfers')renderTransfers(body);
     else if(state.tab==='injuries')renderInjuries(body);
-    else if(state.tab==='scorecard')renderScorecard(body);
+    else if(state.tab==='scorecard')renderScorecard(body);else if(state.tab==='dropping-odds')renderDroppingOdds(body);;
   }
 
   function renderStandings(body){
@@ -455,7 +456,7 @@
       var leaders=d.leaders||{};
       var sc=leaders.scorers||[];
       var as=leaders.assists||[];
-      var h=leaguePillsHtml(state.standingsLeague,'data-stlg');
+      var h=leaguePillsHtml(state.standingsLeague,'data-stlg');h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px">';var ext=[{id:'VLEAGUE',l:'🏐 V-리그'},{id:'UFC',l:'🥊 UFC 랭킹'},{id:'TENNIS',l:'🎾 ATP 랭킹'},{id:'F1',l:'🏎️ F1 순위'}];for(var ei=0;ei<ext.length;ei++){var ex=ext[ei];h+='<button class="dc-pill'+(state.standingsLeague===ex.id?' active':'')+'" data-stlg="'+ex.id+'">'+ex.l+'</button>';}h+='</div>';
       h+='<div class="dc-grid-2">';
       h+='<div class="dc-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">🏆 '+dcEsc(d.league_name||d.league)+' 실시간 순위 ('+dcEsc(d.updated_at_kst)+')</div>';
       h+='<table class="dc-tbl"><thead><tr><th>#</th><th>구단</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>최근5</th><th>승점/승률</th></tr></thead><tbody>';
@@ -663,7 +664,7 @@
     });
   }
 
-  function init(){
+  function renderDroppingOdds(body){dcGetJson('/api/datacenter/dropping-odds?sport='+encodeURIComponent(state.dropSport)+'&min_drop='+encodeURIComponent(state.dropMin),function(err,d){if(err||!d||!d.ok){body.innerHTML='<div style="color:#f87171">드롭 오즈 데이터를 불러오지 못했습니다.</div>';return;}var k=d.kpis||{};var items=d.items||[];var h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px">';var kpis=[{t:'탐지 경기 수',v:(k.total_detected!==undefined?k.total_detected:items.length)+'건',c:'#38bdf8'},{t:'최대 급변 경기',v:k.max_drop_match||'-',c:'#f59e0b'},{t:'슈퍼 스팀(S)',v:(k.super_steam_count!==undefined?k.super_steam_count:0)+'건',c:'#ef4444'},{t:'평균 내재확률 상승',v:(k.avg_prob_shift!==undefined?'+'+k.avg_prob_shift+'%p':'-'),c:'#34d399'}];for(var ki=0;ki<kpis.length;ki++){h+='<div class="dc-card" style="margin:0"><div style="font-size:11px;color:#94a3b8;margin-bottom:4px">'+kpis[ki].t+'</div><div style="font-size:16px;font-weight:800;color:'+kpis[ki].c+'">'+dcEsc(kpis[ki].v)+'</div></div>';}h+='</div>';h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';var mins=[5,10,15];for(var mi=0;mi<mins.length;mi++){h+='<button class="dc-pill'+(Number(state.dropMin)===mins[mi]?' active':'')+'" data-dmin="'+mins[mi]+'">-'+mins[mi]+'%+</button>';}h+='</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">';for(var si=0;si<SPORTS.length;si++){var sp=SPORTS[si];if(sp.id==='live')continue;h+='<button class="dc-pill'+(state.dropSport===sp.id?' active':'')+'" data-dsport="'+dcEsc(sp.id)+'">'+dcEsc(sp.lbl)+'</button>';}h+='</div>';h+='<div class="dc-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">📉 배당 급변 · 드롭 오즈 상세 ('+items.length+'건)</div><div style="overflow-x:auto"><table class="dc-tbl"><thead><tr><th>리그</th><th>일시</th><th>매치업</th><th>타깃</th><th>초기→현재</th><th>하락폭</th><th>확률변화</th><th>등급</th><th>감지사유</th><th>감지시각</th></tr></thead><tbody>';if(!items.length){h+='<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:18px">조건에 맞는 드롭 오즈 경기가 없습니다.</td></tr>';}else{for(var ii=0;ii<items.length;ii++){var it=items[ii];h+='<tr><td><span class="dc-lbadge">'+dcEsc(it.league)+'</span></td><td>'+dcEsc(it.match_dt_kst)+'</td><td style="font-weight:600">'+dcEsc(it.home)+' vs '+dcEsc(it.away)+'</td><td style="color:#fbbf24;font-weight:700">'+dcEsc(it.target_pick)+'</td><td>'+dcEsc(it.open_odds)+' → <b>'+dcEsc(it.curr_odds)+'</b></td><td style="color:#f87171;font-weight:800">'+dcEsc(it.drop_pct)+'%</td><td style="color:#34d399">'+dcEsc(it.prob_before)+'%→'+dcEsc(it.prob_now)+'% (+'+dcEsc(it.prob_shift)+'%p)</td><td><span style="padding:2px 6px;border-radius:6px;background:rgba(245,158,11,0.2);color:#fbbf24;font-weight:700">'+dcEsc(it.grade)+'</span></td><td>'+dcEsc(it.reason)+'</td><td style="color:#94a3b8">'+dcEsc(it.detected_kst)+'</td></tr>';}}h+='</tbody></table></div></div>';body.innerHTML=h;var mBtns=body.querySelectorAll('[data-dmin]');for(var a=0;a<mBtns.length;a++){mBtns[a].onclick=function(){state.dropMin=Number(this.getAttribute('data-dmin'));loadHubTab();};}var sBtns=body.querySelectorAll('[data-dsport]');for(var b=0;b<sBtns.length;b++){sBtns[b].onclick=function(){state.dropSport=this.getAttribute('data-dsport');loadHubTab();};}});}function init(){
     setupTickerBar();
     setupMainHub();
   }
