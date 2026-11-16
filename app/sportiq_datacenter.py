@@ -1432,12 +1432,12 @@ def _publish_daily_briefing(force=False):
         sim_line = "EPL 시즌 예측: 실시간 Elo + Monte Carlo 5,000회 반영 중"
         inj_line = "부상자 명단: 구단별 주요 결장자 실시간 추적 중"
         content = f"[{today_md} SPORTIQ 데이터센터 브리핑]\\n- {sim_line}\\n- {inj_line}\\n- 해외 이적시장: 유럽 5대 리그 루머·오피셜 30분 주기 동기화\\n- 데이터센터 5개 탭에서 전체 18개 리그 상세 지표를 확인하세요."
-        try:
+       try:
             _do = _build_dropping_odds(_collect_all_matches(0), sport="all", min_drop=5.0).get("items", [])
             if _do:
                 _top_do = _do[0]
                 content += f"\n- 📉 [오늘의 대표 드롭오즈] [{_top_do['league']}] {_top_do['home']} vs {_top_do['away']} ({_top_do['target_pick']} {_top_do['open_odds']}→{_top_do['curr_odds']}, {_top_do['drop_pct']}%)"
-        except Exception:
+       except Exception:
             pass
        conn = sqlite3.connect("/tmp/sportiq_lounge.db", timeout=5)
         cur = conn.cursor()
