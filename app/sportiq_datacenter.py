@@ -2153,80 +2153,57 @@ def get_my_weekly_briefing(teams: str = Query(""), user_key: str = Query("guest"
         }
 from typing import Any, Dict
 
-
 @router.post("/share-briefing-to-feed")
-async def share_briefing_to_feed(request: Request) -> Dict[str, Any]:
+async def share_briefing_to_feed(request: Request):
     try:
-body = await request.json()
-raw_nick = str(body.get("nickname") or "").replace("<", "").replace(">", "").strip()
-nickname = (raw_nick or "마이팀분석가")[:20]
-raw_comment = str(body.get("comment") or "").strip()
-comment = (raw_comment or "데이터와 부상 변수를 종합해 선정한 이번 주 마이팀 핵심 매치업 브리핑입니다.")[:240]
-mode = str(body.get("mode") or "single").strip().lower()
-card = body.get("card") if isinstance(body.get("card"), dict) else {}
-cards = body.get("cards") if isinstance(body.get("cards"), list) else []
-now_kst = _now_kst()
-today_ymd = now_kst.strftime("%Y-%m-%d")
-created_at_kst = _fmt_kst(now_kst)
-match_key = f"user-brief-{today_ymd}-{int(time.time())}"
-sport_map = {"KBO": "야구", "MLB": "야구", "NBA": "농구", "VLEAGUE": "배구", "KOVO_M": "배구", "KOVO_W": "배구", "LCK": "e스포츠", "LOL": "e스포츠"}
-badge_text = f"⭐ {nickname} · 마이팀브리핑"
-if mode == "all":
-first_card = cards[0] if cards else card
-league = str(first_card.get("league") or "MY TEAM")
-sport = sport_map.get(league.upper(), "축구")
-title = f"[📅 마이팀 주간 종합브리핑] {nickname}님의 {len(cards)}개 관심구단 픽 — {comment[:32]}"
-summary_lines = [f"• {c.get('team', '')} vs {c.get('opponent', '')} ({c.get('league', '')} · {c.get('match_dt_kst', '')}) → 🎯 {c.get('ai_pick', '')} ({c.get('confidence', 72)}%)" for c in cards]
-content = f'💬 {nickname}님의 한줄 코멘트: "{comment}"\n\n' + ("\n".join(summary_lines) if summary_lines else "선택된 관심구단 매치업이 없습니다.")
-tactical_points = json.dumps([f"한줄평: {comment[:60]}"] + [f"{c.get('team', '')}: {c.get('ai_pick', '')}" for c in cards[:2]], ensure_ascii=False)
-recommended_pick = f"{first_card.get('ai_pick', '종합 브리핑')} (신뢰도 {int(first_card.get('confidence') or 72)}%)"
-confidence_score = int(first_card.get("confidence") or 72)
-sentiment_home_pct = int(first_card.get("my_win_pct") or 55)
-sentiment_away_pct = 100 - sentiment_home_pct
-sentiment_home_label = f"{first_card.get('team') or '마이팀'} 우세"
-sentiment_away_label = f"{first_card.get('opponent') or '상대팀'} 반격"
-hashtags = f"#마이팀브리핑 #주간종합브리핑 #{league}"
-else:
-team = str(card.get("team") or "마이팀")
-opponent = str(card.get("opponent") or "상대팀")
-league = str(card.get("league") or "MY TEAM")
-sport = sport_map.get(league.upper(), "축구")
-match_dt_kst = str(card.get("match_dt_kst") or "")
-venue = str(card.get("venue") or "")
-my_rank_summary = str(card.get("my_rank_summary") or "")
-opp_rank_summary = str(card.get("opp_rank_summary") or "")
-injury_summary = str(card.get("injury_summary") or "")
-ai_pick = str(card.get("ai_pick") or "")
-confidence_score = int(card.get("confidence") or 72)
-odds_note = str(card.get("odds_note") or "")
-tactical_tip = str(card.get("tactical_tip") or "")
-sentiment_home_pct = int(card.get("my_win_pct") or 55)
-sentiment_away_pct = 100 - sentiment_home_pct
-sentiment_home_label = f"{team} 우세"
-sentiment_away_label = f"{opponent} 반격"
-title = f"[⭐ 마이팀 브리핑] {team} vs {opponent} — {comment[:36]}"
-content = f'💬 {nickname}님의 한줄 코멘트: "{comment}"\n\n📅 경기 일정: {match_dt_kst} ({venue})\n📊 전력·순위 비교: {my_rank_summary} vs {opp_rank_summary}\n🏥 부상·결장 변수: {injury_summary}\n🎯 AI 추천 픽: {ai_pick} (신뢰도 {confidence_score}%) · {odds_note}\n💡 전술 포인트: {tactical_tip}'
-tactical_points = json.dumps([f"한줄평: {comment[:60]}", f"부상변수: {injury_summary[:60]}", f"전술팁: {tactical_tip[:60]}"], ensure_ascii=False)
-recommended_pick = f"{ai_pick} (신뢰도 {confidence_score}%)"
-hashtags = f"#마이팀브리핑 #{team.replace(' ', '')} #{opponent.replace(' ', '')} #{league}"
-conn = sqlite3.connect("/tmp/sportiq_lounge.db", timeout=5)
-cur = conn.cursor()
-cur.execute("INSERT INTO auto_analyst_posts (run_date_kst, match_key, rank_num, is_summary, sport, league, badge_text, title, content, tactical_points, recommended_pick, confidence_score, sentiment_home_pct, sentiment_away_pct, sentiment_home_label, sentiment_away_label, hashtags, likes, created_at_kst) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (today_ymd, match_key, 0, 0, sport, league, badge_text, title, content, tactical_points, recommended_pick, confidence_score, sentiment_home_pct, sentiment_away_pct, sentiment_home_label, sentiment_away_label, hashtags, 1, created_at_kst))
-try:
-has_lb = cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='member_leaderboard'").fetchone()
-if has_lb:
-cur.execute("UPDATE member_leaderboard SET points = COALESCE(points, 0) + 10 WHERE nickname = ?", (nickname,))
-if cur.rowcount == 0:
-cur.execute("INSERT INTO member_leaderboard (nickname, points) VALUES (?, 10)", (nickname,))
-except Exception:
-pass
-conn.commit()
-conn.close()
-try:
-from app.sportiq_auto_analyst import trigger_pg_backup_async
-trigger_pg_backup_async()
-except Exception:
-pass
-return {"ok": True, "title": title, "nickname": nickname, "bonus_points": 10, "created_at_kst": created_at_kst}
-except Exception as e:
-return {"ok": False, "error": str(e)}
+        body = await request.json()
+        card = body.get("card") or {}
+        comment = str(body.get("comment") or "").strip()
+        nickname = str(body.get("nickname") or "익명분석가").strip()[:20] or "익명분석가"
+        if not comment:
+            return {"ok": False, "error": "한줄 코멘트를 입력해주세요."}
+        now_kst = _now_kst()
+        today_ymd = now_kst.strftime("%Y-%m-%d")
+        created_at_kst = _fmt_kst(now_kst)
+        team = str(card.get("team") or "마이팀")
+        opponent = str(card.get("opponent") or "상대팀")
+        sport = str(card.get("sport") or "축구")
+        league = str(card.get("league") or "스포츠")
+        match_dt_kst = str(card.get("match_dt_kst") or created_at_kst)
+        venue = str(card.get("venue") or "")
+        my_rank_summary = str(card.get("my_rank_summary") or "")
+        opp_rank_summary = str(card.get("opp_rank_summary") or "")
+        injury_summary = str(card.get("injury_summary") or "")
+        ai_pick = str(card.get("ai_pick") or "")
+        confidence_score = int(card.get("confidence") or 72)
+        odds_note = str(card.get("odds_note") or "")
+        tactical_tip = str(card.get("tactical_tip") or "")
+        sentiment_home_pct = int(card.get("my_win_pct") or 55)
+        sentiment_away_pct = 100 - sentiment_home_pct
+        sentiment_home_label = f"{team} 우세"
+        sentiment_away_label = f"{opponent} 반격"
+        title = f"[⭐ 마이팀 브리핑] {team} vs {opponent} — {comment[:36]}"
+        content = "\n".join([
+            f'💬 {nickname}님의 한줄 코멘트: "{comment}"',
+            "",
+            f"📅 경기 일정: {match_dt_kst} ({venue})",
+            f"📊 전력·순위 비교: {my_rank_summary} vs {opp_rank_summary}",
+            f"🏥 부상·결장: {injury_summary}",
+            f"🎯 AI 승부 픽: {ai_pick} (신뢰도 {confidence_score}%)",
+            f"💰 배당: {odds_note}",
+            f"🧠 전술 팁: {tactical_tip}",
+        ])
+        tactical_points = json.dumps([f"한줄평: {comment[:60]}", f"부상변수: {injury_summary[:60]}", f"전술팁: {tactical_tip[:60]}"], ensure_ascii=False)
+        recommended_pick = f"{ai_pick} (신뢰도 {confidence_score}%)"
+        hashtags = f"#마이팀브리핑 #{team.replace(' ', '')} #{opponent.replace(' ', '')} #{league}"
+        match_key = f"briefing_{team}_{opponent}_{today_ymd}_{int(now_kst.timestamp())}"
+        badge_text = "⭐ 마이팀 브리핑"
+        conn = sqlite3.connect("/tmp/sportiq_lounge.db", timeout=5)
+        cur = conn.cursor()
+        cur.execute("INSERT INTO auto_analyst_posts (run_date_kst, match_key, rank_num, is_summary, sport, league, badge_text, title, content, tactical_points, recommended_pick, confidence_score, sentiment_home_pct, sentiment_away_pct, sentiment_home_label, sentiment_away_label, hashtags, likes, created_at_kst) VALUES (?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)", (today_ymd, match_key, sport, league, badge_text, title, content, tactical_points, recommended_pick, confidence_score, sentiment_home_pct, sentiment_away_pct, sentiment_home_label, sentiment_away_label, hashtags, created_at_kst))
+        conn.commit()
+        conn.close()
+        return {"ok": True, "title": title, "nickname": nickname, "bonus_points": 10, "created_at_kst": created_at_kst}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+        
