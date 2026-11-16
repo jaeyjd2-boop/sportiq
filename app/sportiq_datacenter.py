@@ -2337,27 +2337,27 @@ def _ensure_sample_briefings_for_best() -> None:
             return
     cnt_row = conn.execute("SELECT COUNT(*) FROM auto_analyst_posts WHERE title LIKE '%마이팀 브리핑%' OR title LIKE '%마이팀 주간%'").fetchone()
     cnt = int(cnt_row[0] or 0) if cnt_row else 0
-    if cnt >= 3:
-        conn.close()
-            return
-        
-            now_kst = _now_kst()
-            today_str = now_kst.strftime("%Y-%m-%d")
-            now_str = _fmt_kst(now_kst)
-            samples = [
-                ("best-sample-liverpool-southampton", "축구", "EPL", "[⭐ 마이팀 브리핑] 리버풀 vs 사우샘프턴 — 살라 연속 공격포인트와 전방 압박 우위로 다득점 정배 기대!", "살라의 최근 5경기 연속 공격포인트와 안필드 홈 전방 압박 지표를 감안하면 다득점 정배 흐름이 유력합니다.", "살라 중심 우측 하프스페이스 공략 / 홈 다득점 기대", "리버풀 승", 82, 70, 30, "리버풀 우세", "사우샘프턴 반격", "#리버풀 #살라 #EPL #마이팀브리핑", 12, 4, 1),
-                ("best-sample-bayern-augsburg", "축구", "분데스리가", "[⭐ 마이팀 브리핑] 바이에른 뮌헨 vs 아우크스부르크 — 김민재 철벽 수비와 케인 홈 결정력 조합으로 핸디캡 승 유력!", "김민재의 대인 방어와 케인의 홈 박스 내 슈팅 효율이 맞물려 핸디캡 승리 가능성이 높습니다.", "김민재 수비 라인 컨트롤 / 케인 멀티골 기대", "바이에른 뮌헨 -1.5 승", 79, 65, 35, "뮌헨 압도", "아우크스부르크 수비", "#바이에른뮌헨 #김민재 #케인 #마이팀브리핑", 9, 3, 1),
-                ("best-sample-hyundai-koreanair", "배구", "V-리그", "[⭐ 마이팀 브리핑] 현대캐피탈 vs 대한항공 — 레오·허수봉 서브 에이스 화력으로 세트 우세 전망!", "레오와 허수봉의 강서브가 상대 리시브 라인을 흔들며 세트 후반 집중력에서 우위를 점할 전망입니다.", "레오·허수봉 서브 압박 / 블로킹 높이 우위", "현대캐피탈 승", 76, 60, 40, "현대캐피탈 우세", "대한항공 추격", "#현대캐피탈 #허수봉 #V리그 #마이팀브리핑", 7, 3, 1),
-            ]
-            for mk, sport, league, title, content, tp, pick, conf, hpct, apct, hlbl, albl, tags, likes, ag, op in samples:
-                exists = conn.execute("SELECT 1 FROM auto_analyst_posts WHERE match_key = ? OR title = ?", (mk, title)).fetchone()
-                if exists: continue
-                conn.execute("INSERT INTO auto_analyst_posts (run_date_kst, match_key, rank_num, is_summary, sport, league, badge_text, title, content, tactical_points, recommended_pick, confidence_score, sentiment_home_pct, sentiment_away_pct, sentiment_home_label, sentiment_away_label, hashtags, likes, created_at) VALUES (?, ?, 1, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (today_str, mk, sport, league, "⭐ 마이팀 브리핑", title, content, tp, pick, conf, hpct, apct, hlbl, albl, tags, likes, now_str))
-                conn.execute("INSERT OR IGNORE INTO datacenter_briefing_votes (post_key, agree_cnt, oppose_cnt, base_agree_pct, updated_at) VALUES (?, ?, ?, ?, ?)", (mk, ag, op, hpct, now_str))
-            conn.commit()
+        if cnt >= 3:
             conn.close()
-        except Exception:
-            pass
+                return
+        
+        now_kst = _now_kst()
+        today_str = now_kst.strftime("%Y-%m-%d")
+        now_str = _fmt_kst(now_kst)
+        samples = [
+            ("best-sample-liverpool-southampton", "축구", "EPL", "[⭐ 마이팀 브리핑] 리버풀 vs 사우샘프턴 — 살라 연속 공격포인트와 전방 압박 우위로 다득점 정배 기대!", "살라의 최근 5경기 연속 공격포인트와 안필드 홈 전방 압박 지표를 감안하면 다득점 정배 흐름이 유력합니다.", "살라 중심 우측 하프스페이스 공략 / 홈 다득점 기대", "리버풀 승", 82, 70, 30, "리버풀 우세", "사우샘프턴 반격", "#리버풀 #살라 #EPL #마이팀브리핑", 12, 4, 1),
+            ("best-sample-bayern-augsburg", "축구", "분데스리가", "[⭐ 마이팀 브리핑] 바이에른 뮌헨 vs 아우크스부르크 — 김민재 철벽 수비와 케인 홈 결정력 조합으로 핸디캡 승 유력!", "김민재의 대인 방어와 케인의 홈 박스 내 슈팅 효율이 맞물려 핸디캡 승리 가능성이 높습니다.", "김민재 수비 라인 컨트롤 / 케인 멀티골 기대", "바이에른 뮌헨 -1.5 승", 79, 65, 35, "뮌헨 압도", "아우크스부르크 수비", "#바이에른뮌헨 #김민재 #케인 #마이팀브리핑", 9, 3, 1),
+            ("best-sample-hyundai-koreanair", "배구", "V-리그", "[⭐ 마이팀 브리핑] 현대캐피탈 vs 대한항공 — 레오·허수봉 서브 에이스 화력으로 세트 우세 전망!", "레오와 허수봉의 강서브가 상대 리시브 라인을 흔들며 세트 후반 집중력에서 우위를 점할 전망입니다.", "레오·허수봉 서브 압박 / 블로킹 높이 우위", "현대캐피탈 승", 76, 60, 40, "현대캐피탈 우세", "대한항공 추격", "#현대캐피탈 #허수봉 #V리그 #마이팀브리핑", 7, 3, 1),
+        ]
+        for mk, sport, league, title, content, tp, pick, conf, hpct, apct, hlbl, albl, tags, likes, ag, op in samples:
+            exists = conn.execute("SELECT 1 FROM auto_analyst_posts WHERE match_key = ? OR title = ?", (mk, title)).fetchone()
+            if exists: continue
+            conn.execute("INSERT INTO auto_analyst_posts (run_date_kst, match_key, rank_num, is_summary, sport, league, badge_text, title, content, tactical_points, recommended_pick, confidence_score, sentiment_home_pct, sentiment_away_pct, sentiment_home_label, sentiment_away_label, hashtags, likes, created_at) VALUES (?, ?, 1, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (today_str, mk, sport, league, "⭐ 마이팀 브리핑", title, content, tp, pick, conf, hpct, apct, hlbl, albl, tags, likes, now_str))
+            conn.execute("INSERT OR IGNORE INTO datacenter_briefing_votes (post_key, agree_cnt, oppose_cnt, base_agree_pct, updated_at) VALUES (?, ?, ?, ?, ?)", (mk, ag, op, hpct, now_str))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 @router.get("/best-briefings")
 def get_best_briefings(sort: str = Query("hot"), limit: int = Query(3, ge=1, le=10)) -> Dict[str, Any]:
