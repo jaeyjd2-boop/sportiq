@@ -810,7 +810,7 @@ def _fetch_rss_transfers():
 def get_transfers(category: str = Query("all"), filter_key: str = Query("all")):
     try:
         feed = _fetch_rss_transfers()
-        if category and category != "all":
+        if category and category.strip().lower() != "all":
             feed = [f for f in feed if f["cat"] == category]
         mvs = list(_MARKET_VALUES)
         fk = filter_key or "all"
@@ -921,7 +921,7 @@ def get_injuries(league: str = Query("EPL"), severity: str = Query("all"), q: st
         _cache_set(cache_key, base)
     all_items = base["items"]
     filtered = all_items
-    if severity and severity != "all":
+    if severity and severity.strip().lower() != "all":
         filtered = [it for it in filtered if it["severity"] == severity]
     if q:
         ql = q.strip().lower()
