@@ -2655,4 +2655,245 @@ def get_best_analysts(user_key: str = Query("")) -> Dict[str, Any]:
             "hall_of_fame": [],
             "my_reward": {"has_badge": False, "badge_name": "", "total_bonus_points": 0, "best_count": 0, "rewards": []},
         }
-        
+     
+
+@router.get("/hall-of-fame") 
+def get_hall_of_fame(sort: str = Query("composite"), sport: str = Query("all"), user_key: str = Query("")) -> Dict[str, Any]:
+    try:
+        get_best_briefings(sort="hot", limit=3, user_key=user_key)
+    except Exception:
+        pass
+    db_stats: Dict[str, Dict[str, Any]] = {}
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=5)
+        conn.row_factory = sqlite3.Row
+        _ensure_best_analyst_tables(conn)
+        rows = conn.execute(
+            "SELECT author_name, best_rank, bonus_points, post_title, awarded_at_kst "
+            "FROM datacenter_best_analyst_rewards ORDER BY awarded_at_kst DESC"
+        ).fetchall()
+        conn.close()
+        for r in rows:
+            name = str(r["author_name"] or "").strip()
+            if not name:
+                continue
+            st = db_stats.setdefault(name, {"awards_cnt": 0, "rank1_cnt": 0, "bonus_sum": 0, "latest_title": ""})
+            st["awards_cnt"] += 1
+            if int(r["best_rank"] or 0) == 1:
+                st["rank1_cnt"] += 1
+            st["bonus_sum"] += int(r["bonus_points"] or 0)
+            if not st["latest_title"] and r["post_title"]:
+                st["latest_title"] = str(r["post_title"])
+    except Exception:
+        pass  
+    seeds = [
+        {
+            "analyst_name": "안필드전술가",
+            "specialty": "⚽ EPL·유럽축구",
+            "sport_code": "soccer",
+            "base_awards": 6,
+            "base_rank1": 4,
+            "base_bonus": 260,
+            "total_picks": 42,
+            "hit_picks": 33,
+            "accuracy_pct": 78.6,
+            "avg_like_pct": 84.5,
+            "streak_badge": "🔥 6연승 행진",
+            "featured_pick": "리버풀 vs 사우샘프턴 — 리버풀 승",
+        },
+        {
+            "analyst_name": "분데스인사이드",
+            "specialty": "⚽ 분데스·UCL",
+            "sport_code": "soccer",
+            "base_awards": 5,
+            "base_rank1": 2,
+            "base_bonus": 190,
+            "total_picks": 38,
+            "hit_picks": 28,
+            "accuracy_pct": 73.7,
+            "avg_like_pct": 76.2,
+            "streak_badge": "⚡ 최근 10픽 8적중",
+            "featured_pick": "바이에른 뮌헨 -1.5 핸디캡 승",
+        },
+        {
+            "analyst_name": "스카이워커스분석",
+            "specialty": "🏐 V-리그·배구",
+            "sport_code": "volleyball",
+            "base_awards": 4,
+            "base_rank1": 1,
+            "base_bonus": 150,
+            "total_picks": 35,
+            "hit_picks": 26,
+            "accuracy_pct": 74.3,
+            "avg_like_pct": 79.0,
+            "streak_badge": "✅ 4연속 적중",
+            "featured_pick": "현대캐피탈 vs 대한항공 — 현대캐피탈 승",
+        },
+        {
+            "analyst_name": "잠실불펜연구소",
+            "specialty": "⚾ KBO·MLB",
+            "sport_code": "baseball",
+            "base_awards": 4,
+            "base_rank1": 2,
+            "base_bonus": 170,
+            "total_picks": 44,
+            "hit_picks": 31,
+            "accuracy_pct": 70.5,
+            "avg_like_pct": 74.8,
+            "streak_badge": "⚾ 언더/오버 특화",
+            "featured_pick": "LA 다저스 vs 샌디에이고 — 다저스 승",
+        },
+        {
+            "analyst_name": "코트비전NBA",
+            "specialty": "🏀 NBA·농구",
+            "sport_code": "basketball",
+            "base_awards": 3,
+            "base_rank1": 1,
+            "base_bonus": 120,
+            "total_picks": 40,
+            "hit_picks": 30,
+            "accuracy_pct": 75.0,
+            "avg_like_pct": 77.4,
+            "streak_badge": "🔥 4연승",
+            "featured_pick": "보스턴 셀틱스 -4.5 핸디캡 승",
+        },
+        {
+            "analyst_name": "라리가마에스트로",
+            "specialty": "⚽ 라리가·세리에",
+            "sport_code": "soccer",
+            "base_awards": 3,
+            "base_rank1": 1,
+            "base_bonus": 110,
+            "total_picks": 36,
+            "hit_picks": 25,
+            "accuracy_pct": 69.4,
+            "avg_like_pct": 71.5,
+            "streak_badge": "⚡ 최근 5픽 4적중",
+            "featured_pick": "레알 마드리드 vs 오사수나 — 레알 승",
+        },
+        {
+            "analyst_name": "옥타곤전략가",
+            "specialty": "🥊 UFC·테니스",
+            "sport_code": "other",
+            "base_awards": 2,
+            "base_rank1": 1,
+            "base_bonus": 80,
+            "total_picks": 26,
+            "hit_picks": 20,
+            "accuracy_pct": 76.9,
+            "avg_like_pct": 81.2,
+            "streak_badge": "🎯 메인카드 5연승",
+            "featured_pick": "UFC 넘버링 메인 — 판정승 픽",
+        },
+        {
+            "analyst_name": "설원퍽마스터",
+            "specialty": "🏒 NHL·하키",
+            "sport_code": "other",
+            "base_awards": 2,
+            "base_rank1": 0,
+            "base_bonus": 60,
+            "total_picks": 29,
+            "hit_picks": 19,
+            "accuracy_pct": 65.5,
+            "avg_like_pct": 68.9,
+            "streak_badge": "✅ 역배 발굴",
+            "featured_pick": "토론토 메이플리프스 승",
+        },
+    ]
+    seen_names = set()
+    items: List[Dict[str, Any]] = []
+    for s in seeds:
+        name = s["analyst_name"]
+        seen_names.add(name)
+        st = db_stats.get(name, {})
+        awards_count = s["base_awards"] + int(st.get("awards_cnt", 0))
+        rank1_count = s["base_rank1"] + int(st.get("rank1_cnt", 0))
+        total_bonus_pts = s["base_bonus"] + int(st.get("bonus_sum", 0))
+        accuracy_pct = float(s["accuracy_pct"])
+        composite_score = round(awards_count * 18.0 + total_bonus_pts * 0.22 + accuracy_pct * 1.15, 1)
+        tier_badge = (
+            "👑 레전드 분석가"
+            if (composite_score >= 240 or awards_count >= 6)
+            else ("💎 마스터 분석가" if composite_score >= 190 else "🏅 베스트 분석가")
+        )
+        items.append({
+            "analyst_name": name,
+            "specialty": s["specialty"],
+            "sport_code": s["sport_code"],
+            "awards_count": awards_count,
+            "rank1_count": rank1_count,
+            "total_bonus_pts": total_bonus_pts,
+            "total_picks": s["total_picks"],
+            "hit_picks": s["hit_picks"],
+            "accuracy_pct": accuracy_pct,
+            "avg_like_pct": float(s["avg_like_pct"]),
+            "streak_badge": s["streak_badge"],
+            "featured_pick": st.get("latest_title") or s["featured_pick"],
+            "composite_score": composite_score,
+            "tier_badge": tier_badge,
+            "is_seed": True,
+        })
+    for name, st in db_stats.items():
+        if name in seen_names:
+            continue
+        awards_count = int(st.get("awards_cnt", 0))
+        rank1_count = int(st.get("rank1_cnt", 0))
+        total_bonus_pts = int(st.get("bonus_sum", 0))
+        total_picks = max(awards_count, 1)
+        hit_picks = max(awards_count, 1)
+        accuracy_pct = 75.0
+        composite_score = round(awards_count * 18.0 + total_bonus_pts * 0.22 + accuracy_pct * 1.15, 1)
+        tier_badge = (
+            "👑 레전드 분석가"
+            if (composite_score >= 240 or awards_count >= 6)
+            else ("💎 마스터 분석가" if composite_score >= 190 else "🏅 베스트 분석가")
+        )
+        items.append({
+            "analyst_name": name,
+            "specialty": "🏅 커뮤니티 분석가",
+            "sport_code": "other",
+            "awards_count": awards_count,
+            "rank1_count": rank1_count,
+            "total_bonus_pts": total_bonus_pts,
+            "total_picks": total_picks,
+            "hit_picks": hit_picks,
+            "accuracy_pct": accuracy_pct,
+            "avg_like_pct": 80.0,
+            "streak_badge": "🌟 신규 명예 입성",
+            "featured_pick": st.get("latest_title") or "베스트 브리핑 수상",
+            "composite_score": composite_score,
+            "tier_badge": tier_badge,
+            "is_seed": False,
+        })
+    sport_norm = (sport or "all").strip().lower()
+    if sport_norm and sport_norm != "all":
+        items = [x for x in items if x["sport_code"] == sport_norm]
+    sort_norm = (sort or "composite").strip().lower()
+    if sort_norm == "accuracy":
+        items.sort(key=lambda x: (x["accuracy_pct"], x["composite_score"]), reverse=True)
+    elif sort_norm == "bonus":
+        items.sort(key=lambda x: (x["total_bonus_pts"], x["composite_score"]), reverse=True)
+    elif sort_norm == "awards":
+        items.sort(key=lambda x: (x["awards_count"], x["rank1_count"], x["composite_score"]), reverse=True)
+    else:
+        sort_norm = "composite"
+        items.sort(key=lambda x: (x["composite_score"], x["awards_count"], x["accuracy_pct"]), reverse=True)
+    for idx, item in enumerate(items, start=1):
+        item["rank"] = idx
+    summary_kpis = {
+        "total_analysts": len(items),
+        "total_bonus_pts": sum(int(x["total_bonus_pts"]) for x in items),
+        "avg_accuracy_pct": round(sum(float(x["accuracy_pct"]) for x in items) / len(items), 1) if items else 0.0,
+        "top1_name": items[0]["analyst_name"] if items else "-",
+        "top1_score": items[0]["composite_score"] if items else 0.0,
+        "formula_text": "종합점수 = (수상횟수×18) + (누적보너스P×0.22) + (적중률%×1.15)",
+    }
+    return {
+        "ok": True,
+        "sort": sort_norm,
+        "sport": sport_norm,
+        "updated_at_kst": _fmt_kst(_now_kst()),
+        "summary_kpis": summary_kpis,
+        "podium": items[:3],
+        "items": items,
+    }
