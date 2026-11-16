@@ -1982,7 +1982,7 @@ def get_my_weekly_briefing(teams: str = Query(""), user_key: str = Query("guest"
             for m in matches_pool:
                 ht = str(m.get("home_team") or "")
                 at = str(m.get("away_team") or "")
-                if _team_matches([team_name], ht, at):
+                if _team_matches([team_name], f"{ht} {at}"):
                     matched = m
                     break
 
@@ -2032,7 +2032,7 @@ def get_my_weekly_briefing(teams: str = Query(""), user_key: str = Query("guest"
 
             if league not in injuries_cache:
                 try:
-                    injuries_cache[league] = get_injuries(league) or {}
+                    injuries_cache[league] = get_injuries(league, "all", "") or {}
                 except Exception:
                     injuries_cache[league] = {}
             inj_res = injuries_cache[league]
@@ -2079,7 +2079,7 @@ def get_my_weekly_briefing(teams: str = Query(""), user_key: str = Query("guest"
 
             if league not in odds_cache:
                 try:
-                    odds_cache[league] = _build_dropping_odds(league) or []
+                    odds_cache[league] = (get_dropping_odds("all", 5.0) or {}).get("items") or []
                 except Exception:
                     odds_cache[league] = []
             odds_note = ""
