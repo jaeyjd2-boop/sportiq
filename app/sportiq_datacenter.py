@@ -216,10 +216,10 @@ def _fetch_espn_scoreboard(league_code, date_offset=0):
             dt_kst = _parse_iso_to_kst(ev.get("date"))
             h_name = (home_c.get("team") or {}).get("shortDisplayName") or (home_c.get("team") or {}).get("displayName") or "Home"
             a_name = (away_c.get("team") or {}).get("shortDisplayName") or (away_c.get("team") or {}).get("displayName") or "Away"
-                if h_name == "Home":
-                    h_name = (home_c.get("athlete") or {}).get("shortName") or (home_c.get("athlete") or {}).get("displayName") or "Home"
-                if a_name == "Away":
-                    a_name = (away_c.get("athlete") or {}).get("shortName") or (away_c.get("athlete") or {}).get("displayName") or "Away"
+            if h_name == "Home":
+                h_name = (home_c.get("athlete") or {}).get("shortName") or (home_c.get("athlete") or {}).get("displayName") or "Home"
+            if a_name == "Away":
+                a_name = (away_c.get("athlete") or {}).get("shortName") or (away_c.get("athlete") or {}).get("displayName") or "Away"
             try:
                 h_score = int(float(home_c.get("score", 0) or 0))
             except Exception:
