@@ -1420,7 +1420,7 @@ def get_scorecard():
         return {"ok": False, "error": str(e), "updated_at_kst": _fmt_kst(_now_kst()), "summary": {}, "models": [], "recent_graded": [], "member_leaderboard": []}
 
 
-def _publish_daily_briefing(force=False):
+def _publish_daily_briefing(force: bool = False) -> bool:
     global _LAST_BRIEFING_DATE
     today = _now_kst().strftime("%Y-%m-%d")
     if not force and _LAST_BRIEFING_DATE == today:
@@ -1428,26 +1428,16 @@ def _publish_daily_briefing(force=False):
     try:
         now = _now_kst()
         today_md = now.strftime("%m.%d")
-        title = f"[\U0001f4ca 데이터센터 자동업로드] {today_md} 5종목 18리그 순위 · Elo 시즌예측 · 부상자 · 이적시장 브리핑"
-        sim_line = "EPL 시즌 예측: 실시간 Elo + Monte Carlo 5,000회 반영 중"
-        inj_line = "부상자 명단: 구단별 주요 결장자 실시간 추적 중"
-        content = f"[{today_md} SPORTIQ 데이터센터 브리핑]\\n- {sim_line}\\n- {inj_line}\\n- 해외 이적시장: 유럽 5대 리그 루머·오피셜 30분 주기 동기화\\n- 데이터센터 5개 탭에서 전체 18개 리그 상세 지표를 확인하세요."
-        try:
-            _do = _build_dropping_odds(_collect_all_matches(0), sport="all", min_drop=5.0).get("items", [])
-            if _do:
-                _top_do = _do[0]
-                content += f"\n- 📉 [오늘의 대표 드롭오즈] [{_top_do['league']}] {_top_do['home']} vs {_top_do['away']} ({_top_do['target_pick']} {_top_do['open_odds']}→{_top_do['curr_odds']}, {_top_do['drop_pct']}%)"
-       except Exception:
-            pass
-       conn = sqlite3.connect("/tmp/sportiq_lounge.db", timeout=5)
+        title = f"[📊 데이터센터 자동업로드] {today_md} 5종목 18리그 순위 · Elo 시즌예측 · 부상자 · 이적시장 브리핑"
+        content = chr(10).join([f"[{today_md} SPORTIQ 데이터센터 브리핑]", "- EPL 시즌 예측: 실시간 Elo + Monte Carlo 5,000회 반영 중", "- 부상자 명단: 구단별 주요 결장자 실시간 추적 중", "- 해외 이적시장: 유럽 5대 리그 루머·오피셜 30분 주기 동기화"])
+        conn = sqlite3.connect("/tmp/sportiq_lounge.db", timeout=5)
         cur = conn.cursor()
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='auto_analyst_posts'")
-        if cur.fetchone():
-            mk = f"datacenter-daily-{today}"
-            cur.execute("DELETE FROM auto_analyst_posts WHERE match_key = ?", (mk,))
-            tp = json.dumps(["실시간 18개 리그 순위·득점왕 자동 반영", "Elo + Monte Carlo 5,000회 우승·강등 확률 산출", "구단별 부상자·해외 이적시장 30분 주기 동기화"], ensure_ascii=False)
-            cur.execute("INSERT INTO auto_analyst_posts (run_date_kst, match_key, rank_num, is_summary, sport, league, badge_text, title, content, tactical_points, recommended_pick, confidence_score, sentiment_home_pct, sentiment_away_pct, sentiment_home_label, sentiment_away_label, hashtags, likes, created_at_kst) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (today, mk, 0, 1, "축구", "5종목 · 18리그", "\U0001f4ca 데이터센터 LIVE", title, content, tp, "데이터센터 5대 탭 실시간 브리핑", 89, 64, 36, "데이터 정배 우세", "부상·일정 변수 주의", "#데이터센터 #실시간순위 #AI시즌예측 #해외이적시장 #부상자명단", 15, _fmt_kst(now)))
-            conn.commit()
+        exists = cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='auto_analyst_posts'").fetchone()
+        mk = f"datacenter-daily-{today}"
+        exists and cur.execute("DELETE FROM auto_analyst_posts WHERE match_key = ?", (mk,))
+        tp = json.dumps(["실시간 18개 리그 순위·득점왕 자동 반영", "Elo + Monte Carlo 5,000회 우승·강등 확률 산출", "구단별 부상자·해외 이적시장 30분 주기 동기화"], ensure_ascii=False)
+        exists and cur.execute("INSERT INTO auto_analyst_posts (run_date_kst, match_key, rank_num, is_summary, sport, league, badge_text, title, content, tactical_points, recommended_pick, confidence_score, sentiment_home_pct, sentiment_away_pct, sentiment_home_label, sentiment_away_label, hashtags, likes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (today, mk, 0, 1, "축구", "5종목 · 18리그", "📊 데이터센터 LIVE", title, content, tp, "데이터센터 5대 탭 실시간 브리핑", 89, 64, 36, "데이터 정배 우세", "부상·일정 변수 주의", "#데이터센터 #실시간순위 #AI시즌예측 #해외이적시장 #부상자명단", 15, _fmt_kst(now)))
+        conn.commit()
         conn.close()
         _LAST_BRIEFING_DATE = today
         return True
