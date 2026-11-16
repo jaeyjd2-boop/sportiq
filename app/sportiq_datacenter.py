@@ -1562,7 +1562,7 @@ MYTEAM_ALIASES = {
     "LA 다저스": ["다저스", "dodgers", "오타니"],
     "LA 레이커스": ["레이커스", "lakers"],
     "골든스테이트": ["골든스테이트", "워리어스", "warriors"],
-    "LG 트윈스": ["lg 트윈스", "lg", "twins"],
+    "LG 트윈스": ["lg 트윈스", "lg트윈스", "lg twins"],
     "KIA 타이거즈": ["kia 타이거즈", "kia", "기아", "tigers"],
     "삼성 라이온즈": ["삼성 라이온즈", "삼성", "lions"],
     "현대캐피탈": ["현대캐피탈", "스카이워커스", "hyundai"],
@@ -1581,15 +1581,22 @@ def _team_matches(fav_list, text):
     if not fav_list or not text:
         return ""
     low_text = str(text).lower()
+    def _kw_in(kw_raw):
+        kw = str(kw_raw or "").strip().lower()
+        if not kw:
+            return False
+        if re.fullmatch(r"[a-z0-9]{1,3}", kw):
+            return bool(re.search(rf"(?<![a-z0-9]){re.escape(kw)}(?![a-z0-9])", low_text))
+        return kw in low_text
     for fav in fav_list:
         fav_str = str(fav or "").strip()
         if not fav_str:
             continue
-        if fav_str.lower() in low_text:
+        if _kw_in(fav_str):
             return fav_str
         aliases = MYTEAM_ALIASES.get(fav_str, [])
         for alias in aliases:
-            if alias.lower() in low_text:
+            if _kw_in(alias):
                 return fav_str
     return ""
 
@@ -1854,17 +1861,21 @@ def get_my_alerts(
         "odds": sum(1 for x in all_items if x["type"] == "odds"),
         "team_direct": sum(1 for x in all_items if x.get("is_team_hit")),
     }
-    filtered = (
-        [x for x in all_items if x["type"] == cat]
-        if cat in ("score", "injury", "odds")
-        else all_items
-    )
+    if cat in ("score", "injury", "odds"):
+        filtered = [x for x in all_items if x["type"] == cat][:40]
+    else:
+        odds_part = [x for x in all_items if x["type"] == "odds"][:20]
+        injury_part = [x for x in all_items if x["type"] == "injury"][:20]
+        score_part = [x for x in all_items if x["type"] == "score"][:25]
+        filtered = odds_part + injury_part + score_part
+        filtered.sort(key=lambda x: 0 if x.get("is_team_hit") else 1)
+        filtered = filtered[:65]
     return {
         "ok": True,
         "updated_at_kst": _fmt_kst(_now_kst()),
         "active_teams": active_teams,
         "active_sports": active_sports,
         "counts": counts,
-        "items": filtered[:40],
+        "items": filtered,
     }
 
