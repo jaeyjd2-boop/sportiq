@@ -2339,7 +2339,7 @@ def _ensure_sample_briefings_for_best() -> None:
         cnt = int(cnt_row[0] or 0) if cnt_row else 0
         if cnt >= 3:
             conn.close()
-                return
+            return
         
         now_kst = _now_kst()
         today_str = now_kst.strftime("%Y-%m-%d")
