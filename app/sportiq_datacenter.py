@@ -1042,7 +1042,7 @@ def _publish_daily_briefing(force=False):
         conn.close()
         _LAST_BRIEFING_DATE = today
         return True
-except Exception:
+    except Exception:
         return False
 def _bg_worker():
     while True:
