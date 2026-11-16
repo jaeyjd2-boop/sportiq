@@ -1,0 +1,23 @@
+name: Render Deploy Hook
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render API Deploy Hook
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: curl -fsS -X POST "$RENDER_DEPLOY_HOOK"
+
+      - name: Trigger Render Collector Deploy Hook
+        env:
+          RENDER_COLLECTOR_DEPLOY_HOOK: ${{ secrets.RENDER_COLLECTOR_DEPLOY_HOOK }}
+        run: |
+          if [ -n "$RENDER_COLLECTOR_DEPLOY_HOOK" ]; then
+            curl -fsS -X POST "$RENDER_COLLECTOR_DEPLOY_HOOK"
+          fi
