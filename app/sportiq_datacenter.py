@@ -2206,4 +2206,126 @@ async def share_briefing_to_feed(request: Request):
         return {"ok": True, "title": title, "nickname": nickname, "bonus_points": 10, "created_at_kst": created_at_kst}
     except Exception as e:
         return {"ok": False, "error": str(e)}
-        
+ from fastapi import Request
+from typing import Any, Dict
+
+def _init_briefing_votes_table() -> None:
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=10)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS datacenter_briefing_votes ("
+            "post_key TEXT PRIMARY KEY, "
+            "agree_cnt INTEGER NOT NULL DEFAULT 0, "
+            "oppose_cnt INTEGER NOT NULL DEFAULT 0, "
+            "base_agree_pct INTEGER NOT NULL DEFAULT 55, "
+            "updated_at TEXT NOT NULL)"
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def _reg_brief_votes_snap() -> None:
+    try:
+        from app.pg_snapshot import register_snapshot_table
+        register_snapshot_table("datacenter_briefing_votes", "post_key")
+    except Exception:
+        pass
+
+
+_reg_brief_votes_snap()
+
+
+def _safe_trigger_pg() -> None:
+    try:
+        from app.pg_snapshot import trigger_pg_snapshot
+        trigger_pg_snapshot()
+    except Exception:
+        pass
+
+@router.get("/briefing-votes")
+def get_briefing_votes() -> Dict[str, Any]:
+    try:
+        _init_briefing_votes_table()
+        conn = sqlite3.connect(DB_PATH, timeout=10)
+        rows = conn.execute(
+            "SELECT post_key, agree_cnt, oppose_cnt, base_agree_pct FROM datacenter_briefing_votes"
+        ).fetchall()
+        conn.close()
+        votes: Dict[str, Any] = {}
+        for post_key, agree_cnt, oppose_cnt, base_agree_pct in rows:
+            a_cnt = int(agree_cnt or 0)
+            o_cnt = int(oppose_cnt or 0)
+            b_pct = max(15, min(85, int(base_agree_pct or 55)))
+            base_agree = round(10 * b_pct / 100)
+            base_oppose = 10 - base_agree
+            disp_agree = base_agree + a_cnt
+            disp_oppose = base_oppose + o_cnt
+            total = max(1, disp_agree + disp_oppose)
+            agree_pct = round(disp_agree * 100 / total)
+            oppose_pct = 100 - agree_pct
+            votes[str(post_key)] = {"agree": disp_agree, "oppose": disp_oppose, "raw_agree": a_cnt, "raw_oppose": o_cnt, "agree_pct": agree_pct, "oppose_pct": oppose_pct, "total": total}
+        return {"ok": True, "votes": votes}
+    except Exception as exc:
+        return {"ok": False, "votes": {}, "error": str(exc)}
+
+@router.post("/briefing-votes")
+async def cast_briefing_vote(request: Request) -> Dict[str, Any]:
+    try:
+        _init_briefing_votes_table()
+        body = await request.json()
+        post_key = str(body.get("post_key") or "").strip()[:120]
+        side = str(body.get("side") or "").strip().lower()
+        prev_side = str(body.get("prev_side") or "").strip().lower()
+        base_pct = max(15, min(85, int(body.get("base_pct") or 55)))
+        if not post_key or side not in ("agree", "oppose"):
+            return {"ok": False, "error": "invalid post_key or side"}
+        now_str = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")
+        conn = sqlite3.connect(DB_PATH, timeout=10)
+        conn.execute(
+            "INSERT OR IGNORE INTO datacenter_briefing_votes (post_key, agree_cnt, oppose_cnt, base_agree_pct, updated_at) VALUES (?, 0, 0, ?, ?)",
+            (post_key, base_pct, now_str),
+        )
+        row = conn.execute(
+            "SELECT agree_cnt, oppose_cnt, base_agree_pct FROM datacenter_briefing_votes WHERE post_key = ?",
+            (post_key,),
+        ).fetchone()
+        agree_cnt = int(row[0] or 0) if row else 0
+        oppose_cnt = int(row[1] or 0) if row else 0
+        b_pct = max(15, min(85, int(row[2] or base_pct))) if row else base_pct
+        if prev_side == "agree":
+            agree_cnt = max(0, agree_cnt - 1)
+        elif prev_side == "oppose":
+            oppose_cnt = max(0, oppose_cnt - 1)
+        if side == "agree":
+            agree_cnt += 1
+        elif side == "oppose":
+            oppose_cnt += 1
+        conn.execute(
+            "UPDATE datacenter_briefing_votes SET agree_cnt = ?, oppose_cnt = ?, updated_at = ? WHERE post_key = ?",
+            (agree_cnt, oppose_cnt, now_str, post_key),
+        )
+        base_agree = round(10 * b_pct / 100)
+        base_oppose = 10 - base_agree
+        disp_agree = base_agree + agree_cnt
+        disp_oppose = base_oppose + oppose_cnt
+        total = max(1, disp_agree + disp_oppose)
+        agree_pct = round(disp_agree * 100 / total)
+        oppose_pct = 100 - agree_pct
+        has_posts = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='auto_analyst_posts'"
+        ).fetchone()
+        m = re.fullmatch(r"(?:post-)?(\d+)", post_key) if has_posts else None
+        if has_posts and m:
+            conn.execute("UPDATE auto_analyst_posts SET sentiment_home_pct = ?, sentiment_away_pct = ? WHERE id = ?", (agree_pct, oppose_pct, int(m.group(1))))
+        elif has_posts:
+            conn.execute("UPDATE auto_analyst_posts SET sentiment_home_pct = ?, sentiment_away_pct = ? WHERE match_key = ? OR title = ?", (agree_pct, oppose_pct, post_key, post_key))
+        conn.commit()
+        conn.close()
+        _safe_trigger_pg()
+        return {"ok": True, "post_key": post_key, "side": side, "agree": disp_agree, "oppose": disp_oppose, "agree_pct": agree_pct, "oppose_pct": oppose_pct, "total": total, "bonus_points": 5}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
