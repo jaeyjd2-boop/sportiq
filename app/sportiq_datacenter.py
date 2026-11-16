@@ -2398,7 +2398,7 @@ def get_best_briefings(sort: str = Query("hot"), limit: int = Query(3, ge=1, le=
             raw_content = str(row["content"] or "").strip()
             first_line = raw_content.splitlines()[0].strip() if raw_content else ""
             comment_preview = (first_line[:87] + "...") if len(first_line) > 90 else first_line
-            scored.append({"id": post_id, "post_key": str(post_id), "match_key": match_key, "sport": str(row["sport"] or ""), "league": str(row["league"] or ""), "badge_text": str(row["badge_text"] or ""), "title": title, "comment_preview": comment_preview, "recommended_pick": str(row["recommended_pick"] or ""), "likes": likes, "agree": disp_agree, "oppose": disp_oppose, "total_votes": total, "agree_pct": agree_pct, "oppose_pct": oppose_pct, "hot_score": hot_score, "created_at": str(row["created_at"] or "")})
+            scored.append({"id": post_id, "post_key": str(post_id), "match_key": match_key, "sport": str(row["sport"] or ""), "league": str(row["league"] or ""), "badge_text": str(row["badge_text"] or ""), "title": title, "comment_preview": comment_preview, "recommended_pick": str(row["recommended_pick"] or ""), "likes": likes, "agree": disp_agree, "oppose": disp_oppose, "total_votes": total, "agree_pct": agree_pct, "oppose_pct": oppose_pct, "hot_score": hot_score, "created_at": str(row["created_at_kst"] or "")})
         if sort_mode == "agree_pct":
             scored.sort(key=lambda x: (-x["agree_pct"], -x["total_votes"], -x["id"]))
         elif sort_mode == "votes":
