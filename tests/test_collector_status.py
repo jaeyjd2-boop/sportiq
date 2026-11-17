@@ -64,7 +64,7 @@ class CollectorStatusTests(unittest.TestCase):
         last = now - timedelta(hours=age_hours) if initialized else None
         rows = [{"job_name": "fixtures", "status": status, "result_count": 14,
                  "finished_at": now - timedelta(minutes=5)}] if initialized else []
-        fake = FakeEngine(rows, last, failures, initialized)
+        fake = FakeConnection(rows, last, failures, initialized)
         with patch("app.main.engine", FakeEngine(fake)):
             return collector_status()
 
