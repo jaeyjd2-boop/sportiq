@@ -600,7 +600,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "4.2",
+        "version": "4.3",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -620,6 +620,7 @@ def member_upgrade_status():
         "mobile_slim_dock_v15": True,
         "mobile_nav_auto_scroll_v16": True,
         "hybrid_seed_sanitation_v17": True,
+        "scrollbar_smooth_glide_v18": True,
     }
 
 
@@ -3481,9 +3482,9 @@ def inject_upgrade_into_html(raw_html: str) -> str:
             count=1,
             flags=re.IGNORECASE,
         )
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=17" defer></script>'
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=18" defer></script>'
     if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=17', out)
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=18', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
@@ -3563,9 +3564,14 @@ def _parse_match_kst_epoch(item: Dict[str, Any]) -> Optional[float]:
     if m_md:
         yr = now_kst.year
         mo, da, hh, mm = int(m_md.group(1)), int(m_md.group(2)), int(m_md.group(3)), int(m_md.group(4))
+        state_hint = " ".join(str(item.get(k) or "") for k in ("state", "status", "status_badge")).lower()
+        is_ended_hint = any(w in state_hint for w in ("post", "ft", "final", "ended", "aet", "종료", "경기종료"))
         try:
             cand = datetime(yr, mo, da, hh, mm, tzinfo=KST)
-            if (cand - now_kst).total_seconds() < -180 * 86400:
+            if is_ended_hint:
+                if (cand - now_kst).total_seconds() > 86400:
+                    cand = datetime(yr - 1, mo, da, hh, mm, tzinfo=KST)
+            elif (cand - now_kst).total_seconds() < -180 * 86400:
                 cand = datetime(yr + 1, mo, da, hh, mm, tzinfo=KST)
             return cand.timestamp()
         except ValueError:
@@ -3665,11 +3671,19 @@ def _is_seed_or_contradictory_match(m: Dict[str, Any], now_ts: Optional[float] =
     if "bo3" in state_raw and max(hs, as_) >= 2 and "진행" in state_raw:
         return True
 
-    # Check 5: Known hardcoded domestic fallback pairs without numeric live API ID
+    # Check 5: Stale finished historical seed matches (>36 hours in the past, e.g. 07.20 WC2026 AET, 10.29 MLB Final, 11.01 WNBA)
+    is_ended = any(w in state_raw for w in ("post", "ft", "final", "ended", "aet", "종료", "경기종료"))
+    if any(tag in lg for tag in ("WC2026", "MLB", "WNBA")) and cur_month in (11, 12, 1, 2):
+        if is_ended or is_live:
+            return True
+    if is_ended and ts is not None and (now_epoch - ts) > 36 * 3600:
+        return True
+
+    # Check 6: Known hardcoded domestic fallback pairs without numeric live API ID
     has_numeric_api_id = bool(re.fullmatch(r"\d{5,}", raw_id))
     if not has_numeric_api_id:
         for kw_a, kw_b in _KNOWN_SEED_PAIR_KEYWORDS:
-            if kw_a in matchup and kw_b in matchup and is_live:
+            if kw_a in matchup and kw_b in matchup and (is_live or is_ended):
                 return True
 
     return False
@@ -3772,7 +3786,7 @@ def sort_matches_nearest_recent(items: List[Any]) -> List[Any]:
         )
         is_post = (not is_sched) and (
             state_raw.strip() in ("post", "ft", "final", "ended")
-            or any(w in state_raw for w in ("종료", "final", "ft", "경기종료"))
+            or any(w in state_raw for w in ("종료", "final", "ft", "aet", "경기종료"))
         )
         my_tie = 0 if m.get("is_my_team") else 1
 
@@ -4460,6 +4474,7 @@ P3_AND_CHRONO_JS = r"""
     var txt = String(s || "");
     var now = new Date();
     var yr = now.getFullYear();
+    var isEndedHint = /\bFT\b|\bFinal\b|\bAET\b|종료|경기종료/i.test(txt);
 
     var iso = txt.match(/(20\d{2})[.\-\/](\d{1,2})[.\-\/](\d{1,2})[^\d]{0,14}?(\d{1,2}):(\d{2})/);
     if (iso) {
@@ -4469,8 +4484,10 @@ P3_AND_CHRONO_JS = r"""
     if (md) {
       var mo = Number(md[1]), da = Number(md[2]), hh = Number(md[3]), mm = Number(md[4]);
       var t = new Date(yr, mo - 1, da, hh, mm).getTime();
-      if (t - now.getTime() < -180 * 86400 * 1000) {
+      if (!isEndedHint && (t - now.getTime() < -180 * 86400 * 1000)) {
         t = new Date(yr + 1, mo - 1, da, hh, mm).getTime();
+      } else if (isEndedHint && (t - now.getTime() > 86400 * 1000)) {
+        t = new Date(yr - 1, mo - 1, da, hh, mm).getTime();
       }
       return t;
     }
@@ -4485,9 +4502,12 @@ P3_AND_CHRONO_JS = r"""
 
   function computeMatchOrderTuple(statusText, epochMs, fallbackIdx) {
     var st = String(statusText || "");
+    if (st.indexOf("최근 시즌 기록") !== -1 || st.indexOf("시즌 기록 · 종료") !== -1) {
+      return { bucket: 8, key: fallbackIdx };
+    }
     var isScheduled = /Scheduled|예정/i.test(st) || /^\s*pre\s*$/i.test(st);
-    var isLive = !isScheduled && (/\bLIVE\b|^\s*in\s*$|진행중|전반|후반|\bHT\b|\bQ[1-4]\b|회초|회말|세트/i.test(st));
-    var isEnded = !isScheduled && (/\bFT\b|\bFinal\b|^\s*post\s*$|종료|경기종료/i.test(st));
+    var isEnded = !isScheduled && (/\bFT\b|\bFinal\b|\bAET\b|^\s*post\s*$|종료|경기종료/i.test(st));
+    var isLive = !isScheduled && !isEnded && (/\bLIVE\b|^\s*in\s*$|진행중|전반|후반|\bHT\b|\bQ[1-4]\b|회초|회말|세트/i.test(st));
 
     if (matchSortMode === "DESC") {
       if (isLive) return { bucket: 0, key: -(epochMs != null ? epochMs : Date.now()) };
@@ -4560,6 +4580,99 @@ P3_AND_CHRONO_JS = r"""
     };
   }
 
+  // Inject sleek dark horizontal scrollbar CSS so there is never an ugly bright white OS scrollbar
+  (function injectSmoothStripCss() {
+    if (document.getElementById("sqSmoothStripV18Css")) return;
+    var ss = document.createElement("style");
+    ss.id = "sqSmoothStripV18Css";
+    ss.textContent = [
+      ".sq-smooth-hstrip {",
+      "  scrollbar-width: thin !important;",
+      "  scrollbar-color: #38bdf8 #0f172a !important;",
+      "  -webkit-overflow-scrolling: touch !important;",
+      "  padding-bottom: 8px !important;",
+      "}",
+      ".sq-smooth-hstrip::-webkit-scrollbar {",
+      "  height: 9px !important;",
+      "}",
+      ".sq-smooth-hstrip::-webkit-scrollbar-track {",
+      "  background: #0b1220 !important;",
+      "  border-radius: 999px !important;",
+      "  border: 1px solid #1e293b !important;",
+      "}",
+      ".sq-smooth-hstrip::-webkit-scrollbar-thumb {",
+      "  background: linear-gradient(90deg, #0284c7, #10b981) !important;",
+      "  border-radius: 999px !important;",
+      "  cursor: grab !important;",
+      "}",
+      ".sq-smooth-hstrip::-webkit-scrollbar-thumb:active {",
+      "  cursor: grabbing !important;",
+      "  background: #38bdf8 !important;",
+      "}",
+      ".sq-strip-nav-btn {",
+      "  background: #0f172a !important;",
+      "  border: 1px solid #38bdf8 !important;",
+      "  color: #e0f2fe !important;",
+      "  border-radius: 8px !important;",
+      "  padding: 2px 9px !important;",
+      "  font-size: 11.5px !important;",
+      "  font-weight: 900 !important;",
+      "  cursor: pointer !important;",
+      "  transition: filter .14s ease, transform .12s ease !important;",
+      "}",
+      ".sq-strip-nav-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }"
+    ].join("\n");
+    document.head.appendChild(ss);
+  })();
+
+  var globalPointerDown = false;
+  window.addEventListener("mousedown", function () { globalPointerDown = true; }, { passive: true, capture: true });
+  window.addEventListener("mouseup", function () { globalPointerDown = false; }, { passive: true, capture: true });
+  window.addEventListener("touchstart", function () { globalPointerDown = true; }, { passive: true, capture: true });
+  window.addEventListener("touchend", function () { globalPointerDown = false; }, { passive: true, capture: true });
+
+  function bindSmoothHorizontalControls(stripEl) {
+    if (!stripEl || stripEl.__sqStripControlsBound) return;
+    stripEl.__sqStripControlsBound = true;
+    stripEl.classList.add("sq-smooth-hstrip");
+    stripEl.__sqBusyUntil = 0;
+
+    function markStripBusy(ms) {
+      stripEl.__sqBusyUntil = Math.max(stripEl.__sqBusyUntil || 0, Date.now() + (ms || 2500));
+    }
+
+    stripEl.addEventListener("scroll", function () { markStripBusy(2600); }, { passive: true });
+    stripEl.addEventListener("mouseenter", function () { stripEl.__sqMouseInside = true; }, { passive: true });
+    stripEl.addEventListener("mouseleave", function () { stripEl.__sqMouseInside = false; }, { passive: true });
+    stripEl.addEventListener("pointerdown", function () { markStripBusy(4000); }, { passive: true });
+    stripEl.addEventListener("touchstart", function () { markStripBusy(4000); }, { passive: true });
+
+    // Allow desktop mouse wheel over the horizontal card strip to glide smoothly left/right!
+    stripEl.addEventListener("wheel", function (ev) {
+      if (stripEl.scrollWidth <= stripEl.clientWidth + 12) return;
+      var dy = ev.deltaY || 0;
+      var dx = ev.deltaX || 0;
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 0) {
+        var atStart = stripEl.scrollLeft <= 1 && dy < 0;
+        var atEnd = (stripEl.scrollLeft + stripEl.clientWidth >= stripEl.scrollWidth - 2) && dy > 0;
+        if (!atStart && !atEnd) {
+          ev.preventDefault();
+          markStripBusy(2600);
+          stripEl.scrollLeft += dy;
+        }
+      }
+    }, { passive: false });
+  }
+
+  function isStripUserInteracting(stripEl) {
+    if (!stripEl) return false;
+    if (globalPointerDown) return true;
+    if (stripEl.__sqMouseInside) return true;
+    if (stripEl.__sqBusyUntil && Date.now() < stripEl.__sqBusyUntil) return true;
+    return false;
+  }
+  window.__sqIsStripUserInteracting = isStripUserInteracting;
+
   function sortRenderedMatchCardStrips(forceResort) {
     document.querySelectorAll("div, section, ul").forEach(function (container) {
       if (!container.children || container.children.length < 2 || container.children.length > 500) return;
@@ -4568,18 +4681,29 @@ P3_AND_CHRONO_JS = r"""
       var matchLikeCount = 0;
       kids.forEach(function (ch) {
         var t = ch.textContent || "";
-        if (parseMatchEpochFromText(t) != null && (/Scheduled|예정|종료|LIVE|배당|스코어|vs/i.test(t))) {
+        if ((parseMatchEpochFromText(t) != null || t.indexOf("최근 시즌 기록") !== -1) && (/Scheduled|예정|종료|Final|AET|LIVE|배당|스코어|vs/i.test(t))) {
           matchLikeCount++;
         }
       });
       if (matchLikeCount < 2 || matchLikeCount < Math.ceil(kids.length * 0.4)) return;
 
+      bindSmoothHorizontalControls(container);
       mountSortToggleAboveStrip(container);
+
+      // CRITICAL: Never reorder DOM nodes while user is hovering, dragging scrollbar, or scrolling!
+      if (!forceResort && isStripUserInteracting(container)) return;
+
+      // Compute content fingerprint so we only sort ONCE per data update (zero repeated DOM churn!)
+      var firstTxt = (kids[0].textContent || "").slice(0, 48);
+      var lastTxt = (kids[kids.length - 1].textContent || "").slice(0, 48);
+      var sig = matchSortMode + "|" + kids.length + "|" + firstTxt + "|" + lastTxt;
+      if (!forceResort && container.__sqSortedSig === sig) return;
 
       var decorated = kids.map(function (el, idx) {
         var t = el.textContent || "";
-        var ep = parseMatchEpochFromText(t);
-        var ord = computeMatchOrderTuple(t, ep, idx);
+        var isSeedArch = el.getAttribute("data-sq-seed-archive") === "1" || t.indexOf("최근 시즌 기록") !== -1;
+        var ep = isSeedArch ? null : parseMatchEpochFromText(t);
+        var ord = isSeedArch ? { bucket: 8, key: idx } : computeMatchOrderTuple(t, ep, idx);
         var isMy = /⭐\s*MY\b/.test(t) ? 0 : 1;
         return { el: el, idx: idx, isMy: isMy, bucket: ord.bucket, key: ord.key };
       });
@@ -4597,11 +4721,15 @@ P3_AND_CHRONO_JS = r"""
           if (sorted[i].el !== kids[i]) { changed = true; break; }
         }
       }
-      if (!changed) return;
-
-      var prevScrollLeft = container.scrollLeft || 0;
-      sorted.forEach(function (item) { container.appendChild(item.el); });
-      container.scrollLeft = forceResort ? 0 : prevScrollLeft;
+      if (changed) {
+        var prevScrollLeft = container.scrollLeft || 0;
+        sorted.forEach(function (item) { container.appendChild(item.el); });
+        container.scrollLeft = forceResort ? 0 : prevScrollLeft;
+      }
+      var newKids = container.children;
+      container.__sqSortedSig = matchSortMode + "|" + newKids.length + "|" +
+        ((newKids[0] && newKids[0].textContent) || "").slice(0, 48) + "|" +
+        ((newKids[newKids.length - 1] && newKids[newKids.length - 1].textContent) || "").slice(0, 48);
     });
   }
 
@@ -4610,13 +4738,29 @@ P3_AND_CHRONO_JS = r"""
     if (stripEl.parentNode.querySelector(".sq-match-sort-bar")) return;
     var bar = document.createElement("div");
     bar.className = "sq-match-sort-bar";
-    bar.style.cssText = "display:flex;justify-content:flex-end;align-items:center;gap:6px;margin:0 0 6px 0;font-size:11px;color:#94a3b8;";
+    bar.style.cssText = "display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin:0 0 7px 0;font-size:11px;color:#94a3b8;";
     bar.innerHTML = [
-      "<span>시간·날짜 정렬:</span>",
-      "<button type='button' data-sq-msort='NEAREST' class='dc-pill' style='padding:2px 9px;font-size:11px;font-weight:800;'>🕒 가까운·최근 시간순</button>",
-      "<button type='button' data-sq-msort='DESC' class='dc-pill' style='padding:2px 9px;font-size:11px;font-weight:800;'>📅 최신 날짜순</button>"
+      "<div style='display:inline-flex;align-items:center;gap:5px;'>",
+      "  <button type='button' data-sq-slide='-1' class='sq-strip-nav-btn' title='왼쪽 경기로 이동'>◀ 이전</button>",
+      "  <button type='button' data-sq-slide='1' class='sq-strip-nav-btn' title='오른쪽 경기로 이동'>다음 ▶</button>",
+      "  <span style='font-size:10.5px;color:#64748b;margin-left:2px;'>마우스 휠·슬라이드 지원</span>",
+      "</div>",
+      "<div style='display:inline-flex;align-items:center;gap:6px;'>",
+      "  <span>시간·날짜 정렬:</span>",
+      "  <button type='button' data-sq-msort='NEAREST' class='dc-pill' style='padding:2px 9px;font-size:11px;font-weight:800;'>🕒 가까운·최근 시간순</button>",
+      "  <button type='button' data-sq-msort='DESC' class='dc-pill' style='padding:2px 9px;font-size:11px;font-weight:800;'>📅 최신 날짜순</button>",
+      "</div>"
     ].join("");
     stripEl.parentNode.insertBefore(bar, stripEl);
+
+    bar.querySelectorAll("[data-sq-slide]").forEach(function (sb) {
+      sb.onclick = function () {
+        var dir = Number(sb.getAttribute("data-sq-slide") || 1);
+        var step = Math.max(280, Math.round((stripEl.clientWidth || 640) * 0.72));
+        stripEl.__sqBusyUntil = Date.now() + 3000;
+        stripEl.scrollBy({ left: dir * step, behavior: "smooth" });
+      };
+    });
 
     function syncBtnStyle() {
       bar.querySelectorAll("[data-sq-msort]").forEach(function (b) {
@@ -7299,17 +7443,17 @@ MOBILE_NAV_ENHANCER_V16_JS = r"""
 """
 
 UPGRADE_JS = UPGRADE_JS + "\n" + MOBILE_NAV_ENHANCER_V16_JS
+
 # ============================================================================
-# STAGE P10 (v4.2 / ?v=17): Frontend Hybrid Seed Filter (Plan 1 + Plan 2)
-#   - Plan 1: Hides fake-date/seed archive cards when '오늘·실시간' + '전체 종목' (or Dropping Odds) is active
-#   - Plan 2: Shows them as clean '[시즌 기록 · 종료]' gray reference cards (without fake LIVE or fake today date)
-#             ONLY when the user clicks a specific sport/league tab (e.g., 야구/KBO, 배구/V-리그, E스포츠/LCK)!
+# STAGE P10 (v4.3 / ?v=18): Zero-Jitter Hybrid Seed Filter (Plan 1 + Plan 2)
+#   - Catches both fake-LIVE seeds AND stale finished historical seeds (>36h old: WC2026 07.20 AET, MLB 10.29 Final, WNBA 11.01)
+#   - Never calls appendChild() in a loop -> 0% scrollbar release, 0% screen jitter!
 # ============================================================================
 HYBRID_SEED_GUARD_V17_JS = r"""
-/* SportIQ v17.0: Hybrid Seed Match Sanitizer & Context-Aware Filter (Plan 1 + Plan 2) */
+/* SportIQ v18.0: Zero-Jitter Hybrid Seed Match Sanitizer & Stale Archive Filter */
 (function () {
-  if (window.__SPORTIQ_V17_HYBRID_SEED__) return;
-  window.__SPORTIQ_V17_HYBRID_SEED__ = true;
+  if (window.__SPORTIQ_V18_HYBRID_SEED__) return;
+  window.__SPORTIQ_V18_HYBRID_SEED__ = true;
 
   var KNOWN_SEED_PAIRS = [
     ["한화생명", "dk"],
@@ -7319,11 +7463,14 @@ HYBRID_SEED_GUARD_V17_JS = r"""
     ["ibk기업은행", "흥국생명"],
     ["정관장", "현대건설"],
     ["lg 트윈스", "삼성 라이온즈"],
-    ["울산", "포항"]
+    ["울산", "포항"],
+    ["spain", "argentina"],
+    ["rays", "brewers"],
+    ["valkyries", "dream"]
   ];
 
   var st = document.createElement("style");
-  st.id = "sqSeedArchiveV17Css";
+  st.id = "sqSeedArchiveV18Css";
   st.textContent = [
     ".sq-seed-archive-card {",
     "  opacity: 0.78 !important;",
@@ -7341,12 +7488,15 @@ HYBRID_SEED_GUARD_V17_JS = r"""
   ].join("\n");
   document.head.appendChild(st);
 
-  function parseCardKickoffTodayOrFutureMs(txt) {
+  function parseCardDateSameYearMs(txt) {
     var s = String(txt || "");
     var now = new Date();
     var md = s.match(/(\d{1,2})\.(\d{1,2})\s*(?:\([^)]*\))?\s*(\d{1,2}):(\d{2})/);
     if (!md) return null;
     var t = new Date(now.getFullYear(), Number(md[1]) - 1, Number(md[2]), Number(md[3]), Number(md[4])).getTime();
+    if (t - now.getTime() > 180 * 86400 * 1000) {
+      t = new Date(now.getFullYear() - 1, Number(md[1]) - 1, Number(md[2]), Number(md[3]), Number(md[4])).getTime();
+    }
     return t;
   }
 
@@ -7361,14 +7511,14 @@ HYBRID_SEED_GUARD_V17_JS = r"""
     }
 
     var low = txt.toLowerCase();
-    var hasLiveClaim = /진행중|진행 중|bo3\s*\d세트|\d세트\s*진행|\d회[초말]\s*진행|\bLIVE\b/i.test(txt);
-    if (!hasLiveClaim) return false;
-
     var now = new Date();
     var mo = now.getMonth() + 1;
     var da = now.getDate();
 
-    // 1. Off-season KBO / LCK claiming live today
+    // 1. Off-season / historical tournament tags (WC2026 07.20, MLB 10.29, WNBA 11.01, KBO, LCK in Nov~Feb)
+    if (/\b(?:WC2026|WNBA|MLB)\b/.test(txt) && (mo >= 11 || mo <= 2)) {
+      return true;
+    }
     if ((/\bKBO\b/.test(txt) || (low.indexOf("트윈스") !== -1 && low.indexOf("라이온즈") !== -1)) && (mo === 12 || mo <= 2 || (mo === 11 && da >= 10))) {
       return true;
     }
@@ -7376,25 +7526,31 @@ HYBRID_SEED_GUARD_V17_JS = r"""
       return true;
     }
 
-    // 2. Kickoff time is still >20 minutes in the future OR >7 hours in the past while claiming '진행중'
-    var koMs = parseCardKickoffTodayOrFutureMs(txt);
-    if (koMs != null) {
+    var koMs = parseCardDateSameYearMs(txt);
+    var isEnded = /\bFT\b|\bFinal\b|\bAET\b|종료|경기종료/i.test(txt);
+    var hasLiveClaim = !isEnded && (/진행중|진행 중|bo3\s*\d세트|\d세트\s*진행|\d회[초말]\s*진행|\bLIVE\b/i.test(txt));
+
+    // 2. Finished match older than 36 hours sitting inside today's live-score strip
+    if (isEnded && koMs != null && (now.getTime() - koMs > 36 * 3600 * 1000)) {
+      return true;
+    }
+
+    // 3. Kickoff time contradiction while claiming '진행중'
+    if (hasLiveClaim && koMs != null) {
       if (koMs - now.getTime() > 20 * 60 * 1000) return true;
       if (now.getTime() - koMs > 7 * 3600 * 1000) return true;
     }
 
-    // 3. Known hardcoded domestic seed pairs
+    // 4. Known hardcoded seed pairs
     for (var i = 0; i < KNOWN_SEED_PAIRS.length; i++) {
-      if (low.indexOf(KNOWN_SEED_PAIRS[i][0]) !== -1 && low.indexOf(KNOWN_SEED_PAIRS[i][1]) !== -1) {
+      if (low.indexOf(KNOWN_SEED_PAIRS[i][0]) !== -1 && low.indexOf(KNOWN_SEED_PAIRS[i][1]) !== -1 && (hasLiveClaim || isEnded)) {
         return true;
       }
     }
     return false;
   }
 
-  // Detect whether the user currently has '전체 종목 (ALL)' selected or a specific sport/league tab (축구/야구/배구/E스포츠...)
   function isSpecificSportFilterSelected(stripEl) {
-    // Check global JS state variables if sportiq_community.html exposes them
     try {
       var candVars = ["dcActiveSport", "currentSport", "activeSportFilter", "selectedSport"];
       for (var i = 0; i < candVars.length; i++) {
@@ -7405,18 +7561,15 @@ HYBRID_SEED_GUARD_V17_JS = r"""
       }
     } catch (e) {}
 
-    // Inspect active sport filter pill buttons near the live-score section
     var scope = (stripEl && stripEl.closest("section")) || document;
     var buttons = scope.querySelectorAll("button, [role='tab']");
     for (var j = 0; j < buttons.length; j++) {
       var b = buttons[j];
       var t = (b.textContent || "").replace(/\s+/g, " ").trim();
-      if (!t || t.length > 18) continue;
-      // Sport filter tabs typically say 전체 / 축구 / 농구 / 야구 / 배구 / 하키 / E스포츠 / UFC
+      if (!t || t.length > 22) continue;
       if (/^(?:⚽|🏀|⚾|🏐|🏒|🎮|🥊)?\s*(?:야구|배구|E스포츠|하키|미식축구|UFC|테니스|KBO|V-?리그|LCK)/i.test(t)) {
         var cls = (b.className || "") + " " + (b.getAttribute("aria-selected") || "");
         var bg = window.getComputedStyle ? window.getComputedStyle(b).backgroundColor : "";
-        var borderCol = window.getComputedStyle ? window.getComputedStyle(b).borderColor : "";
         var isActive = /\bactive\b|bg-sky|bg-emerald|bg-cyan|bg-blue|border-sky|border-emerald|text-sky-300|true/i.test(cls) ||
           (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "rgb(15, 23, 42)" && bg !== "rgb(2, 6, 23)" && bg !== "rgb(30, 41, 59)");
         if (isActive) return true;
@@ -7431,7 +7584,6 @@ HYBRID_SEED_GUARD_V17_JS = r"""
     cardEl.setAttribute("data-sq-seed-cleaned", "1");
     cardEl.classList.add("sq-seed-archive-card");
 
-    // 1. Replace fake today date ('📅 11.18 (수) 19:00') with '📌 최근 시즌 기록'
     var walker = document.createTreeWalker(cardEl, NodeFilter.SHOW_TEXT, null, false);
     var n;
     while ((n = walker.nextNode())) {
@@ -7441,30 +7593,33 @@ HYBRID_SEED_GUARD_V17_JS = r"""
       }
     }
 
-    // 2. Replace red '3세트 진행중' / '7회말 진행중' / 'Bo3 2세트' badge with neutral '시즌 기록 · 종료'
     cardEl.querySelectorAll("span, div").forEach(function (badge) {
       if (badge.children && badge.children.length > 1) return;
       var bt = (badge.textContent || "").replace(/\s+/g, " ").trim();
-      if (/^(?:Bo\d\s*\d세트|\d세트\s*진행\s*중?|\d회[초말]\s*진행\s*중?|LIVE|진행\s*중)$/i.test(bt)) {
+      if (/^(?:Bo\d\s*\d세트|\d세트\s*진행\s*중?|\d회[초말]\s*진행\s*중?|LIVE|진행\s*중|Final|AET|FT)$/i.test(bt)) {
         badge.textContent = "시즌 기록 · 종료";
         badge.className = "sq-seed-archive-pill";
       }
-      // Hide misleading '-21.1%' dropping-odds circle on static seed archive cards
       if (/^📉?\s*-\d+(?:\.\d+)?%$/.test(bt) || (bt.indexOf("-") !== -1 && bt.indexOf("%") !== -1 && bt.length <= 10)) {
-        badge.style.display = "none";
+        if (badge.style.display !== "none") badge.style.display = "none";
       }
     });
   }
 
-  function enforceHybridSeedPolicyOnDom() {
+  function enforceHybridSeedPolicyOnDom(forceRun) {
     document.querySelectorAll("div, section, ul").forEach(function (container) {
       if (!container.children || container.children.length < 2 || container.children.length > 500) return;
       if (container.id === "feedList" || container.id === "dcLauncherGrid" || container.id === "globalTop10Grid") return;
 
+      // Never touch DOM while user is scrolling/dragging the strip!
+      if (!forceRun && typeof window.__sqIsStripUserInteracting === "function" && window.__sqIsStripUserInteracting(container)) {
+        return;
+      }
+
       var kids = Array.prototype.slice.call(container.children);
       var matchCards = kids.filter(function (ch) {
         var t = ch.textContent || "";
-        return /Scheduled|예정|종료|진행|LIVE|배당|최근 시즌 기록/i.test(t) && (t.indexOf("AI ") !== -1 || t.indexOf("배당") !== -1 || /:\d/.test(t));
+        return /Scheduled|예정|종료|Final|AET|진행|LIVE|배당|최근 시즌 기록/i.test(t) && (t.indexOf("AI ") !== -1 || t.indexOf("배당") !== -1 || /:\d/.test(t));
       });
       if (matchCards.length < 2) return;
 
@@ -7483,27 +7638,26 @@ HYBRID_SEED_GUARD_V17_JS = r"""
 
       if (!seedCards.length) return;
 
+      var shouldHideSeeds = (!specificSportTab && realCount > 0);
+      var desiredDisplay = shouldHideSeeds ? "none" : "";
+
       seedCards.forEach(function (sc) {
-        if (!specificSportTab && realCount > 0) {
-          // Plan 1: In '오늘·실시간' (All Sports), completely hide seed cards so only 100% real matches show!
-          sc.style.display = "none";
-        } else {
-          // Plan 2: In a specific sport tab (e.g., KBO / V-League / LCK), show cleanly at the end as '[시즌 기록 · 종료]'!
-          sc.style.display = "";
-          container.appendChild(sc);
+        // Only mutate style.display if it actually differs, and NEVER call appendChild() in an interval!
+        if (sc.style.display !== desiredDisplay) {
+          sc.style.display = desiredDisplay;
         }
       });
     });
   }
 
-  // Re-run immediately whenever any filter pill / tab button is clicked
-  document.addEventListener("click", function () {
-    setTimeout(enforceHybridSeedPolicyOnDom, 40);
-    setTimeout(enforceHybridSeedPolicyOnDom, 220);
+  document.addEventListener("click", function (ev) {
+    var t = ev.target;
+    if (t && t.closest && t.closest(".sq-strip-nav-btn")) return;
+    setTimeout(function () { enforceHybridSeedPolicyOnDom(true); }, 60);
   }, true);
 
-  setTimeout(enforceHybridSeedPolicyOnDom, 150);
-  setInterval(enforceHybridSeedPolicyOnDom, 850);
+  setTimeout(function () { enforceHybridSeedPolicyOnDom(true); }, 140);
+  setInterval(function () { enforceHybridSeedPolicyOnDom(false); }, 1400);
 })();
 """
 
