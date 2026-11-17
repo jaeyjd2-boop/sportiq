@@ -600,7 +600,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "3.5",
+        "version": "3.6",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -613,6 +613,7 @@ def member_upgrade_status():
         "ai_iq_online_search": True,
         "header_tagline": "실시간 분석 스포츠IQ 인사이트",
         "odds_alert_off_toggle": True,
+        "iq_live_tv_tab": "https://jjangdoltv.com/",
     }
 
 
@@ -3466,9 +3467,9 @@ def inject_upgrade_into_html(raw_html: str) -> str:
         if h_idx != -1:
             out = out[:h_idx] + pwa_head + "\n" + out[h_idx:]
 
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=10" defer></script>'
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=11" defer></script>'
     if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=10', out)
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=11', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
@@ -6070,3 +6071,185 @@ ODDS_ALERT_TOGGLE_JS = r"""
 """
 
 UPGRADE_JS = UPGRADE_JS + "\n" + ODDS_ALERT_TOGGLE_JS
+# ============================================================================
+# STAGE P6 (v3.6 / ?v=11): "📺 IQ중계티비" Floating Tab (Above AI 아이큐) -> 짱돌티비 바로가기
+# ============================================================================
+IQ_LIVE_TV_JS = r"""
+/* SportIQ v11.0: 'IQ중계티비' Floating Tab Above 'AI 아이큐' + 짱돌티비 바로가기 Modal */
+(function () {
+  if (window.__SPORTIQ_V11_IQ_TV__) return;
+  window.__SPORTIQ_V11_IQ_TV__ = true;
+
+  var JJANGDOL_URL = "https://jjangdoltv.com/";
+
+  var st = document.createElement("style");
+  st.id = "sqIqLiveTvCss";
+  st.textContent = [
+    ".sq-iq-tv-fab {",
+    "  position: fixed;",
+    "  right: 20px;",
+    "  bottom: 76px;",
+    "  z-index: 9996;",
+    "  background: linear-gradient(135deg, #06b6d4, #10b981);",
+    "  color: #020617;",
+    "  border: 0;",
+    "  border-radius: 999px;",
+    "  padding: 11px 20px;",
+    "  font-size: 14px;",
+    "  font-weight: 900;",
+    "  cursor: pointer;",
+    "  display: inline-flex;",
+    "  align-items: center;",
+    "  justify-content: center;",
+    "  gap: 7px;",
+    "  box-shadow: 0 10px 28px rgba(6, 182, 212, .42);",
+    "  transition: transform .16s ease, filter .16s ease;",
+    "  letter-spacing: -0.2px;",
+    "  white-space: nowrap;",
+    "}",
+    ".sq-iq-tv-fab:hover { transform: translateY(-2px) scale(1.02); filter: brightness(1.06); }",
+    ".sq-jjangdol-cta {",
+    "  display: flex;",
+    "  align-items: center;",
+    "  justify-content: center;",
+    "  gap: 8px;",
+    "  width: 100%;",
+    "  background: linear-gradient(135deg, #06b6d4, #10b981);",
+    "  color: #020617 !important;",
+    "  text-decoration: none !important;",
+    "  border-radius: 13px;",
+    "  padding: 14px 18px;",
+    "  font-size: 15.5px;",
+    "  font-weight: 900;",
+    "  box-shadow: 0 10px 26px rgba(16, 185, 129, .32);",
+    "  transition: transform .15s ease, filter .15s ease;",
+    "}",
+    ".sq-jjangdol-cta:hover { transform: translateY(-1px); filter: brightness(1.06); }"
+  ].join("\n");
+  document.head.appendChild(st);
+
+  function findAiIqFloatingButton() {
+    var byId = document.getElementById("sqAiIqFloatingFab");
+    if (byId) return byId;
+    var cands = document.querySelectorAll("button, a, div[role='button']");
+    for (var i = 0; i < cands.length; i++) {
+      var el = cands[i];
+      if (!el || el.id === "sqIqTvFloatingFab" || el.id === "sqFeedAiIqBtn" || el.id === "sqFeedIqTvBtn") continue;
+      if (el.closest("#sqAiIqModal") || el.closest("#sqIqTvModal")) continue;
+      var txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (txt.length <= 28 && (txt.indexOf("AI 아이큐") !== -1 || txt.indexOf("AI아이큐") !== -1)) {
+        var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+        if (cs && cs.position === "fixed") return el;
+      }
+    }
+    return null;
+  }
+
+  function alignIqTvAboveAiIq(tvFab) {
+    if (!tvFab) return;
+    var aiBtn = findAiIqFloatingButton();
+    if (!aiBtn || !aiBtn.getBoundingClientRect) return;
+    var rect = aiBtn.getBoundingClientRect();
+    if (rect.width < 40 || rect.height < 24) return;
+    var viewportW = window.innerWidth || document.documentElement.clientWidth || 1280;
+    var viewportH = window.innerHeight || document.documentElement.clientHeight || 800;
+    var computedRight = Math.max(12, Math.round(viewportW - rect.right));
+    var computedBottom = Math.max(64, Math.round(viewportH - rect.top + 10));
+    tvFab.style.right = computedRight + "px";
+    tvFab.style.bottom = computedBottom + "px";
+    tvFab.style.minWidth = Math.round(rect.width) + "px";
+    var aiZ = parseInt((window.getComputedStyle(aiBtn).zIndex || "9995"), 10);
+    if (!isNaN(aiZ) && aiZ > 0) {
+      tvFab.style.zIndex = String(aiZ);
+    }
+  }
+
+  function buildIqTvModalIfNeeded() {
+    var m = document.getElementById("sqIqTvModal");
+    if (m) return m;
+
+    m = document.createElement("div");
+    m.id = "sqIqTvModal";
+    m.className = "sq-modal-backdrop";
+    m.style.zIndex = "100060";
+    m.innerHTML = [
+      "<div class='sq-modal-panel' style='max-width:440px;padding:22px;border-color:rgba(6,182,212,.55);'>",
+      "  <div style='display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;'>",
+      "    <div style='display:flex;align-items:center;gap:8px;'>",
+      "      <span style='background:linear-gradient(135deg,#06b6d4,#10b981);color:#020617;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:900;'>📺 IQ중계티비</span>",
+      "      <h3 style='margin:0;font-size:16.5px;font-weight:900;color:#f8fafc;'>실시간 스포츠 중계 안내</h3>",
+      "    </div>",
+      "    <button type='button' id='sqCloseIqTvModalBtn' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:800;'>✕ 닫기 (Esc)</button>",
+      "  </div>",
+      "  <div style='background:linear-gradient(145deg,rgba(6,182,212,.12),rgba(15,23,42,.98));border:1px solid rgba(56,189,248,.35);border-radius:15px;padding:18px;text-align:center;'>",
+      "    <div style='font-size:15px;font-weight:900;color:#f8fafc;margin-bottom:6px;'>⚡ 전 종목 고화질 실시간 라이브 중계</div>",
+      "    <div style='font-size:12.5px;color:#94a3b8;line-height:1.6;margin-bottom:16px;'>해외축구 · 야구 · 농구 · 배구 · 하키 · E스포츠 실시간 생중계를<br/><strong style='color:#67e8f9;'>짱돌티비</strong>에서 끊김 없이 바로 시청하실 수 있습니다.</div>",
+      "    <a id='sqGoJjangdolTvLink' href='" + JJANGDOL_URL + "' target='_blank' rel='noopener noreferrer' class='sq-jjangdol-cta'>",
+      "      <span>🎬 짱돌티비 바로가기</span>",
+      "      <span style='font-size:14px;'>↗</span>",
+      "    </a>",
+      "    <div style='margin-top:10px;font-size:11px;color:#64748b;'>클릭 시 공식 중계 페이지(jjangdoltv.com)로 즉시 이동합니다</div>",
+      "  </div>",
+      "</div>"
+    ].join("");
+    document.body.appendChild(m);
+
+    document.getElementById("sqCloseIqTvModalBtn").onclick = function () {
+      m.style.display = "none";
+    };
+    m.addEventListener("click", function (ev) {
+      if (ev.target === m) m.style.display = "none";
+    });
+    document.getElementById("sqGoJjangdolTvLink").addEventListener("click", function () {
+      setTimeout(function () { m.style.display = "none"; }, 180);
+    });
+
+    return m;
+  }
+
+  function openIqTvModal() {
+    var m = buildIqTvModalIfNeeded();
+    m.style.display = "flex";
+  }
+  window.__openSportiqIqTv = openIqTvModal;
+
+  function ensureIqTvFloatingTab() {
+    var tvFab = document.getElementById("sqIqTvFloatingFab");
+    if (!tvFab && document.body) {
+      tvFab = document.createElement("button");
+      tvFab.id = "sqIqTvFloatingFab";
+      tvFab.type = "button";
+      tvFab.className = "sq-iq-tv-fab";
+      tvFab.innerHTML = "📺 <span>IQ중계티비</span>";
+      tvFab.title = "IQ중계티비 — 짱돌티비 실시간 스포츠 중계 바로가기";
+      tvFab.onclick = function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openIqTvModal();
+      };
+      document.body.appendChild(tvFab);
+    }
+    alignIqTvAboveAiIq(tvFab);
+  }
+
+  window.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape" || ev.keyCode === 27) {
+      var m = document.getElementById("sqIqTvModal");
+      if (m && m.style.display === "flex") {
+        ev.preventDefault();
+        ev.stopPropagation();
+        m.style.display = "none";
+      }
+    }
+  }, true);
+
+  window.addEventListener("resize", function () {
+    alignIqTvAboveAiIq(document.getElementById("sqIqTvFloatingFab"));
+  });
+
+  setTimeout(ensureIqTvFloatingTab, 160);
+  setInterval(ensureIqTvFloatingTab, 900);
+})();
+"""
+
+UPGRADE_JS = UPGRADE_JS + "\n" + IQ_LIVE_TV_JS
