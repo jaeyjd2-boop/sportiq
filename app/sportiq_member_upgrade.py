@@ -600,7 +600,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "3.4",
+        "version": "3.5",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -612,6 +612,7 @@ def member_upgrade_status():
         "match_chronological_sort": True,
         "ai_iq_online_search": True,
         "header_tagline": "실시간 분석 스포츠IQ 인사이트",
+        "odds_alert_off_toggle": True,
     }
 
 
@@ -3465,9 +3466,9 @@ def inject_upgrade_into_html(raw_html: str) -> str:
         if h_idx != -1:
             out = out[:h_idx] + pwa_head + "\n" + out[h_idx:]
 
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=9" defer></script>'
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=10" defer></script>'
     if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=9', out)
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=10', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
@@ -5826,3 +5827,246 @@ AI_IQ_ONLINE_SEARCH_JS = r"""
 """
 
 UPGRADE_JS = UPGRADE_JS + "\n" + AI_IQ_ONLINE_SEARCH_JS
+# ============================================================================
+# STAGE P5 (v3.5 / ?v=10): "📉 배당급변 알림 ON" <-> "🔕 배당급변 알림 OFF" Toggle
+# ============================================================================
+ODDS_ALERT_TOGGLE_JS = r"""
+/* SportIQ v10.0: Interactive Dropping-Odds Alert ON/OFF Toggle & Real Toast Blocker */
+(function () {
+  if (window.__SPORTIQ_V10_ODDS_TOGGLE__) return;
+  window.__SPORTIQ_V10_ODDS_TOGGLE__ = true;
+
+  var LS_ODDS_ALERT = "sq_odds_drop_alert_enabled";
+  var manualFeedbackBypass = false;
+
+  // Read saved state (default ON = true unless user explicitly turned it OFF = "0" / "false")
+  function isOddsAlertOn() {
+    var v = localStorage.getItem(LS_ODDS_ALERT);
+    if (v === "0" || v === "false" || v === "OFF") return false;
+    return true;
+  }
+
+  function setOddsAlertState(turnOn) {
+    localStorage.setItem(LS_ODDS_ALERT, turnOn ? "1" : "0");
+    // Sync common global/state flags if sportiq_community.html defines any
+    try {
+      ["oddsAlertOn", "dcOddsAlertOn", "dropOddsAlertOn", "steamAlertOn"].forEach(function (k) {
+        if (k in window) window[k] = Boolean(turnOn);
+      });
+      if (typeof state === "object" && state) {
+        if ("oddsAlert" in state) state.oddsAlert = Boolean(turnOn);
+        if ("oddsAlertOn" in state) state.oddsAlertOn = Boolean(turnOn);
+      }
+    } catch (e) {}
+  }
+
+  // Inject clean CSS classes so ON (sky-blue) and OFF (dark muted slate matching '🔕 득점알림 OFF') look crisp
+  var st = document.createElement("style");
+  st.id = "sqOddsAlertToggleCss";
+  st.textContent = [
+    "[data-sq-odds-alert-pill='1'] { cursor:pointer !important; user-select:none !important; transition:all .16s ease !important; display:inline-flex !important; align-items:center !important; gap:5px !important; }",
+    "[data-sq-odds-alert-pill='1']:hover { filter:brightness(1.08); transform:translateY(-1px); }",
+    "[data-sq-odds-alert-pill='1'][data-sq-odds-state='on'] { background:#0284c7 !important; border:1px solid rgba(56,189,248,.6) !important; color:#ffffff !important; font-weight:800 !important; box-shadow:0 4px 14px rgba(2,132,199,.28) !important; }",
+    "[data-sq-odds-alert-pill='1'][data-sq-odds-state='off'] { background:#0f172a !important; border:1px solid #334155 !important; color:#94a3b8 !important; font-weight:700 !important; box-shadow:none !important; }"
+  ].join("\n");
+  document.head.appendChild(st);
+
+  var ODDS_PILL_REGEX = /^(?:📉|🔕|🔔|⚡|📊)?\s*(?:실시간\s*)?배당\s*급변\s*알림(?:\s*(?:ON|OFF))?$/i;
+  var ODDS_TOAST_REGEX = /배당\s*급변|배당\s*급락|드롭\s*오즈|드롭오즈|스팀\s*무브|STEAM\s*MOVE|DROP\s*ODDS|배당률?\s*하락|📉\s*\[/i;
+
+  function isOddsDropMessage(txt) {
+    if (!txt) return false;
+    var s = String(txt);
+    if (ODDS_TOAST_REGEX.test(s)) return true;
+    if (s.indexOf("배당") !== -1 && /-\d+(?:\.\d+)?%/.test(s)) return true;
+    return false;
+  }
+
+  function findOddsAlertPillElements() {
+    var matched = [];
+    var candidates = document.querySelectorAll("button, span, a, div");
+    for (var i = 0; i < candidates.length; i++) {
+      var el = candidates[i];
+      if (!el || el.id === "dcToastWrap" || el.closest("#dcToastWrap") || el.closest("#sqAiIqModal")) continue;
+      if (el.getAttribute("data-sq-odds-alert-pill") === "1") {
+        matched.push(el);
+        continue;
+      }
+      if (el.children && el.children.length > 2) continue;
+      var txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (!txt || txt.length > 26) continue;
+      if (ODDS_PILL_REGEX.test(txt)) {
+        // Avoid matching a wrapper if a direct child also matches
+        var childMatches = false;
+        for (var j = 0; j < el.children.length; j++) {
+          var cTxt = (el.children[j].textContent || "").replace(/\s+/g, " ").trim();
+          if (ODDS_PILL_REGEX.test(cTxt)) { childMatches = true; break; }
+        }
+        if (!childMatches) matched.push(el);
+      }
+    }
+    return matched;
+  }
+
+  function applyPillVisualState(el, on) {
+    if (!el) return;
+    var desiredState = on ? "on" : "off";
+    var desiredLabel = on ? "📉 배당급변 알림 ON" : "🔕 배당급변 알림 OFF";
+    if (el.getAttribute("data-sq-odds-alert-pill") !== "1") {
+      el.setAttribute("data-sq-odds-alert-pill", "1");
+      if (el.tagName !== "BUTTON" && !el.getAttribute("role")) {
+        el.setAttribute("role", "button");
+      }
+      if (el.tagName !== "BUTTON" && !el.hasAttribute("tabindex")) {
+        el.setAttribute("tabindex", "0");
+      }
+    }
+    if (el.getAttribute("data-sq-odds-state") !== desiredState) {
+      el.setAttribute("data-sq-odds-state", desiredState);
+    }
+    el.setAttribute("aria-pressed", on ? "true" : "false");
+    el.title = on
+      ? "실시간 배당급변 알림이 켜져 있습니다 (클릭하면 OFF 전환)"
+      : "실시간 배당급변 알림이 꺼져 있습니다 (클릭하면 ON 전환)";
+    var curTxt = (el.textContent || "").replace(/\s+/g, " ").trim();
+    if (curTxt !== desiredLabel) {
+      el.textContent = desiredLabel;
+    }
+  }
+
+  function syncAllOddsAlertPills() {
+    var on = isOddsAlertOn();
+    var pills = findOddsAlertPillElements();
+    for (var i = 0; i < pills.length; i++) {
+      applyPillVisualState(pills[i], on);
+    }
+    if (!on) purgeActiveOddsToasts();
+  }
+
+  function purgeActiveOddsToasts() {
+    var wrap = document.getElementById("dcToastWrap");
+    if (!wrap) return;
+    Array.prototype.slice.call(wrap.children).forEach(function (card) {
+      if (!card || card.getAttribute("data-sq-manual-feedback") === "1") return;
+      if (isOddsDropMessage(card.textContent || "")) {
+        if (card.parentNode) card.parentNode.removeChild(card);
+      }
+    });
+  }
+
+  function showToggleFeedback(turnOn) {
+    var msg = turnOn
+      ? "📉 배당급변 실시간 알림이 ON 되었습니다."
+      : "🔕 배당급변 실시간 알림이 OFF 되었습니다. (배당 급락 팝업 숨김)";
+    manualFeedbackBypass = true;
+    try {
+      if (typeof window.showToast === "function") {
+        window.showToast(msg);
+      } else {
+        var wrap = document.getElementById("dcToastWrap");
+        if (wrap) {
+          var t = document.createElement("div");
+          t.className = "dc-toast";
+          t.setAttribute("data-sq-manual-feedback", "1");
+          t.style.cssText = "background:#0f172a;border:1px solid #38bdf8;color:#f8fafc;border-radius:12px;padding:10px 14px;font-size:12.5px;font-weight:800;margin-top:8px;box-shadow:0 10px 25px rgba(0,0,0,.5);";
+          t.textContent = msg;
+          wrap.appendChild(t);
+          setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2600);
+        }
+      }
+    } finally {
+      setTimeout(function () { manualFeedbackBypass = false; }, 120);
+    }
+  }
+
+  function toggleOddsAlertFromUi(ev) {
+    if (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (typeof ev.stopImmediatePropagation === "function") ev.stopImmediatePropagation();
+    }
+    var nextState = !isOddsAlertOn();
+    setOddsAlertState(nextState);
+    syncAllOddsAlertPills();
+    if (!nextState) purgeActiveOddsToasts();
+    showToggleFeedback(nextState);
+  }
+
+  // Capture-phase click & keyboard handler so clicking '📉 배당급변 알림 ON' ALWAYS toggles ON <-> OFF cleanly
+  window.addEventListener("click", function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    var pill = t.closest("[data-sq-odds-alert-pill='1']");
+    if (!pill) {
+      var cand = t.closest("button, span, a, div");
+      if (cand && (!cand.children || cand.children.length <= 2)) {
+        var txt = (cand.textContent || "").replace(/\s+/g, " ").trim();
+        if (txt.length <= 26 && ODDS_PILL_REGEX.test(txt)) {
+          pill = cand;
+        }
+      }
+    }
+    if (!pill) return;
+    toggleOddsAlertFromUi(ev);
+  }, true);
+
+  window.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Enter" && ev.key !== " ") return;
+    var active = document.activeElement;
+    if (active && active.getAttribute && active.getAttribute("data-sq-odds-alert-pill") === "1") {
+      toggleOddsAlertFromUi(ev);
+    }
+  }, true);
+
+  // Hook global toast functions + MutationObserver on #dcToastWrap so OFF truly silences all odds-drop popups
+  function hookToastFunctionsForOddsMute() {
+    ["showToast", "showDcToast", "pushDcToast", "triggerOddsToast"].forEach(function (fnName) {
+      var fn = window[fnName];
+      if (typeof fn === "function" && !fn.__sqOddsMuteWrapped) {
+        var wrapped = function () {
+          var firstArg = arguments.length > 0 ? String(arguments[0] || "") : "";
+          if (!manualFeedbackBypass && !isOddsAlertOn() && isOddsDropMessage(firstArg)) {
+            return;
+          }
+          return fn.apply(this, arguments);
+        };
+        wrapped.__sqOddsMuteWrapped = true;
+        window[fnName] = wrapped;
+      }
+    });
+
+    var wrap = document.getElementById("dcToastWrap");
+    if (wrap && !wrap.__sqOddsMuteObserver) {
+      wrap.__sqOddsMuteObserver = true;
+      var obs = new MutationObserver(function (mutations) {
+        if (manualFeedbackBypass) {
+          mutations.forEach(function (m) {
+            for (var i = 0; i < m.addedNodes.length; i++) {
+              var n = m.addedNodes[i];
+              if (n && n.nodeType === 1) n.setAttribute("data-sq-manual-feedback", "1");
+            }
+          });
+          return;
+        }
+        if (!isOddsAlertOn()) {
+          purgeActiveOddsToasts();
+        }
+      });
+      obs.observe(wrap, { childList: true, subtree: true });
+    }
+  }
+
+  setOddsAlertState(isOddsAlertOn());
+  setTimeout(function () {
+    syncAllOddsAlertPills();
+    hookToastFunctionsForOddsMute();
+  }, 120);
+
+  setInterval(function () {
+    syncAllOddsAlertPills();
+    hookToastFunctionsForOddsMute();
+  }, 800);
+})();
+"""
+
+UPGRADE_JS = UPGRADE_JS + "\n" + ODDS_ALERT_TOGGLE_JS
