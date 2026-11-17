@@ -1,5 +1,7 @@
 import hashlib
+import hmac
 import json
+import secrets
 import os
 import re
 import sqlite3
@@ -10,7 +12,7 @@ import zlib
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -52,6 +54,9 @@ ALL_KNOWN_SQLITE_TABLES: Tuple[str, ...] = (
     "community_member_posts",
     "community_post_comments",
     "member_raffle_entries",
+    "admin_config",
+    "raffle_draw_results",
+    "wp_point_ledger",
 )
 
 SHOP_CATALOG: List[Dict[str, Any]] = [
@@ -133,6 +138,7 @@ _PG_SYNC_STATE = {
 }
 _OG_PNG_CACHE: Optional[bytes] = None
 _FAVICON_PNG_CACHE: Optional[bytes] = None
+_PWA_ICON_CACHE: Dict[int, bytes] = {}
 
 
 def _db_session(write: bool = False):
@@ -220,6 +226,34 @@ def _init_upgrade_tables() -> None:
                     nickname TEXT NOT NULL,
                     round_key TEXT NOT NULL,
                     tickets INTEGER NOT NULL DEFAULT 1,
+                    created_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS admin_config (
+                    cfg_key TEXT PRIMARY KEY,
+                    cfg_value TEXT NOT NULL,
+                    updated_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS raffle_draw_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    round_key TEXT NOT NULL,
+                    winner_nickname TEXT NOT NULL,
+                    winner_tickets INTEGER NOT NULL,
+                    total_tickets INTEGER NOT NULL,
+                    total_participants INTEGER NOT NULL,
+                    prize_name TEXT NOT NULL,
+                    draw_seed_hash TEXT NOT NULL,
+                    claim_code TEXT NOT NULL,
+                    fulfillment_note TEXT NOT NULL DEFAULT '지급 대기',
+                    drawn_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS wp_point_ledger (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nickname TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    ref_id TEXT NOT NULL DEFAULT '',
+                    points_delta INTEGER NOT NULL,
+                    kst_date TEXT NOT NULL,
+                    site_origin TEXT NOT NULL DEFAULT '',
                     created_at REAL NOT NULL
                 );
                 """
@@ -494,9 +528,12 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "1.1",
+        "version": "2.0",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
+        "pwa_enabled": True,
+        "raffle_admin_enabled": True,
+        "wp_pin_bridge_enabled": True,
     }
 
 
@@ -999,9 +1036,1042 @@ def serve_sitemap_xml():
     return Response(content=xml, media_type="application/xml; charset=utf-8")
 
 
+
+
+# ============================================================================
+# STAGE 1: PWA Manifest, App Icons (192/512/180 PNG) & Safe Service Worker
+# ============================================================================
+_SQ_BITMAP_S = (
+    "0111110",
+    "1100011",
+    "1100000",
+    "0111100",
+    "0000110",
+    "1100011",
+    "0111110",
+)
+_SQ_BITMAP_Q = (
+    "0111100",
+    "1100110",
+    "1100110",
+    "1100110",
+    "1101110",
+    "0111100",
+    "0000111",
+)
+
+
+def _build_pwa_app_icon_png(size: int) -> bytes:
+    """Generates a crisp standalone SportIQ stadium crest PNG icon in pure stdlib."""
+    cx = (size - 1) / 2.0
+    cy = (size - 1) / 2.0
+    r_outer = size * 0.43
+    r_ring_in = size * 0.385
+    r_glow = size * 0.33
+
+    glyph_scale = max(2, size // 22)
+    glyph_w = 7 * glyph_scale
+    glyph_h = 7 * glyph_scale
+    gap = max(2, glyph_scale)
+    total_gw = glyph_w * 2 + gap
+    gx0 = (size - total_gw) // 2
+    gy0 = (size - glyph_h) // 2
+
+    raw_rows = bytearray()
+    for y in range(size):
+        raw_rows.append(0)
+        fy = y / max(1, size - 1)
+        bg_r = int(7 + fy * 10)
+        bg_g = int(11 + fy * 16)
+        bg_b = int(20 + fy * 28)
+        dy = y - cy
+        for x in range(size):
+            dx = x - cx
+            dist = (dx * dx + dy * dy) ** 0.5
+            r, g, b = bg_r, bg_g, bg_b
+
+            if r_ring_in <= dist <= r_outer:
+                fx = x / max(1, size - 1)
+                r = int(16 + fx * 40)
+                g = int(185 + fx * 4)
+                b = int(129 + fx * 119)
+            elif dist < r_ring_in:
+                inner_f = dist / max(1.0, r_ring_in)
+                r = int(12 + (1.0 - inner_f) * 10)
+                g = int(23 + (1.0 - inner_f) * 28)
+                b = int(46 + (1.0 - inner_f) * 44)
+                if abs(dist - r_glow) <= max(1.0, size * 0.008):
+                    r, g, b = 30, 96, 138
+
+            if gy0 <= y < gy0 + glyph_h and gx0 <= x < gx0 + total_gw:
+                ry = (y - gy0) // glyph_scale
+                rx_total = x - gx0
+                on_pixel = False
+                is_q_tail = False
+                if rx_total < glyph_w:
+                    rx = rx_total // glyph_scale
+                    on_pixel = _SQ_BITMAP_S[ry][rx] == "1"
+                elif rx_total >= glyph_w + gap:
+                    rx = (rx_total - glyph_w - gap) // glyph_scale
+                    if 0 <= rx < 7:
+                        on_pixel = _SQ_BITMAP_Q[ry][rx] == "1"
+                        is_q_tail = (ry >= 5 and rx >= 4 and on_pixel)
+                if on_pixel:
+                    if is_q_tail:
+                        r, g, b = 251, 191, 36
+                    else:
+                        r, g, b = 248, 250, 252
+
+            raw_rows.extend((r, g, b))
+
+    def _chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack("!I", len(data)) + tag + data + struct.pack("!I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+
+    ihdr = struct.pack("!IIBBBBB", size, size, 8, 2, 0, 0, 0)
+    idat = zlib.compress(bytes(raw_rows), level=6)
+    return b"\x89PNG\r\n\x1a\n" + _chunk(b"IHDR", ihdr) + _chunk(b"IDAT", idat) + _chunk(b"IEND", b"")
+
+
+def _get_pwa_icon_bytes(size: int) -> bytes:
+    if size not in _PWA_ICON_CACHE:
+        _PWA_ICON_CACHE[size] = _build_pwa_app_icon_png(size)
+    return _PWA_ICON_CACHE[size]
+
+
+@upgrade_router.get("/pwa-icon-192.png")
+def serve_pwa_icon_192():
+    return Response(
+        content=_get_pwa_icon_bytes(192),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@upgrade_router.get("/pwa-icon-512.png")
+def serve_pwa_icon_512():
+    return Response(
+        content=_get_pwa_icon_bytes(512),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@upgrade_router.get("/apple-touch-icon.png")
+def serve_apple_touch_icon():
+    return Response(
+        content=_get_pwa_icon_bytes(180),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+def _manifest_payload() -> Dict[str, Any]:
+    return {
+        "id": "/",
+        "name": "SportIQ — 실시간 스포츠 데이터 & 분석 라운지",
+        "short_name": "SportIQ",
+        "description": "9종목 실시간 스코어, 배당 급변 드롭오즈, AI 승부예측과 4자리 PIN 오픈 분석 커뮤니티",
+        "start_url": "/?source=pwa",
+        "scope": "/",
+        "display": "standalone",
+        "orientation": "portrait-primary",
+        "background_color": "#070B14",
+        "theme_color": "#0F172A",
+        "lang": "ko",
+        "dir": "ltr",
+        "categories": ["sports", "news", "social"],
+        "icons": [
+            {"src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+            {"src": "/pwa-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            {"src": "/pwa-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+        ],
+        "shortcuts": [
+            {
+                "name": "실시간 데이터센터",
+                "short_name": "데이터센터",
+                "description": "실시간 배당 급변·리그 순위·명예의 전당 열기",
+                "url": "/?tab=datacenter&source=pwa",
+                "icons": [{"src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png"}],
+            },
+            {
+                "name": "포인트 상점 · PIN 연동",
+                "short_name": "포인트 상점",
+                "description": "4자리 PIN 기기 연동 및 기프티콘 래플 응모",
+                "url": "/?open=shop&source=pwa",
+                "icons": [{"src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png"}],
+            },
+        ],
+    }
+
+
+@upgrade_router.get("/manifest.webmanifest")
+@upgrade_router.get("/manifest.json")
+def serve_pwa_manifest():
+    return Response(
+        content=json.dumps(_manifest_payload(), ensure_ascii=False, indent=2),
+        media_type="application/manifest+json; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+SERVICE_WORKER_JS = (
+    "/* SportIQ Safe Network-First PWA Service Worker v2.0 */\n"
+    "const CACHE_NAME = 'sportiq-pwa-static-v2';\n"
+    "const PRECACHE_URLS = ['/pwa-icon-192.png', '/pwa-icon-512.png', '/apple-touch-icon.png', '/favicon.ico'];\n"
+    "self.addEventListener('install', (event) => {\n"
+    "  self.skipWaiting();\n"
+    "  event.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(PRECACHE_URLS)).catch(() => {}));\n"
+    "});\n"
+    "self.addEventListener('activate', (event) => {\n"
+    "  event.waitUntil(\n"
+    "    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))).then(() => self.clients.claim())\n"
+    "  );\n"
+    "});\n"
+    "self.addEventListener('fetch', (event) => {\n"
+    "  const req = event.request;\n"
+    "  if (req.method !== 'GET') return;\n"
+    "  const url = new URL(req.url);\n"
+    "  if (url.origin !== self.location.origin) return;\n"
+    "  if (PRECACHE_URLS.includes(url.pathname)) {\n"
+    "    event.respondWith(caches.match(req).then((cached) => cached || fetch(req)));\n"
+    "    return;\n"
+    "  }\n"
+    "  if (req.mode === 'navigate') {\n"
+    "    event.respondWith(\n"
+    "      fetch(req).catch(() => new Response(\n"
+    "        \"<!doctype html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>SportIQ 오프라인</title><style>body{background:#070b14;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;text-align:center}.card{background:#0f172a;border:1px solid #334155;border-radius:16px;padding:24px;max-width:360px}button{margin-top:14px;background:#0284c7;color:#fff;border:0;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer}</style></head><body><div class='card'><h2>SportIQ 네트워크 재연결 대기</h2><p style='color:#94a3b8;font-size:14px'>모바일 네트워크 연결을 확인한 뒤 새로고침을 눌러 실시간 스코어와 분석 피드를 불러오세요.</p><button onclick='location.reload()'>다시 연결하기</button></div></body></html>\",\n"
+    "        { headers: { 'Content-Type': 'text/html; charset=utf-8' } }\n"
+    "      ))\n"
+    "    );\n"
+    "  }\n"
+    "});\n"
+)
+
+
+@upgrade_router.get("/sw.js")
+def serve_pwa_service_worker():
+    return Response(
+        content=SERVICE_WORKER_JS,
+        media_type="application/javascript; charset=utf-8",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Service-Worker-Allowed": "/",
+        },
+    )
+
+
+# ============================================================================
+# STAGE 2: Weekly Gifticon Raffle Admin Dashboard & Provably-Fair Winner Draw
+# ============================================================================
+def _hash_admin_key(raw_key: str) -> str:
+    clean = (raw_key or "").strip()
+    return hashlib.pbkdf2_hmac(
+        "sha256",
+        f"sportiq-admin:{PIN_SALT}:{clean}".encode("utf-8"),
+        PIN_SALT.encode("utf-8"),
+        20000,
+    ).hex()
+
+
+def _get_stored_admin_hash() -> str:
+    def _op() -> str:
+        with _db_session(write=False) as conn:
+            row = conn.execute(
+                "SELECT cfg_value FROM admin_config WHERE cfg_key = 'admin_key_hash'"
+            ).fetchone()
+            return str(row["cfg_value"]) if row and row["cfg_value"] else ""
+
+    try:
+        return run_with_db_retry(_op)
+    except Exception:
+        return ""
+
+
+def _is_admin_configured() -> bool:
+    env_key = os.environ.get("SPORTIQ_ADMIN_KEY", "").strip()
+    if env_key:
+        return True
+    return bool(_get_stored_admin_hash())
+
+
+def _require_admin_auth(provided_key: Optional[str]) -> None:
+    cand = (provided_key or "").strip()
+    if not cand:
+        raise HTTPException(status_code=401, detail="관리자 인증 키(X-SportIQ-Admin-Key)를 입력해 주세요.")
+    env_key = os.environ.get("SPORTIQ_ADMIN_KEY", "").strip()
+    if env_key:
+        if not hmac.compare_digest(env_key, cand):
+            raise HTTPException(status_code=403, detail="관리자 인증 키가 일치하지 않습니다.")
+        return
+    stored_hash = _get_stored_admin_hash()
+    if not stored_hash:
+        raise HTTPException(status_code=400, detail="먼저 관리자 마스터 키 초기 설정을 완료해 주세요.")
+    cand_hash = _hash_admin_key(cand)
+    if not hmac.compare_digest(stored_hash, cand_hash):
+        raise HTTPException(status_code=403, detail="관리자 마스터 키가 일치하지 않습니다.")
+
+
+class AdminKeySetupIn(BaseModel):
+    new_admin_key: str
+    current_admin_key: Optional[str] = ""
+
+
+class AdminRaffleDrawIn(BaseModel):
+    round_key: Optional[str] = ""
+    winner_count: int = 1
+    prize_name: str = "편의점·커피 기프티콘 5,000원권"
+    exclude_already_won: bool = True
+
+
+class AdminRaffleFulfillIn(BaseModel):
+    draw_id: int
+    fulfillment_note: str = "기프티콘 발송 완료"
+
+
+class MemberMyWinsIn(BaseModel):
+    nickname: str
+    pin: str
+
+
+def _mask_claim_code(code: str) -> str:
+    s = (code or "").strip()
+    if len(s) < 8:
+        return "SQ-****"
+    return s[:-4] + "****"
+
+
+def _fmt_kst_ts(epoch_val: Any) -> str:
+    try:
+        return datetime.fromtimestamp(float(epoch_val), tz=KST).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return "-"
+
+
+@upgrade_router.get("/api/admin/raffle/auth-state")
+def get_admin_raffle_auth_state():
+    env_locked = bool(os.environ.get("SPORTIQ_ADMIN_KEY", "").strip())
+    return {
+        "ok": True,
+        "configured": _is_admin_configured(),
+        "env_locked": env_locked,
+        "current_round": datetime.now(KST).strftime("%Y-W%W"),
+    }
+
+
+@upgrade_router.post("/api/admin/setup-key")
+def setup_or_rotate_admin_key(payload: AdminKeySetupIn):
+    if os.environ.get("SPORTIQ_ADMIN_KEY", "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Render 환경변수(SPORTIQ_ADMIN_KEY)로 관리자 키가 고정되어 있습니다.",
+        )
+    new_k = (payload.new_admin_key or "").strip()
+    if len(new_k) < 6 or len(new_k) > 48:
+        raise HTTPException(status_code=400, detail="관리자 마스터 키는 6~48자로 설정해 주세요.")
+
+    existing_hash = _get_stored_admin_hash()
+    if existing_hash:
+        cur_k = (payload.current_admin_key or "").strip()
+        if not cur_k or not hmac.compare_digest(existing_hash, _hash_admin_key(cur_k)):
+            raise HTTPException(status_code=403, detail="기존 관리자 마스터 키가 일치하지 않습니다.")
+
+    new_hash = _hash_admin_key(new_k)
+    now = time.time()
+
+    def _op() -> None:
+        with _db_session(write=True) as conn:
+            conn.execute(
+                """
+                INSERT INTO admin_config(cfg_key, cfg_value, updated_at)
+                VALUES ('admin_key_hash', ?, ?)
+                ON CONFLICT(cfg_key) DO UPDATE SET
+                    cfg_value = excluded.cfg_value,
+                    updated_at = excluded.updated_at
+                """,
+                (new_hash, now),
+            )
+
+    run_with_db_retry(_op)
+    threading.Thread(target=_trigger_pg_backup, args=("admin_config",), daemon=True).start()
+    return {
+        "ok": True,
+        "rotated": bool(existing_hash),
+        "message": "관리자 마스터 키가 암호화되어 영구 저장되었습니다.",
+    }
+
+
+@upgrade_router.get("/api/raffle/public-winners")
+def get_public_raffle_winners(limit: int = 8):
+    lim = max(1, min(30, int(limit)))
+
+    def _op() -> List[Dict[str, Any]]:
+        with _db_session(write=False) as conn:
+            rows = conn.execute(
+                """
+                SELECT r.*, COALESCE(m.active_badge, '') AS active_badge, COALESCE(m.role_tier, 'MEMBER') AS role_tier
+                FROM raffle_draw_results r
+                LEFT JOIN member_accounts m ON lower(m.nickname) = lower(r.winner_nickname)
+                ORDER BY r.id DESC
+                LIMIT ?
+                """,
+                (lim,),
+            ).fetchall()
+            out = []
+            for r in rows:
+                tot = max(1, int(r["total_tickets"] or 1))
+                wt = int(r["winner_tickets"] or 1)
+                out.append(
+                    {
+                        "id": int(r["id"]),
+                        "round_key": r["round_key"],
+                        "winner_nickname": r["winner_nickname"],
+                        "active_badge": r["active_badge"] or "",
+                        "role_tier": r["role_tier"] or "MEMBER",
+                        "winner_tickets": wt,
+                        "total_tickets": tot,
+                        "win_odds_pct": round(wt * 100.0 / tot, 1),
+                        "prize_name": r["prize_name"],
+                        "draw_seed_prefix": (r["draw_seed_hash"] or "")[:14],
+                        "masked_claim_code": _mask_claim_code(r["claim_code"]),
+                        "fulfillment_note": r["fulfillment_note"] or "지급 대기",
+                        "drawn_at_kst": _fmt_kst_ts(r["drawn_at"]),
+                    }
+                )
+            return out
+
+    return {"ok": True, "winners": run_with_db_retry(_op)}
+
+
+@upgrade_router.post("/api/member/raffle/my-wins")
+def get_member_own_raffle_wins(payload: MemberMyWinsIn):
+    nick = (payload.nickname or "").strip()[:24]
+    pin = re.sub(r"\D", "", payload.pin or "")
+    if len(nick) < 2 or len(pin) != 4:
+        return {"ok": True, "wins": []}
+    pin_h = _hash_pin(nick, pin)
+
+    def _op() -> List[Dict[str, Any]]:
+        with _db_session(write=False) as conn:
+            acc = conn.execute(
+                "SELECT nickname, pin_hash FROM member_accounts WHERE lower(nickname)=lower(?)",
+                (nick,),
+            ).fetchone()
+            if not acc or acc["pin_hash"] != pin_h:
+                return []
+            rows = conn.execute(
+                """
+                SELECT id, round_key, prize_name, claim_code, fulfillment_note, drawn_at
+                FROM raffle_draw_results
+                WHERE lower(winner_nickname) = lower(?)
+                ORDER BY id DESC
+                LIMIT 10
+                """,
+                (acc["nickname"],),
+            ).fetchall()
+            return [
+                {
+                    "id": int(r["id"]),
+                    "round_key": r["round_key"],
+                    "prize_name": r["prize_name"],
+                    "claim_code": r["claim_code"],
+                    "fulfillment_note": r["fulfillment_note"],
+                    "drawn_at_kst": _fmt_kst_ts(r["drawn_at"]),
+                }
+                for r in rows
+            ]
+
+    return {"ok": True, "wins": run_with_db_retry(_op)}
+
+
+@upgrade_router.get("/api/admin/raffle/rounds")
+def admin_list_raffle_rounds(
+    round_key: Optional[str] = None,
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+):
+    _require_admin_auth(x_sportiq_admin_key)
+    cur_round = datetime.now(KST).strftime("%Y-W%W")
+    target_round = (round_key or cur_round).strip()[:20] or cur_round
+
+    def _op() -> Dict[str, Any]:
+        with _db_session(write=False) as conn:
+            r_keys = [
+                r["round_key"]
+                for r in conn.execute(
+                    """
+                    SELECT DISTINCT round_key FROM (
+                        SELECT round_key FROM member_raffle_entries
+                        UNION
+                        SELECT round_key FROM raffle_draw_results
+                    ) ORDER BY round_key DESC
+                    """
+                ).fetchall()
+                if r["round_key"]
+            ]
+            if cur_round not in r_keys:
+                r_keys.insert(0, cur_round)
+            if target_round not in r_keys:
+                r_keys.insert(0, target_round)
+
+            entry_rows = conn.execute(
+                """
+                SELECT MIN(e.nickname) AS nickname,
+                       SUM(e.tickets) AS tickets,
+                       MAX(e.created_at) AS last_entered,
+                       COALESCE(MAX(m.points), 0) AS points,
+                       COALESCE(MAX(m.role_tier), 'GUEST') AS role_tier,
+                       COALESCE(MAX(m.active_badge), '') AS active_badge
+                FROM member_raffle_entries e
+                LEFT JOIN member_accounts m ON lower(m.nickname) = lower(e.nickname)
+                WHERE e.round_key = ?
+                GROUP BY lower(e.nickname)
+                ORDER BY tickets DESC, last_entered ASC
+                """,
+                (target_round,),
+            ).fetchall()
+
+            total_tickets = sum(int(r["tickets"] or 0) for r in entry_rows)
+            participants = []
+            for r in entry_rows:
+                t_cnt = int(r["tickets"] or 0)
+                participants.append(
+                    {
+                        "nickname": r["nickname"],
+                        "role_tier": r["role_tier"],
+                        "active_badge": r["active_badge"],
+                        "points": int(r["points"] or 0),
+                        "tickets": t_cnt,
+                        "win_probability_pct": round((t_cnt * 100.0 / total_tickets), 2) if total_tickets > 0 else 0.0,
+                        "last_entered_kst": _fmt_kst_ts(r["last_entered"]),
+                    }
+                )
+
+            draw_rows = conn.execute(
+                """
+                SELECT id, round_key, winner_nickname, winner_tickets, total_tickets,
+                       total_participants, prize_name, draw_seed_hash, claim_code,
+                       fulfillment_note, drawn_at
+                FROM raffle_draw_results
+                WHERE round_key = ?
+                ORDER BY id DESC
+                """,
+                (target_round,),
+            ).fetchall()
+
+            draws = [
+                {
+                    "id": int(d["id"]),
+                    "round_key": d["round_key"],
+                    "winner_nickname": d["winner_nickname"],
+                    "winner_tickets": int(d["winner_tickets"]),
+                    "total_tickets": int(d["total_tickets"]),
+                    "total_participants": int(d["total_participants"]),
+                    "prize_name": d["prize_name"],
+                    "draw_seed_hash": d["draw_seed_hash"],
+                    "claim_code": d["claim_code"],
+                    "fulfillment_note": d["fulfillment_note"],
+                    "drawn_at_kst": _fmt_kst_ts(d["drawn_at"]),
+                }
+                for d in draw_rows
+            ]
+
+            return {
+                "current_round": cur_round,
+                "selected_round": target_round,
+                "available_rounds": r_keys,
+                "summary": {
+                    "total_participants": len(participants),
+                    "total_tickets": total_tickets,
+                    "drawn_winners_count": len(draws),
+                },
+                "participants": participants,
+                "draws": draws,
+            }
+
+    return {"ok": True, **run_with_db_retry(_op)}
+
+
+@upgrade_router.post("/api/admin/raffle/draw")
+def admin_draw_raffle_winners(
+    payload: AdminRaffleDrawIn,
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+):
+    _require_admin_auth(x_sportiq_admin_key)
+    cur_round = datetime.now(KST).strftime("%Y-W%W")
+    target_round = (payload.round_key or cur_round).strip()[:20] or cur_round
+    winner_count = max(1, min(5, int(payload.winner_count or 1)))
+    prize_name = (payload.prize_name or "편의점·커피 기프티콘 5,000원권").strip()[:100]
+
+    def _op() -> List[Dict[str, Any]]:
+        with _db_session(write=True) as conn:
+            rows = conn.execute(
+                """
+                SELECT MIN(nickname) AS nickname, SUM(tickets) AS tickets
+                FROM member_raffle_entries
+                WHERE round_key = ?
+                GROUP BY lower(nickname)
+                ORDER BY tickets DESC, nickname ASC
+                """,
+                (target_round,),
+            ).fetchall()
+            if not rows:
+                raise HTTPException(status_code=400, detail=f"선택한 회차({target_round})에 응모 내역이 없습니다.")
+
+            all_total_tickets = sum(int(r["tickets"] or 0) for r in rows)
+            all_participants = len(rows)
+
+            already_won = set()
+            if payload.exclude_already_won:
+                prev = conn.execute(
+                    "SELECT winner_nickname FROM raffle_draw_results WHERE round_key = ?",
+                    (target_round,),
+                ).fetchall()
+                already_won = {str(p["winner_nickname"]).lower() for p in prev}
+
+            pool = [
+                {"nickname": r["nickname"], "tickets": int(r["tickets"] or 0)}
+                for r in rows
+                if int(r["tickets"] or 0) > 0 and str(r["nickname"]).lower() not in already_won
+            ]
+            if not pool:
+                raise HTTPException(
+                    status_code=400,
+                    detail="추첨 가능한 남은 응모자가 없습니다. (이미 전원 당첨되었거나 응모권이 0장입니다.)",
+                )
+
+            actual_count = min(winner_count, len(pool))
+            selected: List[Dict[str, Any]] = []
+            now = time.time()
+
+            for _ in range(actual_count):
+                pool_weight = sum(x["tickets"] for x in pool)
+                pick_idx_ticket = secrets.randbelow(pool_weight)
+                csprng_nonce = secrets.token_hex(16)
+                seed_src = json.dumps(
+                    {"round": target_round, "pool": pool, "pick": pick_idx_ticket, "nonce": csprng_nonce},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+                seed_hash = hashlib.sha256(seed_src.encode("utf-8")).hexdigest()
+
+                acc_w = 0
+                chosen_i = 0
+                for idx, item in enumerate(pool):
+                    acc_w += item["tickets"]
+                    if pick_idx_ticket < acc_w:
+                        chosen_i = idx
+                        break
+
+                winner = pool.pop(chosen_i)
+                claim_code = f"SQ-GIFT-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}"
+                cur = conn.execute(
+                    """
+                    INSERT INTO raffle_draw_results(
+                        round_key, winner_nickname, winner_tickets, total_tickets,
+                        total_participants, prize_name, draw_seed_hash, claim_code,
+                        fulfillment_note, drawn_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '지급 대기', ?)
+                    """,
+                    (
+                        target_round,
+                        winner["nickname"],
+                        winner["tickets"],
+                        all_total_tickets,
+                        all_participants,
+                        prize_name,
+                        seed_hash,
+                        claim_code,
+                        now,
+                    ),
+                )
+                selected.append(
+                    {
+                        "id": int(cur.lastrowid or 0),
+                        "round_key": target_round,
+                        "winner_nickname": winner["nickname"],
+                        "winner_tickets": winner["tickets"],
+                        "total_tickets": all_total_tickets,
+                        "prize_name": prize_name,
+                        "draw_seed_hash": seed_hash,
+                        "claim_code": claim_code,
+                        "fulfillment_note": "지급 대기",
+                        "drawn_at_kst": _fmt_kst_ts(now),
+                    }
+                )
+            return selected
+
+    drawn = run_with_db_retry(_op)
+    threading.Thread(target=_trigger_pg_backup, args=("raffle_draw_results",), daemon=True).start()
+    return {"ok": True, "drawn": drawn}
+
+
+@upgrade_router.post("/api/admin/raffle/fulfill")
+def admin_update_raffle_fulfillment(
+    payload: AdminRaffleFulfillIn,
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+):
+    _require_admin_auth(x_sportiq_admin_key)
+    note = (payload.fulfillment_note or "기프티콘 발송 완료").strip()[:120]
+
+    def _op() -> None:
+        with _db_session(write=True) as conn:
+            cur = conn.execute(
+                "UPDATE raffle_draw_results SET fulfillment_note = ? WHERE id = ?",
+                (note, int(payload.draw_id)),
+            )
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="해당 추첨 결과를 찾을 수 없습니다.")
+
+    run_with_db_retry(_op)
+    threading.Thread(target=_trigger_pg_backup, args=("raffle_draw_results",), daemon=True).start()
+    return {"ok": True, "draw_id": int(payload.draw_id), "fulfillment_note": note}
+
+
+# ============================================================================
+# STAGE 3: WordPress Plugin <-> SportIQ 4-Digit PIN Point & Badge Sync Bridge
+# ============================================================================
+def _make_wp_bridge_token(nickname: str, pin_hash: str) -> str:
+    msg = f"wp-bridge:v1:{(nickname or '').strip().lower()}:{pin_hash}".encode("utf-8")
+    return hmac.new(PIN_SALT.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+
+
+def _authenticate_wp_member(
+    conn: sqlite3.Connection,
+    nickname: str,
+    pin: str = "",
+    bridge_token: str = "",
+    allow_create_with_pin: bool = False,
+) -> sqlite3.Row:
+    nick = (nickname or "").strip()[:24]
+    if len(nick) < 2:
+        raise HTTPException(status_code=400, detail="닉네임은 2~24자로 입력해 주세요.")
+    row = conn.execute(
+        "SELECT * FROM member_accounts WHERE lower(nickname) = lower(?)",
+        (nick,),
+    ).fetchone()
+
+    clean_pin = re.sub(r"\D", "", pin or "")
+    if row is None:
+        if allow_create_with_pin and len(clean_pin) == 4:
+            pin_h = _hash_pin(nick, clean_pin)
+            now = time.time()
+            conn.execute(
+                """
+                INSERT INTO member_accounts(
+                    nickname, pin_hash, points, role_tier, streak_days,
+                    last_checkin_date, active_badge, owned_items_json, my_teams_json, updated_at
+                ) VALUES (?, ?, 120, 'GUEST', 0, '', '', '[]', '[]', ?)
+                """,
+                (nick, pin_h, now),
+            )
+            return conn.execute(
+                "SELECT * FROM member_accounts WHERE lower(nickname) = lower(?)",
+                (nick,),
+            ).fetchone()
+        raise HTTPException(status_code=404, detail="등록된 SportIQ 닉네임을 찾을 수 없습니다. PIN 4자리와 함께 연동해 주세요.")
+
+    if len(clean_pin) == 4:
+        if not hmac.compare_digest(row["pin_hash"], _hash_pin(row["nickname"], clean_pin)):
+            raise HTTPException(status_code=403, detail="4자리 PIN 번호가 일치하지 않습니다.")
+        return row
+
+    if bridge_token:
+        expected_tok = _make_wp_bridge_token(row["nickname"], row["pin_hash"])
+        if hmac.compare_digest(expected_tok, bridge_token.strip()):
+            return row
+        raise HTTPException(status_code=403, detail="워드프레스 연동 토큰이 만료되었거나 유효하지 않습니다. 다시 PIN을 입력해 주세요.")
+
+    raise HTTPException(status_code=401, detail="4자리 PIN 또는 연동 토큰이 필요합니다.")
+
+
+def _serialize_wp_member_profile(conn: sqlite3.Connection, row: sqlite3.Row) -> Dict[str, Any]:
+    round_key = datetime.now(KST).strftime("%Y-W%W")
+    today_kst = datetime.now(KST).strftime("%Y-%m-%d")
+    mt = conn.execute(
+        "SELECT COALESCE(SUM(tickets), 0) AS t FROM member_raffle_entries WHERE round_key = ? AND lower(nickname)=lower(?)",
+        (round_key, row["nickname"]),
+    ).fetchone()
+    pts = int(row["points"] or 0)
+    tier = _tier_for_points(pts)
+    if pts < 150:
+        next_tier = {"target_tier": "MEMBER", "needed_points": 150 - pts}
+    elif pts < 350:
+        next_tier = {"target_tier": "PRO", "needed_points": 350 - pts}
+    else:
+        next_tier = {"target_tier": "MAX", "needed_points": 0}
+    owned_keys = json.loads(row["owned_items_json"] or "[]")
+    owned_badges = [it for it in SHOP_CATALOG if it["item_key"] in owned_keys]
+    return {
+        "nickname": row["nickname"],
+        "points": pts,
+        "role_tier": tier,
+        "streak_days": int(row["streak_days"] or 0),
+        "last_checkin_date": row["last_checkin_date"] or "",
+        "checked_in_today": (row["last_checkin_date"] == today_kst),
+        "active_badge": row["active_badge"] or "",
+        "owned_items": owned_keys,
+        "owned_badges": owned_badges,
+        "my_teams": json.loads(row["my_teams_json"] or "[]"),
+        "raffle_round": round_key,
+        "raffle_my_tickets": int(mt["t"] or 0),
+        "next_tier": next_tier,
+    }
+
+
+class WPMemberVerifyIn(BaseModel):
+    nickname: str
+    pin: Optional[str] = ""
+    bridge_token: Optional[str] = ""
+    site_origin: Optional[str] = ""
+
+
+class WPMemberCheckinIn(BaseModel):
+    nickname: str
+    pin: Optional[str] = ""
+    bridge_token: Optional[str] = ""
+    site_origin: Optional[str] = ""
+
+
+class WPMemberEquipIn(BaseModel):
+    nickname: str
+    item_key: str = ""
+    pin: Optional[str] = ""
+    bridge_token: Optional[str] = ""
+
+
+class WPMemberRewardIn(BaseModel):
+    nickname: str
+    event_type: str = "wp_comment"
+    ref_id: str = ""
+    bridge_token: Optional[str] = ""
+    pin: Optional[str] = ""
+    site_origin: Optional[str] = ""
+
+
+@upgrade_router.get("/api/wp/member/public-profile")
+def wp_get_public_member_profile(nickname: str):
+    nick = (nickname or "").strip()[:24]
+    if len(nick) < 2:
+        raise HTTPException(status_code=400, detail="닉네임을 입력해 주세요.")
+
+    def _op() -> Optional[Dict[str, Any]]:
+        with _db_session(write=False) as conn:
+            row = conn.execute(
+                "SELECT nickname, points, role_tier, active_badge, streak_days FROM member_accounts WHERE lower(nickname)=lower(?)",
+                (nick,),
+            ).fetchone()
+            if not row:
+                return None
+            pts = int(row["points"] or 0)
+            return {
+                "nickname": row["nickname"],
+                "points": pts,
+                "role_tier": _tier_for_points(pts),
+                "active_badge": row["active_badge"] or "",
+                "streak_days": int(row["streak_days"] or 0),
+            }
+
+    prof = run_with_db_retry(_op)
+    if prof is None:
+        return {"ok": False, "found": False}
+    return {"ok": True, "found": True, "profile": prof}
+
+
+@upgrade_router.post("/api/wp/member/verify")
+def wp_verify_member_bridge(payload: WPMemberVerifyIn):
+    def _op() -> Tuple[str, Dict[str, Any]]:
+        with _db_session(write=True) as conn:
+            row = _authenticate_wp_member(
+                conn,
+                nickname=payload.nickname,
+                pin=payload.pin or "",
+                bridge_token=payload.bridge_token or "",
+                allow_create_with_pin=True,
+            )
+            tok = _make_wp_bridge_token(row["nickname"], row["pin_hash"])
+            prof = _serialize_wp_member_profile(conn, row)
+            return tok, prof
+
+    tok, prof = run_with_db_retry(_op)
+    threading.Thread(target=_trigger_pg_backup, args=("member_accounts",), daemon=True).start()
+    return {
+        "ok": True,
+        "bridge_token": tok,
+        "profile": prof,
+        "catalog": SHOP_CATALOG,
+        "tier_thresholds": {"MEMBER": 150, "PRO": 350},
+    }
+
+
+@upgrade_router.post("/api/wp/member/checkin")
+def wp_member_daily_checkin(payload: WPMemberCheckinIn):
+    today_kst = datetime.now(KST).strftime("%Y-%m-%d")
+    yesterday_kst = (datetime.now(KST) - timedelta(days=1)).strftime("%Y-%m-%d")
+    origin = (payload.site_origin or "wordpress").strip()[:120]
+
+    def _op() -> Tuple[bool, int, Dict[str, Any]]:
+        with _db_session(write=True) as conn:
+            row = _authenticate_wp_member(
+                conn,
+                nickname=payload.nickname,
+                pin=payload.pin or "",
+                bridge_token=payload.bridge_token or "",
+                allow_create_with_pin=False,
+            )
+            if (row["last_checkin_date"] or "") == today_kst:
+                return True, 0, _serialize_wp_member_profile(conn, row)
+
+            prev_streak = int(row["streak_days"] or 0)
+            new_streak = (prev_streak + 1) if (row["last_checkin_date"] == yesterday_kst) else 1
+            bonus = 20 + (10 if new_streak > 0 and new_streak % 7 == 0 else 0)
+            new_pts = int(row["points"] or 0) + bonus
+            new_tier = _tier_for_points(new_pts)
+            now = time.time()
+
+            conn.execute(
+                """
+                UPDATE member_accounts
+                SET points = ?, role_tier = ?, streak_days = ?, last_checkin_date = ?, updated_at = ?
+                WHERE nickname = ?
+                """,
+                (new_pts, new_tier, new_streak, today_kst, now, row["nickname"]),
+            )
+            conn.execute(
+                """
+                INSERT INTO wp_point_ledger(nickname, event_type, ref_id, points_delta, kst_date, site_origin, created_at)
+                VALUES (?, 'daily_checkin', ?, ?, ?, ?, ?)
+                """,
+                (row["nickname"], today_kst, bonus, today_kst, origin, now),
+            )
+            updated_row = conn.execute(
+                "SELECT * FROM member_accounts WHERE nickname = ?",
+                (row["nickname"],),
+            ).fetchone()
+            return False, bonus, _serialize_wp_member_profile(conn, updated_row)
+
+    already, awarded, prof = run_with_db_retry(_op)
+    if not already:
+        threading.Thread(
+            target=_trigger_pg_backup, args=("member_accounts", "wp_point_ledger"), daemon=True
+        ).start()
+    msg = (
+        "오늘 이미 출석체크를 완료하셨습니다. (오픈 라운지·워드프레스 통합 1일 1회)"
+        if already
+        else f"출석체크 완료! +{awarded}P가 통합 계정에 적립되었습니다."
+    )
+    return {"ok": True, "already_checked": already, "awarded_points": awarded, "message": msg, "profile": prof}
+
+
+@upgrade_router.post("/api/wp/member/equip-badge")
+def wp_member_equip_badge(payload: WPMemberEquipIn):
+    target_key = (payload.item_key or "").strip()
+
+    def _op() -> Dict[str, Any]:
+        with _db_session(write=True) as conn:
+            row = _authenticate_wp_member(
+                conn,
+                nickname=payload.nickname,
+                pin=payload.pin or "",
+                bridge_token=payload.bridge_token or "",
+                allow_create_with_pin=False,
+            )
+            owned: List[str] = json.loads(row["owned_items_json"] or "[]")
+            if not target_key:
+                new_badge = ""
+            else:
+                item = next((x for x in SHOP_CATALOG if x["item_key"] == target_key), None)
+                if not item or target_key not in owned:
+                    raise HTTPException(status_code=400, detail="보유 중인 칭호만 장착할 수 있습니다.")
+                new_badge = item["badge_label"]
+            conn.execute(
+                "UPDATE member_accounts SET active_badge = ?, updated_at = ? WHERE nickname = ?",
+                (new_badge, time.time(), row["nickname"]),
+            )
+            updated_row = conn.execute(
+                "SELECT * FROM member_accounts WHERE nickname = ?",
+                (row["nickname"],),
+            ).fetchone()
+            return _serialize_wp_member_profile(conn, updated_row)
+
+    prof = run_with_db_retry(_op)
+    threading.Thread(target=_trigger_pg_backup, args=("member_accounts",), daemon=True).start()
+    return {"ok": True, "profile": prof}
+
+
+@upgrade_router.post("/api/wp/member/reward")
+def wp_member_activity_reward(payload: WPMemberRewardIn):
+    ev = (payload.event_type or "wp_comment").strip().lower()
+    rewards_spec = {
+        "wp_comment": (5, 3, "워드프레스 댓글 작성"),
+        "wp_post": (15, 2, "워드프레스 분석글 작성"),
+    }
+    if ev not in rewards_spec:
+        raise HTTPException(status_code=400, detail="지원하지 않는 활동 보상 유형입니다.")
+    pts_delta, daily_cap, ev_label = rewards_spec[ev]
+    ref_id = (payload.ref_id or "").strip()[:64]
+    today_kst = datetime.now(KST).strftime("%Y-%m-%d")
+    origin = (payload.site_origin or "wordpress").strip()[:120]
+
+    def _op() -> Tuple[bool, int, str, Dict[str, Any]]:
+        with _db_session(write=True) as conn:
+            row = _authenticate_wp_member(
+                conn,
+                nickname=payload.nickname,
+                pin=payload.pin or "",
+                bridge_token=payload.bridge_token or "",
+                allow_create_with_pin=False,
+            )
+            if ref_id:
+                dup = conn.execute(
+                    "SELECT 1 FROM wp_point_ledger WHERE lower(nickname)=lower(?) AND event_type=? AND ref_id=?",
+                    (row["nickname"], ev, ref_id),
+                ).fetchone()
+                if dup:
+                    return False, 0, "이미 포인트가 적립된 활동입니다.", _serialize_wp_member_profile(conn, row)
+
+            cnt_today = conn.execute(
+                "SELECT COUNT(*) AS c FROM wp_point_ledger WHERE lower(nickname)=lower(?) AND event_type=? AND kst_date=?",
+                (row["nickname"], ev, today_kst),
+            ).fetchone()["c"]
+            if int(cnt_today or 0) >= daily_cap:
+                return (
+                    False,
+                    0,
+                    f"일일 {ev_label} 포인트 적립 한도({daily_cap}회)를 모두 달성했습니다.",
+                    _serialize_wp_member_profile(conn, row),
+                )
+
+            now = time.time()
+            new_pts = int(row["points"] or 0) + pts_delta
+            new_tier = _tier_for_points(new_pts)
+            conn.execute(
+                "UPDATE member_accounts SET points = ?, role_tier = ?, updated_at = ? WHERE nickname = ?",
+                (new_pts, new_tier, now, row["nickname"]),
+            )
+            conn.execute(
+                """
+                INSERT INTO wp_point_ledger(nickname, event_type, ref_id, points_delta, kst_date, site_origin, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (row["nickname"], ev, ref_id, pts_delta, today_kst, origin, now),
+            )
+            updated_row = conn.execute(
+                "SELECT * FROM member_accounts WHERE nickname = ?",
+                (row["nickname"],),
+            ).fetchone()
+            return True, pts_delta, f"{ev_label} 보상 +{pts_delta}P 적립 완료!", _serialize_wp_member_profile(conn, updated_row)
+
+    credited, delta, msg, prof = run_with_db_retry(_op)
+    if credited:
+        threading.Thread(
+            target=_trigger_pg_backup, args=("member_accounts", "wp_point_ledger"), daemon=True
+        ).start()
+    return {"ok": True, "credited": credited, "awarded_points": delta, "message": msg, "profile": prof}
+
+
 # --- Frontend Upgrade Bundle (/api/member/p0p1-upgrade.js) ---
 UPGRADE_JS = r"""
-/* SportIQ Member-First P0+P1 Upgrade Bundle v1.1 */
+/* SportIQ Member-First P0+P1+P2 Upgrade Bundle v2.0 (PWA + Raffle Admin + WP Bridge) */
 (function () {
   if (window.__SPORTIQ_MEMBER_UPGRADE_V1__) return;
   window.__SPORTIQ_MEMBER_UPGRADE_V1__ = true;
@@ -1252,7 +2322,7 @@ UPGRADE_JS = r"""
 
     function hideKnownModal(el) {
       if (!el) return;
-      if (el.id === "sqMemberHubModal" || el.id === "dcMatchModal" || el.id === "dcMatchDetailModal") {
+      if (el.id === "sqAdminRaffleModal" || el.id === "sqPwaIosModal" || el.id === "sqMemberHubModal" || el.id === "dcMatchModal" || el.id === "dcMatchDetailModal") {
         el.style.display = "none";
         return;
       }
@@ -1264,7 +2334,7 @@ UPGRADE_JS = r"""
 
     window.addEventListener("keydown", function (ev) {
       if (ev.key !== "Escape" && ev.key !== "Esc" && ev.keyCode !== 27) return;
-      var ids = ["sqMemberHubModal", "commentModal", "writeModal", "dcMatchModal", "dcMatchDetailModal"];
+      var ids = ["sqAdminRaffleModal", "sqPwaIosModal", "sqMemberHubModal", "commentModal", "writeModal", "dcMatchModal", "dcMatchDetailModal"];
       for (var i = 0; i < ids.length; i++) {
         var m = document.getElementById(ids[i]);
         if (isModalVisible(m)) {
@@ -1282,7 +2352,7 @@ UPGRADE_JS = r"""
     document.addEventListener("click", function (ev) {
       var t = ev.target;
       if (!t || !t.id) return;
-      if (t.id === "sqMemberHubModal" || t.id === "commentModal" || t.id === "writeModal" || t.id === "dcMatchModal") {
+      if (t.id === "sqAdminRaffleModal" || t.id === "sqPwaIosModal" || t.id === "sqMemberHubModal" || t.id === "commentModal" || t.id === "writeModal" || t.id === "dcMatchModal") {
         hideKnownModal(t);
       }
     });
@@ -1366,7 +2436,7 @@ UPGRADE_JS = r"""
       state.streak = Number(prof.streak_days || 0);
       if (prof.last_checkin_date) {
         localStorage.setItem("sportiq_checked", prof.last_checkin_date);
-        state.checkedToday = prof.last_checkin_date === new Date().toISOString().slice(0, 10);
+        state.checkedToday = prof.last_checkin_date === (function(){ try { return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul" }).format(new Date()); } catch(e) { return new Date().toISOString().slice(0, 10); } })();
       }
       if (typeof window.updatePointsUI === "function") window.updatePointsUI();
       if (typeof window.setRole === "function") window.setRole(prof.role_tier || "GUEST", false);
@@ -1737,16 +2807,26 @@ UPGRADE_JS = r"""
 
         var rf = d.raffle || {};
         var raffleHtml = [
-          "<div style='background:linear-gradient(135deg,rgba(217,119,6,.16),rgba(15,23,42,.95));border:1px solid rgba(245,158,11,.45);border-radius:12px;padding:12px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;'>",
-          "  <div>",
-          "    <div style='font-weight:800;color:#fde68a;font-size:13px;'>🎁 " + escHtml(rf.prize_title || "주간 럭키드로우") + " (" + escHtml(rf.round_key || "") + ")</div>",
-          "    <div style='font-size:11.5px;color:#cbd5e1;margin-top:3px;'>전체 응모: <strong>" + escHtml(rf.total_tickets || 0) + "장</strong> · 내 응모권: <strong style='color:#4ade80;'>" + escHtml(rf.my_tickets || 0) + "장</strong></div>",
+          "<div style='background:linear-gradient(135deg,rgba(217,119,6,.16),rgba(15,23,42,.95));border:1px solid rgba(245,158,11,.45);border-radius:12px;padding:12px;margin-top:12px;'>",
+          "  <div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;'>",
+          "    <div>",
+          "      <div style='font-weight:800;color:#fde68a;font-size:13px;'>🎁 " + escHtml(rf.prize_title || "주간 럭키드로우") + " (" + escHtml(rf.round_key || "") + ")</div>",
+          "      <div style='font-size:11.5px;color:#cbd5e1;margin-top:3px;'>전체 응모: <strong>" + escHtml(rf.total_tickets || 0) + "장</strong> · 내 응모권: <strong style='color:#4ade80;'>" + escHtml(rf.my_tickets || 0) + "장</strong></div>",
+          "    </div>",
+          "    <div style='display:flex;gap:6px;align-items:center;'>",
+          "      <button type='button' id='sqEnterRaffleBtn' class='sq-up-btn' style='background:linear-gradient(135deg,#d97706,#b45309);'>50P 응모하기</button>",
+          "      <button type='button' id='sqOpenAdminRaffleBtn' class='dc-pill' style='font-size:11px;padding:5px 9px;border-color:#475569;color:#cbd5e1;' title='관리자 전용 응모 조회 및 공정 추첨'>👑 추첨 관리</button>",
+          "    </div>",
           "  </div>",
-          "  <button type='button' id='sqEnterRaffleBtn' class='sq-up-btn' style='background:linear-gradient(135deg,#d97706,#b45309);'>50P 응모하기</button>",
+          "  <div id='sqMyWinningClaimArea' style='margin-top:8px;'></div>",
+          "  <div id='sqPublicWinnersArea' style='margin-top:8px;padding-top:8px;border-top:1px solid rgba(148,163,184,.18);font-size:11.5px;color:#94a3b8;'>최근 당첨자 발표 내역을 불러오는 중...</div>",
           "</div>"
         ].join("");
 
-        box.innerHTML = "<div style='font-weight:800;color:#f8fafc;margin-bottom:8px;'>🏅 전용 칭호·배지 상점 (구매 즉시 게시글·응원톡 닉네임 옆 표시)</div>" + cards + raffleHtml;
+        box.innerHTML = "<div style='font-weight:800;color:#f8fafc;margin-bottom:8px;'>🏅 전용 칭호·배지 상점 (구매 즉시 게시글·응원톡·워드프레스 연동 표시)</div>" + cards + raffleHtml;
+        loadPublicAndMyRaffleWinners();
+        var admBtn = document.getElementById("sqOpenAdminRaffleBtn");
+        if (admBtn) admBtn.onclick = function () { openAdminRaffleModal(); };
 
         box.querySelectorAll("[data-sq-buy]").forEach(function (b) {
           b.onclick = function () {
@@ -1820,7 +2900,392 @@ UPGRADE_JS = r"""
     }
   }
 
+
+  // ==========================================================================
+  // STAGE 1 FRONTEND: PWA Service Worker, Header Install Button & Mobile Banner
+  // ==========================================================================
+  var deferredPwaPrompt = null;
+  var LS_PWA_DISMISS = "sq_pwa_dismiss_until";
+
+  function isStandalonePwa() {
+    try {
+      return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function isIosSafariDevice() {
+    var ua = (window.navigator.userAgent || "").toLowerCase();
+    var isIos = /iphone|ipad|ipod/.test(ua);
+    var isCriOS = /crios|fxios|edgios/.test(ua);
+    return isIos && !isCriOS && !isStandalonePwa();
+  }
+
+  function showIosInstallGuideModal() {
+    var m = document.getElementById("sqPwaIosModal");
+    if (!m) {
+      m = document.createElement("div");
+      m.id = "sqPwaIosModal";
+      m.className = "sq-modal-backdrop";
+      m.setAttribute("tabindex", "-1");
+      m.innerHTML = [
+        "<div class='sq-modal-panel' style='max-width:400px;'>",
+        "  <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;'>",
+        "    <h3 style='margin:0;font-size:16px;font-weight:900;color:#f8fafc;'>📲 아이폰·아이패드 홈 화면 앱 추가</h3>",
+        "    <button type='button' id='sqCloseIosGuideBtn' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:4px 9px;cursor:pointer;font-weight:800;'>✕ (Esc)</button>",
+        "  </div>",
+        "  <div style='background:#020617;border:1px solid #1e293b;border-radius:12px;padding:13px;font-size:13px;line-height:1.65;color:#e2e8f0;'>",
+        "    <div style='margin-bottom:8px;'>1️⃣ Safari 하단 바 가운데의 <strong style='color:#38bdf8;'>[공유 ↑]</strong> 아이콘을 탭합니다.</div>",
+        "    <div style='margin-bottom:8px;'>2️⃣ 메뉴를 살짝 올려 <strong style='color:#4ade80;'>[홈 화면에 추가 ➕]</strong>를 선택합니다.</div>",
+        "    <div style='color:#94a3b8;font-size:11.5px;'>설치 즉시 주소창 없는 전체화면 네이티브 앱 모드로 실시간 스코어와 드롭오즈를 0.01초 만에 열 수 있습니다.</div>",
+        "  </div>",
+        "</div>"
+      ].join("");
+      document.body.appendChild(m);
+      document.getElementById("sqCloseIosGuideBtn").onclick = function () { m.style.display = "none"; };
+    }
+    m.style.display = "flex";
+  }
+
+  function triggerPwaInstallAction() {
+    if (deferredPwaPrompt) {
+      deferredPwaPrompt.prompt();
+      deferredPwaPrompt.userChoice.then(function (choice) {
+        if (choice && choice.outcome === "accepted") {
+          if (typeof showToast === "function") showToast("🎉 SportIQ 앱이 홈 화면에 추가되었습니다!");
+          hidePwaInstallElements();
+        }
+        deferredPwaPrompt = null;
+      });
+      return;
+    }
+    if (isIosSafariDevice()) {
+      showIosInstallGuideModal();
+      return;
+    }
+    if (typeof showToast === "function") {
+      showToast("📲 브라우저 우측 상단 메뉴(⋮) → '앱 설치' 또는 '홈 화면에 추가'를 눌러 바로 설치하실 수 있습니다.");
+    }
+  }
+
+  function hidePwaInstallElements() {
+    var b = document.getElementById("sqPwaInstallBanner");
+    if (b) b.style.display = "none";
+    var hb = document.getElementById("sqHeaderPwaBtn");
+    if (hb && isStandalonePwa()) hb.style.display = "none";
+  }
+
+  function mountPwaInstallUi() {
+    if (isStandalonePwa()) {
+      hidePwaInstallElements();
+      return;
+    }
+    var hubBtn = document.getElementById("sqOpenMemberHubBtn");
+    if (hubBtn && hubBtn.parentNode && !document.getElementById("sqHeaderPwaBtn")) {
+      var pbtn = document.createElement("button");
+      pbtn.id = "sqHeaderPwaBtn";
+      pbtn.type = "button";
+      pbtn.className = "sq-up-btn";
+      pbtn.style.background = "linear-gradient(135deg,#1e293b,#0f172a)";
+      pbtn.style.borderColor = "rgba(52,211,153,.55)";
+      pbtn.style.color = "#6ee7b7";
+      pbtn.innerHTML = "📲 앱 설치";
+      pbtn.onclick = triggerPwaInstallAction;
+      hubBtn.insertAdjacentElement("afterend", pbtn);
+    }
+
+    var dismissUntil = Number(localStorage.getItem(LS_PWA_DISMISS) || 0);
+    var shouldShowBanner = (Date.now() > dismissUntil) && (Boolean(deferredPwaPrompt) || isIosSafariDevice() || window.innerWidth <= 820);
+    if (shouldShowBanner && !document.getElementById("sqPwaInstallBanner")) {
+      var banner = document.createElement("div");
+      banner.id = "sqPwaInstallBanner";
+      banner.style.cssText = "position:fixed;left:14px;bottom:16px;z-index:9990;background:rgba(15,23,42,.96);border:1px solid rgba(56,189,248,.45);border-radius:14px;padding:11px 13px;max-width:340px;box-shadow:0 14px 32px rgba(0,0,0,.55);display:flex;align-items:center;gap:10px;backdrop-filter:blur(8px);";
+      banner.innerHTML = [
+        "<img src='/pwa-icon-192.png' alt='SportIQ' style='width:38px;height:38px;border-radius:10px;flex-shrink:0;' />",
+        "<div style='flex:1;min-width:0;'>",
+        "  <div style='font-size:12.5px;font-weight:800;color:#f8fafc;'>SportIQ 홈 화면 앱으로 열기</div>",
+        "  <div style='font-size:11px;color:#94a3b8;margin-top:1px;'>전체화면 스코어 · 실시간 드롭오즈 빠른 실행</div>",
+        "</div>",
+        "<button type='button' id='sqBannerInstallNow' class='sq-up-btn' style='padding:6px 10px;font-size:11.5px;white-space:nowrap;'>설치</button>",
+        "<button type='button' id='sqBannerDismissPwa' aria-label='닫기' style='background:transparent;border:0;color:#94a3b8;cursor:pointer;font-weight:900;font-size:13px;padding:2px 4px;'>✕</button>"
+      ].join("");
+      document.body.appendChild(banner);
+      document.getElementById("sqBannerInstallNow").onclick = triggerPwaInstallAction;
+      document.getElementById("sqBannerDismissPwa").onclick = function () {
+        localStorage.setItem(LS_PWA_DISMISS, String(Date.now() + 7 * 86400 * 1000));
+        banner.style.display = "none";
+      };
+    }
+  }
+
+  function setupPwaSupport() {
+    if ("serviceWorker" in navigator && !window.__sqSwRegistered) {
+      window.__sqSwRegistered = true;
+      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(function () {});
+    }
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault();
+      deferredPwaPrompt = e;
+      mountPwaInstallUi();
+    });
+    window.addEventListener("appinstalled", function () {
+      deferredPwaPrompt = null;
+      hidePwaInstallElements();
+    });
+    mountPwaInstallUi();
+
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      if (params.get("open") === "shop" && !window.__sqShortcutHandled) {
+        window.__sqShortcutHandled = true;
+        setTimeout(function () { openMemberHubModal(); }, 350);
+      } else if (params.get("tab") === "datacenter" && !window.__sqShortcutHandled) {
+        window.__sqShortcutHandled = true;
+        setTimeout(function () {
+          var hb = document.getElementById("dcHubBody");
+          var hint = document.getElementById("dcQuickExpandHint");
+          if (hb) hb.style.display = "block";
+          if (hint) hint.style.display = "none";
+        }, 350);
+      }
+    } catch (e) {}
+  }
+
+  // ==========================================================================
+  // STAGE 2 FRONTEND: Public Winners Feed, Personal Claim Code & Admin Console
+  // ==========================================================================
+  var SS_ADMIN_KEY = "sq_admin_session_key";
+
+  function loadPublicAndMyRaffleWinners() {
+    var pubBox = document.getElementById("sqPublicWinnersArea");
+    var myBox = document.getElementById("sqMyWinningClaimArea");
+    if (pubBox) {
+      fetch("/api/raffle/public-winners?limit=5")
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var list = (d && d.winners) || [];
+          if (!list.length) {
+            pubBox.innerHTML = "🏆 <strong>주간 당첨자 투명 발표:</strong> 이번 회차 추첨 대기 중 (CSPRNG 가중치 해시 검증 적용)";
+            return;
+          }
+          pubBox.innerHTML = "<div style='font-weight:800;color:#fde68a;margin-bottom:5px;'>🏆 최근 주간 기프티콘 당첨자 (해시 검증 완료)</div>" +
+            list.map(function (w) {
+              return "<div style='display:flex;justify-content:space-between;align-items:center;gap:6px;padding:4px 0;border-bottom:1px dashed rgba(148,163,184,.12);'>" +
+                "<span><strong>" + escHtml(w.round_key) + "</strong> · <span style='color:#38bdf8;font-weight:800;'>" + escHtml(w.winner_nickname) + "</span> " + escHtml(w.active_badge || "") + " (" + escHtml(w.winner_tickets) + "장/" + escHtml(w.win_odds_pct) + "%)</span>" +
+                "<span style='color:#86efac;font-size:11px;'>" + escHtml(w.fulfillment_note) + " · #" + escHtml((w.draw_seed_prefix || "").slice(0, 8)) + "</span>" +
+                "</div>";
+            }).join("");
+        }).catch(function () {});
+    }
+
+    var nk = getSavedNick();
+    var pn = getSavedPin();
+    if (myBox && nk && pn.length === 4) {
+      fetch("/api/member/raffle/my-wins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname: nk, pin: pn })
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          var wins = (d && d.wins) || [];
+          if (!wins.length) { myBox.innerHTML = ""; return; }
+          myBox.innerHTML = wins.map(function (w) {
+            return "<div style='background:rgba(16,185,129,.16);border:1px solid rgba(52,211,153,.55);border-radius:10px;padding:9px 11px;margin-top:6px;font-size:12px;color:#ecfdf5;'>" +
+              "🎉 <strong>[" + escHtml(w.round_key) + "] 당첨 축하드립니다!</strong> (" + escHtml(w.prize_name) + ")<br/>" +
+              "🔑 본인 전용 수령 인증코드: <code style='background:#020617;padding:2px 7px;border-radius:6px;color:#fde68a;font-weight:900;'>" + escHtml(w.claim_code) + "</code> · 상태: <strong>" + escHtml(w.fulfillment_note) + "</strong>" +
+              "</div>";
+          }).join("");
+        }).catch(function () {});
+    }
+  }
+
+  function openAdminRaffleModal() {
+    var m = document.getElementById("sqAdminRaffleModal");
+    if (!m) {
+      m = document.createElement("div");
+      m.id = "sqAdminRaffleModal";
+      m.className = "sq-modal-backdrop";
+      m.style.zIndex = "100020";
+      m.setAttribute("tabindex", "-1");
+      m.innerHTML = [
+        "<div class='sq-modal-panel' style='max-width:660px;'>",
+        "  <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;'>",
+        "    <h3 style='margin:0;font-size:16.5px;font-weight:900;color:#fde68a;'>👑 주간 기프티콘 응모 조회 &amp; 공정 추첨 관리 콘솔</h3>",
+        "    <button type='button' id='sqCloseAdminRaffleBtn' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:800;'>✕ 닫기 (Esc)</button>",
+        "  </div>",
+        "  <div id='sqAdminAuthBox' style='background:#020617;border:1px solid #1e293b;border-radius:12px;padding:12px;margin-bottom:12px;'></div>",
+        "  <div id='sqAdminConsoleBody' style='font-size:12.5px;color:#cbd5e1;'>관리자 인증 상태를 확인하는 중...</div>",
+        "</div>"
+      ].join("");
+      document.body.appendChild(m);
+      document.getElementById("sqCloseAdminRaffleBtn").onclick = function () { m.style.display = "none"; };
+    }
+    m.style.display = "flex";
+    if (m.focus) m.focus();
+    refreshAdminRaffleState();
+  }
+
+  function refreshAdminRaffleState(selectedRound) {
+    var authBox = document.getElementById("sqAdminAuthBox");
+    var bodyBox = document.getElementById("sqAdminConsoleBody");
+    if (!authBox || !bodyBox) return;
+
+    fetch("/api/admin/raffle/auth-state")
+      .then(function (r) { return r.json(); })
+      .then(function (st) {
+        if (!st || !st.configured) {
+          authBox.innerHTML = [
+            "<div style='font-size:12px;color:#fde68a;font-weight:800;margin-bottom:7px;'>🔐 최초 1회 관리자 마스터 키 설정 (6~48자, PBKDF2 암호화·PostgreSQL 영구 백업)</div>",
+            "<div style='display:grid;grid-template-columns:1fr auto;gap:8px;'>",
+            "  <input id='sqNewAdminKeyInput' type='password' placeholder='사용하실 관리자 전용 마스터 비밀번호 (6자 이상)' style='background:#0f172a;border:1px solid #334155;border-radius:9px;padding:8px 10px;color:#fff;font-size:12.5px;' />",
+            "  <button type='button' id='sqSaveAdminKeyBtn' class='sq-up-btn'>마스터 키 저장</button>",
+            "</div>"
+          ].join("");
+          bodyBox.innerHTML = "<div style='padding:12px;color:#94a3b8;text-align:center;'>마스터 키를 설정하면 즉시 회차별 응모자 목록 조회 및 당첨자 추첨을 진행할 수 있습니다.</div>";
+          document.getElementById("sqSaveAdminKeyBtn").onclick = function () {
+            var nk = document.getElementById("sqNewAdminKeyInput").value.trim();
+            fetch("/api/admin/setup-key", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ new_admin_key: nk })
+            }).then(function (r) { return r.json().then(function (x) { return { status: r.status, data: x }; }); })
+              .then(function (res) {
+                if (res.status !== 200 || !res.data.ok) {
+                  if (typeof showToast === "function") showToast("❌ " + ((res.data && res.data.detail) || "설정 실패"));
+                  return;
+                }
+                sessionStorage.setItem(SS_ADMIN_KEY, nk);
+                if (typeof showToast === "function") showToast("✅ 관리자 마스터 키가 설정되었습니다!");
+                refreshAdminRaffleState(selectedRound);
+              });
+          };
+          return;
+        }
+
+        var savedKey = sessionStorage.getItem(SS_ADMIN_KEY) || "";
+        authBox.innerHTML = [
+          "<div style='display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;'>",
+          "  <input id='sqAdminKeyInput' type='password' value='" + escHtml(savedKey) + "' placeholder='관리자 마스터 키 입력' style='background:#0f172a;border:1px solid #334155;border-radius:9px;padding:8px 10px;color:#fff;font-size:12.5px;' />",
+          "  <button type='button' id='sqLoadAdminRoundsBtn' class='sq-up-btn'>응모 현황 불러오기</button>",
+          "</div>"
+        ].join("");
+        document.getElementById("sqLoadAdminRoundsBtn").onclick = function () {
+          var k = document.getElementById("sqAdminKeyInput").value.trim();
+          sessionStorage.setItem(SS_ADMIN_KEY, k);
+          loadAdminRoundData(k, selectedRound || st.current_round);
+        };
+        if (savedKey) {
+          loadAdminRoundData(savedKey, selectedRound || st.current_round);
+        } else {
+          bodyBox.innerHTML = "<div style='padding:12px;color:#94a3b8;text-align:center;'>관리자 마스터 키를 입력하고 [응모 현황 불러오기]를 눌러주세요.</div>";
+        }
+      });
+  }
+
+  function loadAdminRoundData(adminKey, roundKey) {
+    var bodyBox = document.getElementById("sqAdminConsoleBody");
+    if (!bodyBox) return;
+    fetch("/api/admin/raffle/rounds?round_key=" + encodeURIComponent(roundKey || ""), {
+      headers: { "X-SportIQ-Admin-Key": adminKey }
+    }).then(function (r) { return r.json().then(function (x) { return { status: r.status, data: x }; }); })
+      .then(function (res) {
+        if (res.status !== 200 || !res.data.ok) {
+          bodyBox.innerHTML = "<div style='padding:12px;color:#f87171;font-weight:700;'>❌ " + escHtml((res.data && res.data.detail) || "권한 확인 실패") + "</div>";
+          return;
+        }
+        var d = res.data;
+        var opts = (d.available_rounds || []).map(function (rk) {
+          return "<option value='" + escHtml(rk) + "'" + (rk === d.selected_round ? " selected" : "") + ">" + escHtml(rk) + "</option>";
+        }).join("");
+
+        var pRows = (d.participants || []).map(function (p, i) {
+          return "<tr style='border-bottom:1px solid #1e293b;'>" +
+            "<td style='padding:6px;'>" + (i + 1) + "</td>" +
+            "<td style='padding:6px;font-weight:800;color:#f8fafc;'>" + escHtml(p.nickname) + " <span style='color:#38bdf8;font-size:11px;'>" + escHtml(p.active_badge || "") + "</span></td>" +
+            "<td style='padding:6px;'>" + escHtml(p.role_tier) + " (" + escHtml(p.points) + "P)</td>" +
+            "<td style='padding:6px;font-weight:800;color:#4ade80;'>" + escHtml(p.tickets) + "장</td>" +
+            "<td style='padding:6px;color:#fde68a;'>" + escHtml(p.win_probability_pct) + "%</td>" +
+            "</tr>";
+        }).join("");
+
+        var dRows = (d.draws || []).map(function (w) {
+          var isDone = (w.fulfillment_note || "").indexOf("완료") !== -1;
+          var nextStatus = isDone ? "지급 대기" : "기프티콘 발송 완료";
+          return "<div style='background:#0b1220;border:1px solid #1e293b;border-radius:10px;padding:9px 11px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;'>" +
+            "<div>" +
+            "  <div style='font-weight:800;color:#4ade80;'>🎉 " + escHtml(w.winner_nickname) + " (" + escHtml(w.winner_tickets) + "장 / 총 " + escHtml(w.total_tickets) + "장) — " + escHtml(w.prize_name) + "</div>" +
+            "  <div style='font-size:11px;color:#94a3b8;margin-top:2px;'>수령코드: <code style='color:#fde68a;font-weight:800;'>" + escHtml(w.claim_code) + "</code> · 추첨시각: " + escHtml(w.drawn_at_kst) + " · 상태: <strong>" + escHtml(w.fulfillment_note) + "</strong></div>" +
+            "</div>" +
+            "<button type='button' class='dc-pill' data-sq-fulfill='" + escHtml(w.id) + "' data-sq-nextnote='" + escHtml(nextStatus) + "' style='font-size:11px;font-weight:800;'>" + (isDone ? "↩ 대기 전환" : "✅ 발송 완료 처리") + "</button>" +
+            "</div>";
+        }).join("");
+
+        bodyBox.innerHTML = [
+          "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;'>",
+          "  <div>회차 선택: <select id='sqAdminRoundSelect' style='background:#0f172a;border:1px solid #334155;border-radius:8px;padding:5px 9px;color:#fff;'>" + opts + "</select></div>",
+          "  <div style='font-size:12px;color:#93c5fd;'>응모 회원 <strong>" + escHtml(d.summary.total_participants) + "명</strong> · 총 응모권 <strong>" + escHtml(d.summary.total_tickets) + "장</strong> · 당첨 <strong>" + escHtml(d.summary.drawn_winners_count) + "명</strong></div>",
+          "</div>",
+          "<div style='background:#020617;border:1px solid #1e293b;border-radius:12px;padding:11px;margin-bottom:12px;'>",
+          "  <div style='font-weight:800;color:#fde68a;margin-bottom:7px;'>🎲 CSPRNG 응모권 가중치 공정 추첨 실행</div>",
+          "  <div style='display:grid;grid-template-columns:1fr 90px auto;gap:8px;'>",
+          "    <input id='sqAdminPrizeName' value='편의점·커피 기프티콘 5,000원권' placeholder='경품명 입력' style='background:#0f172a;border:1px solid #334155;border-radius:8px;padding:7px 10px;color:#fff;font-size:12px;' />",
+          "    <input id='sqAdminWinCount' type='number' min='1' max='5' value='1' title='추첨 인원' style='background:#0f172a;border:1px solid #334155;border-radius:8px;padding:7px 10px;color:#fff;font-size:12px;' />",
+          "    <button type='button' id='sqRunDrawNowBtn' class='sq-up-btn' style='background:linear-gradient(135deg,#d97706,#b45309);'>🎲 즉시 추첨하기</button>",
+          "  </div>",
+          "</div>",
+          "<div style='font-weight:800;color:#f8fafc;margin-bottom:6px;'>📋 회차별 응모자 &amp; 가중치 당첨 확률</div>",
+          "<div style='max-height:180px;overflow-y:auto;border:1px solid #1e293b;border-radius:10px;margin-bottom:12px;'>",
+          "  <table style='width:100%;border-collapse:collapse;font-size:12px;text-align:left;'>",
+          "    <thead><tr style='background:#020617;color:#94a3b8;'><th style='padding:6px;'>#</th><th style='padding:6px;'>닉네임·칭호</th><th style='padding:6px;'>등급·보유P</th><th style='padding:6px;'>응모권</th><th style='padding:6px;'>당첨확률</th></tr></thead>",
+          "    <tbody>" + (pRows || "<tr><td colspan='5' style='padding:12px;text-align:center;color:#94a3b8;'>이 회차에 아직 응모한 회원이 없습니다.</td></tr>") + "</tbody>",
+          "  </table>",
+          "</div>",
+          "<div style='font-weight:800;color:#f8fafc;margin-bottom:6px;'>🏆 당첨 결과 및 수령 코드 관리</div>",
+          (dRows || "<div style='padding:10px;color:#94a3b8;background:#020617;border-radius:10px;text-align:center;'>아직 추첨된 당첨자가 없습니다.</div>")
+        ].join("");
+
+        document.getElementById("sqAdminRoundSelect").onchange = function (ev) {
+          loadAdminRoundData(adminKey, ev.target.value);
+        };
+        document.getElementById("sqRunDrawNowBtn").onclick = function () {
+          var prize = document.getElementById("sqAdminPrizeName").value.trim();
+          var cnt = parseInt(document.getElementById("sqAdminWinCount").value || "1", 10);
+          fetch("/api/admin/raffle/draw", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-SportIQ-Admin-Key": adminKey },
+            body: JSON.stringify({ round_key: d.selected_round, winner_count: cnt, prize_name: prize, exclude_already_won: true })
+          }).then(function (r) { return r.json().then(function (x) { return { status: r.status, data: x }; }); })
+            .then(function (dr) {
+              if (dr.status !== 200 || !dr.data.ok) {
+                if (typeof showToast === "function") showToast("❌ " + ((dr.data && dr.data.detail) || "추첨 실패"));
+                return;
+              }
+              var names = (dr.data.drawn || []).map(function (x) { return x.winner_nickname; }).join(", ");
+              if (typeof showToast === "function") showToast("🎉 당첨자 추첨 완료: " + names);
+              loadAdminRoundData(adminKey, d.selected_round);
+              loadPublicAndMyRaffleWinners();
+            });
+        };
+        bodyBox.querySelectorAll("[data-sq-fulfill]").forEach(function (fb) {
+          fb.onclick = function () {
+            var did = parseInt(fb.getAttribute("data-sq-fulfill"), 10);
+            var nnote = fb.getAttribute("data-sq-nextnote") || "기프티콘 발송 완료";
+            fetch("/api/admin/raffle/fulfill", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-SportIQ-Admin-Key": adminKey },
+              body: JSON.stringify({ draw_id: did, fulfillment_note: nnote })
+            }).then(function (r) { return r.json(); }).then(function () {
+              loadAdminRoundData(adminKey, d.selected_round);
+              loadPublicAndMyRaffleWinners();
+            });
+          };
+        });
+      });
+  }
+
   function bootUpgrade() {
+    setupPwaSupport();
     fixInitialAttendanceStreak();
     setupToastLimiter();
     applyAboveTheFoldDiet();
@@ -1828,6 +3293,7 @@ UPGRADE_JS = r"""
     hookRoleAndAttendance();
     setupWriteModalAndServerPosts();
     mountMemberHubButtonsAndModal();
+    mountPwaInstallUi();
     polishLabelsAndProvenance();
     autoCheckTierUpgrade();
     if (getSavedNick() && getSavedPin().length === 4) {
@@ -1860,10 +3326,25 @@ def serve_p0p1_upgrade_js():
 
 
 def inject_upgrade_into_html(raw_html: str) -> str:
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=2" defer></script>'
-    if "/api/member/p0p1-upgrade.js" in raw_html:
-        return re.sub(r'/api/member/p0p1-upgrade\.js\?v=\d+', '/api/member/p0p1-upgrade.js?v=2', raw_html)
-    idx = raw_html.rfind("</body>")
+    pwa_head = (
+        '  <link rel="manifest" href="/manifest.webmanifest" />\n'
+        '  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />\n'
+        '  <meta name="theme-color" content="#0F172A" />\n'
+        '  <meta name="mobile-web-app-capable" content="yes" />\n'
+        '  <meta name="apple-mobile-web-app-capable" content="yes" />\n'
+        '  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />\n'
+        '  <meta name="apple-mobile-web-app-title" content="SportIQ" />'
+    )
+    out = raw_html
+    if 'rel="manifest"' not in out and "rel='manifest'" not in out:
+        h_idx = out.find("</head>")
+        if h_idx != -1:
+            out = out[:h_idx] + pwa_head + "\n" + out[h_idx:]
+
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=3" defer></script>'
+    if "/api/member/p0p1-upgrade.js" in out:
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=3', out)
+    idx = out.rfind("</body>")
     if idx != -1:
-        return raw_html[:idx] + "\n" + tag + "\n" + raw_html[idx:]
-    return raw_html + "\n" + tag + "\n"
+        return out[:idx] + "\n" + tag + "\n" + out[idx:]
+    return out + "\n" + tag + "\n"
