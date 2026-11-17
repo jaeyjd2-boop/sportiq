@@ -1,4 +1,7 @@
+import functools
 import hashlib
+import inspect
+import sys
 import hmac
 import json
 import secrets
@@ -57,6 +60,11 @@ ALL_KNOWN_SQLITE_TABLES: Tuple[str, ...] = (
     "admin_config",
     "raffle_draw_results",
     "wp_point_ledger",
+    "member_match_predictions",
+    "member_prediction_stats",
+    "member_notifications",
+    "community_post_blinds",
+    "community_post_report_logs",
 )
 
 SHOP_CATALOG: List[Dict[str, Any]] = [
@@ -255,6 +263,55 @@ def _init_upgrade_tables() -> None:
                     kst_date TEXT NOT NULL,
                     site_origin TEXT NOT NULL DEFAULT '',
                     created_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS member_match_predictions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nickname TEXT NOT NULL,
+                    match_key TEXT NOT NULL,
+                    matchup TEXT NOT NULL,
+                    league TEXT NOT NULL DEFAULT 'EPL',
+                    pick TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'PENDING',
+                    reward_points INTEGER NOT NULL DEFAULT 5,
+                    settled_score TEXT NOT NULL DEFAULT '',
+                    created_at REAL NOT NULL,
+                    settled_at REAL NOT NULL DEFAULT 0,
+                    UNIQUE(nickname, match_key)
+                );
+                CREATE TABLE IF NOT EXISTS member_prediction_stats (
+                    nickname TEXT PRIMARY KEY,
+                    total_picks INTEGER NOT NULL DEFAULT 0,
+                    hit_count INTEGER NOT NULL DEFAULT 0,
+                    miss_count INTEGER NOT NULL DEFAULT 0,
+                    win_streak INTEGER NOT NULL DEFAULT 0,
+                    best_streak INTEGER NOT NULL DEFAULT 0,
+                    total_earned_points INTEGER NOT NULL DEFAULT 0,
+                    updated_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS member_notifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nickname TEXT NOT NULL,
+                    notif_type TEXT NOT NULL DEFAULT 'SYSTEM',
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    link_target TEXT NOT NULL DEFAULT '',
+                    is_read INTEGER NOT NULL DEFAULT 0,
+                    created_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS community_post_blinds (
+                    post_id TEXT PRIMARY KEY,
+                    report_count INTEGER NOT NULL DEFAULT 0,
+                    blinded INTEGER NOT NULL DEFAULT 0,
+                    last_reason TEXT NOT NULL DEFAULT '',
+                    updated_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS community_post_report_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    post_id TEXT NOT NULL,
+                    reporter_key TEXT NOT NULL,
+                    reason TEXT NOT NULL DEFAULT '스팸/도배',
+                    created_at REAL NOT NULL,
+                    UNIQUE(post_id, reporter_key)
                 );
                 """
             )
@@ -528,7 +585,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "3.0",
+        "version": "3.2",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -773,6 +830,10 @@ def list_community_posts():
             c_rows = conn.execute(
                 "SELECT post_id, user_name, user_badge, comment_text, created_at FROM community_post_comments ORDER BY id ASC"
             ).fetchall()
+            blind_set = {
+                r["post_id"]
+                for r in conn.execute("SELECT post_id FROM community_post_blinds WHERE blinded = 1").fetchall()
+            }
         comments_by_post: Dict[str, List[Dict[str, str]]] = {}
         for c in c_rows:
             label = f"{c['user_name']} {c['user_badge']}".strip()
@@ -782,6 +843,7 @@ def list_community_posts():
         posts = []
         for r in p_rows:
             pid = r["id"]
+            is_bl = pid in blind_set
             mins = max(0, int((now - float(r["created_at"] or now)) // 60))
             posts.append(
                 {
@@ -794,12 +856,13 @@ def list_community_posts():
                     "likes": int(r["likes"] or 1),
                     "bookmarked": False,
                     "liked": False,
-                    "hidden": False,
+                    "hidden": is_bl,
+                    "blinded": is_bl,
                     "time": mins,
-                    "title": r["title"],
-                    "body": r["body"],
+                    "title": "🚨 [클린 블라인드] 누적 신고로 숨김 처리된 게시글입니다." if is_bl else r["title"],
+                    "body": "커뮤니티 운영 정책에 따라 신고 3회 이상 누적되어 자동 블라인드 처리되었습니다." if is_bl else r["body"],
                     "tags": json.loads(r["tags_json"] or "[]"),
-                    "comments": comments_by_post.get(pid, []),
+                    "comments": [] if is_bl else comments_by_post.get(pid, []),
                     "isMemberServerPost": True,
                     "hasPin": bool(r["pin_hash"]),
                 }
@@ -961,15 +1024,34 @@ def add_community_comment(post_id: str, payload: CommentCreateIn):
             ).fetchone()
             if acc and acc["active_badge"]:
                 badge = acc["active_badge"]
+            now_c = time.time()
             conn.execute(
                 "INSERT INTO community_post_comments(post_id, user_name, user_badge, comment_text, created_at) VALUES (?, ?, ?, ?, ?)",
-                (post_id[:64], user, badge, txt, time.time()),
+                (post_id[:64], user, badge, txt, now_c),
             )
+            p_owner = conn.execute(
+                "SELECT author, title FROM community_member_posts WHERE id = ?",
+                (post_id[:64],),
+            ).fetchone()
+            if p_owner and p_owner["author"] and p_owner["author"].strip().lower() != user.lower():
+                conn.execute(
+                    """
+                    INSERT INTO member_notifications(nickname, notif_type, title, body, link_target, is_read, created_at)
+                    VALUES (?, 'COMMENT', ?, ?, ?, 0, ?)
+                    """,
+                    (
+                        p_owner["author"].strip()[:24],
+                        f"💬 '{user}'님이 내 분석글에 댓글을 남겼습니다",
+                        f"[{p_owner['title'][:36]}] {txt[:80]}",
+                        post_id[:64],
+                        now_c,
+                    ),
+                )
         label = f"{user} {badge}".strip()
         return {"user": label, "text": txt}
 
     c_obj = run_with_db_retry(_op)
-    threading.Thread(target=_trigger_pg_backup, args=("community_post_comments",), daemon=True).start()
+    threading.Thread(target=_trigger_pg_backup, args=("community_post_comments", "member_notifications"), daemon=True).start()
     return {"ok": True, "comment": c_obj}
 
 
@@ -2073,7 +2155,7 @@ def wp_member_activity_reward(payload: WPMemberRewardIn):
     return {"ok": True, "credited": credited, "awarded_points": delta, "message": msg, "profile": prof}
 
 
-# --- Frontend Upgrade Bundle (/api/member/p0p1-upgrade.js?v=5) ---
+# --- Frontend Upgrade Bundle (/api/member/p0p1-upgrade.js) ---
 UPGRADE_JS = r"""
 /* SportIQ Member-First P0+P1+P2 Upgrade Bundle v2.0 (PWA + Raffle Admin + WP Bridge) */
 (function () {
@@ -3320,7 +3402,7 @@ UPGRADE_JS = r"""
 """
 
 
-@upgrade_router.get("/api/member/p0p1-upgrade.js?v=5")
+@upgrade_router.get("/api/member/p0p1-upgrade.js")
 def serve_p0p1_upgrade_js():
     return Response(
         content=UPGRADE_JS,
@@ -3345,90 +3427,16 @@ def inject_upgrade_into_html(raw_html: str) -> str:
         if h_idx != -1:
             out = out[:h_idx] + pwa_head + "\n" + out[h_idx:]
 
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=5" defer></script>'
-    if "/api/member/p0p1-upgrade.js?v=5" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=5', out)
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=7" defer></script>'
+    if "/api/member/p0p1-upgrade.js" in out:
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=7', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
     return out + "\n" + tag + "\n"
 # ============================================================================
-# STAGE P3 (v3.0) + CHRONOLOGICAL/RECENT MATCH TIME SORTER
-# - P3-A: Auto Match Prediction Settlement Daemon + Mini MyPage (/api/member/mypage)
-# - P3-B: In-App Notification Bell + Comment/Settlement Alerts + PWA Push (/sw.js)
-# - P3-C: Community 3-Tab Split (ALL/MEMBER/AI) + Search + 3-Strike Auto Blind
-# - Match Sorter: Sorts Live Score & Dropping-Odds Cards by Nearest/Recent Time
+# STAGE P3 (v3.2) + UNIVERSAL CHRONOLOGICAL MATCH SORTER (v7.0)
 # ============================================================================
-P3_EXTRA_TABLES: Tuple[str, ...] = (
-    "member_match_predictions",
-    "member_prediction_stats",
-    "member_notifications",
-    "community_post_blinds",
-    "community_post_report_logs",
-)
-ALL_KNOWN_SQLITE_TABLES = tuple(dict.fromkeys([*ALL_KNOWN_SQLITE_TABLES, *P3_EXTRA_TABLES]))
-
-
-def _init_p3_tables() -> None:
-    def _op() -> None:
-        with _db_session(write=True) as conn:
-            conn.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS member_match_predictions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    nickname TEXT NOT NULL,
-                    match_key TEXT NOT NULL,
-                    matchup TEXT NOT NULL,
-                    league TEXT NOT NULL DEFAULT 'EPL',
-                    pick TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'PENDING',
-                    reward_points INTEGER NOT NULL DEFAULT 5,
-                    settled_score TEXT NOT NULL DEFAULT '',
-                    created_at REAL NOT NULL,
-                    settled_at REAL NOT NULL DEFAULT 0,
-                    UNIQUE(nickname, match_key)
-                );
-                CREATE TABLE IF NOT EXISTS member_prediction_stats (
-                    nickname TEXT PRIMARY KEY,
-                    total_picks INTEGER NOT NULL DEFAULT 0,
-                    hit_count INTEGER NOT NULL DEFAULT 0,
-                    miss_count INTEGER NOT NULL DEFAULT 0,
-                    win_streak INTEGER NOT NULL DEFAULT 0,
-                    best_streak INTEGER NOT NULL DEFAULT 0,
-                    total_earned_points INTEGER NOT NULL DEFAULT 0,
-                    updated_at REAL NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS member_notifications (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    nickname TEXT NOT NULL,
-                    notif_type TEXT NOT NULL DEFAULT 'SYSTEM',
-                    title TEXT NOT NULL,
-                    body TEXT NOT NULL,
-                    link_target TEXT NOT NULL DEFAULT '',
-                    is_read INTEGER NOT NULL DEFAULT 0,
-                    created_at REAL NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS community_post_blinds (
-                    post_id TEXT PRIMARY KEY,
-                    report_count INTEGER NOT NULL DEFAULT 0,
-                    blinded INTEGER NOT NULL DEFAULT 0,
-                    last_reason TEXT NOT NULL DEFAULT '',
-                    updated_at REAL NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS community_post_report_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    post_id TEXT NOT NULL,
-                    reporter_key TEXT NOT NULL,
-                    reason TEXT NOT NULL DEFAULT '스팸/도배',
-                    created_at REAL NOT NULL,
-                    UNIQUE(post_id, reporter_key)
-                );
-                """
-            )
-
-    run_with_db_retry(_op)
-
-
 def _push_member_notification(
     conn: sqlite3.Connection,
     nickname: str,
@@ -3462,8 +3470,9 @@ def _parse_match_kst_epoch(item: Dict[str, Any]) -> Optional[float]:
     for k in ("kickoff_ts", "start_ts", "timestamp", "epoch", "commence_ts"):
         v = item.get(k)
         if isinstance(v, (int, float)) and v > 1_000_000_000:
-            return float(v)
-    for k in ("commence_time", "utc_date", "start_time", "kickoff_utc", "date"):
+            return float(v / 1000.0) if v > 10_000_000_000 else float(v)
+
+    for k in ("commence_time", "utc_date", "start_time", "kickoff_utc", "date", "match_date"):
         v = item.get(k)
         if isinstance(v, str) and len(v) >= 10 and ("T" in v or "-" in v):
             try:
@@ -3473,12 +3482,33 @@ def _parse_match_kst_epoch(item: Dict[str, Any]) -> Optional[float]:
                 return dt.timestamp()
             except Exception:
                 pass
-    dt_txt = str(item.get("match_dt_kst") or item.get("schedule_venue") or item.get("kickoff_kst") or "")
-    m = re.search(r"(\d{1,2})\.(\d{1,2})\s*(?:\([^)]*\))?\s*(\d{1,2}):(\d{2})", dt_txt)
-    if m:
-        now_kst = datetime.now(KST)
+
+    dt_txt = " ".join(
+        str(item.get(k) or "")
+        for k in ("match_dt_kst", "kickoff_kst", "schedule_venue", "time_kst", "display_time")
+    ).strip()
+    if not dt_txt:
+        return None
+
+    now_kst = datetime.now(KST)
+    m_iso = re.search(r"(20\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})\D{0,14}?(\d{1,2}):(\d{2})", dt_txt)
+    if m_iso:
+        try:
+            return datetime(
+                int(m_iso.group(1)),
+                int(m_iso.group(2)),
+                int(m_iso.group(3)),
+                int(m_iso.group(4)),
+                int(m_iso.group(5)),
+                tzinfo=KST,
+            ).timestamp()
+        except ValueError:
+            pass
+
+    m_md = re.search(r"(\d{1,2})[./](\d{1,2})\s*(?:\([^)]*\))?\s*(\d{1,2}):(\d{2})", dt_txt)
+    if m_md:
         yr = now_kst.year
-        mo, da, hh, mm = int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))
+        mo, da, hh, mm = int(m_md.group(1)), int(m_md.group(2)), int(m_md.group(3)), int(m_md.group(4))
         try:
             cand = datetime(yr, mo, da, hh, mm, tzinfo=KST)
             if (cand - now_kst).total_seconds() < -180 * 86400:
@@ -3486,57 +3516,143 @@ def _parse_match_kst_epoch(item: Dict[str, Any]) -> Optional[float]:
             return cand.timestamp()
         except ValueError:
             return None
+
+    m_rel = re.search(r"(오늘|내일|어제)\s*(\d{1,2}):(\d{2})", dt_txt)
+    if m_rel:
+        day_shift = 0 if m_rel.group(1) == "오늘" else (1 if m_rel.group(1) == "내일" else -1)
+        base_d = (now_kst + timedelta(days=day_shift)).date()
+        return datetime(base_d.year, base_d.month, base_d.day, int(m_rel.group(2)), int(m_rel.group(3)), tzinfo=KST).timestamp()
+
     return None
 
 
 def sort_matches_nearest_recent(items: List[Any]) -> List[Any]:
     """
-    Sorts match dictionaries so:
-      1) In-play / LIVE matches appear first (most recent kickoff first)
-      2) Scheduled / upcoming matches appear in chronological order nearest to now (e.g. 11.21 04:30 before 11.21 04:45)
-      3) Finished / FT matches appear in reverse chronological order (most recently ended first)
+    Orders match cards by nearest/recent date & time:
+      Bucket 0: LIVE / in-progress games first (most recent kickoff first)
+      Bucket 1: Upcoming / Scheduled games in ascending chronological order (today 11.17 -> ... -> 11.21 04:30 -> 11.21 04:45)
+      Bucket 2: Finished / FT games in descending chronological order (most recently finished first)
     """
     if not isinstance(items, list) or len(items) < 2:
         return items
     now_ts = time.time()
 
-    def _sort_key(entry: Tuple[int, Any]) -> Tuple[int, float, int]:
+    def _sort_key(entry: Tuple[int, Any]) -> Tuple[int, float, int, int]:
         idx, m = entry
         if not isinstance(m, dict):
-            return (9, float(idx), idx)
+            return (9, float(idx), 1, idx)
         ts = _parse_match_kst_epoch(m)
-        state_raw = str(m.get("state") or m.get("status") or m.get("status_badge") or "").lower()
-        is_live = state_raw in ("in", "live") or any(w in state_raw for w in ("live", "진행", "전반", "후반", "ht", "q1", "q2", "q3", "q4"))
-        is_post = state_raw in ("post", "ft", "final", "ended") or any(w in state_raw for w in ("종료", "final", "ft"))
+        state_raw = " ".join(
+            str(m.get(k) or "") for k in ("state", "status", "status_badge")
+        ).lower()
+        is_sched = "scheduled" in state_raw or "예정" in state_raw or state_raw.strip() == "pre"
+        is_live = (not is_sched) and (
+            state_raw.strip() in ("in", "live")
+            or any(w in state_raw for w in ("live", "진행", "전반", "후반", "ht", "q1", "q2", "q3", "q4", "세트", "회초", "회말"))
+        )
+        is_post = (not is_sched) and (
+            state_raw.strip() in ("post", "ft", "final", "ended")
+            or any(w in state_raw for w in ("종료", "final", "ft", "경기종료"))
+        )
+        my_tie = 0 if m.get("is_my_team") else 1
+
         if is_live:
-            return (0, -(ts if ts is not None else now_ts), idx)
+            return (0, -(ts if ts is not None else now_ts), my_tie, idx)
         if is_post:
-            return (2, -(ts if ts is not None else 0.0), idx)
+            return (2, -(ts if ts is not None else 0.0), my_tie, idx)
         if ts is not None:
-            return (1, ts, idx)
-        return (3, float(idx), idx)
+            return (1, ts, my_tie, idx)
+        return (3, float(idx), my_tie, idx)
 
     return [x[1] for x in sorted(enumerate(items), key=_sort_key)]
 
 
+def _sort_datacenter_payload_any(payload: Any) -> Any:
+    if isinstance(payload, dict):
+        out = dict(payload)
+        for key in ("items", "matches", "alerts", "rows", "games", "fixtures"):
+            if isinstance(out.get(key), list) and len(out[key]) > 1:
+                out[key] = sort_matches_nearest_recent(out[key])
+        return out
+    if isinstance(payload, Response) and getattr(payload, "body", None):
+        try:
+            parsed = json.loads(payload.body.decode("utf-8"))
+            if isinstance(parsed, dict):
+                sorted_dict = _sort_datacenter_payload_any(parsed)
+                return Response(
+                    content=json.dumps(sorted_dict, ensure_ascii=False),
+                    status_code=payload.status_code,
+                    media_type="application/json; charset=utf-8",
+                )
+        except Exception:
+            pass
+    return payload
+
+
 def _install_datacenter_chronological_patch() -> bool:
+    patched_any = False
     try:
         from app import sportiq_datacenter as _dc
-        if getattr(_dc, "__sq_chrono_sorted__", False):
-            return True
-        orig_collect = getattr(_dc, "_collect_all_matches", None)
-        if callable(orig_collect):
-            def _sorted_collect(date_offset: int = 0):
-                res = orig_collect(date_offset)
-                if isinstance(res, list):
-                    return sort_matches_nearest_recent(res)
-                return res
-            _dc._collect_all_matches = _sorted_collect
-            _dc.__sq_chrono_sorted__ = True
-            return True
+        if not getattr(_dc, "__sq_chrono_sorted_v7__", False):
+            orig_collect = getattr(_dc, "_collect_all_matches", None)
+            if callable(orig_collect):
+                @functools.wraps(orig_collect)
+                def _sorted_collect(*args, **kwargs):
+                    res = orig_collect(*args, **kwargs)
+                    return sort_matches_nearest_recent(res) if isinstance(res, list) else res
+
+                _dc._collect_all_matches = _sorted_collect
+                _dc.__sq_chrono_sorted_v7__ = True
+                patched_any = True
+                try:
+                    from app import sportiq_lounge_router as _lr
+                    with _lr._DC_SWR_LOCK:
+                        _lr._DC_SWR_CACHE.clear()
+                except Exception:
+                    pass
     except Exception:
         pass
-    return False
+
+    # Scan all loaded modules in sys.modules for any FastAPI / APIRouter holding datacenter routes
+    try:
+        for mod in list(sys.modules.values()):
+            if mod is None:
+                continue
+            for attr_name in ("app", "router", "datacenter_router"):
+                container = getattr(mod, attr_name, None)
+                routes = getattr(container, "routes", None)
+                if not isinstance(routes, list):
+                    continue
+                for r in routes:
+                    r_path = getattr(r, "path", "") or ""
+                    if not any(k in r_path for k in ("live-scores", "dropping-odds", "datacenter/matches", "datacenter/scores")):
+                        continue
+                    dep = getattr(r, "dependant", None)
+                    call_fn = getattr(dep, "call", None) if dep is not None else None
+                    if callable(call_fn) and not getattr(call_fn, "__sq_route_sorted_v7__", False):
+                        if inspect.iscoroutinefunction(call_fn):
+                            @functools.wraps(call_fn)
+                            async def _async_sorted_ep(*args, __orig=call_fn, **kwargs):
+                                res = await __orig(*args, **kwargs)
+                                return _sort_datacenter_payload_any(res)
+
+                            _async_sorted_ep.__sq_route_sorted_v7__ = True
+                            dep.call = _async_sorted_ep
+                            r.endpoint = _async_sorted_ep
+                        else:
+                            @functools.wraps(call_fn)
+                            def _sync_sorted_ep(*args, __orig=call_fn, **kwargs):
+                                res = __orig(*args, **kwargs)
+                                return _sort_datacenter_payload_any(res)
+
+                            _sync_sorted_ep.__sq_route_sorted_v7__ = True
+                            dep.call = _sync_sorted_ep
+                            r.endpoint = _sync_sorted_ep
+                        patched_any = True
+    except Exception:
+        pass
+
+    return patched_any
 
 
 def _settle_pending_predictions_once() -> int:
@@ -3688,19 +3804,16 @@ def _settle_pending_predictions_once() -> int:
 
 
 def _p3_background_daemon() -> None:
-    time.sleep(3.5)
-    _init_p3_tables()
-    for _ in range(12):
-        if _install_datacenter_chronological_patch():
-            break
-        time.sleep(1.5)
+    time.sleep(1.5)
+    for _ in range(15):
+        _install_datacenter_chronological_patch()
+        time.sleep(1.0)
     while True:
         _install_datacenter_chronological_patch()
         _settle_pending_predictions_once()
         time.sleep(60.0)
 
 
-_init_p3_tables()
 threading.Thread(target=_p3_background_daemon, daemon=True, name="sportiq-p3-daemon").start()
 
 
@@ -3866,7 +3979,7 @@ def get_member_mini_mypage(nickname: str, pin: str = ""):
     return {"ok": True, **run_with_db_retry(_op)}
 
 
-# --- P3-B: In-App Notification Bell & Comment Trigger ---
+# --- P3-B: In-App Notification Bell ---
 @upgrade_router.get("/api/member/notifications")
 def list_member_notifications(nickname: str, limit: int = 20):
     nick = (nickname or "").strip()[:24]
@@ -3927,7 +4040,7 @@ def mark_all_notifications_read(payload: NotificationReadIn):
     return {"ok": True}
 
 
-# --- P3-C: 3-Strike Auto Blind Moderation & Blinded Map ---
+# --- P3-C: 3-Strike Auto Blind Moderation ---
 @upgrade_router.get("/api/posts/blinds")
 def list_blinded_posts():
     def _op() -> Dict[str, Any]:
@@ -4014,47 +4127,7 @@ def admin_unblind_community_post(
     return {"ok": True, "unblinded_id": post_id}
 
 
-# Hook comment notification trigger onto existing add_community_comment
-_orig_add_comment_fn = add_community_comment
-
-
-def _notify_post_author_on_comment(post_id: str, commenter: str, text: str) -> None:
-    def _op() -> None:
-        with _db_session(write=True) as conn:
-            row = conn.execute(
-                "SELECT author, title FROM community_member_posts WHERE id=?", (post_id[:64],)
-            ).fetchone()
-            if row and row["author"] and row["author"].strip().lower() != commenter.strip().lower():
-                _push_member_notification(
-                    conn,
-                    row["author"],
-                    "COMMENT",
-                    f"💬 '{commenter}'님이 내 분석글에 댓글을 남겼습니다",
-                    f"[{row['title'][:36]}] {text[:80]}",
-                    post_id[:64],
-                )
-
-    try:
-        run_with_db_retry(_op)
-        _trigger_pg_backup("member_notifications")
-    except Exception:
-        pass
-
-
-for _r in upgrade_router.routes:
-    if getattr(_r, "path", "") == "/api/posts/{post_id}/comments" and "POST" in getattr(_r, "methods", set()):
-        def _wrapped_add_comment(post_id: str, payload: CommentCreateIn):
-            res = _orig_add_comment_fn(post_id, payload)
-            sender = (payload.nickname or payload.user or "익명팬").strip()[:28]
-            threading.Thread(
-                target=_notify_post_author_on_comment, args=(post_id, sender, payload.text or ""), daemon=True
-            ).start()
-            return res
-
-        _r.endpoint = _wrapped_add_comment
-        break
-
-# Upgrade Service Worker for Web Push Notification Click Handling (v3.0)
+# Upgrade Service Worker for Web Push Notification Click Handling (v3.2)
 SERVICE_WORKER_JS = SERVICE_WORKER_JS + (
     "\nself.addEventListener('notificationclick', (event) => {\n"
     "  event.notification.close();\n"
@@ -4062,23 +4135,23 @@ SERVICE_WORKER_JS = SERVICE_WORKER_JS + (
     "});\n"
 )
 
-# Frontend v5.0: Chronological/Recent Match Sorter (fetch + DOM) + P3-A/B/C Suite
+# Frontend v7.0: Universal Match Date-Time Sorter + P3 Full Suite + Guaranteed Header/Floating Buttons
 P3_AND_CHRONO_JS = r"""
-/* SportIQ v5.0: Nearest/Recent Match Date-Time Sorter + P3 Full Suite */
+/* SportIQ v7.0: Nearest/Recent Match Date-Time Sorter + P3 Full Suite */
 (function () {
-  if (window.__SPORTIQ_V5_DATE_P3__) return;
-  window.__SPORTIQ_V5_DATE_P3__ = true;
+  if (window.__SPORTIQ_V7_DATE_P3__) return;
+  window.__SPORTIQ_V7_DATE_P3__ = true;
 
   var p3FeedSourceFilter = "ALL";
   var p3SearchQuery = "";
   var blindedPostSet = {};
   var lastUnreadNotifCount = -1;
+  var matchSortMode = localStorage.getItem("sq_match_sort_mode") || "NEAREST";
 
   function sqNick() { return (localStorage.getItem("sportiq_member_nick") || localStorage.getItem("sportiq_guest_nick") || "").trim(); }
   function sqPin() { return (localStorage.getItem("sportiq_member_pin") || "").trim(); }
   function esc(v) { return v == null ? "" : String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
-  // --- Chronological / Recent Match Date-Time Parser & Sorter ---
   function parseMatchEpochFromText(s) {
     var txt = String(s || "");
     var now = new Date();
@@ -4088,7 +4161,7 @@ P3_AND_CHRONO_JS = r"""
     if (iso) {
       return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), Number(iso[4]), Number(iso[5])).getTime();
     }
-    var md = txt.match(/(\d{1,2})\.(\d{1,2})\s*(?:\([^)]*\))?\s*(\d{1,2}):(\d{2})/);
+    var md = txt.match(/(\d{1,2})[.\/](\d{1,2})\s*(?:\([^)]*\))?\s*(\d{1,2}):(\d{2})/);
     if (md) {
       var mo = Number(md[1]), da = Number(md[2]), hh = Number(md[3]), mm = Number(md[4]);
       var t = new Date(yr, mo - 1, da, hh, mm).getTime();
@@ -4097,51 +4170,82 @@ P3_AND_CHRONO_JS = r"""
       }
       return t;
     }
+    var rel = txt.match(/(오늘|내일|어제)\s*(\d{1,2}):(\d{2})/);
+    if (rel) {
+      var shift = rel[1] === "오늘" ? 0 : (rel[1] === "내일" ? 1 : -1);
+      var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + shift, Number(rel[2]), Number(rel[3]));
+      return d.getTime();
+    }
     return null;
   }
 
   function computeMatchOrderTuple(statusText, epochMs, fallbackIdx) {
     var st = String(statusText || "");
-    var isScheduled = /Scheduled|예정/i.test(st);
-    var isLive = !isScheduled && (/\bLIVE\b|\bin\b|진행중|전반|후반|\bHT\b/i.test(st));
-    var isEnded = !isScheduled && (/\bFT\b|\bFinal\b|\bpost\b|종료|경기종료/i.test(st));
+    var isScheduled = /Scheduled|예정/i.test(st) || /^\s*pre\s*$/i.test(st);
+    var isLive = !isScheduled && (/\bLIVE\b|^\s*in\s*$|진행중|전반|후반|\bHT\b|\bQ[1-4]\b|회초|회말|세트/i.test(st));
+    var isEnded = !isScheduled && (/\bFT\b|\bFinal\b|^\s*post\s*$|종료|경기종료/i.test(st));
+
+    if (matchSortMode === "DESC") {
+      if (isLive) return { bucket: 0, key: -(epochMs != null ? epochMs : Date.now()) };
+      if (epochMs == null) return { bucket: 9, key: fallbackIdx };
+      return { bucket: 1, key: -epochMs };
+    }
+
+    if (isLive) return { bucket: 0, key: -(epochMs != null ? epochMs : Date.now()) };
     if (epochMs == null) return { bucket: 9, key: fallbackIdx };
-    // 0: LIVE first (latest kickoff first)
-    // 1: Scheduled/Upcoming nearest to now first (e.g. 11.17 -> 11.21 04:30 -> 11.21 04:45)
-    // 2: Finished most recently ended first
-    if (isLive) return { bucket: 0, key: -epochMs };
     if (isEnded) return { bucket: 2, key: -epochMs };
     return { bucket: 1, key: epochMs };
   }
 
-  // Intercept /api/datacenter/live-scores & /api/datacenter/dropping-odds JSON arrays so JS renderers always receive chronological order
+  function looksLikeMatchItem(m) {
+    if (!m || typeof m !== "object") return false;
+    return Boolean(m.match_dt_kst || m.kickoff_ts || m.commence_time || (m.home && m.away) || m.matchup);
+  }
+
+  function sortMatchDataArray(arr) {
+    if (!Array.isArray(arr) || arr.length < 2 || !looksLikeMatchItem(arr[0])) return arr;
+    return arr.map(function (m, idx) {
+      var rawDt = (m && (m.match_dt_kst || m.commence_time || m.kickoff_kst || m.date || m.schedule_venue)) || "";
+      var ep = null;
+      if (m && typeof m.kickoff_ts === "number") {
+        ep = m.kickoff_ts > 10000000000 ? m.kickoff_ts : m.kickoff_ts * 1000;
+      } else {
+        ep = parseMatchEpochFromText(rawDt);
+      }
+      var stTxt = (m && (m.state || m.status_badge || m.status)) || "";
+      var ord = computeMatchOrderTuple(stTxt, ep, idx);
+      var myTie = (m && m.is_my_team) ? 0 : 1;
+      return { m: m, idx: idx, myTie: myTie, bucket: ord.bucket, key: ord.key };
+    }).sort(function (a, b) {
+      if (a.bucket !== b.bucket) return a.bucket - b.bucket;
+      if (a.key !== b.key) return a.key - b.key;
+      if (a.myTie !== b.myTie) return a.myTie - b.myTie;
+      return a.idx - b.idx;
+    }).map(function (w) { return w.m; });
+  }
+
   if (typeof window.fetch === "function" && !window.__sqChronoFetchHooked) {
     window.__sqChronoFetchHooked = true;
     var origFetch = window.fetch.bind(window);
     window.fetch = function (input, init) {
       var urlStr = typeof input === "string" ? input : (input && input.url ? input.url : "");
-      var isMatchFeed = urlStr.indexOf("/api/datacenter/live-scores") !== -1 || urlStr.indexOf("/api/datacenter/dropping-odds") !== -1;
-      if (!isMatchFeed) return origFetch(input, init);
+      var isApiCall = urlStr.indexOf("/api/") !== -1 && urlStr.indexOf("/api/rankings/global-matches") === -1;
+      if (!isApiCall) return origFetch(input, init);
 
       return origFetch(input, init).then(function (resp) {
         if (!resp || !resp.ok || typeof resp.clone !== "function") return resp;
+        var ct = (resp.headers && resp.headers.get && resp.headers.get("content-type")) || "";
+        if (ct && ct.indexOf("json") === -1) return resp;
         return resp.clone().json().then(function (data) {
           if (!data || typeof data !== "object") return resp;
-          ["items", "matches", "alerts", "rows"].forEach(function (arrKey) {
-            if (Array.isArray(data[arrKey]) && data[arrKey].length > 1) {
-              data[arrKey] = data[arrKey].map(function (m, idx) {
-                var rawDt = (m && (m.match_dt_kst || m.commence_time || m.kickoff_kst || m.date || m.schedule_venue)) || "";
-                var ep = (m && typeof m.kickoff_ts === "number") ? m.kickoff_ts * 1000 : parseMatchEpochFromText(rawDt);
-                var stTxt = (m && (m.state || m.status_badge || m.status)) || "";
-                var ord = computeMatchOrderTuple(stTxt, ep, idx);
-                return { m: m, idx: idx, bucket: ord.bucket, key: ord.key };
-              }).sort(function (a, b) {
-                if (a.bucket !== b.bucket) return a.bucket - b.bucket;
-                if (a.key !== b.key) return a.key - b.key;
-                return a.idx - b.idx;
-              }).map(function (w) { return w.m; });
+          var touched = false;
+          ["items", "matches", "alerts", "rows", "games", "fixtures"].forEach(function (arrKey) {
+            if (Array.isArray(data[arrKey]) && data[arrKey].length > 1 && looksLikeMatchItem(data[arrKey][0])) {
+              data[arrKey] = sortMatchDataArray(data[arrKey]);
+              touched = true;
             }
           });
+          if (!touched) return resp;
           return new Response(JSON.stringify(data), {
             status: resp.status,
             statusText: resp.statusText,
@@ -4152,20 +4256,21 @@ P3_AND_CHRONO_JS = r"""
     };
   }
 
-  // Also sort any already-rendered horizontal or grid match card containers directly in the DOM
-  function sortRenderedMatchCardStrips() {
-    document.querySelectorAll("div, section").forEach(function (container) {
-      if (!container.children || container.children.length < 2 || container.children.length > 90) return;
-      if (container.id === "feedList" || container.id === "dcLauncherGrid") return;
+  function sortRenderedMatchCardStrips(forceResort) {
+    document.querySelectorAll("div, section, ul").forEach(function (container) {
+      if (!container.children || container.children.length < 2 || container.children.length > 500) return;
+      if (container.id === "feedList" || container.id === "dcLauncherGrid" || container.id === "globalTop10Grid") return;
       var kids = Array.prototype.slice.call(container.children);
       var matchLikeCount = 0;
       kids.forEach(function (ch) {
         var t = ch.textContent || "";
-        if (parseMatchEpochFromText(t) != null && (/Scheduled|LIVE|배당|스코어|vs/i.test(t))) {
+        if (parseMatchEpochFromText(t) != null && (/Scheduled|예정|종료|LIVE|배당|스코어|vs/i.test(t))) {
           matchLikeCount++;
         }
       });
-      if (matchLikeCount < 2 || matchLikeCount < Math.ceil(kids.length * 0.5)) return;
+      if (matchLikeCount < 2 || matchLikeCount < Math.ceil(kids.length * 0.4)) return;
+
+      mountSortToggleAboveStrip(container);
 
       var decorated = kids.map(function (el, idx) {
         var t = el.textContent || "";
@@ -4182,22 +4287,69 @@ P3_AND_CHRONO_JS = r"""
         return a.idx - b.idx;
       });
 
-      var changed = false;
-      for (var i = 0; i < sorted.length; i++) {
-        if (sorted[i].el !== kids[i]) { changed = true; break; }
+      var changed = Boolean(forceResort);
+      if (!changed) {
+        for (var i = 0; i < sorted.length; i++) {
+          if (sorted[i].el !== kids[i]) { changed = true; break; }
+        }
       }
       if (!changed) return;
 
       var prevScrollLeft = container.scrollLeft || 0;
       sorted.forEach(function (item) { container.appendChild(item.el); });
-      if (prevScrollLeft > 0) container.scrollLeft = prevScrollLeft;
+      container.scrollLeft = forceResort ? 0 : prevScrollLeft;
     });
   }
 
-  // --- P3-A: Mini MyPage & Big-Match Quick Prediction Buttons ---
+  function mountSortToggleAboveStrip(stripEl) {
+    if (!stripEl || !stripEl.parentNode) return;
+    if (stripEl.parentNode.querySelector(".sq-match-sort-bar")) return;
+    var bar = document.createElement("div");
+    bar.className = "sq-match-sort-bar";
+    bar.style.cssText = "display:flex;justify-content:flex-end;align-items:center;gap:6px;margin:0 0 6px 0;font-size:11px;color:#94a3b8;";
+    bar.innerHTML = [
+      "<span>시간·날짜 정렬:</span>",
+      "<button type='button' data-sq-msort='NEAREST' class='dc-pill' style='padding:2px 9px;font-size:11px;font-weight:800;'>🕒 가까운·최근 시간순</button>",
+      "<button type='button' data-sq-msort='DESC' class='dc-pill' style='padding:2px 9px;font-size:11px;font-weight:800;'>📅 최신 날짜순</button>"
+    ].join("");
+    stripEl.parentNode.insertBefore(bar, stripEl);
+
+    function syncBtnStyle() {
+      bar.querySelectorAll("[data-sq-msort]").forEach(function (b) {
+        var on = b.getAttribute("data-sq-msort") === matchSortMode;
+        b.style.borderColor = on ? "#38bdf8" : "";
+        b.style.color = on ? "#e0f2fe" : "";
+      });
+    }
+    syncBtnStyle();
+    bar.querySelectorAll("[data-sq-msort]").forEach(function (b) {
+      b.onclick = function () {
+        matchSortMode = b.getAttribute("data-sq-msort") || "NEAREST";
+        localStorage.setItem("sq_match_sort_mode", matchSortMode);
+        document.querySelectorAll(".sq-match-sort-bar [data-sq-msort]").forEach(function (x) {
+          var on = x.getAttribute("data-sq-msort") === matchSortMode;
+          x.style.borderColor = on ? "#38bdf8" : "";
+          x.style.color = on ? "#e0f2fe" : "";
+        });
+        sortRenderedMatchCardStrips(true);
+      };
+    });
+  }
+
+  // --- P3-A & P3-B: Guaranteed Header Buttons + Floating Quick Dock Fallback ---
   function mountMyPageAndBellHeader() {
-    var hubBtn = document.getElementById("sqOpenMemberHubBtn");
-    if (!hubBtn || !hubBtn.parentNode) return;
+    var anchor = document.getElementById("sqOpenMemberHubBtn") || document.getElementById("pointsBadge");
+    if (!anchor) {
+      var hdr = document.querySelector("header .flex") || document.querySelector("header");
+      if (hdr && !document.getElementById("sqFallbackTopBar")) {
+        var fb = document.createElement("div");
+        fb.id = "sqFallbackTopBar";
+        fb.style.cssText = "display:inline-flex;gap:6px;align-items:center;margin-left:auto;";
+        hdr.appendChild(fb);
+        anchor = fb;
+      }
+    }
+    if (!anchor || !anchor.parentNode) return;
 
     if (!document.getElementById("sqOpenMyPageBtn")) {
       var mpBtn = document.createElement("button");
@@ -4207,7 +4359,7 @@ P3_AND_CHRONO_JS = r"""
       mpBtn.style.background = "linear-gradient(135deg,#4f46e5,#0284c7)";
       mpBtn.innerHTML = "📊 내 프로필";
       mpBtn.onclick = openMyPageModal;
-      hubBtn.insertAdjacentElement("afterend", mpBtn);
+      anchor.insertAdjacentElement("afterend", mpBtn);
     }
 
     if (!document.getElementById("sqNotifBellBtn")) {
@@ -4219,7 +4371,7 @@ P3_AND_CHRONO_JS = r"""
       bell.style.background = "#0f172a";
       bell.innerHTML = "🔔 알림 <span id='sqNotifBadge' style='display:none;background:#ef4444;color:#fff;border-radius:999px;padding:0 6px;font-size:10.5px;font-weight:900;'>0</span>";
       bell.onclick = openNotificationsModal;
-      hubBtn.insertAdjacentElement("afterend", bell);
+      anchor.insertAdjacentElement("afterend", bell);
     }
   }
 
@@ -4312,7 +4464,6 @@ P3_AND_CHRONO_JS = r"""
     });
   }
 
-  // --- P3-B: Notification Bell Modal + Browser Web Push ---
   function pollMemberNotifications() {
     var nk = sqNick();
     if (!nk) return;
@@ -4380,7 +4531,6 @@ P3_AND_CHRONO_JS = r"""
       });
   }
 
-  // --- P3-C: Community Feed 3-Tab Split + Live Search + 3-Strike Auto Blind ---
   function loadBlindedSet() {
     fetch("/api/posts/blinds").then(function(r){return r.json();}).then(function(d){
       if (!d || !d.ok) return;
@@ -4467,7 +4617,6 @@ P3_AND_CHRONO_JS = r"""
     });
   }
 
-  // Close P3 modals on Escape key as well
   window.addEventListener("keydown", function(ev){
     if (ev.key !== "Escape" && ev.keyCode !== 27) return;
     ["sqNotifModal", "sqMyPageModal"].forEach(function(id){
@@ -4477,21 +4626,21 @@ P3_AND_CHRONO_JS = r"""
   }, true);
 
   setTimeout(function(){
-    sortRenderedMatchCardStrips();
+    sortRenderedMatchCardStrips(false);
     loadBlindedSet();
     mountMyPageAndBellHeader();
     mountFeedFilterAndSearchBar();
     injectQuickPickButtonsOnTop20();
     pollMemberNotifications();
-  }, 300);
+  }, 200);
 
   setInterval(function(){
-    sortRenderedMatchCardStrips();
+    sortRenderedMatchCardStrips(false);
     mountMyPageAndBellHeader();
     mountFeedFilterAndSearchBar();
     injectQuickPickButtonsOnTop20();
     applyFeedFilterAndBlindDom();
-  }, 1100);
+  }, 900);
   setInterval(pollMemberNotifications, 25000);
 })();
 """
