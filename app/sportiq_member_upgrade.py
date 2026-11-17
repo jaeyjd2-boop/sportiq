@@ -10,7 +10,7 @@ import zlib
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -89,6 +89,43 @@ SHOP_CATALOG: List[Dict[str, Any]] = [
     },
 ]
 
+_TEAM_CANON_MAP: Tuple[Tuple[Tuple[str, ...], str], ...] = (
+    (("newcastle", "뉴캐슬"), "newcastle"),
+    (("arsenal", "아스널", "아스날"), "arsenal"),
+    (("liverpool", "리버풀"), "liverpool"),
+    (("manchester united", "man utd", "맨체스터 유나이티드", "맨유"), "manutd"),
+    (("manchester city", "man city", "맨체스터 시티", "맨시티"), "mancity"),
+    (("tottenham", "spurs", "토트넘"), "tottenham"),
+    (("chelsea", "첼시"), "chelsea"),
+    (("dortmund", "도르트문트"), "dortmund"),
+    (("bayern", "바이에른", "뮌헨"), "bayern"),
+    (("real madrid", "레알 마드리드", "레알"), "realmadrid"),
+    (("celta", "셀타"), "celta"),
+    (("barcelona", "바르셀로나", "바르샤"), "barcelona"),
+    (("villarreal", "비야레알"), "villarreal"),
+    (("atalanta", "아탈란타"), "atalanta"),
+    (("inter", "인터 밀란", "인테르"), "inter"),
+    (("lille", "릴 osc", "릴"), "lille"),
+    (("spain", "스페인"), "spain"),
+    (("england", "잉글랜드"), "england"),
+    (("celtics", "셀틱스", "보스턴"), "celtics"),
+    (("mavericks", "매버릭스", "댈러스"), "mavericks"),
+    (("suns", "피닉스"), "suns"),
+    (("lakers", "레이커스"), "lakers"),
+    (("nuggets", "너기츠", "덴버"), "nuggets"),
+    (("lions", "라이온스", "디트로이트"), "detroit_lions"),
+    (("patriots", "패트리어츠", "뉴잉글랜드"), "patriots"),
+    (("panthers", "팬서스", "플로리다"), "panthers"),
+    (("oilers", "오일러스", "에드먼턴"), "oilers"),
+    (("blackhawks", "블랙호크스", "시카고"), "blackhawks"),
+    (("maple leafs", "메이플리프스", "토론토"), "mapleleafs"),
+    (("rangers", "레인저스", "뉴욕"), "rangers"),
+    (("canadiens", "캐나디언스", "몬트리올"), "canadiens"),
+    (("lightning", "라이트닝", "탬파베이"), "lightning"),
+    (("대한민국", "south korea", "korea"), "korea"),
+    (("일본", "japan"), "japan"),
+)
+
 _PG_SYNC_STATE = {
     "initial_restore_done": False,
     "registered_tables": 0,
@@ -115,6 +152,27 @@ def _tier_for_points(points: int) -> str:
     if points >= 150:
         return "MEMBER"
     return "GUEST"
+
+
+def canonical_matchup_signature(matchup: str) -> str:
+    raw = (matchup or "").strip().lower()
+    if not raw:
+        return ""
+    parts = re.split(r"\s+vs\.?\s+|\s+대\s+", raw, maxsplit=1)
+    norm_sides: List[str] = []
+    for side in parts:
+        s = side.strip()
+        matched = None
+        for aliases, canon in _TEAM_CANON_MAP:
+            if any(a in s for a in aliases):
+                matched = canon
+                break
+        norm_sides.append(matched or re.sub(r"[^a-z0-9가-힣]", "", s))
+    return "|".join(sorted(norm_sides))
+
+
+def _has_hangul(text: str) -> bool:
+    return bool(re.search(r"[가-힣]", text or ""))
 
 
 def _init_upgrade_tables() -> None:
@@ -171,18 +229,7 @@ def _init_upgrade_tables() -> None:
 
 
 def deduplicate_global_match_rankings() -> int:
-    """Merge English/Korean duplicate matchups (e.g. Newcastle vs Arsenal -> 뉴캐슬 유나이티드 vs 아스널)."""
-    alias_pairs = [
-        ("newcastle vs arsenal", "epl-new-ars"),
-        ("liverpool vs manchester united", "epl-liv-mun"),
-        ("liverpool vs man utd", "epl-liv-mun"),
-        ("arsenal vs borussia dortmund", "ucl-ars-bvb"),
-        ("boston celtics vs dallas mavericks", "nba-bos-dal"),
-        ("real madrid vs celta vigo", "laliga-rma-cel"),
-        ("barcelona vs villarreal", "laliga-bar-vil"),
-        ("fc barcelona vs villarreal", "laliga-bar-vil"),
-    ]
-
+    """Canonicalize English/Korean team pairs across all rows regardless of match_key."""
     def _op() -> int:
         removed = 0
         with _db_session(write=True) as conn:
@@ -191,27 +238,35 @@ def deduplicate_global_match_rankings() -> int:
             ).fetchone()
             if not exists:
                 return 0
-            rows = conn.execute(
-                "SELECT id, match_key, matchup, votes FROM global_match_rankings ORDER BY id ASC"
-            ).fetchall()
-            by_key = {r["match_key"]: dict(r) for r in rows}
+            rows = [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT id, match_key, matchup, votes, buzz_score FROM global_match_rankings ORDER BY votes DESC, id ASC"
+                ).fetchall()
+            ]
+            groups: Dict[str, List[dict]] = {}
             for r in rows:
-                low_m = (r["matchup"] or "").strip().lower()
-                for eng_sub, target_key in alias_pairs:
-                    if eng_sub in low_m and r["match_key"] != target_key and target_key in by_key:
-                        extra_votes = max(0, int(r["votes"] or 0) - 1000)
-                        if extra_votes > 0:
-                            conn.execute(
-                                "UPDATE global_match_rankings SET votes = votes + ? WHERE match_key = ?",
-                                (min(extra_votes, 300), target_key),
-                            )
-                        conn.execute("DELETE FROM global_match_rankings WHERE id = ?", (r["id"],))
-                        removed += 1
-                        break
+                sig = canonical_matchup_signature(r.get("matchup") or "")
+                if not sig:
+                    continue
+                groups.setdefault(sig, []).append(r)
+
+            for sig, grp in groups.items():
+                if len(grp) < 2:
+                    continue
+                # Prefer Korean-labeled row first, then highest votes
+                grp.sort(key=lambda x: (1 if _has_hangul(x.get("matchup", "")) else 0, int(x.get("votes") or 0)), reverse=True)
+                keeper = grp[0]
+                for dup in grp[1:]:
+                    conn.execute("DELETE FROM global_match_rankings WHERE id = ?", (dup["id"],))
+                    removed += 1
         return removed
 
     try:
-        return run_with_db_retry(_op)
+        cnt = run_with_db_retry(_op)
+        if cnt > 0:
+            threading.Thread(target=_trigger_pg_backup, args=("global_match_rankings",), daemon=True).start()
+        return cnt
     except Exception:
         return 0
 
@@ -239,7 +294,7 @@ def classify_overseas_sport_accurately(title: str, default_sport: str = "general
         "nfl", "quarterback", "touchdown", "chiefs", "mahomes", "bills", "dolphins",
         "49ers", "chargers", "ravens", "lamar", "eagles", "cowboys", "steelers", "packers",
         "lions", "vikings", "texans", "commanders", "falcons", "broncos", "seahawks",
-        "bengals", "jets", "patriots", "raiders", "saints", "bears", "SUPER BOWL".lower(),
+        "bengals", "jets", "patriots", "raiders", "saints", "bears", "super bowl",
     )
     nhl_kw = (
         "nhl", "hockey", "oilers", "mcdavid", "maple leafs", "rangers", "stanley cup",
@@ -320,7 +375,6 @@ def _pg_full_persistence_daemon() -> None:
     except Exception:
         pass
 
-    # 1) Expand _PG_SNAPSHOT_TABLES to ALL SQLite tables and restore from PostgreSQL FIRST
     try:
         from app import sportiq_auto_analyst as _analyst
         with _db_session(write=False) as conn:
@@ -349,6 +403,7 @@ def _pg_full_persistence_daemon() -> None:
     last_hashes: Dict[str, str] = {}
     while True:
         try:
+            deduplicate_global_match_rankings()
             repair_overseas_news_sport_tags()
             from app import sportiq_auto_analyst as _analyst
             changed: List[str] = []
@@ -369,7 +424,6 @@ def _pg_full_persistence_daemon() -> None:
                         continue
                     rows = conn.execute(f"SELECT * FROM {tname}").fetchall()
                     if not rows and tname not in last_hashes:
-                        # Avoid clobbering non-empty PG snapshots with an untouched empty table
                         continue
                     raw_sig = hashlib.md5(
                         json.dumps([dict(r) for r in rows], ensure_ascii=False, sort_keys=True).encode("utf-8")
@@ -418,11 +472,6 @@ class PostUpdateIn(BaseModel):
     author: Optional[str] = ""
 
 
-class PostDeleteIn(BaseModel):
-    pin: str
-    author: Optional[str] = ""
-
-
 class CommentCreateIn(BaseModel):
     user: str = "익명팬"
     text: str
@@ -445,6 +494,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
+        "version": "1.1",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
     }
@@ -951,7 +1001,7 @@ def serve_sitemap_xml():
 
 # --- Frontend Upgrade Bundle (/api/member/p0p1-upgrade.js) ---
 UPGRADE_JS = r"""
-/* SportIQ Member-First P0+P1 Upgrade Bundle */
+/* SportIQ Member-First P0+P1 Upgrade Bundle v1.1 */
 (function () {
   if (window.__SPORTIQ_MEMBER_UPGRADE_V1__) return;
   window.__SPORTIQ_MEMBER_UPGRADE_V1__ = true;
@@ -962,6 +1012,61 @@ UPGRADE_JS = r"""
   var top20ShowAll = false;
   var bootTime = Date.now();
   var editingPostId = null;
+
+  var TEAM_CANON_RULES = [
+    [["newcastle", "뉴캐슬"], "newcastle"],
+    [["arsenal", "아스널", "아스날"], "arsenal"],
+    [["liverpool", "리버풀"], "liverpool"],
+    [["manchester united", "man utd", "맨체스터 유나이티드", "맨유"], "manutd"],
+    [["manchester city", "man city", "맨체스터 시티", "맨시티"], "mancity"],
+    [["tottenham", "spurs", "토트넘"], "tottenham"],
+    [["chelsea", "첼시"], "chelsea"],
+    [["dortmund", "도르트문트"], "dortmund"],
+    [["bayern", "바이에른", "뮌헨"], "bayern"],
+    [["real madrid", "레알 마드리드", "레알"], "realmadrid"],
+    [["celta", "셀타"], "celta"],
+    [["barcelona", "바르셀로나", "바르샤"], "barcelona"],
+    [["villarreal", "비야레알"], "villarreal"],
+    [["atalanta", "아탈란타"], "atalanta"],
+    [["inter", "인터 밀란", "인테르"], "inter"],
+    [["lille", "릴 osc", "릴"], "lille"],
+    [["spain", "스페인"], "spain"],
+    [["england", "잉글랜드"], "england"],
+    [["celtics", "셀틱스", "보스턴"], "celtics"],
+    [["mavericks", "매버릭스", "댈러스"], "mavericks"],
+    [["suns", "피닉스"], "suns"],
+    [["lakers", "레이커스"], "lakers"],
+    [["nuggets", "너기츠", "덴버"], "nuggets"],
+    [["lions", "라이온스", "디트로이트"], "detroit_lions"],
+    [["patriots", "패트리어츠", "뉴잉글랜드"], "patriots"],
+    [["panthers", "팬서스", "플로리다"], "panthers"],
+    [["oilers", "오일러스", "에드먼턴"], "oilers"],
+    [["blackhawks", "블랙호크스", "시카고"], "blackhawks"],
+    [["maple leafs", "메이플리프스", "토론토"], "mapleleafs"],
+    [["rangers", "레인저스", "뉴욕"], "rangers"],
+    [["canadiens", "캐나디언스", "몬트리올"], "canadiens"],
+    [["lightning", "라이트닝", "탬파베이"], "lightning"],
+    [["대한민국", "south korea", "korea"], "korea"],
+    [["일본", "japan"], "japan"]
+  ];
+
+  function canonMatchupKey(txt) {
+    var raw = String(txt || "").trim().toLowerCase();
+    if (!raw) return "";
+    var parts = raw.split(/\s+vs\.?\s+|\s+대\s+/i);
+    var out = parts.map(function (side) {
+      var s = side.trim();
+      for (var i = 0; i < TEAM_CANON_RULES.length; i++) {
+        var aliases = TEAM_CANON_RULES[i][0];
+        for (var j = 0; j < aliases.length; j++) {
+          if (s.indexOf(aliases[j]) !== -1) return TEAM_CANON_RULES[i][1];
+        }
+      }
+      return s.replace(/[^a-z0-9가-힣]/g, "");
+    });
+    out.sort();
+    return out.join("|");
+  }
 
   function escHtml(v) {
     return v == null ? "" : String(v)
@@ -982,7 +1087,6 @@ UPGRADE_JS = r"""
     return (localStorage.getItem(LS_BADGE) || "").trim();
   }
 
-  // 1) Inject sleek styles for Toast position, Top20 compact toggle, PIN/Shop modal, and Seed badges
   var st = document.createElement("style");
   st.id = "sportiqP0P1Css";
   st.textContent = [
@@ -992,12 +1096,10 @@ UPGRADE_JS = r"""
     ".sq-up-btn:hover { filter:brightness(1.1); transform:translateY(-1px); }",
     ".sq-modal-backdrop { position:fixed; inset:0; background:rgba(2,6,23,.8); z-index:100000; display:none; align-items:center; justify-content:center; padding:16px; }",
     ".sq-modal-panel { background:#0f172a; border:1px solid #334155; border-radius:18px; max-width:540px; width:100%; max-height:88vh; overflow-y:auto; padding:20px; color:#f8fafc; box-shadow:0 20px 50px rgba(0,0,0,.6); }",
-    ".sq-seed-badge { display:inline-flex; align-items:center; gap:4px; background:rgba(245,158,11,.14); color:#fcd34d; border:1px solid rgba(245,158,11,.35); border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700; margin-left:6px; }",
-    ".sq-live-badge { display:inline-flex; align-items:center; gap:4px; background:rgba(16,185,129,.14); color:#6ee7b7; border:1px solid rgba(16,185,129,.35); border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700; margin-left:6px; }"
+    ".sq-seed-badge { display:inline-flex; align-items:center; gap:4px; background:rgba(245,158,11,.14); color:#fcd34d; border:1px solid rgba(245,158,11,.35); border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700; margin-left:6px; }"
   ].join("\n");
   document.head.appendChild(st);
 
-  // 2) [P0] Fix Fake '연속 3일째' Attendance Bug for Brand-New Visitors
   function fixInitialAttendanceStreak() {
     try {
       var checked = localStorage.getItem("sportiq_checked");
@@ -1010,14 +1112,12 @@ UPGRADE_JS = r"""
     } catch (e) {}
   }
 
-  // 3) [P0] Suppress Initial Drop-Odds Toast Overload (Max 1 Active Toast + Close Button)
   function setupToastLimiter() {
     var wrap = document.getElementById("dcToastWrap");
     if (!wrap || wrap.__sqToastLimited) return;
     wrap.__sqToastLimited = true;
     var obs = new MutationObserver(function () {
       var cards = wrap.querySelectorAll(".dc-toast");
-      // During initial 4.5s page entry, keep at most 1 toast so header/cards stay clear
       var maxAllowed = (Date.now() - bootTime < 4500) ? 1 : 2;
       for (var i = 0; i < cards.length - maxAllowed; i++) {
         if (cards[i] && cards[i].parentNode) cards[i].parentNode.removeChild(cards[i]);
@@ -1035,16 +1135,81 @@ UPGRADE_JS = r"""
     obs.observe(wrap, { childList: true });
   }
 
-  // 4) [P0] Above-the-Fold Scroll Diet: Start DataCenter Body Collapsed on Initial Home Load & Compact Top 20 to Top 4 Preview
+  // Deduplicate rendered cards directly in #globalTop10Grid (works even when globalMatchesData is let-scoped!)
+  function deduplicateAndCompactTop20Dom() {
+    var grid = document.getElementById("globalTop10Grid");
+    if (!grid) return;
+    var rawCards = Array.prototype.slice.call(grid.children);
+    if (!rawCards.length || (rawCards.length === 1 && rawCards[0].textContent.indexOf("표시할 경기가") !== -1)) return;
+
+    // First pass: prefer Korean-labeled card when an English duplicate exists anywhere in the list
+    var koreanKeys = {};
+    rawCards.forEach(function (card) {
+      var titleEl = card.querySelector(".text-sm.font-extrabold") || card.querySelector("h4, strong");
+      var mTxt = titleEl ? titleEl.textContent.trim() : "";
+      if (/[가-힣]/.test(mTxt)) {
+        var k = canonMatchupKey(mTxt);
+        if (k) koreanKeys[k] = true;
+      }
+    });
+
+    var seenKeys = {};
+    rawCards.forEach(function (card) {
+      var titleEl = card.querySelector(".text-sm.font-extrabold") || card.querySelector("h4, strong");
+      var mTxt = titleEl ? titleEl.textContent.trim() : "";
+      var k = canonMatchupKey(mTxt);
+      if (!k) return;
+      var hasKo = /[가-힣]/.test(mTxt);
+      if (seenKeys[k] || (!hasKo && koreanKeys[k])) {
+        if (card.parentNode) card.parentNode.removeChild(card);
+        return;
+      }
+      seenKeys[k] = true;
+    });
+
+    // Re-number remaining rank badges sequentially (#1, #2, #3, 4위...) so there are zero rank gaps
+    var cleanCards = Array.prototype.slice.call(grid.children);
+    cleanCards.forEach(function (card, idx) {
+      var rankNum = idx + 1;
+      var badgeRow = card.querySelector(".flex.flex-wrap.items-center");
+      if (badgeRow && badgeRow.firstElementChild) {
+        var first = badgeRow.firstElementChild;
+        if (rankNum > 3 && /위|#\d+/.test(first.textContent || "")) {
+          first.textContent = rankNum + "위";
+        }
+      }
+      card.style.display = (!top20ShowAll && idx >= 4) ? "none" : "";
+    });
+
+    var prevBtnWrap = document.getElementById("sqTop20MoreWrap");
+    if (prevBtnWrap && prevBtnWrap.parentNode) prevBtnWrap.parentNode.removeChild(prevBtnWrap);
+    if (cleanCards.length > 4) {
+      var moreWrap = document.createElement("div");
+      moreWrap.id = "sqTop20MoreWrap";
+      moreWrap.style.cssText = "margin-top:10px;text-align:center;";
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dc-pill";
+      btn.style.cssText = "padding:6px 16px;font-weight:800;border-color:#f59e0b;color:#fde68a;";
+      btn.textContent = top20ShowAll
+        ? "▲ 상위 4개 빅매치만 간략히 보기"
+        : "🔥 빅매치 TOP " + cleanCards.length + " 전체 펼치기 (나머지 " + (cleanCards.length - 4) + "경기 더보기 ▼)";
+      btn.onclick = function () {
+        top20ShowAll = !top20ShowAll;
+        deduplicateAndCompactTop20Dom();
+      };
+      moreWrap.appendChild(btn);
+      grid.parentNode.appendChild(moreWrap);
+    }
+  }
+
   function applyAboveTheFoldDiet() {
     var dcCol = document.getElementById("dcHubCollapsible");
-    var dcBtn = document.getElementById("dcCollapseBtn");
     if (dcCol && !dcCol.__sqDietApplied) {
       dcCol.__sqDietApplied = true;
       var launcherGrid = document.getElementById("dcLauncherGrid");
       var hubBody = document.getElementById("dcHubBody");
       if (hubBody && launcherGrid) {
-        // Keep the 7 compact launcher cards visible, fold only the tall table body until user clicks any tab!
         hubBody.style.display = "none";
         var hint = document.createElement("div");
         hint.id = "dcQuickExpandHint";
@@ -1062,86 +1227,67 @@ UPGRADE_JS = r"""
       }
     }
 
-    // Wrap renderGlobalTop10 to deduplicate bilingual cards & show Top 4 preview with '전체 20경기 펼치기' button
     if (typeof window.renderGlobalTop10 === "function" && !window.__sqTop20Wrapped) {
       window.__sqTop20Wrapped = true;
       var origRenderTop10 = window.renderGlobalTop10;
       window.renderGlobalTop10 = function () {
-        if (Array.isArray(window.globalMatchesData)) {
-          var seenCanonical = {};
-          window.globalMatchesData = window.globalMatchesData.filter(function (m) {
-            var key = String(m.matchup || "").toLowerCase()
-              .replace("newcastle vs arsenal", "뉴캐슬 유나이티드 vs 아스널")
-              .replace("liverpool vs manchester united", "리버풀 vs 맨체스터 유나이티드")
-              .replace(/\s+/g, "");
-            if (seenCanonical[key]) return false;
-            seenCanonical[key] = true;
-            return true;
-          }).map(function (m, idx) { m.rank = idx + 1; return m; });
-        }
         origRenderTop10();
-        var grid = document.getElementById("globalTop10Grid");
-        if (!grid) return;
-        var cards = Array.prototype.slice.call(grid.children);
-        var prevBtnWrap = document.getElementById("sqTop20MoreWrap");
-        if (prevBtnWrap && prevBtnWrap.parentNode) prevBtnWrap.parentNode.removeChild(prevBtnWrap);
-        if (cards.length > 4) {
-          cards.forEach(function (el, idx) {
-            el.style.display = (!top20ShowAll && idx >= 4) ? "none" : "";
-          });
-          var moreWrap = document.createElement("div");
-          moreWrap.id = "sqTop20MoreWrap";
-          moreWrap.style.cssText = "margin-top:10px;text-align:center;";
-          var btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "dc-pill";
-          btn.style.cssText = "padding:6px 16px;font-weight:800;border-color:#f59e0b;color:#fde68a;";
-          btn.textContent = top20ShowAll
-            ? "▲ 상위 4개 빅매치만 간략히 보기"
-            : "🔥 빅매치 TOP 20 전체 펼치기 (나머지 " + (cards.length - 4) + "경기 더보기 ▼)";
-          btn.onclick = function () {
-            top20ShowAll = !top20ShowAll;
-            window.renderGlobalTop10();
-          };
-          moreWrap.appendChild(btn);
-          grid.parentNode.appendChild(moreWrap);
-        }
+        deduplicateAndCompactTop20Dom();
       };
-      window.renderGlobalTop10();
     }
+    deduplicateAndCompactTop20Dom();
   }
 
-  // 5) [P1] Universal Esc Key & Outside Backdrop Click to Close Any Open Modal
+  // Capture-phase Escape & Backdrop click handler so inputs/handlers never swallow Escape
   function setupUniversalModalClose() {
+    if (window.__sqEscInstalled) return;
+    window.__sqEscInstalled = true;
+
+    function isModalVisible(el) {
+      if (!el) return false;
+      if (el.classList && el.classList.contains("hidden")) return false;
+      var disp = window.getComputedStyle ? window.getComputedStyle(el).display : el.style.display;
+      return disp && disp !== "none";
+    }
+
     function hideKnownModal(el) {
       if (!el) return;
+      if (el.id === "sqMemberHubModal" || el.id === "dcMatchModal" || el.id === "dcMatchDetailModal") {
+        el.style.display = "none";
+        return;
+      }
       if (typeof window.closeModal === "function" && el.id) {
         try { window.closeModal(el.id); } catch (e) {}
       }
-      el.classList.add("hidden");
-      if (el.style && el.style.display && el.style.display !== "none") {
-        el.style.display = "none";
-      }
+      if (el.classList) el.classList.add("hidden");
     }
-    document.addEventListener("keydown", function (ev) {
-      if (ev.key !== "Escape") return;
-      ["commentModal", "writeModal", "dcMatchModal", "dcMatchDetailModal", "sqMemberHubModal"].forEach(function (id) {
-        var m = document.getElementById(id);
-        if (m && !m.classList.contains("hidden") && m.style.display !== "none") {
+
+    window.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Escape" && ev.key !== "Esc" && ev.keyCode !== 27) return;
+      var ids = ["sqMemberHubModal", "commentModal", "writeModal", "dcMatchModal", "dcMatchDetailModal"];
+      for (var i = 0; i < ids.length; i++) {
+        var m = document.getElementById(ids[i]);
+        if (isModalVisible(m)) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (document.activeElement && typeof document.activeElement.blur === "function") {
+            document.activeElement.blur();
+          }
           hideKnownModal(m);
+          break;
         }
-      });
-    });
+      }
+    }, true);
+
     document.addEventListener("click", function (ev) {
       var t = ev.target;
       if (!t || !t.id) return;
-      if (t.id === "commentModal" || t.id === "writeModal" || t.id === "dcMatchModal" || t.id === "sqMemberHubModal") {
+      if (t.id === "sqMemberHubModal" || t.id === "commentModal" || t.id === "writeModal" || t.id === "dcMatchModal") {
         hideKnownModal(t);
       }
     });
   }
 
-  // 6) [P1] Auto-Tier Enforcement (GUEST -> MEMBER 150P+ -> PRO 350P+) & Points Sync
   function hookRoleAndAttendance() {
     if (typeof window.setRole === "function" && !window.__sqRoleHooked) {
       window.__sqRoleHooked = true;
@@ -1231,7 +1377,6 @@ UPGRADE_JS = r"""
     }
   }
 
-  // 7) [P1] Server-Persisted Posts, Comments & 4-Digit PIN Edit/Delete
   function setupWriteModalAndServerPosts() {
     var wm = document.getElementById("writeModal");
     if (wm && !document.getElementById("sqWriteAuthorPinRow")) {
@@ -1248,7 +1393,6 @@ UPGRADE_JS = r"""
       }
     }
 
-    // Pre-fill saved nick/pin whenever writeModal opens
     document.addEventListener("click", function () {
       var ai = document.getElementById("sqPostAuthorInput");
       var pi = document.getElementById("sqPostPinInput");
@@ -1256,7 +1400,6 @@ UPGRADE_JS = r"""
       if (pi && !pi.value && getSavedPin()) pi.value = getSavedPin();
     });
 
-    // Override submitNewPost & submitComment for real SQLite+PG persistence + Edit mode
     window.submitNewPost = function () {
       var titleEl = document.getElementById("postTitle");
       var bodyEl = document.getElementById("postContent");
@@ -1351,7 +1494,6 @@ UPGRADE_JS = r"""
         });
     };
 
-    // Persist comments to server too
     window.submitComment = function () {
       var input = document.getElementById("commentModalInput");
       if (!input) return;
@@ -1374,7 +1516,6 @@ UPGRADE_JS = r"""
       });
     };
 
-    // Wrap renderFeed to append Edit / Delete buttons & author badges on server-persisted member posts
     if (typeof window.renderFeed === "function" && !window.__sqFeedWrapped) {
       window.__sqFeedWrapped = true;
       var origRenderFeed = window.renderFeed;
@@ -1455,7 +1596,6 @@ UPGRADE_JS = r"""
       });
     }
 
-    // Load saved posts & comments from server on startup
     fetch("/api/posts")
       .then(function (r) { return r.json(); })
       .then(function (d) {
@@ -1476,7 +1616,6 @@ UPGRADE_JS = r"""
       }).catch(function () {});
   }
 
-  // 8) [P1] Member PIN Sync & Point Lounge Shop Modal + Header Buttons
   function mountMemberHubButtonsAndModal() {
     var ptsBadge = document.getElementById("pointsBadge");
     if (ptsBadge && ptsBadge.parentNode && !document.getElementById("sqOpenMemberHubBtn")) {
@@ -1493,11 +1632,12 @@ UPGRADE_JS = r"""
       var modal = document.createElement("div");
       modal.id = "sqMemberHubModal";
       modal.className = "sq-modal-backdrop";
+      modal.setAttribute("tabindex", "-1");
       modal.innerHTML = [
         "<div class='sq-modal-panel'>",
         "  <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;'>",
         "    <h3 style='margin:0;font-size:17px;font-weight:900;color:#f8fafc;'>🔐 4자리 PIN 기기 연동 &amp; 🛍️ 포인트 라운지 상점</h3>",
-        "    <button type='button' id='sqCloseMemberHubBtn' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:800;'>✕ 닫기</button>",
+        "    <button type='button' id='sqCloseMemberHubBtn' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:800;'>✕ 닫기 (Esc)</button>",
         "  </div>",
         "  <div style='background:#020617;border:1px solid #1e293b;border-radius:12px;padding:13px;margin-bottom:14px;'>",
         "    <div style='font-size:12px;color:#93c5fd;font-weight:700;margin-bottom:8px;'>📱 PC ↔ 스마트폰 간편 연동 (회원가입 없이 닉네임 + 숫자 4자리 PIN)</div>",
@@ -1566,6 +1706,7 @@ UPGRADE_JS = r"""
     if (ni) ni.value = getSavedNick();
     if (pi) pi.value = getSavedPin();
     m.style.display = "flex";
+    if (m.focus) m.focus();
     loadShopItems();
   }
   window.__openSportiqMemberHub = openMemberHubModal;
@@ -1657,7 +1798,6 @@ UPGRADE_JS = r"""
       });
   }
 
-  // 9) [P1] Clarify Shorts Tab Label & Add Honest Data Provenance Badges on Seed Sub-Views
   function polishLabelsAndProvenance() {
     document.querySelectorAll("button, a, span").forEach(function (el) {
       if (!el.children.length && el.textContent && el.textContent.indexOf("하이라이트 유튜브 숏츠") !== -1) {
@@ -1720,9 +1860,9 @@ def serve_p0p1_upgrade_js():
 
 
 def inject_upgrade_into_html(raw_html: str) -> str:
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=1" defer></script>'
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=2" defer></script>'
     if "/api/member/p0p1-upgrade.js" in raw_html:
-        return raw_html
+        return re.sub(r'/api/member/p0p1-upgrade\.js\?v=\d+', '/api/member/p0p1-upgrade.js?v=2', raw_html)
     idx = raw_html.rfind("</body>")
     if idx != -1:
         return raw_html[:idx] + "\n" + tag + "\n" + raw_html[idx:]
