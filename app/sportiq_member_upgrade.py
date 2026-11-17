@@ -528,12 +528,16 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "2.0",
+        "version": "3.0",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
         "raffle_admin_enabled": True,
         "wp_pin_bridge_enabled": True,
+        "p3_predictions_mypage": True,
+        "p3_notifications_webpush": True,
+        "p3_feed_tabs_search_blind": True,
+        "match_chronological_sort": True,
     }
 
 
@@ -2069,7 +2073,7 @@ def wp_member_activity_reward(payload: WPMemberRewardIn):
     return {"ok": True, "credited": credited, "awarded_points": delta, "message": msg, "profile": prof}
 
 
-# --- Frontend Upgrade Bundle (/api/member/p0p1-upgrade.js) ---
+# --- Frontend Upgrade Bundle (/api/member/p0p1-upgrade.js?v=5) ---
 UPGRADE_JS = r"""
 /* SportIQ Member-First P0+P1+P2 Upgrade Bundle v2.0 (PWA + Raffle Admin + WP Bridge) */
 (function () {
@@ -3316,7 +3320,7 @@ UPGRADE_JS = r"""
 """
 
 
-@upgrade_router.get("/api/member/p0p1-upgrade.js")
+@upgrade_router.get("/api/member/p0p1-upgrade.js?v=5")
 def serve_p0p1_upgrade_js():
     return Response(
         content=UPGRADE_JS,
@@ -3341,10 +3345,1155 @@ def inject_upgrade_into_html(raw_html: str) -> str:
         if h_idx != -1:
             out = out[:h_idx] + pwa_head + "\n" + out[h_idx:]
 
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=3" defer></script>'
-    if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=3', out)
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=5" defer></script>'
+    if "/api/member/p0p1-upgrade.js?v=5" in out:
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=5', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
     return out + "\n" + tag + "\n"
+# ============================================================================
+# STAGE P3 (v3.0) + CHRONOLOGICAL/RECENT MATCH TIME SORTER
+# - P3-A: Auto Match Prediction Settlement Daemon + Mini MyPage (/api/member/mypage)
+# - P3-B: In-App Notification Bell + Comment/Settlement Alerts + PWA Push (/sw.js)
+# - P3-C: Community 3-Tab Split (ALL/MEMBER/AI) + Search + 3-Strike Auto Blind
+# - Match Sorter: Sorts Live Score & Dropping-Odds Cards by Nearest/Recent Time
+# ============================================================================
+P3_EXTRA_TABLES: Tuple[str, ...] = (
+    "member_match_predictions",
+    "member_prediction_stats",
+    "member_notifications",
+    "community_post_blinds",
+    "community_post_report_logs",
+)
+ALL_KNOWN_SQLITE_TABLES = tuple(dict.fromkeys([*ALL_KNOWN_SQLITE_TABLES, *P3_EXTRA_TABLES]))
+
+
+def _init_p3_tables() -> None:
+    def _op() -> None:
+        with _db_session(write=True) as conn:
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS member_match_predictions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nickname TEXT NOT NULL,
+                    match_key TEXT NOT NULL,
+                    matchup TEXT NOT NULL,
+                    league TEXT NOT NULL DEFAULT 'EPL',
+                    pick TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'PENDING',
+                    reward_points INTEGER NOT NULL DEFAULT 5,
+                    settled_score TEXT NOT NULL DEFAULT '',
+                    created_at REAL NOT NULL,
+                    settled_at REAL NOT NULL DEFAULT 0,
+                    UNIQUE(nickname, match_key)
+                );
+                CREATE TABLE IF NOT EXISTS member_prediction_stats (
+                    nickname TEXT PRIMARY KEY,
+                    total_picks INTEGER NOT NULL DEFAULT 0,
+                    hit_count INTEGER NOT NULL DEFAULT 0,
+                    miss_count INTEGER NOT NULL DEFAULT 0,
+                    win_streak INTEGER NOT NULL DEFAULT 0,
+                    best_streak INTEGER NOT NULL DEFAULT 0,
+                    total_earned_points INTEGER NOT NULL DEFAULT 0,
+                    updated_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS member_notifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nickname TEXT NOT NULL,
+                    notif_type TEXT NOT NULL DEFAULT 'SYSTEM',
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    link_target TEXT NOT NULL DEFAULT '',
+                    is_read INTEGER NOT NULL DEFAULT 0,
+                    created_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS community_post_blinds (
+                    post_id TEXT PRIMARY KEY,
+                    report_count INTEGER NOT NULL DEFAULT 0,
+                    blinded INTEGER NOT NULL DEFAULT 0,
+                    last_reason TEXT NOT NULL DEFAULT '',
+                    updated_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS community_post_report_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    post_id TEXT NOT NULL,
+                    reporter_key TEXT NOT NULL,
+                    reason TEXT NOT NULL DEFAULT '스팸/도배',
+                    created_at REAL NOT NULL,
+                    UNIQUE(post_id, reporter_key)
+                );
+                """
+            )
+
+    run_with_db_retry(_op)
+
+
+def _push_member_notification(
+    conn: sqlite3.Connection,
+    nickname: str,
+    notif_type: str,
+    title: str,
+    body: str,
+    link_target: str = "",
+) -> None:
+    nick = (nickname or "").strip()[:24]
+    if not nick:
+        return
+    conn.execute(
+        """
+        INSERT INTO member_notifications(nickname, notif_type, title, body, link_target, is_read, created_at)
+        VALUES (?, ?, ?, ?, ?, 0, ?)
+        """,
+        (nick, notif_type[:20], title[:120], body[:280], link_target[:120], time.time()),
+    )
+
+
+def _parse_score_outcome(score_text: str) -> Optional[Tuple[str, str]]:
+    m = re.search(r"(\d+)\s*[:\-]\s*(\d+)", score_text or "")
+    if not m:
+        return None
+    h, a = int(m.group(1)), int(m.group(2))
+    outcome = "HOME" if h > a else ("AWAY" if a > h else "DRAW")
+    return outcome, f"{h}:{a}"
+
+
+def _parse_match_kst_epoch(item: Dict[str, Any]) -> Optional[float]:
+    for k in ("kickoff_ts", "start_ts", "timestamp", "epoch", "commence_ts"):
+        v = item.get(k)
+        if isinstance(v, (int, float)) and v > 1_000_000_000:
+            return float(v)
+    for k in ("commence_time", "utc_date", "start_time", "kickoff_utc", "date"):
+        v = item.get(k)
+        if isinstance(v, str) and len(v) >= 10 and ("T" in v or "-" in v):
+            try:
+                dt = datetime.fromisoformat(v.strip().replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=KST)
+                return dt.timestamp()
+            except Exception:
+                pass
+    dt_txt = str(item.get("match_dt_kst") or item.get("schedule_venue") or item.get("kickoff_kst") or "")
+    m = re.search(r"(\d{1,2})\.(\d{1,2})\s*(?:\([^)]*\))?\s*(\d{1,2}):(\d{2})", dt_txt)
+    if m:
+        now_kst = datetime.now(KST)
+        yr = now_kst.year
+        mo, da, hh, mm = int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))
+        try:
+            cand = datetime(yr, mo, da, hh, mm, tzinfo=KST)
+            if (cand - now_kst).total_seconds() < -180 * 86400:
+                cand = datetime(yr + 1, mo, da, hh, mm, tzinfo=KST)
+            return cand.timestamp()
+        except ValueError:
+            return None
+    return None
+
+
+def sort_matches_nearest_recent(items: List[Any]) -> List[Any]:
+    """
+    Sorts match dictionaries so:
+      1) In-play / LIVE matches appear first (most recent kickoff first)
+      2) Scheduled / upcoming matches appear in chronological order nearest to now (e.g. 11.21 04:30 before 11.21 04:45)
+      3) Finished / FT matches appear in reverse chronological order (most recently ended first)
+    """
+    if not isinstance(items, list) or len(items) < 2:
+        return items
+    now_ts = time.time()
+
+    def _sort_key(entry: Tuple[int, Any]) -> Tuple[int, float, int]:
+        idx, m = entry
+        if not isinstance(m, dict):
+            return (9, float(idx), idx)
+        ts = _parse_match_kst_epoch(m)
+        state_raw = str(m.get("state") or m.get("status") or m.get("status_badge") or "").lower()
+        is_live = state_raw in ("in", "live") or any(w in state_raw for w in ("live", "진행", "전반", "후반", "ht", "q1", "q2", "q3", "q4"))
+        is_post = state_raw in ("post", "ft", "final", "ended") or any(w in state_raw for w in ("종료", "final", "ft"))
+        if is_live:
+            return (0, -(ts if ts is not None else now_ts), idx)
+        if is_post:
+            return (2, -(ts if ts is not None else 0.0), idx)
+        if ts is not None:
+            return (1, ts, idx)
+        return (3, float(idx), idx)
+
+    return [x[1] for x in sorted(enumerate(items), key=_sort_key)]
+
+
+def _install_datacenter_chronological_patch() -> bool:
+    try:
+        from app import sportiq_datacenter as _dc
+        if getattr(_dc, "__sq_chrono_sorted__", False):
+            return True
+        orig_collect = getattr(_dc, "_collect_all_matches", None)
+        if callable(orig_collect):
+            def _sorted_collect(date_offset: int = 0):
+                res = orig_collect(date_offset)
+                if isinstance(res, list):
+                    return sort_matches_nearest_recent(res)
+                return res
+            _dc._collect_all_matches = _sorted_collect
+            _dc.__sq_chrono_sorted__ = True
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _settle_pending_predictions_once() -> int:
+    def _op() -> int:
+        settled_cnt = 0
+        now = time.time()
+        today_kst = datetime.now(KST).strftime("%Y-%m-%d")
+        with _db_session(write=True) as conn:
+            pending = conn.execute(
+                "SELECT * FROM member_match_predictions WHERE status = 'PENDING' LIMIT 200"
+            ).fetchall()
+            if not pending:
+                return 0
+
+            finished_map: Dict[str, Tuple[str, str]] = {}
+            for tbl, m_col, s_col, st_col in (
+                ("live_prediction_ledger", "matchup", "final_score", "status"),
+                ("ai_scorecard_records", "matchup", "actual_score", "result"),
+            ):
+                exists = conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (tbl,)
+                ).fetchone()
+                if not exists:
+                    continue
+                cols = {r[1] for r in conn.execute(f"PRAGMA table_info({tbl})").fetchall()}
+                if m_col not in cols or s_col not in cols:
+                    continue
+                for qr in conn.execute(f"SELECT * FROM {tbl} ORDER BY rowid DESC LIMIT 300").fetchall():
+                    qd = dict(qr)
+                    st_val = str(qd.get(st_col, "FT") or "FT").upper()
+                    if st_col in cols and not any(k in st_val for k in ("FT", "FINAL", "END", "HIT", "MISS", "종료", "완료")):
+                        continue
+                    parsed = _parse_score_outcome(str(qd.get(s_col) or ""))
+                    sig = canonical_matchup_signature(str(qd.get(m_col) or ""))
+                    if parsed and sig:
+                        finished_map[sig] = parsed
+
+            if not finished_map:
+                return 0
+
+            for p in pending:
+                sig = canonical_matchup_signature(p["matchup"]) or p["match_key"]
+                res = finished_map.get(sig)
+                if not res:
+                    continue
+                actual_side, clean_score = res
+                nick = p["nickname"]
+                is_hit = (p["pick"] == actual_side)
+                new_status = "HIT" if is_hit else "MISS"
+
+                st_row = conn.execute(
+                    "SELECT * FROM member_prediction_stats WHERE lower(nickname)=lower(?)", (nick,)
+                ).fetchone()
+                prev_streak = int(st_row["win_streak"]) if st_row else 0
+                prev_best = int(st_row["best_streak"]) if st_row else 0
+                prev_hits = int(st_row["hit_count"]) if st_row else 0
+                prev_miss = int(st_row["miss_count"]) if st_row else 0
+                prev_earned = int(st_row["total_earned_points"]) if st_row else 0
+
+                bonus_pts = 0
+                if is_hit:
+                    new_streak = prev_streak + 1
+                    bonus_pts = 30 + (25 if new_streak == 3 else 0) + (60 if new_streak == 5 else 0)
+                    new_hits, new_miss = prev_hits + 1, prev_miss
+                else:
+                    new_streak = 0
+                    new_hits, new_miss = prev_hits, prev_miss + 1
+                new_best = max(prev_best, new_streak)
+
+                conn.execute(
+                    """
+                    UPDATE member_match_predictions
+                    SET status = ?, reward_points = reward_points + ?, settled_score = ?, settled_at = ?
+                    WHERE id = ?
+                    """,
+                    (new_status, bonus_pts, clean_score, now, p["id"]),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO member_prediction_stats(
+                        nickname, total_picks, hit_count, miss_count, win_streak, best_streak, total_earned_points, updated_at
+                    ) VALUES (?, 1, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(nickname) DO UPDATE SET
+                        hit_count = ?, miss_count = ?, win_streak = ?, best_streak = ?,
+                        total_earned_points = ?, updated_at = ?
+                    """,
+                    (
+                        nick, new_hits, new_miss, new_streak, new_best, prev_earned + bonus_pts, now,
+                        new_hits, new_miss, new_streak, new_best, prev_earned + bonus_pts, now,
+                    ),
+                )
+
+                if is_hit:
+                    acc = conn.execute(
+                        "SELECT * FROM member_accounts WHERE lower(nickname)=lower(?)", (nick,)
+                    ).fetchone()
+                    if acc:
+                        updated_pts = int(acc["points"] or 0) + bonus_pts
+                        owned = json.loads(acc["owned_items_json"] or "[]")
+                        badge_now = acc["active_badge"] or ""
+                        if new_streak >= 5 and "badge_streak_tactician" not in owned:
+                            owned.append("badge_streak_tactician")
+                            if not badge_now:
+                                badge_now = "🔥 연승 전술가"
+                        conn.execute(
+                            """
+                            UPDATE member_accounts
+                            SET points = ?, role_tier = ?, active_badge = ?, owned_items_json = ?, updated_at = ?
+                            WHERE nickname = ?
+                            """,
+                            (
+                                updated_pts,
+                                _tier_for_points(updated_pts),
+                                badge_now,
+                                json.dumps(owned, ensure_ascii=False),
+                                now,
+                                acc["nickname"],
+                            ),
+                        )
+                        conn.execute(
+                            """
+                            INSERT INTO wp_point_ledger(nickname, event_type, ref_id, points_delta, kst_date, site_origin, created_at)
+                            VALUES (?, 'prediction_hit', ?, ?, ?, 'billnojay.com', ?)
+                            """,
+                            (acc["nickname"], str(p["id"]), bonus_pts, today_kst, now),
+                        )
+                    _push_member_notification(
+                        conn,
+                        nick,
+                        "SETTLE",
+                        f"🎯 승부예측 적중! (+{bonus_pts}P 지급)",
+                        f"[{p['matchup']}] 최종 {clean_score} 적중 완료! 현재 {new_streak}연승 기록 중입니다.",
+                        "mypage",
+                    )
+                settled_cnt += 1
+        return settled_cnt
+
+    try:
+        cnt = run_with_db_retry(_op)
+        if cnt > 0:
+            threading.Thread(
+                target=_trigger_pg_backup,
+                args=("member_match_predictions", "member_prediction_stats", "member_accounts", "member_notifications", "wp_point_ledger"),
+                daemon=True,
+            ).start()
+        return cnt
+    except Exception:
+        return 0
+
+
+def _p3_background_daemon() -> None:
+    time.sleep(3.5)
+    _init_p3_tables()
+    for _ in range(12):
+        if _install_datacenter_chronological_patch():
+            break
+        time.sleep(1.5)
+    while True:
+        _install_datacenter_chronological_patch()
+        _settle_pending_predictions_once()
+        time.sleep(60.0)
+
+
+_init_p3_tables()
+threading.Thread(target=_p3_background_daemon, daemon=True, name="sportiq-p3-daemon").start()
+
+
+# --- P3 Schemas ---
+class PredictionPickIn(BaseModel):
+    nickname: str
+    pin: str
+    match_key: str
+    matchup: str
+    league: str = "EPL"
+    pick: str
+
+
+class NotificationReadIn(BaseModel):
+    nickname: str
+    pin: Optional[str] = ""
+    notif_id: Optional[int] = None
+
+
+class PostReportIn(BaseModel):
+    reporter: Optional[str] = ""
+    reason: str = "스팸·도배 또는 부적절한 게시물"
+
+
+# --- P3-A: Match Prediction Pick & Mini MyPage Endpoints ---
+@upgrade_router.post("/api/member/predictions/pick")
+def submit_member_match_pick(payload: PredictionPickIn):
+    nick = (payload.nickname or "").strip()[:24]
+    pin = re.sub(r"\D", "", payload.pin or "")
+    pick = (payload.pick or "").strip().upper()
+    if pick not in ("HOME", "DRAW", "AWAY"):
+        raise HTTPException(status_code=400, detail="예측 선택값은 HOME, DRAW, AWAY 중 하나여야 합니다.")
+    if len(nick) < 2 or len(pin) != 4:
+        raise HTTPException(status_code=400, detail="닉네임과 4자리 PIN 연동 후 승부예측에 참여할 수 있습니다.")
+    pin_h = _hash_pin(nick, pin)
+    matchup = (payload.matchup or "").strip()[:120]
+    mkey = (payload.match_key or canonical_matchup_signature(matchup) or matchup)[:80]
+    league = (payload.league or "SPORT").strip()[:24]
+    now = time.time()
+    today_kst = datetime.now(KST).strftime("%Y-%m-%d")
+
+    def _op() -> Dict[str, Any]:
+        with _db_session(write=True) as conn:
+            acc = conn.execute(
+                "SELECT * FROM member_accounts WHERE lower(nickname)=lower(?)", (nick,)
+            ).fetchone()
+            if not acc or acc["pin_hash"] != pin_h:
+                raise HTTPException(status_code=403, detail="닉네임 또는 4자리 PIN이 일치하지 않습니다.")
+            dup = conn.execute(
+                "SELECT pick, status FROM member_match_predictions WHERE lower(nickname)=lower(?) AND match_key=?",
+                (acc["nickname"], mkey),
+            ).fetchone()
+            if dup:
+                raise HTTPException(status_code=400, detail=f"이미 '{dup['pick']}' 픽으로 참여한 경기입니다.")
+
+            new_pts = int(acc["points"] or 0) + 5
+            conn.execute(
+                """
+                INSERT INTO member_match_predictions(nickname, match_key, matchup, league, pick, status, reward_points, created_at)
+                VALUES (?, ?, ?, ?, ?, 'PENDING', 5, ?)
+                """,
+                (acc["nickname"], mkey, matchup, league, pick, now),
+            )
+            conn.execute(
+                """
+                INSERT INTO member_prediction_stats(nickname, total_picks, hit_count, miss_count, win_streak, best_streak, total_earned_points, updated_at)
+                VALUES (?, 1, 0, 0, 0, 0, 5, ?)
+                ON CONFLICT(nickname) DO UPDATE SET
+                    total_picks = total_picks + 1,
+                    total_earned_points = total_earned_points + 5,
+                    updated_at = excluded.updated_at
+                """,
+                (acc["nickname"], now),
+            )
+            conn.execute(
+                "UPDATE member_accounts SET points = ?, role_tier = ?, updated_at = ? WHERE nickname = ?",
+                (new_pts, _tier_for_points(new_pts), now, acc["nickname"]),
+            )
+            conn.execute(
+                """
+                INSERT INTO wp_point_ledger(nickname, event_type, ref_id, points_delta, kst_date, site_origin, created_at)
+                VALUES (?, 'prediction_pick', ?, 5, ?, 'billnojay.com', ?)
+                """,
+                (acc["nickname"], mkey, today_kst, now),
+            )
+            return {"nickname": acc["nickname"], "points": new_pts, "pick": pick, "match_key": mkey}
+
+    res = run_with_db_retry(_op)
+    threading.Thread(
+        target=_trigger_pg_backup,
+        args=("member_match_predictions", "member_prediction_stats", "member_accounts", "wp_point_ledger"),
+        daemon=True,
+    ).start()
+    return {"ok": True, "awarded_points": 5, **res}
+
+
+@upgrade_router.get("/api/member/mypage")
+def get_member_mini_mypage(nickname: str, pin: str = ""):
+    nick = (nickname or "").strip()[:24]
+    clean_pin = re.sub(r"\D", "", pin or "")
+    if len(nick) < 2:
+        raise HTTPException(status_code=400, detail="닉네임을 입력해 주세요.")
+
+    def _op() -> Dict[str, Any]:
+        with _db_session(write=False) as conn:
+            acc = conn.execute(
+                "SELECT * FROM member_accounts WHERE lower(nickname)=lower(?)", (nick,)
+            ).fetchone()
+            if not acc:
+                raise HTTPException(status_code=404, detail="연동된 계정을 찾을 수 없습니다.")
+            if clean_pin and acc["pin_hash"] != _hash_pin(acc["nickname"], clean_pin):
+                raise HTTPException(status_code=403, detail="4자리 PIN이 일치하지 않습니다.")
+
+            prof = _serialize_wp_member_profile(conn, acc)
+            st = conn.execute(
+                "SELECT * FROM member_prediction_stats WHERE lower(nickname)=lower(?)", (acc["nickname"],)
+            ).fetchone()
+            picks = [
+                {
+                    "id": r["id"],
+                    "matchup": r["matchup"],
+                    "league": r["league"],
+                    "pick": r["pick"],
+                    "status": r["status"],
+                    "reward_points": r["reward_points"],
+                    "settled_score": r["settled_score"],
+                    "created_kst": _fmt_kst_ts(r["created_at"]),
+                }
+                for r in conn.execute(
+                    "SELECT * FROM member_match_predictions WHERE lower(nickname)=lower(?) ORDER BY id DESC LIMIT 12",
+                    (acc["nickname"],),
+                ).fetchall()
+            ]
+            ledger = [
+                {
+                    "event_type": r["event_type"],
+                    "points_delta": r["points_delta"],
+                    "kst_date": r["kst_date"],
+                    "created_kst": _fmt_kst_ts(r["created_at"]),
+                }
+                for r in conn.execute(
+                    "SELECT * FROM wp_point_ledger WHERE lower(nickname)=lower(?) ORDER BY id DESC LIMIT 10",
+                    (acc["nickname"],),
+                ).fetchall()
+            ]
+            settled_total = (int(st["hit_count"]) + int(st["miss_count"])) if st else 0
+            hit_rate = round((int(st["hit_count"]) * 100.0 / settled_total), 1) if settled_total > 0 else 0.0
+            return {
+                "profile": prof,
+                "stats": {
+                    "total_picks": int(st["total_picks"]) if st else 0,
+                    "hit_count": int(st["hit_count"]) if st else 0,
+                    "miss_count": int(st["miss_count"]) if st else 0,
+                    "hit_rate_pct": hit_rate,
+                    "win_streak": int(st["win_streak"]) if st else 0,
+                    "best_streak": int(st["best_streak"]) if st else 0,
+                    "total_earned_points": int(st["total_earned_points"]) if st else 0,
+                },
+                "recent_picks": picks,
+                "recent_ledger": ledger,
+            }
+
+    return {"ok": True, **run_with_db_retry(_op)}
+
+
+# --- P3-B: In-App Notification Bell & Comment Trigger ---
+@upgrade_router.get("/api/member/notifications")
+def list_member_notifications(nickname: str, limit: int = 20):
+    nick = (nickname or "").strip()[:24]
+    if len(nick) < 2:
+        return {"ok": True, "unread_count": 0, "items": []}
+    lim = max(1, min(50, int(limit)))
+
+    def _op() -> Dict[str, Any]:
+        with _db_session(write=False) as conn:
+            unread = conn.execute(
+                "SELECT COUNT(*) AS c FROM member_notifications WHERE lower(nickname)=lower(?) AND is_read=0",
+                (nick,),
+            ).fetchone()["c"]
+            rows = conn.execute(
+                "SELECT * FROM member_notifications WHERE lower(nickname)=lower(?) ORDER BY id DESC LIMIT ?",
+                (nick, lim),
+            ).fetchall()
+            return {
+                "unread_count": int(unread or 0),
+                "items": [
+                    {
+                        "id": int(r["id"]),
+                        "notif_type": r["notif_type"],
+                        "title": r["title"],
+                        "body": r["body"],
+                        "link_target": r["link_target"],
+                        "is_read": bool(r["is_read"]),
+                        "created_kst": _fmt_kst_ts(r["created_at"]),
+                    }
+                    for r in rows
+                ],
+            }
+
+    return {"ok": True, **run_with_db_retry(_op)}
+
+
+@upgrade_router.post("/api/member/notifications/read-all")
+def mark_all_notifications_read(payload: NotificationReadIn):
+    nick = (payload.nickname or "").strip()[:24]
+    if len(nick) < 2:
+        return {"ok": True}
+
+    def _op() -> None:
+        with _db_session(write=True) as conn:
+            if payload.notif_id:
+                conn.execute(
+                    "UPDATE member_notifications SET is_read=1 WHERE id=? AND lower(nickname)=lower(?)",
+                    (int(payload.notif_id), nick),
+                )
+            else:
+                conn.execute(
+                    "UPDATE member_notifications SET is_read=1 WHERE lower(nickname)=lower(?)",
+                    (nick,),
+                )
+
+    run_with_db_retry(_op)
+    threading.Thread(target=_trigger_pg_backup, args=("member_notifications",), daemon=True).start()
+    return {"ok": True}
+
+
+# --- P3-C: 3-Strike Auto Blind Moderation & Blinded Map ---
+@upgrade_router.get("/api/posts/blinds")
+def list_blinded_posts():
+    def _op() -> Dict[str, Any]:
+        with _db_session(write=False) as conn:
+            rows = conn.execute("SELECT post_id, report_count, blinded FROM community_post_blinds").fetchall()
+            return {
+                "blinded_ids": [r["post_id"] for r in rows if int(r["blinded"] or 0) == 1],
+                "counts": {r["post_id"]: int(r["report_count"] or 0) for r in rows},
+            }
+
+    return {"ok": True, **run_with_db_retry(_op)}
+
+
+@upgrade_router.post("/api/posts/{post_id}/report-clean")
+def report_post_with_auto_blind(post_id: str, payload: PostReportIn):
+    pid = (post_id or "").strip()[:64]
+    reporter = (payload.reporter or "anon").strip()[:40] or "anon"
+    reason = (payload.reason or "스팸·도배").strip()[:120]
+    rep_key = hashlib.sha256(f"{pid}:{reporter}".encode("utf-8")).hexdigest()[:24]
+    now = time.time()
+
+    def _op() -> Dict[str, Any]:
+        with _db_session(write=True) as conn:
+            dup = conn.execute(
+                "SELECT 1 FROM community_post_report_logs WHERE post_id=? AND reporter_key=?",
+                (pid, rep_key),
+            ).fetchone()
+            if dup:
+                cur = conn.execute("SELECT report_count, blinded FROM community_post_blinds WHERE post_id=?", (pid,)).fetchone()
+                return {
+                    "already_reported": True,
+                    "report_count": int(cur["report_count"]) if cur else 1,
+                    "blinded": bool(cur["blinded"]) if cur else False,
+                }
+
+            conn.execute(
+                "INSERT INTO community_post_report_logs(post_id, reporter_key, reason, created_at) VALUES (?, ?, ?, ?)",
+                (pid, rep_key, reason, now),
+            )
+            cnt = conn.execute(
+                "SELECT COUNT(*) AS c FROM community_post_report_logs WHERE post_id=?", (pid,)
+            ).fetchone()["c"]
+            is_blinded = 1 if int(cnt) >= 3 else 0
+            conn.execute(
+                """
+                INSERT INTO community_post_blinds(post_id, report_count, blinded, last_reason, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(post_id) DO UPDATE SET
+                    report_count = excluded.report_count,
+                    blinded = CASE WHEN community_post_blinds.blinded = 1 THEN 1 ELSE excluded.blinded END,
+                    last_reason = excluded.last_reason,
+                    updated_at = excluded.updated_at
+                """,
+                (pid, int(cnt), is_blinded, reason, now),
+            )
+            return {"already_reported": False, "report_count": int(cnt), "blinded": bool(is_blinded)}
+
+    out = run_with_db_retry(_op)
+    threading.Thread(
+        target=_trigger_pg_backup, args=("community_post_blinds", "community_post_report_logs"), daemon=True
+    ).start()
+    return {"ok": True, **out}
+
+
+@upgrade_router.post("/api/admin/posts/{post_id}/unblind")
+def admin_unblind_community_post(
+    post_id: str,
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+):
+    _require_admin_auth(x_sportiq_admin_key)
+
+    def _op() -> None:
+        with _db_session(write=True) as conn:
+            conn.execute(
+                "UPDATE community_post_blinds SET blinded=0, report_count=0, updated_at=? WHERE post_id=?",
+                (time.time(), post_id[:64]),
+            )
+            conn.execute("DELETE FROM community_post_report_logs WHERE post_id=?", (post_id[:64],))
+
+    run_with_db_retry(_op)
+    threading.Thread(
+        target=_trigger_pg_backup, args=("community_post_blinds", "community_post_report_logs"), daemon=True
+    ).start()
+    return {"ok": True, "unblinded_id": post_id}
+
+
+# Hook comment notification trigger onto existing add_community_comment
+_orig_add_comment_fn = add_community_comment
+
+
+def _notify_post_author_on_comment(post_id: str, commenter: str, text: str) -> None:
+    def _op() -> None:
+        with _db_session(write=True) as conn:
+            row = conn.execute(
+                "SELECT author, title FROM community_member_posts WHERE id=?", (post_id[:64],)
+            ).fetchone()
+            if row and row["author"] and row["author"].strip().lower() != commenter.strip().lower():
+                _push_member_notification(
+                    conn,
+                    row["author"],
+                    "COMMENT",
+                    f"💬 '{commenter}'님이 내 분석글에 댓글을 남겼습니다",
+                    f"[{row['title'][:36]}] {text[:80]}",
+                    post_id[:64],
+                )
+
+    try:
+        run_with_db_retry(_op)
+        _trigger_pg_backup("member_notifications")
+    except Exception:
+        pass
+
+
+for _r in upgrade_router.routes:
+    if getattr(_r, "path", "") == "/api/posts/{post_id}/comments" and "POST" in getattr(_r, "methods", set()):
+        def _wrapped_add_comment(post_id: str, payload: CommentCreateIn):
+            res = _orig_add_comment_fn(post_id, payload)
+            sender = (payload.nickname or payload.user or "익명팬").strip()[:28]
+            threading.Thread(
+                target=_notify_post_author_on_comment, args=(post_id, sender, payload.text or ""), daemon=True
+            ).start()
+            return res
+
+        _r.endpoint = _wrapped_add_comment
+        break
+
+# Upgrade Service Worker for Web Push Notification Click Handling (v3.0)
+SERVICE_WORKER_JS = SERVICE_WORKER_JS + (
+    "\nself.addEventListener('notificationclick', (event) => {\n"
+    "  event.notification.close();\n"
+    "  event.waitUntil(clients.openWindow('/?source=pwa_notif'));\n"
+    "});\n"
+)
+
+# Frontend v5.0: Chronological/Recent Match Sorter (fetch + DOM) + P3-A/B/C Suite
+P3_AND_CHRONO_JS = r"""
+/* SportIQ v5.0: Nearest/Recent Match Date-Time Sorter + P3 Full Suite */
+(function () {
+  if (window.__SPORTIQ_V5_DATE_P3__) return;
+  window.__SPORTIQ_V5_DATE_P3__ = true;
+
+  var p3FeedSourceFilter = "ALL";
+  var p3SearchQuery = "";
+  var blindedPostSet = {};
+  var lastUnreadNotifCount = -1;
+
+  function sqNick() { return (localStorage.getItem("sportiq_member_nick") || localStorage.getItem("sportiq_guest_nick") || "").trim(); }
+  function sqPin() { return (localStorage.getItem("sportiq_member_pin") || "").trim(); }
+  function esc(v) { return v == null ? "" : String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+  // --- Chronological / Recent Match Date-Time Parser & Sorter ---
+  function parseMatchEpochFromText(s) {
+    var txt = String(s || "");
+    var now = new Date();
+    var yr = now.getFullYear();
+
+    var iso = txt.match(/(20\d{2})[.\-\/](\d{1,2})[.\-\/](\d{1,2})[^\d]{0,14}?(\d{1,2}):(\d{2})/);
+    if (iso) {
+      return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), Number(iso[4]), Number(iso[5])).getTime();
+    }
+    var md = txt.match(/(\d{1,2})\.(\d{1,2})\s*(?:\([^)]*\))?\s*(\d{1,2}):(\d{2})/);
+    if (md) {
+      var mo = Number(md[1]), da = Number(md[2]), hh = Number(md[3]), mm = Number(md[4]);
+      var t = new Date(yr, mo - 1, da, hh, mm).getTime();
+      if (t - now.getTime() < -180 * 86400 * 1000) {
+        t = new Date(yr + 1, mo - 1, da, hh, mm).getTime();
+      }
+      return t;
+    }
+    return null;
+  }
+
+  function computeMatchOrderTuple(statusText, epochMs, fallbackIdx) {
+    var st = String(statusText || "");
+    var isScheduled = /Scheduled|예정/i.test(st);
+    var isLive = !isScheduled && (/\bLIVE\b|\bin\b|진행중|전반|후반|\bHT\b/i.test(st));
+    var isEnded = !isScheduled && (/\bFT\b|\bFinal\b|\bpost\b|종료|경기종료/i.test(st));
+    if (epochMs == null) return { bucket: 9, key: fallbackIdx };
+    // 0: LIVE first (latest kickoff first)
+    // 1: Scheduled/Upcoming nearest to now first (e.g. 11.17 -> 11.21 04:30 -> 11.21 04:45)
+    // 2: Finished most recently ended first
+    if (isLive) return { bucket: 0, key: -epochMs };
+    if (isEnded) return { bucket: 2, key: -epochMs };
+    return { bucket: 1, key: epochMs };
+  }
+
+  // Intercept /api/datacenter/live-scores & /api/datacenter/dropping-odds JSON arrays so JS renderers always receive chronological order
+  if (typeof window.fetch === "function" && !window.__sqChronoFetchHooked) {
+    window.__sqChronoFetchHooked = true;
+    var origFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+      var urlStr = typeof input === "string" ? input : (input && input.url ? input.url : "");
+      var isMatchFeed = urlStr.indexOf("/api/datacenter/live-scores") !== -1 || urlStr.indexOf("/api/datacenter/dropping-odds") !== -1;
+      if (!isMatchFeed) return origFetch(input, init);
+
+      return origFetch(input, init).then(function (resp) {
+        if (!resp || !resp.ok || typeof resp.clone !== "function") return resp;
+        return resp.clone().json().then(function (data) {
+          if (!data || typeof data !== "object") return resp;
+          ["items", "matches", "alerts", "rows"].forEach(function (arrKey) {
+            if (Array.isArray(data[arrKey]) && data[arrKey].length > 1) {
+              data[arrKey] = data[arrKey].map(function (m, idx) {
+                var rawDt = (m && (m.match_dt_kst || m.commence_time || m.kickoff_kst || m.date || m.schedule_venue)) || "";
+                var ep = (m && typeof m.kickoff_ts === "number") ? m.kickoff_ts * 1000 : parseMatchEpochFromText(rawDt);
+                var stTxt = (m && (m.state || m.status_badge || m.status)) || "";
+                var ord = computeMatchOrderTuple(stTxt, ep, idx);
+                return { m: m, idx: idx, bucket: ord.bucket, key: ord.key };
+              }).sort(function (a, b) {
+                if (a.bucket !== b.bucket) return a.bucket - b.bucket;
+                if (a.key !== b.key) return a.key - b.key;
+                return a.idx - b.idx;
+              }).map(function (w) { return w.m; });
+            }
+          });
+          return new Response(JSON.stringify(data), {
+            status: resp.status,
+            statusText: resp.statusText,
+            headers: resp.headers
+          });
+        }).catch(function () { return resp; });
+      });
+    };
+  }
+
+  // Also sort any already-rendered horizontal or grid match card containers directly in the DOM
+  function sortRenderedMatchCardStrips() {
+    document.querySelectorAll("div, section").forEach(function (container) {
+      if (!container.children || container.children.length < 2 || container.children.length > 90) return;
+      if (container.id === "feedList" || container.id === "dcLauncherGrid") return;
+      var kids = Array.prototype.slice.call(container.children);
+      var matchLikeCount = 0;
+      kids.forEach(function (ch) {
+        var t = ch.textContent || "";
+        if (parseMatchEpochFromText(t) != null && (/Scheduled|LIVE|배당|스코어|vs/i.test(t))) {
+          matchLikeCount++;
+        }
+      });
+      if (matchLikeCount < 2 || matchLikeCount < Math.ceil(kids.length * 0.5)) return;
+
+      var decorated = kids.map(function (el, idx) {
+        var t = el.textContent || "";
+        var ep = parseMatchEpochFromText(t);
+        var ord = computeMatchOrderTuple(t, ep, idx);
+        var isMy = /⭐\s*MY\b/.test(t) ? 0 : 1;
+        return { el: el, idx: idx, isMy: isMy, bucket: ord.bucket, key: ord.key };
+      });
+
+      var sorted = decorated.slice().sort(function (a, b) {
+        if (a.bucket !== b.bucket) return a.bucket - b.bucket;
+        if (a.key !== b.key) return a.key - b.key;
+        if (a.isMy !== b.isMy) return a.isMy - b.isMy;
+        return a.idx - b.idx;
+      });
+
+      var changed = false;
+      for (var i = 0; i < sorted.length; i++) {
+        if (sorted[i].el !== kids[i]) { changed = true; break; }
+      }
+      if (!changed) return;
+
+      var prevScrollLeft = container.scrollLeft || 0;
+      sorted.forEach(function (item) { container.appendChild(item.el); });
+      if (prevScrollLeft > 0) container.scrollLeft = prevScrollLeft;
+    });
+  }
+
+  // --- P3-A: Mini MyPage & Big-Match Quick Prediction Buttons ---
+  function mountMyPageAndBellHeader() {
+    var hubBtn = document.getElementById("sqOpenMemberHubBtn");
+    if (!hubBtn || !hubBtn.parentNode) return;
+
+    if (!document.getElementById("sqOpenMyPageBtn")) {
+      var mpBtn = document.createElement("button");
+      mpBtn.id = "sqOpenMyPageBtn";
+      mpBtn.type = "button";
+      mpBtn.className = "sq-up-btn";
+      mpBtn.style.background = "linear-gradient(135deg,#4f46e5,#0284c7)";
+      mpBtn.innerHTML = "📊 내 프로필";
+      mpBtn.onclick = openMyPageModal;
+      hubBtn.insertAdjacentElement("afterend", mpBtn);
+    }
+
+    if (!document.getElementById("sqNotifBellBtn")) {
+      var bell = document.createElement("button");
+      bell.id = "sqNotifBellBtn";
+      bell.type = "button";
+      bell.className = "sq-up-btn";
+      bell.style.position = "relative";
+      bell.style.background = "#0f172a";
+      bell.innerHTML = "🔔 알림 <span id='sqNotifBadge' style='display:none;background:#ef4444;color:#fff;border-radius:999px;padding:0 6px;font-size:10.5px;font-weight:900;'>0</span>";
+      bell.onclick = openNotificationsModal;
+      hubBtn.insertAdjacentElement("afterend", bell);
+    }
+  }
+
+  function openMyPageModal() {
+    var nk = sqNick();
+    if (!nk) {
+      if (typeof window.__openSportiqMemberHub === "function") window.__openSportiqMemberHub();
+      if (typeof showToast === "function") showToast("🔐 먼저 닉네임 + 4자리 PIN을 연동하면 내 적중률 프로필이 활성화됩니다!");
+      return;
+    }
+    var m = document.getElementById("sqMyPageModal");
+    if (!m) {
+      m = document.createElement("div");
+      m.id = "sqMyPageModal";
+      m.className = "sq-modal-backdrop";
+      m.innerHTML = "<div class='sq-modal-panel' style='max-width:580px;'><div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;'><h3 style='margin:0;font-size:16.5px;font-weight:900;'>📊 내 적중률 &amp; 포인트 마이페이지</h3><button type='button' id='sqCloseMyPageBtn' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:800;'>✕ 닫기 (Esc)</button></div><div id='sqMyPageBody'>불러오는 중...</div></div>";
+      document.body.appendChild(m);
+      document.getElementById("sqCloseMyPageBtn").onclick = function(){ m.style.display = "none"; };
+      m.addEventListener("click", function(e){ if (e.target === m) m.style.display = "none"; });
+    }
+    m.style.display = "flex";
+    var body = document.getElementById("sqMyPageBody");
+    fetch("/api/member/mypage?nickname=" + encodeURIComponent(nk) + "&pin=" + encodeURIComponent(sqPin()))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok) { body.innerHTML = "<div style='color:#f87171;'>프로필을 불러오지 못했습니다.</div>"; return; }
+        var pf = d.profile || {};
+        var st = d.stats || {};
+        var picksHtml = (d.recent_picks || []).map(function(p){
+          var col = p.status === "HIT" ? "#4ade80" : (p.status === "MISS" ? "#f87171" : "#fde68a");
+          return "<div style='display:flex;justify-content:space-between;padding:7px 9px;background:#020617;border:1px solid #1e293b;border-radius:8px;margin-bottom:5px;font-size:12px;'>" +
+            "<span><strong>[" + esc(p.league) + "]</strong> " + esc(p.matchup) + " · 픽: <strong style='color:#38bdf8;'>" + esc(p.pick) + "</strong></span>" +
+            "<span style='color:" + col + ";font-weight:800;'>" + esc(p.status) + (p.settled_score ? " (" + esc(p.settled_score) + ")" : "") + " +" + esc(p.reward_points) + "P</span></div>";
+        }).join("") || "<div style='color:#94a3b8;font-size:12px;padding:8px;'>아직 참여한 승부예측이 없습니다. 상단 빅매치 카드에서 홈승/무/원정승을 픽해보세요! (+5P 즉시 지급 · 적중 시 +30P)</div>";
+
+        body.innerHTML = [
+          "<div style='display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;text-align:center;'>",
+          "  <div style='background:#020617;border:1px solid #1e293b;border-radius:10px;padding:10px;'><div style='font-size:11px;color:#94a3b8;'>보유 포인트</div><div style='font-size:16px;font-weight:900;color:#38bdf8;'>" + esc(pf.points) + "P</div></div>",
+          "  <div style='background:#020617;border:1px solid #1e293b;border-radius:10px;padding:10px;'><div style='font-size:11px;color:#94a3b8;'>예측 적중률</div><div style='font-size:16px;font-weight:900;color:#4ade80;'>" + esc(st.hit_rate_pct) + "%</div></div>",
+          "  <div style='background:#020617;border:1px solid #1e293b;border-radius:10px;padding:10px;'><div style='font-size:11px;color:#94a3b8;'>현재 / 최고연승</div><div style='font-size:16px;font-weight:900;color:#fbbf24;'>" + esc(st.win_streak) + " / " + esc(st.best_streak) + "</div></div>",
+          "  <div style='background:#020617;border:1px solid #1e293b;border-radius:10px;padding:10px;'><div style='font-size:11px;color:#94a3b8;'>연속 출석</div><div style='font-size:16px;font-weight:900;color:#f472b6;'>" + esc(pf.streak_days) + "일</div></div>",
+          "</div>",
+          "<div style='font-weight:800;font-size:13px;margin-bottom:6px;color:#f8fafc;'>🎯 최근 승부예측 &amp; 자동 정산 내역 (적중 +30P · 3연승 +25P · 5연승 +60P)</div>",
+          picksHtml
+        ].join("");
+      });
+  }
+
+  function injectQuickPickButtonsOnTop20() {
+    var grid = document.getElementById("globalTop10Grid");
+    if (!grid) return;
+    Array.prototype.slice.call(grid.children).forEach(function(card){
+      if (card.querySelector(".sq-p3-pickbar")) return;
+      var titleEl = card.querySelector(".text-sm.font-extrabold") || card.querySelector("h4, strong");
+      var matchup = titleEl ? titleEl.textContent.trim() : "";
+      if (!matchup || matchup.indexOf("vs") === -1) return;
+      var bar = document.createElement("div");
+      bar.className = "sq-p3-pickbar";
+      bar.style.cssText = "display:flex;gap:5px;margin-top:8px;padding-top:7px;border-top:1px dashed rgba(148,163,184,.16);";
+      [["HOME","🏠 홈승"],["DRAW","⚖️ 무"],["AWAY","✈️ 원정승"]].forEach(function(pair){
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "dc-pill";
+        b.style.cssText = "flex:1;font-size:11px;padding:4px 6px;font-weight:800;";
+        b.textContent = pair[1];
+        b.onclick = function(ev){
+          ev.stopPropagation();
+          if (!sqNick() || sqPin().length !== 4) {
+            if (typeof window.__openSportiqMemberHub === "function") window.__openSportiqMemberHub();
+            if (typeof showToast === "function") showToast("🔐 승부예측 자동 정산을 위해 닉네임 + 4자리 PIN을 먼저 연동해 주세요!");
+            return;
+          }
+          fetch("/api/member/predictions/pick", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ nickname: sqNick(), pin: sqPin(), match_key: matchup, matchup: matchup, league: "TOP매치", pick: pair[0] })
+          }).then(function(r){ return r.json().then(function(x){ return {status:r.status, data:x}; }); })
+            .then(function(res){
+              if (res.status !== 200 || !res.data.ok) {
+                if (typeof showToast === "function") showToast("ℹ️ " + ((res.data && res.data.detail) || "참여 실패"));
+                return;
+              }
+              if (typeof state === "object" && state) { state.points = Number(res.data.points); if (typeof updatePointsUI === "function") updatePointsUI(); }
+              if (typeof showToast === "function") showToast("🎯 [" + matchup + "] " + pair[1] + " 예측 완료! (+5P 즉시 지급 · 경기 종료 후 자동 정산)");
+            });
+        };
+        bar.appendChild(b);
+      });
+      card.appendChild(bar);
+    });
+  }
+
+  // --- P3-B: Notification Bell Modal + Browser Web Push ---
+  function pollMemberNotifications() {
+    var nk = sqNick();
+    if (!nk) return;
+    fetch("/api/member/notifications?nickname=" + encodeURIComponent(nk) + "&limit=15")
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok) return;
+        var unread = Number(d.unread_count || 0);
+        var badge = document.getElementById("sqNotifBadge");
+        if (badge) {
+          badge.style.display = unread > 0 ? "inline-block" : "none";
+          badge.textContent = String(unread);
+        }
+        if (lastUnreadNotifCount >= 0 && unread > lastUnreadNotifCount && d.items && d.items[0]) {
+          var latest = d.items[0];
+          if (typeof showToast === "function") showToast(latest.title);
+          if ("Notification" in window && Notification.permission === "granted" && navigator.serviceWorker) {
+            navigator.serviceWorker.ready.then(function(reg){
+              reg.showNotification(latest.title, { body: latest.body, icon: "/pwa-icon-192.png" });
+            }).catch(function(){});
+          }
+        }
+        lastUnreadNotifCount = unread;
+      }).catch(function(){});
+  }
+
+  function openNotificationsModal() {
+    var nk = sqNick();
+    var m = document.getElementById("sqNotifModal");
+    if (!m) {
+      m = document.createElement("div");
+      m.id = "sqNotifModal";
+      m.className = "sq-modal-backdrop";
+      m.innerHTML = "<div class='sq-modal-panel' style='max-width:480px;'><div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;'><h3 style='margin:0;font-size:16px;font-weight:900;'>🔔 실시간 알림 센터</h3><div style='display:flex;gap:6px;'><button type='button' id='sqEnablePushBtn' class='dc-pill' style='font-size:11px;'>📲 푸시 허용</button><button type='button' id='sqReadAllNotifBtn' class='dc-pill' style='font-size:11px;'>모두 읽음</button><button type='button' id='sqCloseNotifBtn' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:4px 9px;cursor:pointer;'>✕</button></div></div><div id='sqNotifListArea' style='font-size:12.5px;'>불러오는 중...</div></div>";
+      document.body.appendChild(m);
+      document.getElementById("sqCloseNotifBtn").onclick = function(){ m.style.display = "none"; };
+      m.addEventListener("click", function(e){ if (e.target === m) m.style.display = "none"; });
+      document.getElementById("sqEnablePushBtn").onclick = function(){
+        if (!("Notification" in window)) return;
+        Notification.requestPermission().then(function(p){
+          if (typeof showToast === "function") showToast(p === "granted" ? "✅ 웹 푸시 알림이 활성화되었습니다!" : "브라우저 설정에서 알림 권한을 허용해 주세요.");
+        });
+      };
+      document.getElementById("sqReadAllNotifBtn").onclick = function(){
+        if (!sqNick()) return;
+        fetch("/api/member/notifications/read-all", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({nickname:sqNick()}) })
+          .then(function(){ pollMemberNotifications(); openNotificationsModal(); });
+      };
+    }
+    m.style.display = "flex";
+    var box = document.getElementById("sqNotifListArea");
+    if (!nk) { box.innerHTML = "<div style='color:#94a3b8;padding:12px;'>닉네임 + 4자리 PIN 연동 후 내 글 댓글·승부예측 정산 알림을 실시간으로 받아보실 수 있습니다.</div>"; return; }
+    fetch("/api/member/notifications?nickname=" + encodeURIComponent(nk) + "&limit=20")
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var items = (d && d.items) || [];
+        if (!items.length) { box.innerHTML = "<div style='color:#94a3b8;padding:12px;text-align:center;'>새로운 알림이 없습니다.</div>"; return; }
+        box.innerHTML = items.map(function(n){
+          var bg = n.is_read ? "#0b1220" : "rgba(2,132,199,.16)";
+          return "<div style='background:" + bg + ";border:1px solid #1e293b;border-radius:10px;padding:10px;margin-bottom:7px;'>" +
+            "<div style='font-weight:800;color:#f8fafc;'>" + esc(n.title) + "</div>" +
+            "<div style='color:#cbd5e1;font-size:12px;margin-top:3px;'>" + esc(n.body) + "</div>" +
+            "<div style='color:#64748b;font-size:10.5px;margin-top:4px;'>" + esc(n.created_kst) + "</div></div>";
+        }).join("");
+      });
+  }
+
+  // --- P3-C: Community Feed 3-Tab Split + Live Search + 3-Strike Auto Blind ---
+  function loadBlindedSet() {
+    fetch("/api/posts/blinds").then(function(r){return r.json();}).then(function(d){
+      if (!d || !d.ok) return;
+      blindedPostSet = {};
+      (d.blinded_ids || []).forEach(function(id){ blindedPostSet[id] = true; });
+      applyFeedFilterAndBlindDom();
+    }).catch(function(){});
+  }
+
+  function mountFeedFilterAndSearchBar() {
+    var feedBox = document.getElementById("feedList");
+    if (!feedBox || !feedBox.parentNode || document.getElementById("sqP3FeedToolbar")) return;
+    var bar = document.createElement("div");
+    bar.id = "sqP3FeedToolbar";
+    bar.style.cssText = "display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;background:#0b1220;border:1px solid #1e293b;border-radius:12px;padding:9px 11px;";
+    bar.innerHTML = [
+      "<div style='display:flex;gap:6px;flex-wrap:wrap;'>",
+      "  <button type='button' data-sq-ftab='ALL' class='dc-pill' style='font-weight:800;border-color:#38bdf8;color:#e0f2fe;'>전체 피드</button>",
+      "  <button type='button' data-sq-ftab='MEMBER' class='dc-pill' style='font-weight:800;'>✍️ 회원 분석글</button>",
+      "  <button type='button' data-sq-ftab='AI' class='dc-pill' style='font-weight:800;'>🤖 AI 데이터 브리핑</button>",
+      "</div>",
+      "<input id='sqP3FeedSearchInput' placeholder='🔍 팀명 · 리그 · 작성자 · #해시태그 검색' style='flex:1;min-width:200px;max-width:300px;background:#020617;border:1px solid #334155;border-radius:9px;padding:6px 10px;color:#fff;font-size:12px;' />"
+    ].join("");
+    feedBox.parentNode.insertBefore(bar, feedBox);
+
+    bar.querySelectorAll("[data-sq-ftab]").forEach(function(btn){
+      btn.onclick = function(){
+        p3FeedSourceFilter = btn.getAttribute("data-sq-ftab") || "ALL";
+        bar.querySelectorAll("[data-sq-ftab]").forEach(function(x){
+          var active = x.getAttribute("data-sq-ftab") === p3FeedSourceFilter;
+          x.style.borderColor = active ? "#38bdf8" : "";
+          x.style.color = active ? "#e0f2fe" : "";
+        });
+        applyFeedFilterAndBlindDom();
+      };
+    });
+    document.getElementById("sqP3FeedSearchInput").addEventListener("input", function(ev){
+      p3SearchQuery = (ev.target.value || "").trim().toLowerCase();
+      applyFeedFilterAndBlindDom();
+    });
+  }
+
+  function applyFeedFilterAndBlindDom() {
+    var box = document.getElementById("feedList");
+    if (!box || typeof state !== "object" || !state) return;
+    box.querySelectorAll("article").forEach(function(art){
+      var likeBtn = art.querySelector("button[onclick^='toggleLike(']");
+      var m = likeBtn ? (likeBtn.getAttribute("onclick") || "").match(/toggleLike\(['"]([^'"]+)['"]\)/) : null;
+      var pid = m ? m[1] : "";
+      var postObj = (state.posts || []).find(function(x){ return x.id === pid; });
+
+      if (pid && blindedPostSet[pid]) {
+        art.innerHTML = "<div style='padding:14px;text-align:center;color:#94a3b8;font-size:12.5px;'>🚨 다수 회원의 누적 신고(3회 이상)로 자동 블라인드 처리된 게시글입니다.</div>";
+        return;
+      }
+
+      if (pid && likeBtn && !art.querySelector("[data-sq-report]")) {
+        var repBtn = document.createElement("button");
+        repBtn.type = "button";
+        repBtn.setAttribute("data-sq-report", pid);
+        repBtn.className = "rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-slate-400 hover:text-amber-300";
+        repBtn.textContent = "🚨 신고";
+        repBtn.onclick = function(){
+          fetch("/api/posts/" + encodeURIComponent(pid) + "/report-clean", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ reporter: sqNick() || ("guest_" + (localStorage.getItem("sportiq_checked") || "1")), reason: "커뮤니티 클린 신고" })
+          }).then(function(r){ return r.json(); }).then(function(d){
+            if (d && d.blinded) { blindedPostSet[pid] = true; applyFeedFilterAndBlindDom(); }
+            if (typeof showToast === "function") showToast(d && d.already_reported ? "이미 신고 접수된 게시글입니다." : "🚨 클린 신고가 접수되었습니다. (누적 " + ((d && d.report_count) || 1) + "/3)");
+          });
+        };
+        likeBtn.parentNode.appendChild(repBtn);
+      }
+
+      var isAiPost = false;
+      if (postObj) {
+        var au = String(postObj.author || "").toLowerCase();
+        isAiPost = !postObj.isMemberServerPost && (au.indexOf("ai") !== -1 || au.indexOf("봇") !== -1 || au.indexOf("데스크") !== -1 || au.indexOf("앙상블") !== -1 || String(pid).indexOf("mp_") !== 0);
+      }
+      var matchTab = (p3FeedSourceFilter === "ALL") || (p3FeedSourceFilter === "MEMBER" && !isAiPost) || (p3FeedSourceFilter === "AI" && isAiPost);
+      var matchSearch = !p3SearchQuery || (art.textContent || "").toLowerCase().indexOf(p3SearchQuery) !== -1;
+      art.style.display = (matchTab && matchSearch) ? "" : "none";
+    });
+  }
+
+  // Close P3 modals on Escape key as well
+  window.addEventListener("keydown", function(ev){
+    if (ev.key !== "Escape" && ev.keyCode !== 27) return;
+    ["sqNotifModal", "sqMyPageModal"].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el && el.style.display === "flex") el.style.display = "none";
+    });
+  }, true);
+
+  setTimeout(function(){
+    sortRenderedMatchCardStrips();
+    loadBlindedSet();
+    mountMyPageAndBellHeader();
+    mountFeedFilterAndSearchBar();
+    injectQuickPickButtonsOnTop20();
+    pollMemberNotifications();
+  }, 300);
+
+  setInterval(function(){
+    sortRenderedMatchCardStrips();
+    mountMyPageAndBellHeader();
+    mountFeedFilterAndSearchBar();
+    injectQuickPickButtonsOnTop20();
+    applyFeedFilterAndBlindDom();
+  }, 1100);
+  setInterval(pollMemberNotifications, 25000);
+})();
+"""
+
+UPGRADE_JS = UPGRADE_JS + "\n" + P3_AND_CHRONO_JS
