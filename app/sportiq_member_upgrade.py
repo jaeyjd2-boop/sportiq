@@ -600,7 +600,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "3.3",
+        "version": "3.4",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -611,6 +611,7 @@ def member_upgrade_status():
         "p3_feed_tabs_search_blind": True,
         "match_chronological_sort": True,
         "ai_iq_online_search": True,
+        "header_tagline": "실시간 분석 스포츠IQ 인사이트",
     }
 
 
@@ -3428,13 +3429,24 @@ def serve_p0p1_upgrade_js():
 
 
 def _rebrand_scobi_text(text: str) -> str:
-    if not text or "스코비" not in text:
+    if not text:
         return text
-    return (
-        text.replace("AI 스코비", "AI 아이큐")
-        .replace("AI스코비", "AI아이큐")
-        .replace("스코비", "아이큐")
-    )
+    out = text
+    if "오픈 스포츠 인사이트" in out:
+        out = re.sub(
+            r"billnojay\.com\s*(?:[·|\-]\s*)?오픈\s*스포츠\s*인사이트",
+            "실시간 분석 스포츠IQ 인사이트",
+            out,
+            flags=re.IGNORECASE,
+        )
+        out = out.replace("오픈 스포츠 인사이트", "실시간 분석 스포츠IQ 인사이트")
+    if "스코비" in out:
+        out = (
+            out.replace("AI 스코비", "AI 아이큐")
+            .replace("AI스코비", "AI아이큐")
+            .replace("스코비", "아이큐")
+        )
+    return out
 
 
 def inject_upgrade_into_html(raw_html: str) -> str:
@@ -3453,9 +3465,9 @@ def inject_upgrade_into_html(raw_html: str) -> str:
         if h_idx != -1:
             out = out[:h_idx] + pwa_head + "\n" + out[h_idx:]
 
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=8" defer></script>'
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=9" defer></script>'
     if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=8', out)
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=9', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
@@ -4708,7 +4720,7 @@ def _patch_scobi_across_modules() -> None:
                     continue
                 try:
                     val = getattr(mod, attr)
-                    if isinstance(val, str) and "스코비" in val:
+                    if isinstance(val, str) and ("스코비" in val or "오픈 스포츠 인사이트" in val):
                         setattr(mod, attr, _rebrand_scobi_text(val))
                 except Exception:
                     pass
@@ -5342,26 +5354,53 @@ AI_IQ_ONLINE_SEARCH_JS = r"""
   ].join("\n");
   document.head.appendChild(st);
 
-  // 1) Replace every 'AI 스코비' / '스코비' text node & attribute across the entire DOM immediately
+  function rebrandTextString(val) {
+    if (!val) return val;
+    var out = val;
+    if (out.indexOf("오픈 스포츠 인사이트") !== -1) {
+      out = out
+        .replace(/billnojay\.com\s*(?:·\s*)?오픈\s*스포츠\s*인사이트/gi, "실시간 분석 스포츠IQ 인사이트")
+        .replace(/오픈\s*스포츠\s*인사이트/g, "실시간 분석 스포츠IQ 인사이트");
+    }
+    if (out.indexOf("스코비") !== -1) {
+      out = out.replace(/AI\s*스코비/g, "AI 아이큐").replace(/스코비/g, "아이큐");
+    }
+    return out;
+  }
+
+  // 1) Replace every 'billnojay.com 오픈 스포츠 인사이트' & 'AI 스코비' text node / split header subtitle / attribute across DOM
   function replaceScobiInNode(root) {
     if (!root) return;
+    if (root.querySelectorAll) {
+      // Handle cases where 'billnojay.com' and '오픈 스포츠 인사이트' are in adjacent spans inside a single subtitle line
+      root.querySelectorAll("header p, header div, header span, p, div, span").forEach(function (el) {
+        if (!el || el.children.length > 3) return;
+        var flat = (el.textContent || "").replace(/\s+/g, " ").trim();
+        if (/^billnojay\.com\s*(?:·\s*)?오픈\s*스포츠\s*인사이트$/i.test(flat)) {
+          el.textContent = "실시간 분석 스포츠IQ 인사이트";
+        }
+      });
+    }
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
     var node;
     while ((node = walker.nextNode())) {
       var val = node.nodeValue;
-      if (val && val.indexOf("스코비") !== -1) {
-        node.nodeValue = val.replace(/AI\s*스코비/g, "AI 아이큐").replace(/스코비/g, "아이큐");
+      if (val && (val.indexOf("스코비") !== -1 || val.indexOf("오픈 스포츠 인사이트") !== -1)) {
+        node.nodeValue = rebrandTextString(val);
       }
     }
     if (root.querySelectorAll) {
-      root.querySelectorAll("[placeholder*='스코비'], [title*='스코비'], [aria-label*='스코비']").forEach(function (el) {
-        ["placeholder", "title", "aria-label"].forEach(function (attr) {
+      root.querySelectorAll("[placeholder*='스코비'], [title*='스코비'], [aria-label*='스코비'], [content*='오픈 스포츠 인사이트']").forEach(function (el) {
+        ["placeholder", "title", "aria-label", "content"].forEach(function (attr) {
           var v = el.getAttribute(attr);
-          if (v && v.indexOf("스코비") !== -1) {
-            el.setAttribute(attr, v.replace(/AI\s*스코비/g, "AI 아이큐").replace(/스코비/g, "아이큐"));
+          if (v && (v.indexOf("스코비") !== -1 || v.indexOf("오픈 스포츠 인사이트") !== -1)) {
+            el.setAttribute(attr, rebrandTextString(v));
           }
         });
       });
+    }
+    if (document.title && (document.title.indexOf("스코비") !== -1 || document.title.indexOf("오픈 스포츠 인사이트") !== -1)) {
+      document.title = rebrandTextString(document.title);
     }
   }
 
@@ -5758,15 +5797,15 @@ AI_IQ_ONLINE_SEARCH_JS = r"""
     replaceScobiInNode(document.body);
     var obs = new MutationObserver(function (mutations) {
       mutations.forEach(function (mu) {
-        if (mu.type === "characterData" && mu.target && mu.target.nodeValue && mu.target.nodeValue.indexOf("스코비") !== -1) {
-          mu.target.nodeValue = mu.target.nodeValue.replace(/AI\s*스코비/g, "AI 아이큐").replace(/스코비/g, "아이큐");
+        if (mu.type === "characterData" && mu.target && mu.target.nodeValue && (mu.target.nodeValue.indexOf("스코비") !== -1 || mu.target.nodeValue.indexOf("오픈 스포츠 인사이트") !== -1)) {
+          mu.target.nodeValue = rebrandTextString(mu.target.nodeValue);
         }
         if (mu.addedNodes && mu.addedNodes.length) {
           for (var i = 0; i < mu.addedNodes.length; i++) {
             var n = mu.addedNodes[i];
             if (n.nodeType === 1) replaceScobiInNode(n);
-            else if (n.nodeType === 3 && n.nodeValue && n.nodeValue.indexOf("스코비") !== -1) {
-              n.nodeValue = n.nodeValue.replace(/AI\s*스코비/g, "AI 아이큐").replace(/스코비/g, "아이큐");
+            else if (n.nodeType === 3 && n.nodeValue && (n.nodeValue.indexOf("스코비") !== -1 || n.nodeValue.indexOf("오픈 스포츠 인사이트") !== -1)) {
+              n.nodeValue = rebrandTextString(n.nodeValue);
             }
           }
         }
