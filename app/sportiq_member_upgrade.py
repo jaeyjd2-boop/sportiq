@@ -1,4 +1,9 @@
+import email.utils
 import functools
+import html
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
 import hashlib
 import inspect
 import sys
@@ -65,6 +70,7 @@ ALL_KNOWN_SQLITE_TABLES: Tuple[str, ...] = (
     "member_notifications",
     "community_post_blinds",
     "community_post_report_logs",
+    "ai_iq_search_logs",
 )
 
 SHOP_CATALOG: List[Dict[str, Any]] = [
@@ -312,6 +318,15 @@ def _init_upgrade_tables() -> None:
                     reason TEXT NOT NULL DEFAULT '스팸/도배',
                     created_at REAL NOT NULL,
                     UNIQUE(post_id, reporter_key)
+                );
+                CREATE TABLE IF NOT EXISTS ai_iq_search_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    query TEXT NOT NULL,
+                    norm_query TEXT NOT NULL,
+                    mode TEXT NOT NULL DEFAULT 'all',
+                    nickname TEXT NOT NULL DEFAULT '',
+                    result_count INTEGER NOT NULL DEFAULT 0,
+                    created_at REAL NOT NULL
                 );
                 """
             )
@@ -585,7 +600,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "3.2",
+        "version": "3.3",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -595,6 +610,7 @@ def member_upgrade_status():
         "p3_notifications_webpush": True,
         "p3_feed_tabs_search_blind": True,
         "match_chronological_sort": True,
+        "ai_iq_online_search": True,
     }
 
 
@@ -3411,6 +3427,16 @@ def serve_p0p1_upgrade_js():
     )
 
 
+def _rebrand_scobi_text(text: str) -> str:
+    if not text or "스코비" not in text:
+        return text
+    return (
+        text.replace("AI 스코비", "AI 아이큐")
+        .replace("AI스코비", "AI아이큐")
+        .replace("스코비", "아이큐")
+    )
+
+
 def inject_upgrade_into_html(raw_html: str) -> str:
     pwa_head = (
         '  <link rel="manifest" href="/manifest.webmanifest" />\n'
@@ -3421,15 +3447,15 @@ def inject_upgrade_into_html(raw_html: str) -> str:
         '  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />\n'
         '  <meta name="apple-mobile-web-app-title" content="SportIQ" />'
     )
-    out = raw_html
+    out = _rebrand_scobi_text(raw_html)
     if 'rel="manifest"' not in out and "rel='manifest'" not in out:
         h_idx = out.find("</head>")
         if h_idx != -1:
             out = out[:h_idx] + pwa_head + "\n" + out[h_idx:]
 
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=7" defer></script>'
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=8" defer></script>'
     if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=7', out)
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=8', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
@@ -4646,3 +4672,1118 @@ P3_AND_CHRONO_JS = r"""
 """
 
 UPGRADE_JS = UPGRADE_JS + "\n" + P3_AND_CHRONO_JS
+# ============================================================================
+# STAGE P4 (v3.3 / ?v=8): "AI 스코비" -> "AI 아이큐" Rebrand & Live AI Online Search
+# ============================================================================
+_AI_IQ_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_AI_IQ_CACHE_LOCK = threading.Lock()
+_AI_IQ_HTTP_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+}
+_AI_IQ_STARTER_TRENDS: Tuple[str, ...] = (
+    "오늘 해외축구 빅매치 속보",
+    "손흥민 최신 뉴스",
+    "EPL 주요 구단 부상자 명단",
+    "NBA 오늘 경기 프리뷰",
+    "오타니 쇼헤이 최신 소식",
+    "챔피언스리그 우승 배당 흐름",
+    "기대득점 xG 전술 뜻",
+)
+
+
+def _patch_scobi_across_modules() -> None:
+    """Replaces 'AI 스코비' / '스코비' in any loaded app.* module string attributes."""
+    try:
+        for mname, mod in list(sys.modules.items()):
+            if not mod or not mname.startswith("app"):
+                continue
+            if mname.endswith("sportiq_member_upgrade"):
+                continue
+            for attr in dir(mod):
+                if attr.startswith("__"):
+                    continue
+                try:
+                    val = getattr(mod, attr)
+                    if isinstance(val, str) and "스코비" in val:
+                        setattr(mod, attr, _rebrand_scobi_text(val))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+def _http_get_bytes(url: str, timeout: float = 3.6) -> bytes:
+    req = urllib.request.Request(url, headers=_AI_IQ_HTTP_HEADERS)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read()
+
+
+def _parse_rss_items(xml_bytes: bytes, default_source: str = "온라인 뉴스", limit: int = 8) -> List[Dict[str, Any]]:
+    items: List[Dict[str, Any]] = []
+    try:
+        root = ET.fromstring(xml_bytes)
+    except Exception:
+        return items
+
+    for item_el in root.findall(".//item"):
+        raw_title = (item_el.findtext("title") or "").strip()
+        link = (item_el.findtext("link") or "").strip()
+        pub_raw = (item_el.findtext("pubDate") or "").strip()
+        src_el = item_el.find("source")
+        source_name = src_el.text.strip() if (src_el is not None and src_el.text) else ""
+
+        if not source_name and " - " in raw_title:
+            parts = raw_title.rsplit(" - ", 1)
+            if 1 < len(parts[1].strip()) <= 28:
+                raw_title, source_name = parts[0].strip(), parts[1].strip()
+        elif source_name and raw_title.endswith(" - " + source_name):
+            raw_title = raw_title[: -(len(source_name) + 3)].strip()
+
+        desc_raw = item_el.findtext("description") or ""
+        desc_clean = re.sub(r"<[^>]+>", " ", html.unescape(desc_raw))
+        desc_clean = re.sub(r"\s+", " ", desc_clean).strip()
+        clean_title = html.unescape(raw_title).strip()
+        if desc_clean.startswith(clean_title):
+            desc_clean = desc_clean[len(clean_title) :].strip(" -·|")
+        if source_name and desc_clean.endswith(source_name):
+            desc_clean = desc_clean[: -len(source_name)].strip(" -·|")
+
+        pub_kst = "실시간"
+        ts = 0.0
+        if pub_raw:
+            try:
+                dt = email.utils.parsedate_to_datetime(pub_raw)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                ts = dt.timestamp()
+                pub_kst = dt.astimezone(KST).strftime("%Y.%m.%d %H:%M")
+            except Exception:
+                pub_kst = pub_raw[:16]
+
+        if clean_title and link.startswith(("http://", "https://")):
+            items.append(
+                {
+                    "title": clean_title,
+                    "url": link,
+                    "source": source_name or default_source,
+                    "published_kst": pub_kst,
+                    "published_ts": ts,
+                    "snippet": desc_clean[:180],
+                }
+            )
+        if len(items) >= limit:
+            break
+    return items
+
+
+def _fetch_google_news_online(query: str, lang: str = "ko", limit: int = 8) -> List[Dict[str, Any]]:
+    q_enc = urllib.parse.quote(query)
+    if lang == "ko":
+        url = f"https://news.google.com/rss/search?q={q_enc}&hl=ko&gl=KR&ceid=KR:ko"
+    else:
+        url = f"https://news.google.com/rss/search?q={q_enc}&hl=en-US&gl=US&ceid=US:en"
+    try:
+        raw = _http_get_bytes(url, timeout=3.6)
+        return _parse_rss_items(raw, default_source="Google 뉴스", limit=limit)
+    except Exception:
+        return []
+
+
+def _fetch_bing_news_online(query: str, limit: int = 6) -> List[Dict[str, Any]]:
+    q_enc = urllib.parse.quote(query)
+    url = f"https://www.bing.com/news/search?q={q_enc}&format=rss&mkt=ko-KR"
+    try:
+        raw = _http_get_bytes(url, timeout=3.5)
+        return _parse_rss_items(raw, default_source="웹 뉴스", limit=limit)
+    except Exception:
+        return []
+
+
+def _fetch_wikipedia_knowledge(query: str) -> List[Dict[str, Any]]:
+    results: List[Dict[str, Any]] = []
+    for lang, label in (("ko", "한국어 위키백과"), ("en", "Wikipedia")):
+        try:
+            params = urllib.parse.urlencode(
+                {
+                    "action": "query",
+                    "list": "search",
+                    "srsearch": query,
+                    "srlimit": 2,
+                    "utf8": 1,
+                    "format": "json",
+                }
+            )
+            raw = _http_get_bytes(f"https://{lang}.wikipedia.org/w/api.php?{params}", timeout=3.2)
+            data = json.loads(raw.decode("utf-8"))
+            hits = ((data.get("query") or {}).get("search")) or []
+            if not hits:
+                continue
+            for h in hits[:2]:
+                title = (h.get("title") or "").strip()
+                if not title:
+                    continue
+                sum_url = (
+                    f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/"
+                    + urllib.parse.quote(title.replace(" ", "_"), safe="")
+                )
+                try:
+                    s_raw = _http_get_bytes(sum_url, timeout=2.8)
+                    s_data = json.loads(s_raw.decode("utf-8"))
+                    extract = (s_data.get("extract") or "").strip()
+                    page_url = (
+                        ((s_data.get("content_urls") or {}).get("desktop") or {}).get("page")
+                        or f"https://{lang}.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
+                    )
+                except Exception:
+                    snippet_html = h.get("snippet") or ""
+                    extract = re.sub(r"<[^>]+>", "", html.unescape(snippet_html)).strip()
+                    page_url = f"https://{lang}.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
+
+                if extract:
+                    results.append(
+                        {
+                            "title": title,
+                            "summary": extract[:420],
+                            "url": page_url,
+                            "source": label,
+                        }
+                    )
+            if results:
+                break
+        except Exception:
+            continue
+    return results
+
+
+def _fetch_ddg_instant_answer(query: str) -> List[Dict[str, Any]]:
+    q_enc = urllib.parse.quote(query)
+    url = f"https://api.duckduckgo.com/?q={q_enc}&format=json&no_html=1&skip_disambig=1"
+    out: List[Dict[str, Any]] = []
+    try:
+        raw = _http_get_bytes(url, timeout=3.0)
+        data = json.loads(raw.decode("utf-8"))
+        abstract = (data.get("AbstractText") or "").strip()
+        abs_url = (data.get("AbstractURL") or "").strip()
+        heading = (data.get("Heading") or query).strip()
+        if abstract and abs_url:
+            out.append(
+                {
+                    "title": heading,
+                    "summary": abstract[:400],
+                    "url": abs_url,
+                    "source": data.get("AbstractSource") or "웹 백과",
+                }
+            )
+    except Exception:
+        pass
+    return out
+
+
+def _search_sportiq_internal_context(query: str) -> Dict[str, List[Dict[str, Any]]]:
+    tokens = [t.lower() for t in re.split(r"\s+", query.strip()) if len(t.strip()) >= 2][:5]
+    if not tokens and query.strip():
+        tokens = [query.strip().lower()]
+
+    matched_games: List[Dict[str, Any]] = []
+    matched_posts: List[Dict[str, Any]] = []
+    cached_news: List[Dict[str, Any]] = []
+
+    # 1. Check live/upcoming matches from sportiq_datacenter if loaded
+    try:
+        from app import sportiq_datacenter as _dc
+        collect_fn = getattr(_dc, "_collect_all_matches", None)
+        if callable(collect_fn):
+            live_list = collect_fn(0) or []
+            for m in live_list:
+                if not isinstance(m, dict):
+                    continue
+                hay = " ".join(
+                    str(m.get(k) or "") for k in ("home", "away", "league", "sport", "match_dt_kst", "status_badge")
+                ).lower()
+                if any(tok in hay for tok in tokens):
+                    ai = m.get("ai") if isinstance(m.get("ai"), dict) else {}
+                    matched_games.append(
+                        {
+                            "league": str(m.get("league") or "SPORT"),
+                            "matchup": f"{m.get('home', '-')} vs {m.get('away', '-')}",
+                            "dt_kst": str(m.get("match_dt_kst") or "일정 확인"),
+                            "status": str(m.get("status_badge") or "Scheduled"),
+                            "score": f"{m.get('home_score', 0)} : {m.get('away_score', 0)}",
+                            "ai_prob": f"홈 {ai.get('home_pct', 50)}% / 원정 {ai.get('away_pct', 50)}%",
+                            "drop_badge": str(m.get("drop_badge") or ""),
+                        }
+                    )
+                    if len(matched_games) >= 5:
+                        break
+    except Exception:
+        pass
+
+    # 2. Check SQLite tables (global_match_rankings, community_member_posts, auto_analyst_posts, overseas_news_cache)
+    def _db_lookup() -> None:
+        with _db_session(write=False) as conn:
+            tables = {
+                r[0]
+                for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+            }
+            if len(matched_games) < 5 and "global_match_rankings" in tables:
+                rows = conn.execute(
+                    "SELECT league, matchup, schedule_venue, votes, buzz_score FROM global_match_rankings ORDER BY votes DESC LIMIT 25"
+                ).fetchall()
+                for r in rows:
+                    hay = f"{r['league']} {r['matchup']} {r['schedule_venue']}".lower()
+                    if any(tok in hay for tok in tokens):
+                        matched_games.append(
+                            {
+                                "league": r["league"],
+                                "matchup": r["matchup"],
+                                "dt_kst": r["schedule_venue"],
+                                "status": f"🔥 관심도 {r['buzz_score']}",
+                                "score": f"투표 {r['votes']}표",
+                                "ai_prob": "빅매치 랭킹 등재",
+                                "drop_badge": "",
+                            }
+                        )
+                        if len(matched_games) >= 5:
+                            break
+
+            if "community_member_posts" in tables:
+                prows = conn.execute(
+                    "SELECT id, league, author, title, body FROM community_member_posts ORDER BY created_at DESC LIMIT 40"
+                ).fetchall()
+                for r in prows:
+                    hay = f"{r['league']} {r['author']} {r['title']} {r['body']}".lower()
+                    if any(tok in hay for tok in tokens):
+                        matched_posts.append(
+                            {
+                                "id": r["id"],
+                                "league": r["league"],
+                                "author": r["author"],
+                                "title": r["title"],
+                                "excerpt": (r["body"] or "")[:110],
+                            }
+                        )
+                        if len(matched_posts) >= 4:
+                            break
+
+            if "overseas_news_cache" in tables:
+                nrows = conn.execute(
+                    "SELECT title, link, source, summary_tag FROM overseas_news_cache ORDER BY rowid DESC LIMIT 50"
+                ).fetchall()
+                for r in nrows:
+                    hay = f"{r['title']} {r['summary_tag']}".lower()
+                    if any(tok in hay for tok in tokens):
+                        cached_news.append(
+                            {
+                                "title": r["title"],
+                                "url": r["link"] or "",
+                                "source": (r["source"] or "해외속보").upper(),
+                                "published_kst": r["summary_tag"] or "최신 외신",
+                                "published_ts": 1.0,
+                                "snippet": "",
+                            }
+                        )
+                        if len(cached_news) >= 4:
+                            break
+
+    try:
+        run_with_db_retry(_db_lookup)
+    except Exception:
+        pass
+
+    return {"games": matched_games, "posts": matched_posts, "cached_news": cached_news}
+
+
+def _try_llm_grounded_summary(
+    query: str,
+    web_news: List[Dict[str, Any]],
+    knowledge: List[Dict[str, Any]],
+    internal: Dict[str, List[Dict[str, Any]]],
+) -> Optional[str]:
+    """Uses Gemini or OpenAI API automatically if configured in Render environment variables."""
+    gemini_key = (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
+    openai_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
+    if not gemini_key and not openai_key:
+        return None
+
+    ctx_lines = [f"검색어: {query}"]
+    for k in knowledge[:2]:
+        ctx_lines.append(f"[백과] {k['title']}: {k['summary']}")
+    for n in web_news[:5]:
+        ctx_lines.append(f"[온라인뉴스/{n['source']}/{n['published_kst']}] {n['title']} - {n.get('snippet','')}")
+    for g in internal.get("games", [])[:3]:
+        ctx_lines.append(f"[SportIQ 경기] [{g['league']}] {g['matchup']} ({g['dt_kst']}) 상태:{g['status']} {g['ai_prob']} {g['drop_badge']}")
+
+    prompt = (
+        "당신은 스포츠 데이터 플랫폼 SportIQ의 실시간 검색 어시스턴트 'AI 아이큐'입니다. "
+        "아래 실시간 온라인 검색 결과와 SportIQ 경기 데이터를 바탕으로 회원에게 핵심만 4~6문장으로 명확하고 친절하게 한국어 요약을 작성하세요.\n\n"
+        + "\n".join(ctx_lines)
+    )
+
+    if gemini_key:
+        try:
+            g_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={urllib.parse.quote(gemini_key)}"
+            payload = json.dumps(
+                {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"maxOutputTokens": 420, "temperature": 0.3}}
+            ).encode("utf-8")
+            req = urllib.request.Request(g_url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=4.5) as resp:
+                gd = json.loads(resp.read().decode("utf-8"))
+            txt = gd["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if txt:
+                return txt
+        except Exception:
+            pass
+
+    if openai_key:
+        try:
+            o_url = "https://api.openai.com/v1/chat/completions"
+            payload = json.dumps(
+                {
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 400,
+                    "temperature": 0.3,
+                }
+            ).encode("utf-8")
+            req = urllib.request.Request(
+                o_url,
+                data=payload,
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {openai_key}"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=4.5) as resp:
+                od = json.loads(resp.read().decode("utf-8"))
+            txt = od["choices"][0]["message"]["content"].strip()
+            if txt:
+                return txt
+        except Exception:
+            pass
+
+    return None
+
+
+def _synthesize_ai_iq_briefing(
+    query: str,
+    web_news: List[Dict[str, Any]],
+    knowledge: List[Dict[str, Any]],
+    internal: Dict[str, List[Dict[str, Any]]],
+) -> str:
+    llm_txt = _try_llm_grounded_summary(query, web_news, knowledge, internal)
+    if llm_txt:
+        return llm_txt
+
+    bullets: List[str] = []
+    if knowledge:
+        k0 = knowledge[0]
+        bullets.append(f"📌 핵심 개요 ({k0['source']}): {k0['summary']}")
+
+    games = internal.get("games") or []
+    if games:
+        g_summaries = [
+            f"[{g['league']}] {g['matchup']} ({g['dt_kst']} · {g['ai_prob']}{' · ' + g['drop_badge'] if g['drop_badge'] else ''})"
+            for g in games[:2]
+        ]
+        bullets.append("⚽ SportIQ 실시간 매치 데이터: " + " / ".join(g_summaries))
+
+    if web_news:
+        top_n = web_news[:3]
+        headlines = [f"• [{n['source']} · {n['published_kst']}] {n['title']}" for n in top_n]
+        bullets.append(f"🌐 실시간 온라인 뉴스 핵심 흐름 (총 {len(web_news)}건 포착):\n" + "\n".join(headlines))
+
+    posts = internal.get("posts") or []
+    if posts:
+        bullets.append(f"💬 라운지 연관 분석글: '{posts[0]['title']}' 외 {len(posts)}건의 커뮤니티 의견이 등록되어 있습니다.")
+
+    if not bullets:
+        return (
+            f"'{query}' 키워드에 대한 실시간 웹 탐색을 완료했으나 직결된 최신 기사나 백과 문서가 적습니다. "
+            "구단명·선수명(예: 손흥민, 아스널, 바이에른, NBA, 오타니)이나 리그명을 포함해 검색하시면 훨씬 정확한 실시간 온라인 결과를 확인하실 수 있습니다."
+        )
+    return "\n\n".join(bullets)
+
+
+class AiIqSearchIn(BaseModel):
+    query: str
+    mode: str = "all"  # all | news | wiki
+    nickname: Optional[str] = ""
+    pin: Optional[str] = ""
+
+
+def _award_ai_search_bonus_if_eligible(nickname: str, pin: str, query: str) -> Tuple[int, Optional[int]]:
+    nick = (nickname or "").strip()[:24]
+    clean_pin = re.sub(r"\D", "", pin or "")
+    if len(nick) < 2 or len(clean_pin) != 4:
+        return 0, None
+    pin_h = _hash_pin(nick, clean_pin)
+    today_kst = datetime.now(KST).strftime("%Y-%m-%d")
+    now = time.time()
+
+    def _op() -> Tuple[int, Optional[int]]:
+        with _db_session(write=True) as conn:
+            acc = conn.execute(
+                "SELECT nickname, pin_hash, points FROM member_accounts WHERE lower(nickname)=lower(?)",
+                (nick,),
+            ).fetchone()
+            if not acc or acc["pin_hash"] != pin_h:
+                return 0, None
+            cnt = conn.execute(
+                "SELECT COUNT(*) AS c FROM wp_point_ledger WHERE lower(nickname)=lower(?) AND event_type='ai_iq_search' AND kst_date=?",
+                (acc["nickname"], today_kst),
+            ).fetchone()["c"]
+            if int(cnt or 0) >= 2:
+                return 0, int(acc["points"] or 0)
+            new_pts = int(acc["points"] or 0) + 3
+            conn.execute(
+                "UPDATE member_accounts SET points=?, role_tier=?, updated_at=? WHERE nickname=?",
+                (new_pts, _tier_for_points(new_pts), now, acc["nickname"]),
+            )
+            conn.execute(
+                """
+                INSERT INTO wp_point_ledger(nickname, event_type, ref_id, points_delta, kst_date, site_origin, created_at)
+                VALUES (?, 'ai_iq_search', ?, 3, ?, 'billnojay.com', ?)
+                """,
+                (acc["nickname"], query[:40], today_kst, now),
+            )
+            return 3, new_pts
+
+    try:
+        awarded, updated_pts = run_with_db_retry(_op)
+        if awarded > 0:
+            threading.Thread(target=_trigger_pg_backup, args=("member_accounts", "wp_point_ledger"), daemon=True).start()
+        return awarded, updated_pts
+    except Exception:
+        return 0, None
+
+
+@upgrade_router.get("/api/ai-iq/trending")
+def get_ai_iq_trending():
+    def _op() -> List[str]:
+        with _db_session(write=False) as conn:
+            rows = conn.execute(
+                """
+                SELECT MIN(query) AS q, COUNT(*) AS cnt, MAX(created_at) AS last_ts
+                FROM ai_iq_search_logs
+                WHERE length(norm_query) >= 2
+                GROUP BY norm_query
+                ORDER BY cnt DESC, last_ts DESC
+                LIMIT 8
+                """
+            ).fetchall()
+            popular = [r["q"] for r in rows if r["q"]]
+            for st in _AI_IQ_STARTER_TRENDS:
+                if len(popular) >= 8:
+                    break
+                if st.lower() not in {p.lower() for p in popular}:
+                    popular.append(st)
+            return popular[:8]
+
+    return {"ok": True, "assistant_name": "AI 아이큐", "keywords": run_with_db_retry(_op)}
+
+
+@upgrade_router.post("/api/ai-iq/search")
+def run_ai_iq_online_search(payload: AiIqSearchIn):
+    q = re.sub(r"\s+", " ", (payload.query or "").strip())[:100]
+    if len(q) < 1:
+        raise HTTPException(status_code=400, detail="검색어를 입력해 주세요.")
+    mode = (payload.mode or "all").strip().lower()
+    if mode not in ("all", "news", "wiki"):
+        mode = "all"
+
+    cache_key = f"{mode}:{q.lower()}"
+    now_m = time.monotonic()
+    cached_payload: Optional[Dict[str, Any]] = None
+    with _AI_IQ_CACHE_LOCK:
+        hit = _AI_IQ_CACHE.get(cache_key)
+        if hit and (now_m - hit[0]) <= 120.0:
+            cached_payload = dict(hit[1])
+
+    if cached_payload is None:
+        bucket: Dict[str, Any] = {"gnews_ko": [], "gnews_en": [], "bnews": [], "wiki": [], "ddg": []}
+
+        def _t_gko():
+            if mode in ("all", "news"):
+                bucket["gnews_ko"] = _fetch_google_news_online(q, lang="ko", limit=8)
+
+        def _t_gen():
+            if mode in ("all", "news") and re.search(r"[a-zA-Z]", q):
+                bucket["gnews_en"] = _fetch_google_news_online(q, lang="en", limit=5)
+
+        def _t_bing():
+            if mode in ("all", "news"):
+                bucket["bnews"] = _fetch_bing_news_online(q, limit=6)
+
+        def _t_wiki():
+            if mode in ("all", "wiki"):
+                bucket["wiki"] = _fetch_wikipedia_knowledge(q)
+                if not bucket["wiki"]:
+                    bucket["ddg"] = _fetch_ddg_instant_answer(q)
+
+        workers = [
+            threading.Thread(target=fn, daemon=True)
+            for fn in (_t_gko, _t_gen, _t_bing, _t_wiki)
+        ]
+        for w in workers:
+            w.start()
+        internal_ctx = _search_sportiq_internal_context(q)
+        for w in workers:
+            w.join(timeout=4.0)
+
+        # Merge, deduplicate, and sort online news by newest published_ts first
+        seen_titles: set[str] = set()
+        merged_news: List[Dict[str, Any]] = []
+        for item in [*bucket["gnews_ko"], *bucket["bnews"], *bucket["gnews_en"], *internal_ctx.get("cached_news", [])]:
+            norm_t = re.sub(r"[^a-z0-9가-힣]", "", (item.get("title") or "").lower())[:42]
+            if not norm_t or norm_t in seen_titles:
+                continue
+            seen_titles.add(norm_t)
+            merged_news.append(item)
+        merged_news.sort(key=lambda x: float(x.get("published_ts") or 0.0), reverse=True)
+        merged_news = merged_news[:10]
+
+        knowledge_cards = (bucket["wiki"] + bucket["ddg"])[:3]
+        summary_text = _synthesize_ai_iq_briefing(q, merged_news, knowledge_cards, internal_ctx)
+
+        related_queries = [
+            f"{q} 최신 뉴스",
+            f"{q} 부상·라인업",
+            f"{q} 경기 일정·배당",
+        ]
+
+        cached_payload = {
+            "query": q,
+            "mode": mode,
+            "searched_at_kst": datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S KST"),
+            "ai_summary": summary_text,
+            "knowledge": knowledge_cards,
+            "web_news": merged_news,
+            "sportiq_matches": internal_ctx.get("games", []),
+            "sportiq_posts": internal_ctx.get("posts", []),
+            "related_queries": related_queries,
+        }
+        with _AI_IQ_CACHE_LOCK:
+            if len(_AI_IQ_CACHE) > 200:
+                _AI_IQ_CACHE.clear()
+            _AI_IQ_CACHE[cache_key] = (now_m, cached_payload)
+
+    total_cnt = (
+        len(cached_payload.get("web_news") or [])
+        + len(cached_payload.get("knowledge") or [])
+        + len(cached_payload.get("sportiq_matches") or [])
+    )
+
+    def _log_op() -> None:
+        with _db_session(write=True) as conn:
+            conn.execute(
+                """
+                INSERT INTO ai_iq_search_logs(query, norm_query, mode, nickname, result_count, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (q, q.lower(), mode, (payload.nickname or "").strip()[:24], total_cnt, time.time()),
+            )
+
+    try:
+        run_with_db_retry(_log_op)
+        threading.Thread(target=_trigger_pg_backup, args=("ai_iq_search_logs",), daemon=True).start()
+    except Exception:
+        pass
+
+    awarded_pts, updated_pts = _award_ai_search_bonus_if_eligible(
+        payload.nickname or "", payload.pin or "", q
+    )
+
+    return {
+        "ok": True,
+        "assistant": "AI 아이큐",
+        "awarded_points": awarded_pts,
+        "updated_points": updated_pts,
+        **cached_payload,
+    }
+
+
+# Run Scoby -> AI IQ module rebrander in background as well
+def _ai_iq_rebrand_daemon() -> None:
+    for _ in range(10):
+        _patch_scobi_across_modules()
+        time.sleep(2.0)
+
+
+threading.Thread(target=_ai_iq_rebrand_daemon, daemon=True, name="sportiq-ai-iq-rebrand").start()
+
+
+# --- Frontend v8.0: "AI 스코비" -> "AI 아이큐" Rebrand + Online AI Search Modal ---
+AI_IQ_ONLINE_SEARCH_JS = r"""
+/* SportIQ v8.0: 'AI 스코비' -> 'AI 아이큐' Rebrand & Live Online AI Search Hub */
+(function () {
+  if (window.__SPORTIQ_V8_AI_IQ__) return;
+  window.__SPORTIQ_V8_AI_IQ__ = true;
+
+  var LS_AI_HISTORY = "sq_ai_iq_recent_queries";
+  var currentAiMode = "all";
+  var lastSearchResult = null;
+
+  function sqNick() { return (localStorage.getItem("sportiq_member_nick") || localStorage.getItem("sportiq_guest_nick") || "").trim(); }
+  function sqPin() { return (localStorage.getItem("sportiq_member_pin") || "").trim(); }
+  function esc(v) { return v == null ? "" : String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+  // Inject dedicated styles for AI 아이큐 pill & online search modal
+  var st = document.createElement("style");
+  st.id = "sqAiIqStyles";
+  st.textContent = [
+    ".sq-ai-iq-fab { position:fixed; right:20px; bottom:20px; z-index:9995; background:linear-gradient(135deg,#06b6d4,#10b981); color:#020617; border:0; border-radius:999px; padding:11px 20px; font-size:14px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:7px; box-shadow:0 10px 28px rgba(6,182,212,.42); transition:transform .16s, filter .16s; letter-spacing:-0.2px; }",
+    ".sq-ai-iq-fab:hover { transform:translateY(-2px) scale(1.02); filter:brightness(1.06); }",
+    ".sq-ai-iq-card { background:#0b1220; border:1px solid #1e293b; border-radius:12px; padding:12px 14px; margin-bottom:9px; transition:border-color .15s; }",
+    ".sq-ai-iq-card:hover { border-color:#38bdf8; }",
+    "@keyframes sqPulseDot { 0%,100%{opacity:.35;transform:scale(.9);} 50%{opacity:1;transform:scale(1.15);} }",
+    ".sq-ai-loading-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#22d3ee; margin:0 2px; animation:sqPulseDot 1.1s infinite; }"
+  ].join("\n");
+  document.head.appendChild(st);
+
+  // 1) Replace every 'AI 스코비' / '스코비' text node & attribute across the entire DOM immediately
+  function replaceScobiInNode(root) {
+    if (!root) return;
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    var node;
+    while ((node = walker.nextNode())) {
+      var val = node.nodeValue;
+      if (val && val.indexOf("스코비") !== -1) {
+        node.nodeValue = val.replace(/AI\s*스코비/g, "AI 아이큐").replace(/스코비/g, "아이큐");
+      }
+    }
+    if (root.querySelectorAll) {
+      root.querySelectorAll("[placeholder*='스코비'], [title*='스코비'], [aria-label*='스코비']").forEach(function (el) {
+        ["placeholder", "title", "aria-label"].forEach(function (attr) {
+          var v = el.getAttribute(attr);
+          if (v && v.indexOf("스코비") !== -1) {
+            el.setAttribute(attr, v.replace(/AI\s*스코비/g, "AI 아이큐").replace(/스코비/g, "아이큐"));
+          }
+        });
+      });
+    }
+  }
+
+  function isLauncherPillElement(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.id === "sqAiIqModal" || el.closest("#sqAiIqModal")) return false;
+    var btn = el.closest("button, a, [role='button'], .sq-ai-iq-fab");
+    if (!btn) return false;
+    if (btn.closest("#sqAiIqModal")) return false;
+    if (btn.id === "sqAiIqFloatingFab" || btn.hasAttribute("data-sq-ai-iq-trigger")) return true;
+    var txt = (btn.textContent || "").replace(/\s+/g, " ").trim();
+    if (txt.length <= 28 && (txt.indexOf("AI 아이큐") !== -1 || txt.indexOf("AI 스코비") !== -1 || txt.indexOf("AI아이큐") !== -1)) {
+      return true;
+    }
+    return false;
+  }
+
+  function hideLegacyScobiPopups() {
+    document.querySelectorAll("[id*='scobi' i], [id*='scoby' i], [class*='scobi' i], [class*='scoby' i]").forEach(function (el) {
+      if (isLauncherPillElement(el) || el.querySelector && isLauncherPillElement(el.querySelector("button"))) return;
+      var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+      var w = el.offsetWidth || 0;
+      var h = el.offsetHeight || 0;
+      if (w > 220 && h > 180 && cs && (cs.position === "fixed" || cs.position === "absolute")) {
+        el.style.display = "none";
+      }
+    });
+  }
+
+  // Ensure the bottom-right '🤖 AI 아이큐' pill button is always visible & styled cleanly
+  function ensureAiIqLauncherButtons() {
+    replaceScobiInNode(document.body);
+
+    var foundExistingPill = null;
+    document.querySelectorAll("button, a, div[role='button']").forEach(function (el) {
+      if (el.closest("#sqAiIqModal") || el.id === "sqHeaderAiIqBtn" || el.id === "sqFeedAiIqBtn") return;
+      var t = (el.textContent || "").trim();
+      if (t.length <= 28 && (t.indexOf("AI 아이큐") !== -1 || t.indexOf("AI 스코비") !== -1)) {
+        foundExistingPill = el;
+        el.setAttribute("data-sq-ai-iq-trigger", "1");
+        el.title = "AI 아이큐 — 실시간 온라인 AI 검색 열기 (단축키 Ctrl+K)";
+      }
+    });
+
+    if (!foundExistingPill && !document.getElementById("sqAiIqFloatingFab")) {
+      var fab = document.createElement("button");
+      fab.id = "sqAiIqFloatingFab";
+      fab.type = "button";
+      fab.className = "sq-ai-iq-fab";
+      fab.setAttribute("data-sq-ai-iq-trigger", "1");
+      fab.innerHTML = "🤖 <span>AI 아이큐</span>";
+      fab.title = "AI 아이큐 — 실시간 온라인 AI 검색 열기 (단축키 Ctrl+K)";
+      document.body.appendChild(fab);
+    }
+
+    // Add quick '🤖 AI 아이큐 검색' button inside the Community search toolbar as well
+    var feedToolbar = document.getElementById("sqP3FeedToolbar");
+    if (feedToolbar && !document.getElementById("sqFeedAiIqBtn")) {
+      var qb = document.createElement("button");
+      qb.id = "sqFeedAiIqBtn";
+      qb.type = "button";
+      qb.setAttribute("data-sq-ai-iq-trigger", "1");
+      qb.style.cssText = "background:linear-gradient(135deg,#06b6d4,#10b981);color:#020617;border:0;border-radius:9px;padding:6px 12px;font-size:12px;font-weight:900;cursor:pointer;white-space:nowrap;";
+      qb.innerHTML = "🤖 AI 아이큐 온라인 검색";
+      feedToolbar.appendChild(qb);
+    }
+  }
+
+  // Intercept clicks on any '🤖 AI 아이큐' trigger in capture phase so legacy Scoby never blocks or overlaps
+  window.addEventListener("click", function (ev) {
+    if (!isLauncherPillElement(ev.target)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (typeof ev.stopImmediatePropagation === "function") ev.stopImmediatePropagation();
+    hideLegacyScobiPopups();
+    openAiIqModal();
+  }, true);
+
+  // Keyboard shortcut: Ctrl+K or Cmd+K opens AI 아이큐 search, Escape closes it
+  window.addEventListener("keydown", function (ev) {
+    if ((ev.ctrlKey || ev.metaKey) && (ev.key === "k" || ev.key === "K")) {
+      ev.preventDefault();
+      openAiIqModal();
+      return;
+    }
+    if (ev.key === "Escape" || ev.keyCode === 27) {
+      var m = document.getElementById("sqAiIqModal");
+      if (m && m.style.display === "flex") {
+        ev.preventDefault();
+        ev.stopPropagation();
+        m.style.display = "none";
+      }
+    }
+  }, true);
+
+  function getRecentHistory() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(LS_AI_HISTORY) || "[]");
+      return Array.isArray(arr) ? arr.slice(0, 6) : [];
+    } catch (e) { return []; }
+  }
+
+  function saveRecentHistory(q) {
+    var clean = String(q || "").trim();
+    if (!clean) return;
+    var list = getRecentHistory().filter(function (x) { return x.toLowerCase() !== clean.toLowerCase(); });
+    list.unshift(clean);
+    try { localStorage.setItem(LS_AI_HISTORY, JSON.stringify(list.slice(0, 6))); } catch (e) {}
+  }
+
+  function buildAiIqModalIfNeeded() {
+    var m = document.getElementById("sqAiIqModal");
+    if (m) return m;
+
+    m = document.createElement("div");
+    m.id = "sqAiIqModal";
+    m.className = "sq-modal-backdrop";
+    m.style.zIndex = "100050";
+    m.innerHTML = [
+      "<div class='sq-modal-panel' style='max-width:680px;padding:20px;border-color:rgba(6,182,212,.5);'>",
+      "  <div style='display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;'>",
+      "    <div style='display:flex;align-items:center;gap:8px;'>",
+      "      <span style='background:linear-gradient(135deg,#06b6d4,#10b981);color:#020617;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:900;'>🤖 AI 아이큐</span>",
+      "      <h3 style='margin:0;font-size:16.5px;font-weight:900;color:#f8fafc;'>실시간 온라인 AI 스포츠·통합 검색</h3>",
+      "    </div>",
+      "    <button type='button' id='sqCloseAiIqModalBtn' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:800;'>✕ 닫기 (Esc)</button>",
+      "  </div>",
+      "  <div style='font-size:12px;color:#94a3b8;margin-bottom:10px;'>구글·웹 실시간 뉴스, 위키백과 지식, SportIQ 실시간 경기·배당·분석글을 동시에 온라인 탐색해 요약합니다. (PIN 연동 회원 일일 리서치 <strong style='color:#34d399;'>+3P</strong> 적립)</div>",
+      "  <form id='sqAiIqSearchForm' style='display:flex;gap:8px;margin-bottom:10px;'>",
+      "    <input id='sqAiIqInput' type='search' autocomplete='off' placeholder='선수·구단·부상속보·배당·전술 등 무엇이든 온라인 검색 (예: 손흥민 최신 뉴스)' style='flex:1;background:#020617;border:1px solid #38bdf8;border-radius:11px;padding:10px 13px;color:#f8fafc;font-size:13.5px;outline:none;' />",
+      "    <button type='submit' id='sqAiIqSubmitBtn' style='background:linear-gradient(135deg,#06b6d4,#10b981);color:#020617;border:0;border-radius:11px;padding:0 18px;font-size:13px;font-weight:900;cursor:pointer;white-space:nowrap;'>🔍 AI 검색</button>",
+      "  </form>",
+      "  <div id='sqAiIqModeBar' style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;'>",
+      "    <button type='button' data-ai-mode='all' class='dc-pill' style='font-size:11.5px;font-weight:800;border-color:#22d3ee;color:#cffafe;'>🌐 통합 AI 온라인 검색</button>",
+      "    <button type='button' data-ai-mode='news' class='dc-pill' style='font-size:11.5px;font-weight:800;'>📰 최신 온라인 속보 집중</button>",
+      "    <button type='button' data-ai-mode='wiki' class='dc-pill' style='font-size:11.5px;font-weight:800;'>📚 선수·구단·용어 백과</button>",
+      "  </div>",
+      "  <div id='sqAiIqTrendingWrap' style='margin-bottom:12px;'></div>",
+      "  <div id='sqAiIqResultArea' style='font-size:13px;color:#e2e8f0;line-height:1.6;'>",
+      "    <div style='background:#020617;border:1px dashed #334155;border-radius:12px;padding:16px;text-align:center;color:#94a3b8;'>",
+      "      💡 궁금한 팀·선수·매치업이나 스포츠 이슈를 위 검색창에 입력하거나 추천 키워드를 눌러보세요!",
+      "    </div>",
+      "  </div>",
+      "</div>"
+    ].join("");
+    document.body.appendChild(m);
+
+    document.getElementById("sqCloseAiIqModalBtn").onclick = function () { m.style.display = "none"; };
+    m.addEventListener("click", function (ev) { if (ev.target === m) m.style.display = "none"; });
+
+    document.getElementById("sqAiIqModeBar").querySelectorAll("[data-ai-mode]").forEach(function (btn) {
+      btn.onclick = function () {
+        currentAiMode = btn.getAttribute("data-ai-mode") || "all";
+        document.getElementById("sqAiIqModeBar").querySelectorAll("[data-ai-mode]").forEach(function (b) {
+          var on = b.getAttribute("data-ai-mode") === currentAiMode;
+          b.style.borderColor = on ? "#22d3ee" : "";
+          b.style.color = on ? "#cffafe" : "";
+        });
+        var curQ = (document.getElementById("sqAiIqInput").value || "").trim();
+        if (curQ) executeAiIqSearch(curQ);
+      };
+    });
+
+    document.getElementById("sqAiIqSearchForm").onsubmit = function (ev) {
+      ev.preventDefault();
+      var q = (document.getElementById("sqAiIqInput").value || "").trim();
+      if (!q) {
+        if (typeof showToast === "function") showToast("검색어를 입력해 주세요.");
+        return;
+      }
+      executeAiIqSearch(q);
+    };
+
+    return m;
+  }
+
+  function loadTrendingAndHistoryChips() {
+    var wrap = document.getElementById("sqAiIqTrendingWrap");
+    if (!wrap) return;
+    fetch("/api/ai-iq/trending")
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var trends = (d && d.keywords) || [];
+        var recent = getRecentHistory();
+        var htmlParts = [];
+        if (recent.length) {
+          htmlParts.push(
+            "<div style='display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:6px;'>" +
+            "<span style='font-size:11px;color:#64748b;font-weight:700;'>최근 검색:</span>" +
+            recent.map(function (rk) {
+              return "<button type='button' data-ai-chip='" + esc(rk) + "' style='background:#0f172a;border:1px solid #334155;color:#cbd5e1;border-radius:999px;padding:2px 9px;font-size:11px;cursor:pointer;'>🕒 " + esc(rk) + "</button>";
+            }).join("") +
+            "</div>"
+          );
+        }
+        if (trends.length) {
+          htmlParts.push(
+            "<div style='display:flex;gap:5px;flex-wrap:wrap;align-items:center;'>" +
+            "<span style='font-size:11px;color:#38bdf8;font-weight:800;'>🔥 실시간 추천:</span>" +
+            trends.slice(0, 6).map(function (tk) {
+              return "<button type='button' data-ai-chip='" + esc(tk) + "' style='background:rgba(6,182,212,.12);border:1px solid rgba(34,211,238,.35);color:#a5f3fc;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;cursor:pointer;'>" + esc(tk) + "</button>";
+            }).join("") +
+            "</div>"
+          );
+        }
+        wrap.innerHTML = htmlParts.join("");
+        wrap.querySelectorAll("[data-ai-chip]").forEach(function (c) {
+          c.onclick = function () {
+            var q = c.getAttribute("data-ai-chip") || "";
+            var inp = document.getElementById("sqAiIqInput");
+            if (inp) inp.value = q;
+            executeAiIqSearch(q);
+          };
+        });
+      }).catch(function () {});
+  }
+
+  function executeAiIqSearch(query) {
+    var box = document.getElementById("sqAiIqResultArea");
+    var btn = document.getElementById("sqAiIqSubmitBtn");
+    if (!box) return;
+    saveRecentHistory(query);
+    if (btn) { btn.disabled = true; btn.textContent = "탐색 중..."; }
+    box.innerHTML = [
+      "<div style='background:#020617;border:1px solid #1e293b;border-radius:12px;padding:22px;text-align:center;'>",
+      "  <div><span class='sq-ai-loading-dot'></span><span class='sq-ai-loading-dot' style='animation-delay:.2s'></span><span class='sq-ai-loading-dot' style='animation-delay:.4s'></span></div>",
+      "  <div style='margin-top:8px;font-weight:800;color:#67e8f9;'>🤖 AI 아이큐가 실시간 온라인 뉴스·백과·매치 데이터를 검색하고 있습니다...</div>",
+      "  <div style='font-size:11.5px;color:#64748b;margin-top:3px;'>검색어: " + esc(query) + "</div>",
+      "</div>"
+    ].join("");
+
+    fetch("/api/ai-iq/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: query,
+        mode: currentAiMode,
+        nickname: sqNick(),
+        pin: sqPin()
+      })
+    })
+      .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+      .then(function (res) {
+        if (btn) { btn.disabled = false; btn.textContent = "🔍 AI 검색"; }
+        if (res.status !== 200 || !res.data || !res.data.ok) {
+          box.innerHTML = "<div style='color:#f87171;padding:12px;'>❌ " + esc((res.data && res.data.detail) || "온라인 검색 중 일시적인 오류가 발생했습니다.") + "</div>";
+          return;
+        }
+        var d = res.data;
+        lastSearchResult = d;
+        if (d.awarded_points && d.awarded_points > 0) {
+          if (typeof state === "object" && state && d.updated_points != null) {
+            state.points = Number(d.updated_points);
+            if (typeof window.updatePointsUI === "function") window.updatePointsUI();
+          }
+          if (typeof showToast === "function") {
+            showToast("🤖 AI 아이큐 리서치 보너스 +" + d.awarded_points + "P 적립 완료!");
+          }
+        }
+        renderAiIqSearchResult(d);
+        loadTrendingAndHistoryChips();
+      })
+      .catch(function () {
+        if (btn) { btn.disabled = false; btn.textContent = "🔍 AI 검색"; }
+        box.innerHTML = "<div style='color:#f87171;padding:12px;'>네트워크 연결을 확인한 뒤 다시 검색해 주세요.</div>";
+      });
+  }
+
+  function renderAiIqSearchResult(d) {
+    var box = document.getElementById("sqAiIqResultArea");
+    if (!box) return;
+    var summaryHtml = esc(d.ai_summary || "").replace(/\n/g, "<br/>");
+
+    var out = [
+      "<div style='background:linear-gradient(145deg,rgba(6,182,212,.14),rgba(15,23,42,.96));border:1px solid rgba(34,211,238,.45);border-radius:14px;padding:14px 15px;margin-bottom:12px;'>",
+      "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;'>",
+      "    <span style='font-weight:900;color:#67e8f9;font-size:13.5px;'>🧠 AI 아이큐 실시간 온라인 브리핑</span>",
+      "    <span style='font-size:11px;color:#94a3b8;'>" + esc(d.searched_at_kst || "") + "</span>",
+      "  </div>",
+      "  <div style='font-size:13px;color:#f1f5f9;line-height:1.68;'>" + summaryHtml + "</div>",
+      "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:11px;padding-top:9px;border-top:1px dashed rgba(148,163,184,.2);'>",
+      "    <div style='display:flex;gap:5px;flex-wrap:wrap;'>",
+      (d.related_queries || []).map(function (rq) {
+        return "<button type='button' data-ai-rel='" + esc(rq) + "' style='background:#0f172a;border:1px solid #334155;color:#93c5fd;border-radius:999px;padding:2px 9px;font-size:11px;cursor:pointer;'>🔎 " + esc(rq) + "</button>";
+      }).join(""),
+      "    </div>",
+      "    <button type='button' id='sqAiWriteFromSearchBtn' style='background:#0284c7;color:#fff;border:0;border-radius:8px;padding:5px 11px;font-size:11.5px;font-weight:800;cursor:pointer;'>✍️ 이 주제로 분석글 쓰기 (+15P)</button>",
+      "  </div>",
+      "</div>"
+    ];
+
+    // Knowledge / Encyclopedia Cards
+    var know = d.knowledge || [];
+    if (know.length) {
+      out.push("<div style='font-weight:800;color:#fde68a;font-size:12.5px;margin:10px 0 6px;'>📚 백과 · 핵심 배경지식</div>");
+      know.forEach(function (k) {
+        out.push(
+          "<div class='sq-ai-iq-card'>" +
+          "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;'>" +
+          "    <strong style='color:#f8fafc;font-size:13px;'>" + esc(k.title) + " <span style='font-size:11px;color:#38bdf8;font-weight:700;'>(" + esc(k.source) + ")</span></strong>" +
+          "    <a href='" + esc(k.url) + "' target='_blank' rel='noopener noreferrer' style='font-size:11px;color:#34d399;font-weight:800;text-decoration:none;'>원문 보기 ↗</a>" +
+          "  </div>" +
+          "  <div style='font-size:12px;color:#cbd5e1;margin-top:5px;'>" + esc(k.summary) + "</div>" +
+          "</div>"
+        );
+      });
+    }
+
+    // SportIQ Live Match & Odds Cards
+    var games = d.sportiq_matches || [];
+    if (games.length) {
+      out.push("<div style='font-weight:800;color:#4ade80;font-size:12.5px;margin:10px 0 6px;'>📊 SportIQ 실시간 매치 · 배당 연동</div>");
+      games.forEach(function (g) {
+        out.push(
+          "<div class='sq-ai-iq-card' style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;'>" +
+          "  <div>" +
+          "    <span style='background:#1e293b;color:#38bdf8;border-radius:6px;padding:2px 6px;font-size:10.5px;font-weight:800;margin-right:6px;'>" + esc(g.league) + "</span>" +
+          "    <strong style='color:#f8fafc;font-size:13px;'>" + esc(g.matchup) + "</strong>" +
+          "    <div style='font-size:11.5px;color:#94a3b8;margin-top:3px;'>📅 " + esc(g.dt_kst) + " · 🎯 " + esc(g.ai_prob) + (g.drop_badge ? " · <span style='color:#fbbf24;font-weight:800;'>" + esc(g.drop_badge) + "</span>" : "") + "</div>" +
+          "  </div>" +
+          "  <span style='font-size:11.5px;font-weight:800;color:#e2e8f0;background:#020617;border:1px solid #334155;border-radius:8px;padding:4px 9px;'>" + esc(g.status) + "</span>" +
+          "</div>"
+        );
+      });
+    }
+
+    // Live Online Web News List
+    var news = d.web_news || [];
+    if (news.length) {
+      out.push("<div style='font-weight:800;color:#38bdf8;font-size:12.5px;margin:10px 0 6px;'>🌐 실시간 온라인 뉴스 &amp; 웹 문서 (최신순 " + news.length + "건)</div>");
+      news.forEach(function (n) {
+        out.push(
+          "<a href='" + esc(n.url) + "' target='_blank' rel='noopener noreferrer' class='sq-ai-iq-card' style='display:block;text-decoration:none;'>" +
+          "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;'>" +
+          "    <span style='font-size:11px;font-weight:800;color:#22d3ee;'>📰 " + esc(n.source) + "</span>" +
+          "    <span style='font-size:11px;color:#94a3b8;'>🕒 " + esc(n.published_kst) + " · 원문 열기 ↗</span>" +
+          "  </div>" +
+          "  <div style='font-weight:800;color:#f8fafc;font-size:13px;'>" + esc(n.title) + "</div>" +
+          (n.snippet ? "<div style='font-size:11.5px;color:#94a3b8;margin-top:3px;'>" + esc(n.snippet) + "</div>" : "") +
+          "</a>"
+        );
+      });
+    }
+
+    box.innerHTML = out.join("");
+
+    box.querySelectorAll("[data-ai-rel]").forEach(function (rb) {
+      rb.onclick = function () {
+        var rq = rb.getAttribute("data-ai-rel") || "";
+        var inp = document.getElementById("sqAiIqInput");
+        if (inp) inp.value = rq;
+        executeAiIqSearch(rq);
+      };
+    });
+
+    var wBtn = document.getElementById("sqAiWriteFromSearchBtn");
+    if (wBtn) {
+      wBtn.onclick = function () {
+        var modal = document.getElementById("sqAiIqModal");
+        if (modal) modal.style.display = "none";
+        var tEl = document.getElementById("postTitle");
+        var bEl = document.getElementById("postContent");
+        if (tEl) tEl.value = "[AI 아이큐 리서치] " + (d.query || "") + " 핵심 분석";
+        if (bEl) {
+          var topLinks = (d.web_news || []).slice(0, 2).map(function (x) { return "- " + x.title + " (" + x.source + ")"; }).join("\n");
+          bEl.value = (d.ai_summary || "") + (topLinks ? "\n\n[참고 온라인 뉴스]\n" + topLinks : "") + "\n\n[내 승부예측 의견]\n";
+        }
+        if (typeof window.openModal === "function") window.openModal("writeModal");
+        else {
+          var wm = document.getElementById("writeModal");
+          if (wm) wm.classList.remove("hidden");
+        }
+      };
+    }
+  }
+
+  function openAiIqModal(initialQuery) {
+    var m = buildAiIqModalIfNeeded();
+    m.style.display = "flex";
+    loadTrendingAndHistoryChips();
+    var inp = document.getElementById("sqAiIqInput");
+    if (inp) {
+      if (initialQuery) inp.value = initialQuery;
+      setTimeout(function () { inp.focus(); }, 60);
+    }
+    if (initialQuery) executeAiIqSearch(initialQuery);
+  }
+  window.__openSportiqAiIq = openAiIqModal;
+
+  // MutationObserver so if any script renders 'AI 스코비' dynamically, it turns into 'AI 아이큐' immediately
+  function installScobiRebrandObserver() {
+    if (!document.body || window.__sqAiIqObsInstalled) return;
+    window.__sqAiIqObsInstalled = true;
+    replaceScobiInNode(document.body);
+    var obs = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mu) {
+        if (mu.type === "characterData" && mu.target && mu.target.nodeValue && mu.target.nodeValue.indexOf("스코비") !== -1) {
+          mu.target.nodeValue = mu.target.nodeValue.replace(/AI\s*스코비/g, "AI 아이큐").replace(/스코비/g, "아이큐");
+        }
+        if (mu.addedNodes && mu.addedNodes.length) {
+          for (var i = 0; i < mu.addedNodes.length; i++) {
+            var n = mu.addedNodes[i];
+            if (n.nodeType === 1) replaceScobiInNode(n);
+            else if (n.nodeType === 3 && n.nodeValue && n.nodeValue.indexOf("스코비") !== -1) {
+              n.nodeValue = n.nodeValue.replace(/AI\s*스코비/g, "AI 아이큐").replace(/스코비/g, "아이큐");
+            }
+          }
+        }
+      });
+    });
+    obs.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+
+  setTimeout(function () {
+    installScobiRebrandObserver();
+    ensureAiIqLauncherButtons();
+  }, 150);
+
+  setInterval(function () {
+    ensureAiIqLauncherButtons();
+  }, 1000);
+})();
+"""
+
+UPGRADE_JS = UPGRADE_JS + "\n" + AI_IQ_ONLINE_SEARCH_JS
