@@ -600,7 +600,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "3.9",
+        "version": "4.0",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -617,6 +617,7 @@ def member_upgrade_status():
         "floating_tabs_aligned_v12": True,
         "hero_brand_crest_v13": True,
         "mobile_bottom_clearance_v14": True,
+        "mobile_slim_dock_v15": True,
     }
 
 
@@ -3478,9 +3479,9 @@ def inject_upgrade_into_html(raw_html: str) -> str:
             count=1,
             flags=re.IGNORECASE,
         )
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=14" defer></script>'
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=15" defer></script>'
     if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=14', out)
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=15', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
@@ -6084,281 +6085,6 @@ ODDS_ALERT_TOGGLE_JS = r"""
 UPGRADE_JS = UPGRADE_JS + "\n" + ODDS_ALERT_TOGGLE_JS
 
 # ============================================================================
-# STAGE P6 (v3.7 / ?v=12): Unified Equal-Size High-Visibility Floating Tabs
-#   - Top Pill    : 🔴 LIVE 📺 IQ중계티비 (-> 짱돌티비 바로가기 https://jjangdoltv.com/)
-#   - Bottom Pill : ✨ AI   🤖 AI 아이큐   (-> 실시간 온라인 AI 검색 모달)
-#   - Identical 194px x 50px dimensions, locked vertical alignment, neon border & glow
-# ============================================================================
-IQ_LIVE_TV_JS = r"""
-/* SportIQ v12.0: Equal-Size High-Visibility Dual Floating Tabs (IQ중계티비 + AI 아이큐) */
-(function () {
-  if (window.__SPORTIQ_V12_DUAL_DOCK__) return;
-  window.__SPORTIQ_V12_DUAL_DOCK__ = true;
-
-  var JJANGDOL_URL = "https://jjangdoltv.com/";
-
-  var st = document.createElement("style");
-  st.id = "sqDualFloatingDockCss";
-  st.textContent = [
-    "@keyframes sqFabGlowPulse {",
-    "  0%, 100% { box-shadow: 0 10px 26px rgba(6, 182, 212, .46), 0 0 0 2px rgba(255, 255, 255, .22), inset 0 1px 1px rgba(255, 255, 255, .45); }",
-    "  50% { box-shadow: 0 12px 34px rgba(16, 185, 129, .68), 0 0 18px rgba(34, 211, 238, .55), 0 0 0 2px rgba(165, 243, 252, .65), inset 0 1px 2px rgba(255, 255, 255, .65); }",
-    "}",
-    "@keyframes sqLiveDotBlink {",
-    "  0%, 100% { opacity: 1; transform: scale(1); }",
-    "  50% { opacity: 0.35; transform: scale(0.82); }",
-    "}",
-    "#sqDualFloatingDock {",
-    "  position: fixed !important;",
-    "  right: 18px !important;",
-    "  bottom: 18px !important;",
-    "  z-index: 9998 !important;",
-    "  display: flex !important;",
-    "  flex-direction: column !important;",
-    "  align-items: stretch !important;",
-    "  gap: 10px !important;",
-    "  width: 196px !important;",
-    "  pointer-events: none !important;",
-    "}",
-    ".sq-dock-pill {",
-    "  pointer-events: auto !important;",
-    "  box-sizing: border-box !important;",
-    "  width: 196px !important;",
-    "  min-width: 196px !important;",
-    "  max-width: 196px !important;",
-    "  height: 50px !important;",
-    "  min-height: 50px !important;",
-    "  max-height: 50px !important;",
-    "  margin: 0 !important;",
-    "  padding: 0 14px !important;",
-    "  border-radius: 999px !important;",
-    "  border: 1.5px solid rgba(224, 242, 254, .75) !important;",
-    "  cursor: pointer !important;",
-    "  display: inline-flex !important;",
-    "  align-items: center !important;",
-    "  justify-content: space-between !important;",
-    "  gap: 8px !important;",
-    "  font-family: inherit !important;",
-    "  font-size: 15px !important;",
-    "  font-weight: 900 !important;",
-    "  letter-spacing: -0.3px !important;",
-    "  line-height: 1 !important;",
-    "  white-space: nowrap !important;",
-    "  text-decoration: none !important;",
-    "  transition: transform .16s cubic-bezier(.2,.8,.2,1), filter .16s ease !important;",
-    "  animation: sqFabGlowPulse 2.8s ease-in-out infinite !important;",
-    "}",
-    ".sq-dock-pill:hover {",
-    "  transform: translateY(-2px) scale(1.03) !important;",
-    "  filter: brightness(1.08) !important;",
-    "}",
-    ".sq-dock-pill:active {",
-    "  transform: translateY(0) scale(0.99) !important;",
-    "}",
-    ".sq-dock-pill--tv {",
-    "  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 48%, #10b981 100%) !important;",
-    "  color: #020617 !important;",
-    "}",
-    ".sq-dock-pill--ai {",
-    "  background: linear-gradient(135deg, #06b6d4 0%, #14b8a6 52%, #22c55e 100%) !important;",
-    "  color: #020617 !important;",
-    "  animation-delay: 1.4s !important;",
-    "}",
-    ".sq-dock-pill-main {",
-    "  display: inline-flex !important;",
-    "  align-items: center !important;",
-    "  gap: 7px !important;",
-    "  font-size: 15px !important;",
-    "  font-weight: 900 !important;",
-    "  color: #020617 !important;",
-    "  text-shadow: 0 1px 0 rgba(255, 255, 255, .35) !important;",
-    "}",
-    ".sq-dock-pill-icon {",
-    "  font-size: 17px !important;",
-    "  line-height: 1 !important;",
-    "}",
-    ".sq-dock-badge-live {",
-    "  display: inline-flex !important;",
-    "  align-items: center !important;",
-    "  gap: 4px !important;",
-    "  background: #dc2626 !important;",
-    "  color: #ffffff !important;",
-    "  font-size: 10px !important;",
-    "  font-weight: 900 !important;",
-    "  padding: 3px 7px !important;",
-    "  border-radius: 999px !important;",
-    "  letter-spacing: 0.3px !important;",
-    "  box-shadow: 0 2px 8px rgba(220, 38, 38, .55) !important;",
-    "}",
-    ".sq-dock-badge-live-dot {",
-    "  width: 5px !important;",
-    "  height: 5px !important;",
-    "  border-radius: 50% !important;",
-    "  background: #ffffff !important;",
-    "  animation: sqLiveDotBlink 1.1s infinite !important;",
-    "}",
-    ".sq-dock-badge-ai {",
-    "  display: inline-flex !important;",
-    "  align-items: center !important;",
-    "  background: #0f172a !important;",
-    "  color: #67e8f9 !important;",
-    "  border: 1px solid rgba(103, 232, 249, .5) !important;",
-    "  font-size: 10px !important;",
-    "  font-weight: 900 !important;",
-    "  padding: 3px 7px !important;",
-    "  border-radius: 999px !important;",
-    "  letter-spacing: 0.2px !important;",
-    "}",
-    "@media (max-width: 640px) {",
-    "  #sqDualFloatingDock { right: 12px !important; bottom: 14px !important; width: 178px !important; gap: 8px !important; }",
-    "  .sq-dock-pill { width: 178px !important; min-width: 178px !important; max-width: 178px !important; height: 46px !important; min-height: 46px !important; max-height: 46px !important; padding: 0 12px !important; font-size: 13.5px !important; }",
-    "  .sq-dock-pill-main { font-size: 13.5px !important; gap: 5px !important; }",
-    "}",
-    ".sq-jjangdol-cta {",
-    "  display: flex;",
-    "  align-items: center;",
-    "  justify-content: center;",
-    "  gap: 8px;",
-    "  width: 100%;",
-    "  background: linear-gradient(135deg, #06b6d4, #10b981);",
-    "  color: #020617 !important;",
-    "  text-decoration: none !important;",
-    "  border: 1.5px solid rgba(224, 242, 254, .7);",
-    "  border-radius: 13px;",
-    "  padding: 14px 18px;",
-    "  font-size: 15.5px;",
-    "  font-weight: 900;",
-    "  box-shadow: 0 10px 26px rgba(16, 185, 129, .36);",
-    "  transition: transform .15s ease, filter .15s ease;",
-    "}",
-    ".sq-jjangdol-cta:hover { transform: translateY(-1px); filter: brightness(1.07); }"
-  ].join("\n");
-  document.head.appendChild(st);
-
-  // Hide any standalone/legacy floating AI 아이큐 or AI 스코비 pills outside #sqDualFloatingDock so there is zero misalignment or duplication
-  function hideStandaloneLegacyFabs() {
-    var cands = document.querySelectorAll("button, a, div[role='button']");
-    for (var i = 0; i < cands.length; i++) {
-      var el = cands[i];
-      if (!el || el.closest("#sqDualFloatingDock") || el.closest("#sqAiIqModal") || el.closest("#sqIqTvModal")) continue;
-      if (el.id === "sqFeedAiIqBtn" || el.id === "sqHeaderAiIqBtn") continue;
-      if (el.id === "sqAiIqFloatingFab" || el.id === "sqIqTvFloatingFab") {
-        el.style.setProperty("display", "none", "important");
-        continue;
-      }
-      var txt = (el.textContent || "").replace(/\s+/g, " ").trim();
-      if (txt.length > 0 && txt.length <= 28 && (txt.indexOf("AI 아이큐") !== -1 || txt.indexOf("AI 스코비") !== -1 || txt.indexOf("AI아이큐") !== -1)) {
-        var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
-        if (cs && cs.position === "fixed") {
-          el.style.setProperty("display", "none", "important");
-        }
-      }
-    }
-  }
-
-  function buildIqTvModalIfNeeded() {
-    var m = document.getElementById("sqIqTvModal");
-    if (m) return m;
-
-    m = document.createElement("div");
-    m.id = "sqIqTvModal";
-    m.className = "sq-modal-backdrop";
-    m.style.zIndex = "100060";
-    m.innerHTML = [
-      "<div class='sq-modal-panel' style='max-width:440px;padding:22px;border-color:rgba(6,182,212,.6);'>",
-      "  <div style='display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;'>",
-      "    <div style='display:flex;align-items:center;gap:8px;'>",
-      "      <span style='background:linear-gradient(135deg,#06b6d4,#10b981);color:#020617;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:900;'>📺 IQ중계티비</span>",
-      "      <h3 style='margin:0;font-size:16.5px;font-weight:900;color:#f8fafc;'>실시간 스포츠 중계 안내</h3>",
-      "    </div>",
-      "    <button type='button' id='sqCloseIqTvModalBtn' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:800;'>✕ 닫기 (Esc)</button>",
-      "  </div>",
-      "  <div style='background:linear-gradient(145deg,rgba(6,182,212,.14),rgba(15,23,42,.98));border:1px solid rgba(56,189,248,.4);border-radius:15px;padding:18px;text-align:center;'>",
-      "    <div style='font-size:15px;font-weight:900;color:#f8fafc;margin-bottom:6px;'>⚡ 전 종목 고화질 실시간 라이브 중계</div>",
-      "    <div style='font-size:12.5px;color:#94a3b8;line-height:1.6;margin-bottom:16px;'>해외축구 · 야구 · 농구 · 배구 · 하키 · E스포츠 실시간 생중계를<br/><strong style='color:#67e8f9;'>짱돌티비</strong>에서 끊김 없이 바로 시청하실 수 있습니다.</div>",
-      "    <a id='sqGoJjangdolTvLink' href='" + JJANGDOL_URL + "' target='_blank' rel='noopener noreferrer' class='sq-jjangdol-cta'>",
-      "      <span>🎬 짱돌티비 바로가기</span>",
-      "      <span style='font-size:14px;'>↗</span>",
-      "    </a>",
-      "    <div style='margin-top:10px;font-size:11px;color:#64748b;'>클릭 시 공식 중계 페이지(jjangdoltv.com)로 즉시 이동합니다</div>",
-      "  </div>",
-      "</div>"
-    ].join("");
-    document.body.appendChild(m);
-
-    document.getElementById("sqCloseIqTvModalBtn").onclick = function () {
-      m.style.display = "none";
-    };
-    m.addEventListener("click", function (ev) {
-      if (ev.target === m) m.style.display = "none";
-    });
-    document.getElementById("sqGoJjangdolTvLink").addEventListener("click", function () {
-      setTimeout(function () { m.style.display = "none"; }, 180);
-    });
-
-    return m;
-  }
-
-  function openIqTvModal() {
-    var m = buildIqTvModalIfNeeded();
-    m.style.display = "flex";
-  }
-  window.__openSportiqIqTv = openIqTvModal;
-
-  function ensureUnifiedDualDock() {
-    if (!document.body) return;
-    hideStandaloneLegacyFabs();
-
-    var dock = document.getElementById("sqDualFloatingDock");
-    if (!dock) {
-      dock = document.createElement("div");
-      dock.id = "sqDualFloatingDock";
-      dock.innerHTML = [
-        "<button type='button' id='sqDockIqTvBtn' class='sq-dock-pill sq-dock-pill--tv' title='IQ중계티비 — 짱돌티비 실시간 중계 바로가기'>",
-        "  <span class='sq-dock-pill-main'><span class='sq-dock-pill-icon'>📺</span><span>IQ중계티비</span></span>",
-        "  <span class='sq-dock-badge-live'><span class='sq-dock-badge-live-dot'></span>LIVE</span>",
-        "</button>",
-        "<button type='button' id='sqDockAiIqBtn' class='sq-dock-pill sq-dock-pill--ai' data-sq-ai-iq-trigger='1' title='AI 아이큐 — 실시간 온라인 AI 검색 (Ctrl+K)'>",
-        "  <span class='sq-dock-pill-main'><span class='sq-dock-pill-icon'>🤖</span><span>AI 아이큐</span></span>",
-        "  <span class='sq-dock-badge-ai'>검색</span>",
-        "</button>"
-      ].join("");
-      document.body.appendChild(dock);
-
-      document.getElementById("sqDockIqTvBtn").addEventListener("click", function (ev) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        openIqTvModal();
-      });
-
-      document.getElementById("sqDockAiIqBtn").addEventListener("click", function (ev) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        if (typeof window.__openSportiqAiIq === "function") {
-          window.__openSportiqAiIq();
-        }
-      });
-    }
-  }
-
-  window.addEventListener("keydown", function (ev) {
-    if (ev.key === "Escape" || ev.keyCode === 27) {
-      var m = document.getElementById("sqIqTvModal");
-      if (m && m.style.display === "flex") {
-        ev.preventDefault();
-        ev.stopPropagation();
-        m.style.display = "none";
-      }
-    }
-  }, true);
-
-  setTimeout(ensureUnifiedDualDock, 120);
-  setInterval(ensureUnifiedDualDock, 700);
-})();
-"""
-
-UPGRADE_JS = UPGRADE_JS + "\n" + IQ_LIVE_TV_JS
-# ============================================================================
 # STAGE P7 (v3.8 / ?v=13): High-Visibility Brand Crest & Header Logo Upgrade
 #   - Replaces muted header brand block ([IQ] + SportIQ + OPEN LOUNGE + subtitle)
 #     with a crisp, high-contrast Electric-Cyan & Emerald neon broadcast crest.
@@ -6584,104 +6310,282 @@ BRAND_CREST_V13_JS = r"""
 """
 
 UPGRADE_JS = UPGRADE_JS + "\n" + BRAND_CREST_V13_JS
+
 # ============================================================================
-# STAGE P8 (v3.9 / ?v=14): Mobile Bottom Safe-Zone & Smart Adaptive Floating UX
-#   - Safe-area bottom clearance (148px + env(safe-area-inset-bottom)) on mobile
-#   - Smart scroll-down translucent compact glide (restores instantly on scroll-up/touch/bottom)
-#   - Virtual keyboard & modal open auto-retract (zero overlap when typing posts/comments/cheers)
-#   - Zero collision between #sqPwaInstallBanner and #sqDualFloatingDock on narrow screens
+# STAGE P6 + P8 (v4.0 / ?v=15): Zero-Overlap Dual Dock & Mobile Tab-Bar Clearance
+#   - Detects mobile fixed bottom navigation bar (피드·일정·숏츠·이슈/톡·랭킹·실험실)
+#     and anchors the dock cleanly ABOVE the nav bar so nav tabs are 100% clickable.
+#   - Eliminates the duplicate legacy 'AI 아이큐' ghost pill on mobile & desktop.
+#   - Slims mobile pills to 124px x 34px + adds a 1-tap minimize/collapse toggle (▾ / ⚡IQ)
+#     so cards & filter buttons underneath are never blocked!
 # ============================================================================
-MOBILE_BOTTOM_UX_V14_JS = r"""
-/* SportIQ v14.0: Smart Mobile Bottom Clearance, Keyboard Retract & Adaptive Floating Dock */
+IQ_DUAL_DOCK_AND_MOBILE_V15_JS = r"""
+/* SportIQ v15.0: Zero-Overlap Dual Floating Dock (Desktop Full + Mobile Slim Collapsible Above Bottom Nav) */
 (function () {
-  if (window.__SPORTIQ_V14_MOBILE_CLEARANCE__) return;
-  window.__SPORTIQ_V14_MOBILE_CLEARANCE__ = true;
+  if (window.__SPORTIQ_V15_DOCK_MOBILE__) return;
+  window.__SPORTIQ_V15_DOCK_MOBILE__ = true;
+
+  var JJANGDOL_URL = "https://jjangdoltv.com/";
+  var LS_DOCK_MIN = "sq_mobile_dock_minimized";
+
+  function isDockMinimized() {
+    return localStorage.getItem(LS_DOCK_MIN) === "1";
+  }
+
+  function setDockMinimized(minState) {
+    localStorage.setItem(LS_DOCK_MIN, minState ? "1" : "0");
+    var dock = document.getElementById("sqDualFloatingDock");
+    if (dock) {
+      if (minState) dock.classList.add("sq-dock-minimized");
+      else dock.classList.remove("sq-dock-minimized");
+    }
+  }
 
   var st = document.createElement("style");
-  st.id = "sqMobileClearanceV14Css";
+  st.id = "sqDualDockV15Css";
   st.textContent = [
-    "/* Smooth transitions for Dual Floating Dock & PWA Install Banner */",
-    "#sqDualFloatingDock {",
-    "  transition: transform .26s cubic-bezier(.22, 1, .36, 1), opacity .24s ease, bottom .24s ease !important;",
-    "  will-change: transform, opacity;",
+    "@keyframes sqFabGlowPulse {",
+    "  0%, 100% { box-shadow: 0 8px 22px rgba(6, 182, 212, .42), 0 0 0 1.5px rgba(255, 255, 255, .25); }",
+    "  50% { box-shadow: 0 10px 28px rgba(16, 185, 129, .62), 0 0 14px rgba(34, 211, 238, .48), 0 0 0 1.5px rgba(165, 243, 252, .65); }",
     "}",
-    "#sqPwaInstallBanner {",
-    "  transition: transform .26s cubic-bezier(.22, 1, .36, 1), opacity .24s ease, bottom .24s ease !important;",
+    "@keyframes sqLiveDotBlink {",
+    "  0%, 100% { opacity: 1; transform: scale(1); }",
+    "  50% { opacity: 0.35; transform: scale(0.8); }",
+    "}",
+    ":root {",
+    "  --sq-mobile-nav-h: 64px;",
+    "}",
+    "#sqDualFloatingDock {",
+    "  position: fixed !important;",
+    "  right: 18px !important;",
+    "  bottom: 20px !important;",
+    "  z-index: 9992 !important;",
+    "  display: flex !important;",
+    "  flex-direction: column !important;",
+    "  align-items: flex-end !important;",
+    "  gap: 9px !important;",
+    "  width: auto !important;",
+    "  pointer-events: none !important;",
+    "  transition: transform .24s cubic-bezier(.22, 1, .36, 1), opacity .22s ease, bottom .22s ease !important;",
+    "}",
+    ".sq-dock-items-wrap {",
+    "  display: flex !important;",
+    "  flex-direction: column !important;",
+    "  align-items: stretch !important;",
+    "  gap: 9px !important;",
+    "  pointer-events: none !important;",
+    "}",
+    ".sq-dock-pill {",
+    "  pointer-events: auto !important;",
+    "  box-sizing: border-box !important;",
+    "  width: 192px !important;",
+    "  min-width: 192px !important;",
+    "  max-width: 192px !important;",
+    "  height: 48px !important;",
+    "  min-height: 48px !important;",
+    "  max-height: 48px !important;",
+    "  margin: 0 !important;",
+    "  padding: 0 14px !important;",
+    "  border-radius: 999px !important;",
+    "  border: 1.5px solid rgba(224, 242, 254, .78) !important;",
+    "  cursor: pointer !important;",
+    "  display: inline-flex !important;",
+    "  align-items: center !important;",
+    "  justify-content: space-between !important;",
+    "  gap: 7px !important;",
+    "  font-family: inherit !important;",
+    "  font-size: 14.5px !important;",
+    "  font-weight: 900 !important;",
+    "  letter-spacing: -0.3px !important;",
+    "  line-height: 1 !important;",
+    "  white-space: nowrap !important;",
+    "  text-decoration: none !important;",
+    "  transition: transform .16s ease, filter .16s ease !important;",
+    "  animation: sqFabGlowPulse 2.8s ease-in-out infinite !important;",
+    "}",
+    ".sq-dock-pill:hover { transform: translateY(-2px) scale(1.02) !important; filter: brightness(1.07) !important; }",
+    ".sq-dock-pill:active { transform: scale(0.98) !important; }",
+    ".sq-dock-pill--tv {",
+    "  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 48%, #10b981 100%) !important;",
+    "  color: #020617 !important;",
+    "}",
+    ".sq-dock-pill--ai {",
+    "  background: linear-gradient(135deg, #06b6d4 0%, #14b8a6 52%, #22c55e 100%) !important;",
+    "  color: #020617 !important;",
+    "  animation-delay: 1.4s !important;",
+    "}",
+    ".sq-dock-pill-main {",
+    "  display: inline-flex !important;",
+    "  align-items: center !important;",
+    "  gap: 6px !important;",
+    "  font-size: 14.5px !important;",
+    "  font-weight: 900 !important;",
+    "  color: #020617 !important;",
+    "  text-shadow: 0 1px 0 rgba(255, 255, 255, .32) !important;",
+    "}",
+    ".sq-dock-pill-icon { font-size: 16px !important; line-height: 1 !important; }",
+    ".sq-dock-badge-live {",
+    "  display: inline-flex !important;",
+    "  align-items: center !important;",
+    "  gap: 3px !important;",
+    "  background: #dc2626 !important;",
+    "  color: #ffffff !important;",
+    "  font-size: 9.5px !important;",
+    "  font-weight: 900 !important;",
+    "  padding: 3px 6px !important;",
+    "  border-radius: 999px !important;",
+    "  box-shadow: 0 2px 6px rgba(220, 38, 38, .5) !important;",
+    "}",
+    ".sq-dock-badge-live-dot {",
+    "  width: 5px !important;",
+    "  height: 5px !important;",
+    "  border-radius: 50% !important;",
+    "  background: #ffffff !important;",
+    "  animation: sqLiveDotBlink 1.1s infinite !important;",
+    "}",
+    ".sq-dock-badge-ai {",
+    "  display: inline-flex !important;",
+    "  align-items: center !important;",
+    "  background: #0f172a !important;",
+    "  color: #67e8f9 !important;",
+    "  border: 1px solid rgba(103, 232, 249, .5) !important;",
+    "  font-size: 9.5px !important;",
+    "  font-weight: 900 !important;",
+    "  padding: 3px 6px !important;",
+    "  border-radius: 999px !important;",
+    "}",
+    "/* Minimize / Expand toggle button (shown on mobile so user can tuck dock away anytime) */",
+    "#sqDockMinToggleBtn {",
+    "  display: none;",
+    "  pointer-events: auto !important;",
+    "  align-items: center;",
+    "  justify-content: center;",
+    "  gap: 4px;",
+    "  background: rgba(15, 23, 42, .92);",
+    "  color: #93c5fd;",
+    "  border: 1px solid rgba(56, 189, 248, .45);",
+    "  border-radius: 999px;",
+    "  padding: 3px 9px;",
+    "  font-size: 10.5px;",
+    "  font-weight: 800;",
+    "  cursor: pointer;",
+    "  box-shadow: 0 4px 12px rgba(0, 0, 0, .45);",
+    "}",
+    "#sqDockRestoreFab {",
+    "  display: none;",
+    "  pointer-events: auto !important;",
+    "  align-items: center;",
+    "  justify-content: center;",
+    "  gap: 4px;",
+    "  height: 36px;",
+    "  padding: 0 12px;",
+    "  border-radius: 999px;",
+    "  background: linear-gradient(135deg, #0ea5e9, #10b981);",
+    "  color: #020617;",
+    "  border: 1.5px solid rgba(224, 242, 254, .85);",
+    "  font-size: 12px;",
+    "  font-weight: 900;",
+    "  cursor: pointer;",
+    "  box-shadow: 0 6px 18px rgba(6, 182, 212, .45);",
     "}",
     "",
-    "/* Desktop subtle bottom cushion so footer/last post never touches dock */",
+    "/* Desktop comfortable bottom cushion */",
     "@media (min-width: 769px) {",
     "  body { padding-bottom: 84px !important; }",
     "}",
     "",
-    "/* Mobile & Tablet (< 768px): Full Safe-Zone Cushion + iOS Home-Indicator Support */",
+    "/* MOBILE (< 768px): Ultra-Clean Slim Pills + Positioned Above Bottom Nav Bar */",
     "@media (max-width: 768px) {",
     "  body {",
-    "    padding-bottom: calc(144px + env(safe-area-inset-bottom, 0px)) !important;",
+    "    padding-bottom: calc(var(--sq-mobile-nav-h, 64px) + 108px + env(safe-area-inset-bottom, 0px)) !important;",
     "  }",
-    "  body.sq-pwa-banner-visible {",
-    "    padding-bottom: calc(214px + env(safe-area-inset-bottom, 0px)) !important;",
-    "  }",
-    "  footer, #feedList {",
-    "    scroll-margin-bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important;",
-    "  }",
-    "  #feedList > article:last-child {",
-    "    margin-bottom: 18px !important;",
-    "  }",
-    "  /* Respect iOS notch / home bar on Dual Floating Dock */",
     "  #sqDualFloatingDock {",
-    "    right: 12px !important;",
-    "    bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;",
+    "    right: 10px !important;",
+    "    bottom: calc(var(--sq-mobile-nav-h, 64px) + 10px + env(safe-area-inset-bottom, 0px)) !important;",
+    "    gap: 5px !important;",
     "  }",
-    "  /* Stack Dual Dock cleanly ABOVE PWA install banner when banner is open on mobile */",
-    "  body.sq-pwa-banner-visible #sqPwaInstallBanner {",
+    "  .sq-dock-items-wrap {",
+    "    gap: 6px !important;",
+    "  }",
+    "  .sq-dock-pill {",
+    "    width: 126px !important;",
+    "    min-width: 126px !important;",
+    "    max-width: 126px !important;",
+    "    height: 35px !important;",
+    "    min-height: 35px !important;",
+    "    max-height: 35px !important;",
+    "    padding: 0 10px !important;",
+    "    font-size: 12px !important;",
+    "    gap: 5px !important;",
+    "    animation: none !important;",
+    "    box-shadow: 0 5px 14px rgba(2, 6, 23, .55), 0 0 0 1px rgba(224, 242, 254, .55) !important;",
+    "  }",
+    "  .sq-dock-pill-main { font-size: 12px !important; gap: 4px !important; }",
+    "  .sq-dock-pill-icon { font-size: 13.5px !important; }",
+    "  /* Hide wide sub-badges on narrow mobile screens and show crisp live dot only so width stays 126px! */",
+    "  .sq-dock-badge-ai { display: none !important; }",
+    "  .sq-dock-badge-live {",
+    "    padding: 3px !important;",
+    "    font-size: 0 !important;",
+    "    gap: 0 !important;",
+    "    width: 9px !important;",
+    "    height: 9px !important;",
+    "    justify-content: center !important;",
+    "  }",
+    "  .sq-dock-badge-live-dot { width: 5px !important; height: 5px !important; }",
+    "  #sqDockMinToggleBtn { display: inline-flex !important; }",
+    "  #sqDualFloatingDock.sq-dock-minimized .sq-dock-items-wrap,",
+    "  #sqDualFloatingDock.sq-dock-minimized #sqDockMinToggleBtn {",
+    "    display: none !important;",
+    "  }",
+    "  #sqDualFloatingDock.sq-dock-minimized #sqDockRestoreFab {",
+    "    display: inline-flex !important;",
+    "  }",
+    "  /* PWA banner sits neatly above bottom nav bar too */",
+    "  #sqPwaInstallBanner {",
     "    left: 10px !important;",
     "    right: 10px !important;",
     "    max-width: calc(100vw - 20px) !important;",
-    "    bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;",
+    "    bottom: calc(var(--sq-mobile-nav-h, 64px) + 8px + env(safe-area-inset-bottom, 0px)) !important;",
     "  }",
     "  body.sq-pwa-banner-visible #sqDualFloatingDock {",
-    "    bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important;",
+    "    bottom: calc(var(--sq-mobile-nav-h, 64px) + 78px + env(safe-area-inset-bottom, 0px)) !important;",
     "  }",
-    "  /* Smart Scroll-Down Compact Glide: keeps buttons tappable while freeing 45% visual space */",
-    "  #sqDualFloatingDock.sq-dock-scroll-compact {",
-    "    transform: translate3d(6px, 6px, 0) scale(0.88) !important;",
-    "    transform-origin: bottom right !important;",
-    "    opacity: 0.80 !important;",
+    "  /* Auto-fade & pass-through while actively scrolling down on mobile so underneath buttons are 100% unobstructed */",
+    "  #sqDualFloatingDock.sq-dock-scrolling-down {",
+    "    opacity: 0.25 !important;",
+    "    transform: translate3d(8px, 0, 0) scale(0.92) !important;",
+    "    pointer-events: none !important;",
     "  }",
-    "  #sqDualFloatingDock.sq-dock-scroll-compact:hover,",
-    "  #sqDualFloatingDock.sq-dock-scroll-compact:active {",
-    "    transform: translate3d(0, 0, 0) scale(1) !important;",
-    "    opacity: 1 !important;",
-    "  }",
-    "  /* Auto-retract when typing in inputs/textareas or when any full modal is open */",
+    "  /* Auto-hide completely when typing in inputs or when any modal is open */",
     "  body.sq-kb-typing #sqDualFloatingDock,",
     "  body.sq-kb-typing #sqPwaInstallBanner,",
     "  body.sq-modal-active #sqDualFloatingDock,",
     "  body.sq-modal-active #sqPwaInstallBanner {",
     "    opacity: 0 !important;",
     "    pointer-events: none !important;",
-    "    transform: translate3d(0, 28px, 0) scale(0.92) !important;",
+    "    transform: translate3d(0, 20px, 0) scale(0.9) !important;",
     "  }",
-    "  /* Ensure modals fit comfortably inside mobile dynamic viewport height */",
     "  .sq-modal-panel {",
-    "    max-height: calc(86dvh - env(safe-area-inset-bottom, 0px)) !important;",
+    "    max-height: calc(85dvh - env(safe-area-inset-bottom, 0px)) !important;",
     "    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)) !important;",
     "  }",
     "}",
-    "",
-    "/* Dedicated bottom breathing room spacer at end of main container */",
-    "#sqMobileBottomSafeSpacer {",
-    "  display: none;",
+    ".sq-jjangdol-cta {",
+    "  display: flex;",
+    "  align-items: center;",
+    "  justify-content: center;",
+    "  gap: 8px;",
     "  width: 100%;",
-    "  height: 0;",
-    "  pointer-events: none;",
-    "}",
-    "@media (max-width: 768px) {",
-    "  #sqMobileBottomSafeSpacer {",
-    "    display: block;",
-    "    height: calc(36px + env(safe-area-inset-bottom, 0px));",
-    "  }",
+    "  background: linear-gradient(135deg, #06b6d4, #10b981);",
+    "  color: #020617 !important;",
+    "  text-decoration: none !important;",
+    "  border: 1.5px solid rgba(224, 242, 254, .7);",
+    "  border-radius: 13px;",
+    "  padding: 14px 18px;",
+    "  font-size: 15.5px;",
+    "  font-weight: 900;",
+    "  box-shadow: 0 10px 26px rgba(16, 185, 129, .36);",
     "}"
   ].join("\n");
   document.head.appendChild(st);
@@ -6690,84 +6594,209 @@ MOBILE_BOTTOM_UX_V14_JS = r"""
     return (window.innerWidth || document.documentElement.clientWidth || 1024) <= 768;
   }
 
-  function ensureBottomSafeSpacer() {
-    if (!document.body || document.getElementById("sqMobileBottomSafeSpacer")) return;
-    var sp = document.createElement("div");
-    sp.id = "sqMobileBottomSafeSpacer";
-    sp.setAttribute("aria-hidden", "true");
-    var mainEl = document.querySelector("main") || document.querySelector("footer") || document.body;
-    if (mainEl === document.body) {
-      document.body.appendChild(sp);
-    } else if (mainEl.parentNode) {
-      mainEl.insertAdjacentElement("afterend", sp);
+  // Measure the native fixed bottom navigation bar (피드 · 일정 · 숏츠 · 이슈/톡 · 랭킹 · 실험실)
+  function measureBottomNavBarHeight() {
+    if (!isMobileViewport()) {
+      document.documentElement.style.setProperty("--sq-mobile-nav-h", "0px");
+      return 0;
+    }
+    var winH = window.innerHeight || document.documentElement.clientHeight || 800;
+    var winW = window.innerWidth || document.documentElement.clientWidth || 390;
+    var detectedH = 0;
+    var nodes = document.querySelectorAll("nav, footer, div");
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      if (!el || el.id === "sqDualFloatingDock" || el.id === "sqPwaInstallBanner" || el.closest("#sqDualFloatingDock")) continue;
+      if (el.classList && el.classList.contains("sq-modal-backdrop")) continue;
+      var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+      if (!cs || (cs.position !== "fixed" && cs.position !== "sticky") || cs.display === "none" || cs.visibility === "hidden") continue;
+      var r = el.getBoundingClientRect();
+      // Full-width bottom tab bar sits at bottom of viewport and spans >75% of screen width
+      if (r.width >= winW * 0.75 && r.height >= 42 && r.height <= 105 && Math.abs(winH - r.bottom) <= 18) {
+        if (r.height > detectedH) detectedH = Math.round(r.height);
+      }
+    }
+    if (detectedH === 0) detectedH = 62; // Safe default for mobile bottom tab bar
+    document.documentElement.style.setProperty("--sq-mobile-nav-h", detectedH + "px");
+    return detectedH;
+  }
+
+  // Thoroughly hide ANY duplicate/legacy 'AI 아이큐' / 'AI 스코비' floating pill (even when wrapped inside a fixed parent div!)
+  function hideStandaloneLegacyFabs() {
+    var cands = document.querySelectorAll("button, a, div, span");
+    for (var i = 0; i < cands.length; i++) {
+      var el = cands[i];
+      if (!el || el.id === "sqDualFloatingDock" || el.closest("#sqDualFloatingDock")) continue;
+      if (el.closest("#sqAiIqModal") || el.closest("#sqIqTvModal") || el.closest("#sqP3FeedToolbar") || el.closest("header")) continue;
+      if (el.id === "sqFeedAiIqBtn" || el.id === "sqHeaderAiIqBtn") continue;
+      if (el.id === "sqAiIqFloatingFab" || el.id === "sqIqTvFloatingFab") {
+        el.style.setProperty("display", "none", "important");
+        continue;
+      }
+      if (el.children && el.children.length > 3) continue;
+      var txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (txt.length > 0 && txt.length <= 24 && (txt === "🤖 AI 아이큐" || txt === "AI 아이큐" || txt.indexOf("AI 스코비") !== -1 || txt === "🤖 AI아이큐")) {
+        // Walk up 3 ancestors to check if the button OR its wrapper is position:fixed/sticky near bottom-right
+        var cur = el;
+        var fixedHost = null;
+        for (var d = 0; d < 4 && cur && cur !== document.body; d++) {
+          var cs = window.getComputedStyle ? window.getComputedStyle(cur) : null;
+          if (cs && (cs.position === "fixed" || cs.position === "sticky")) {
+            fixedHost = cur;
+            break;
+          }
+          cur = cur.parentElement;
+        }
+        if (fixedHost && fixedHost.id !== "sqDualFloatingDock") {
+          var fr = fixedHost.getBoundingClientRect ? fixedHost.getBoundingClientRect() : { width: 0 };
+          // Only hide floating pill hosts, never full-width navbars
+          if (fr.width < 280) {
+            fixedHost.style.setProperty("display", "none", "important");
+          } else {
+            el.style.setProperty("display", "none", "important");
+          }
+        }
+      }
     }
   }
 
-  // Track whether PWA install banner is currently visible so Dual Dock stacks cleanly above it
-  function syncPwaBannerBodyClass() {
+  function buildIqTvModalIfNeeded() {
+    var m = document.getElementById("sqIqTvModal");
+    if (m) return m;
+
+    m = document.createElement("div");
+    m.id = "sqIqTvModal";
+    m.className = "sq-modal-backdrop";
+    m.style.zIndex = "100060";
+    m.innerHTML = [
+      "<div class='sq-modal-panel' style='max-width:440px;padding:22px;border-color:rgba(6,182,212,.6);'>",
+      "  <div style='display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;'>",
+      "    <div style='display:flex;align-items:center;gap:8px;'>",
+      "      <span style='background:linear-gradient(135deg,#06b6d4,#10b981);color:#020617;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:900;'>📺 IQ중계티비</span>",
+      "      <h3 style='margin:0;font-size:16.5px;font-weight:900;color:#f8fafc;'>실시간 스포츠 중계 안내</h3>",
+      "    </div>",
+      "    <button type='button' id='sqCloseIqTvModalBtn' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:800;'>✕ 닫기 (Esc)</button>",
+      "  </div>",
+      "  <div style='background:linear-gradient(145deg,rgba(6,182,212,.14),rgba(15,23,42,.98));border:1px solid rgba(56,189,248,.4);border-radius:15px;padding:18px;text-align:center;'>",
+      "    <div style='font-size:15px;font-weight:900;color:#f8fafc;margin-bottom:6px;'>⚡ 전 종목 고화질 실시간 라이브 중계</div>",
+      "    <div style='font-size:12.5px;color:#94a3b8;line-height:1.6;margin-bottom:16px;'>해외축구 · 야구 · 농구 · 배구 · 하키 · E스포츠 실시간 생중계를<br/><strong style='color:#67e8f9;'>짱돌티비</strong>에서 끊김 없이 바로 시청하실 수 있습니다.</div>",
+      "    <a id='sqGoJjangdolTvLink' href='" + JJANGDOL_URL + "' target='_blank' rel='noopener noreferrer' class='sq-jjangdol-cta'>",
+      "      <span>🎬 짱돌티비 바로가기</span>",
+      "      <span style='font-size:14px;'>↗</span>",
+      "    </a>",
+      "    <div style='margin-top:10px;font-size:11px;color:#64748b;'>클릭 시 공식 중계 페이지(jjangdoltv.com)로 즉시 이동합니다</div>",
+      "  </div>",
+      "</div>"
+    ].join("");
+    document.body.appendChild(m);
+
+    document.getElementById("sqCloseIqTvModalBtn").onclick = function () { m.style.display = "none"; };
+    m.addEventListener("click", function (ev) { if (ev.target === m) m.style.display = "none"; });
+    document.getElementById("sqGoJjangdolTvLink").addEventListener("click", function () {
+      setTimeout(function () { m.style.display = "none"; }, 180);
+    });
+    return m;
+  }
+
+  function openIqTvModal() {
+    var m = buildIqTvModalIfNeeded();
+    m.style.display = "flex";
+  }
+  window.__openSportiqIqTv = openIqTvModal;
+
+  function ensureUnifiedDualDock() {
     if (!document.body) return;
+    hideStandaloneLegacyFabs();
+    measureBottomNavBarHeight();
+
+    var dock = document.getElementById("sqDualFloatingDock");
+    if (!dock) {
+      dock = document.createElement("div");
+      dock.id = "sqDualFloatingDock";
+      if (isDockMinimized()) dock.classList.add("sq-dock-minimized");
+      dock.innerHTML = [
+        "<button type='button' id='sqDockMinToggleBtn' title='플로팅 탭 작게 접기'>▾ 탭 접기</button>",
+        "<div class='sq-dock-items-wrap'>",
+        "  <button type='button' id='sqDockIqTvBtn' class='sq-dock-pill sq-dock-pill--tv' title='IQ중계티비 — 짱돌티비 실시간 중계 바로가기'>",
+        "    <span class='sq-dock-pill-main'><span class='sq-dock-pill-icon'>📺</span><span>IQ중계티비</span></span>",
+        "    <span class='sq-dock-badge-live'><span class='sq-dock-badge-live-dot'></span>LIVE</span>",
+        "  </button>",
+        "  <button type='button' id='sqDockAiIqBtn' class='sq-dock-pill sq-dock-pill--ai' data-sq-ai-iq-trigger='1' title='AI 아이큐 — 실시간 온라인 AI 검색 (Ctrl+K)'>",
+        "    <span class='sq-dock-pill-main'><span class='sq-dock-pill-icon'>🤖</span><span>AI 아이큐</span></span>",
+        "    <span class='sq-dock-badge-ai'>검색</span>",
+        "  </button>",
+        "</div>",
+        "<button type='button' id='sqDockRestoreFab' title='IQ중계티비 · AI 아이큐 펼치기'>⚡ IQ 메뉴 ▴</button>"
+      ].join("");
+      document.body.appendChild(dock);
+
+      document.getElementById("sqDockIqTvBtn").addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openIqTvModal();
+      });
+      document.getElementById("sqDockAiIqBtn").addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (typeof window.__openSportiqAiIq === "function") window.__openSportiqAiIq();
+      });
+      document.getElementById("sqDockMinToggleBtn").addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        setDockMinimized(true);
+      });
+      document.getElementById("sqDockRestoreFab").addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        setDockMinimized(false);
+      });
+    }
+  }
+
+  function syncOverlayStates() {
+    if (!document.body) return;
+    // 1. PWA banner check
     var banner = document.getElementById("sqPwaInstallBanner");
-    var visible = false;
+    var bVis = false;
     if (banner) {
-      var cs = window.getComputedStyle ? window.getComputedStyle(banner) : null;
-      visible = Boolean(cs && cs.display !== "none" && cs.visibility !== "hidden" && banner.offsetHeight > 10);
+      var bcs = window.getComputedStyle ? window.getComputedStyle(banner) : null;
+      bVis = Boolean(bcs && bcs.display !== "none" && bcs.visibility !== "hidden" && banner.offsetHeight > 10);
     }
-    if (visible) {
-      document.body.classList.add("sq-pwa-banner-visible");
-    } else {
-      document.body.classList.remove("sq-pwa-banner-visible");
-    }
-  }
+    document.body.classList.toggle("sq-pwa-banner-visible", bVis);
 
-  // Track whether any modal dialog is open so floating dock never floats over modal close/submit buttons
-  function syncModalActiveBodyClass() {
-    if (!document.body) return;
+    // 2. Modal check
     var modalIds = [
-      "sqAiIqModal",
-      "sqIqTvModal",
-      "sqMemberHubModal",
-      "sqMyPageModal",
-      "sqNotifModal",
-      "sqAdminRaffleModal",
-      "sqPwaIosModal",
-      "writeModal",
-      "commentModal",
-      "dcMatchModal",
-      "dcMatchDetailModal"
+      "sqAiIqModal", "sqIqTvModal", "sqMemberHubModal", "sqMyPageModal",
+      "sqNotifModal", "sqAdminRaffleModal", "sqPwaIosModal",
+      "writeModal", "commentModal", "dcMatchModal", "dcMatchDetailModal"
     ];
-    var anyOpen = false;
+    var mOpen = false;
     for (var i = 0; i < modalIds.length; i++) {
       var m = document.getElementById(modalIds[i]);
-      if (!m) continue;
-      if (m.classList && m.classList.contains("hidden")) continue;
-      var cs = window.getComputedStyle ? window.getComputedStyle(m) : null;
-      if (cs && cs.display !== "none" && cs.visibility !== "hidden" && m.offsetHeight > 20) {
-        anyOpen = true;
+      if (!m || (m.classList && m.classList.contains("hidden"))) continue;
+      var mcs = window.getComputedStyle ? window.getComputedStyle(m) : null;
+      if (mcs && mcs.display !== "none" && mcs.visibility !== "hidden" && m.offsetHeight > 20) {
+        mOpen = true;
         break;
       }
     }
-    if (anyOpen) {
-      document.body.classList.add("sq-modal-active");
-    } else {
-      document.body.classList.remove("sq-modal-active");
-    }
+    document.body.classList.toggle("sq-modal-active", mOpen);
   }
 
-  // Track mobile virtual keyboard / input focus so typing comments, cheer talk, or search is 100% unobstructed
-  function isTextEditingElement(el) {
+  // Keyboard focus auto-hide
+  function isTypingEl(el) {
     if (!el || !el.tagName) return false;
-    var tag = el.tagName.toUpperCase();
-    if (tag === "TEXTAREA" || tag === "SELECT") return true;
-    if (tag === "INPUT") {
+    var t = el.tagName.toUpperCase();
+    if (t === "TEXTAREA" || t === "SELECT") return true;
+    if (t === "INPUT") {
       var tp = (el.getAttribute("type") || "text").toLowerCase();
-      return ["button", "checkbox", "radio", "submit", "reset", "range", "file"].indexOf(tp) === -1;
+      return ["button", "checkbox", "radio", "submit", "reset"].indexOf(tp) === -1;
     }
     return el.isContentEditable === true;
   }
 
   document.addEventListener("focusin", function (ev) {
-    if (!isMobileViewport() || !document.body) return;
-    if (isTextEditingElement(ev.target)) {
+    if (isMobileViewport() && document.body && isTypingEl(ev.target)) {
       document.body.classList.add("sq-kb-typing");
     }
   }, true);
@@ -6775,82 +6804,60 @@ MOBILE_BOTTOM_UX_V14_JS = r"""
   document.addEventListener("focusout", function () {
     if (!document.body) return;
     setTimeout(function () {
-      if (!isTextEditingElement(document.activeElement)) {
-        document.body.classList.remove("sq-kb-typing");
-      }
+      if (!isTypingEl(document.activeElement)) document.body.classList.remove("sq-kb-typing");
     }, 140);
   }, true);
 
-  if (window.visualViewport) {
-    var baseHeight = window.visualViewport.height || window.innerHeight || 800;
-    window.visualViewport.addEventListener("resize", function () {
-      if (!isMobileViewport() || !document.body) return;
-      var curH = window.visualViewport.height || window.innerHeight || 800;
-      if (curH > baseHeight) baseHeight = curH;
-      // If viewport shrinks by >140px on mobile, soft keyboard is open
-      if (baseHeight - curH > 140 && isTextEditingElement(document.activeElement)) {
-        document.body.classList.add("sq-kb-typing");
-      } else if (!isTextEditingElement(document.activeElement)) {
-        document.body.classList.remove("sq-kb-typing");
-      }
-    });
-  }
-
-  // Smart Scroll Direction Detector: compact glide when reading downward, instant full restore on scroll-up or page bottom
-  var lastScrollY = window.pageYOffset || 0;
-  var scrollIdleTimer = null;
-
-  function handleSmartMobileScroll() {
+  // Mobile scroll-down pass-through fade so buttons underneath are immediately clickable while browsing
+  var lastY = window.pageYOffset || 0;
+  var idleTimer = null;
+  window.addEventListener("scroll", function () {
     var dock = document.getElementById("sqDualFloatingDock");
     if (!dock) return;
     if (!isMobileViewport()) {
-      dock.classList.remove("sq-dock-scroll-compact");
+      dock.classList.remove("sq-dock-scrolling-down");
       return;
     }
     var curY = window.pageYOffset || document.documentElement.scrollTop || 0;
-    var docH = Math.max(
-      document.body ? document.body.scrollHeight : 0,
-      document.documentElement ? document.documentElement.scrollHeight : 0
-    );
-    var winH = window.innerHeight || document.documentElement.clientHeight || 800;
-    var nearTop = curY < 90;
-    var nearBottom = (curY + winH) >= (docH - 120);
-    var delta = curY - lastScrollY;
-
-    if (nearTop || nearBottom || delta < -8) {
-      // Near top, reached bottom cushion, or scrolling UP -> full vivid size!
-      dock.classList.remove("sq-dock-scroll-compact");
-    } else if (delta > 12 && curY > 140) {
-      // Actively reading/scrolling DOWN -> sleek compact mode so feed actions stay wide open
-      dock.classList.add("sq-dock-scroll-compact");
+    var dy = curY - lastY;
+    if (dy > 10 && curY > 100) {
+      dock.classList.add("sq-dock-scrolling-down");
+    } else if (dy < -8 || curY <= 80) {
+      dock.classList.remove("sq-dock-scrolling-down");
     }
-    lastScrollY = curY;
-
-    if (scrollIdleTimer) clearTimeout(scrollIdleTimer);
-    scrollIdleTimer = setTimeout(function () {
+    lastY = curY;
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () {
       var d = document.getElementById("sqDualFloatingDock");
-      if (d) d.classList.remove("sq-dock-scroll-compact");
-    }, 1600);
-  }
+      if (d) d.classList.remove("sq-dock-scrolling-down");
+    }, 950);
+  }, { passive: true });
 
-  window.addEventListener("scroll", handleSmartMobileScroll, { passive: true });
   window.addEventListener("resize", function () {
-    syncPwaBannerBodyClass();
-    handleSmartMobileScroll();
+    measureBottomNavBarHeight();
   });
 
+  window.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape" || ev.keyCode === 27) {
+      var m = document.getElementById("sqIqTvModal");
+      if (m && m.style.display === "flex") {
+        ev.preventDefault();
+        ev.stopPropagation();
+        m.style.display = "none";
+      }
+    }
+  }, true);
+
   setTimeout(function () {
-    ensureBottomSafeSpacer();
-    syncPwaBannerBodyClass();
-    syncModalActiveBodyClass();
-  }, 140);
+    ensureUnifiedDualDock();
+    syncOverlayStates();
+  }, 100);
 
   setInterval(function () {
-    ensureBottomSafeSpacer();
-    syncPwaBannerBodyClass();
-    syncModalActiveBodyClass();
+    ensureUnifiedDualDock();
+    syncOverlayStates();
   }, 650);
 })();
 """
 
-UPGRADE_JS = UPGRADE_JS + "\n" + MOBILE_BOTTOM_UX_V14_JS
+UPGRADE_JS = UPGRADE_JS + "\n" + IQ_DUAL_DOCK_AND_MOBILE_V15_JS
