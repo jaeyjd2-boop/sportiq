@@ -600,7 +600,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "3.7",
+        "version": "3.8",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -615,6 +615,7 @@ def member_upgrade_status():
         "odds_alert_off_toggle": True,
         "iq_live_tv_tab": "https://jjangdoltv.com/",
         "floating_tabs_aligned_v12": True,
+        "hero_brand_crest_v13": True,
     }
 
 
@@ -3468,9 +3469,9 @@ def inject_upgrade_into_html(raw_html: str) -> str:
         if h_idx != -1:
             out = out[:h_idx] + pwa_head + "\n" + out[h_idx:]
 
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=12" defer></script>'
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=13" defer></script>'
     if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=12', out)
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=13', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
@@ -6348,3 +6349,229 @@ IQ_LIVE_TV_JS = r"""
 """
 
 UPGRADE_JS = UPGRADE_JS + "\n" + IQ_LIVE_TV_JS
+# ============================================================================
+# STAGE P7 (v3.8 / ?v=13): High-Visibility Brand Crest & Header Logo Upgrade
+#   - Replaces muted header brand block ([IQ] + SportIQ + OPEN LOUNGE + subtitle)
+#     with a crisp, high-contrast Electric-Cyan & Emerald neon broadcast crest.
+# ============================================================================
+BRAND_CREST_V13_JS = r"""
+/* SportIQ v13.0: High-Visibility Header Brand Crest & Neon Typography Upgrade */
+(function () {
+  if (window.__SPORTIQ_V13_BRAND_CREST__) return;
+  window.__SPORTIQ_V13_BRAND_CREST__ = true;
+
+  var st = document.createElement("style");
+  st.id = "sqBrandCrestV13Css";
+  st.textContent = [
+    "@keyframes sqCrestRingGlow {",
+    "  0%, 100% { box-shadow: 0 0 18px rgba(0, 180, 216, .58), 0 0 32px rgba(16, 185, 129, .32), inset 0 1px 2px rgba(255, 255, 255, .65); }",
+    "  50% { box-shadow: 0 0 24px rgba(56, 189, 248, .85), 0 0 42px rgba(16, 185, 129, .52), inset 0 1px 3px rgba(255, 255, 255, .85); }",
+    "}",
+    "@keyframes sqCrestDotBlink {",
+    "  0%, 100% { opacity: 1; transform: scale(1); }",
+    "  50% { opacity: 0.35; transform: scale(0.78); }",
+    "}",
+    "@keyframes sqBadgeShimmer {",
+    "  0% { background-position: -180% 0; }",
+    "  100% { background-position: 180% 0; }",
+    "}",
+    ".sq-brand-hero {",
+    "  display: inline-flex !important;",
+    "  align-items: center !important;",
+    "  gap: 13px !important;",
+    "  padding: 5px 12px 5px 6px !important;",
+    "  border-radius: 16px !important;",
+    "  background: linear-gradient(135deg, rgba(14, 165, 233, .13) 0%, rgba(15, 23, 42, .85) 55%, rgba(16, 185, 129, .12) 100%) !important;",
+    "  border: 1px solid rgba(56, 189, 248, .38) !important;",
+    "  box-shadow: 0 6px 22px rgba(2, 6, 23, .55), inset 0 1px 0 rgba(255, 255, 255, .12) !important;",
+    "  cursor: pointer !important;",
+    "  text-decoration: none !important;",
+    "  user-select: none !important;",
+    "  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease !important;",
+    "}",
+    ".sq-brand-hero:hover {",
+    "  transform: translateY(-1px) !important;",
+    "  border-color: rgba(103, 232, 249, .8) !important;",
+    "  box-shadow: 0 8px 28px rgba(6, 182, 212, .32), inset 0 1px 0 rgba(255, 255, 255, .22) !important;",
+    "}",
+    ".sq-brand-emblem {",
+    "  position: relative !important;",
+    "  width: 50px !important;",
+    "  height: 50px !important;",
+    "  min-width: 50px !important;",
+    "  border-radius: 14px !important;",
+    "  background: linear-gradient(135deg, #00B4D8 0%, #0ea5e9 45%, #10b981 100%) !important;",
+    "  border: 2px solid rgba(224, 242, 254, .92) !important;",
+    "  display: flex !important;",
+    "  flex-direction: column !important;",
+    "  align-items: center !important;",
+    "  justify-content: center !important;",
+    "  animation: sqCrestRingGlow 3s ease-in-out infinite !important;",
+    "  overflow: hidden !important;",
+    "}",
+    ".sq-brand-emblem-bolt {",
+    "  font-size: 10px !important;",
+    "  line-height: 1 !important;",
+    "  margin-bottom: 1px !important;",
+    "  filter: drop-shadow(0 1px 2px rgba(2, 6, 23, .65)) !important;",
+    "}",
+    ".sq-brand-emblem-iq {",
+    "  font-size: 20px !important;",
+    "  font-weight: 900 !important;",
+    "  letter-spacing: -0.8px !important;",
+    "  line-height: 1 !important;",
+    "  color: #ffffff !important;",
+    "  text-shadow: 0 2px 6px rgba(2, 6, 23, .75), 0 0 10px rgba(255, 255, 255, .45) !important;",
+    "}",
+    ".sq-brand-text-col {",
+    "  display: flex !important;",
+    "  flex-direction: column !important;",
+    "  justify-content: center !important;",
+    "  gap: 4px !important;",
+    "}",
+    ".sq-brand-top-row {",
+    "  display: flex !important;",
+    "  align-items: center !important;",
+    "  gap: 9px !important;",
+    "  flex-wrap: nowrap !important;",
+    "}",
+    ".sq-brand-wordmark {",
+    "  font-size: 24px !important;",
+    "  font-weight: 900 !important;",
+    "  letter-spacing: -0.6px !important;",
+    "  line-height: 1.05 !important;",
+    "  color: #ffffff !important;",
+    "  text-shadow: 0 2px 12px rgba(56, 189, 248, .42) !important;",
+    "}",
+    ".sq-brand-wordmark-iq {",
+    "  background: linear-gradient(135deg, #67e8f9 0%, #38bdf8 45%, #34d399 100%) !important;",
+    "  -webkit-background-clip: text !important;",
+    "  background-clip: text !important;",
+    "  color: transparent !important;",
+    "  filter: drop-shadow(0 0 10px rgba(56, 189, 248, .55)) !important;",
+    "}",
+    ".sq-brand-lounge-pill {",
+    "  display: inline-flex !important;",
+    "  align-items: center !important;",
+    "  gap: 5px !important;",
+    "  padding: 4px 10px !important;",
+    "  border-radius: 999px !important;",
+    "  background: linear-gradient(90deg, rgba(6, 182, 212, .28) 0%, rgba(16, 185, 129, .38) 50%, rgba(6, 182, 212, .28) 100%) !important;",
+    "  background-size: 200% 100% !important;",
+    "  animation: sqBadgeShimmer 4.5s linear infinite !important;",
+    "  border: 1.5px solid #34d399 !important;",
+    "  color: #ecfdf5 !important;",
+    "  font-size: 11px !important;",
+    "  font-weight: 900 !important;",
+    "  letter-spacing: 0.4px !important;",
+    "  line-height: 1 !important;",
+    "  white-space: nowrap !important;",
+    "  box-shadow: 0 0 14px rgba(16, 185, 129, .38) !important;",
+    "  text-shadow: 0 1px 2px rgba(2, 6, 23, .8) !important;",
+    "}",
+    ".sq-brand-lounge-dot {",
+    "  width: 6px !important;",
+    "  height: 6px !important;",
+    "  border-radius: 50% !important;",
+    "  background: #4ade80 !important;",
+    "  box-shadow: 0 0 8px #4ade80 !important;",
+    "  animation: sqCrestDotBlink 1.2s infinite !important;",
+    "}",
+    ".sq-brand-tagline {",
+    "  display: inline-flex !important;",
+    "  align-items: center !important;",
+    "  gap: 5px !important;",
+    "  font-size: 13px !important;",
+    "  font-weight: 800 !important;",
+    "  letter-spacing: -0.2px !important;",
+    "  line-height: 1.2 !important;",
+    "  color: #e0f2fe !important;",
+    "  text-shadow: 0 1px 8px rgba(14, 165, 233, .45) !important;",
+    "}",
+    ".sq-brand-tagline-accent {",
+    "  color: #fde047 !important;",
+    "  font-weight: 900 !important;",
+    "  text-shadow: 0 0 10px rgba(250, 204, 21, .45) !important;",
+    "}",
+    "@media (max-width: 640px) {",
+    "  .sq-brand-hero { gap: 9px !important; padding: 4px 9px 4px 5px !important; }",
+    "  .sq-brand-emblem { width: 42px !important; height: 42px !important; min-width: 42px !important; border-radius: 12px !important; }",
+    "  .sq-brand-emblem-iq { font-size: 17px !important; }",
+    "  .sq-brand-wordmark { font-size: 19.5px !important; }",
+    "  .sq-brand-lounge-pill { font-size: 10px !important; padding: 3px 8px !important; }",
+    "  .sq-brand-tagline { font-size: 11.5px !important; }",
+    "}"
+  ].join("\n");
+  document.head.appendChild(st);
+
+  function findHeaderBrandContainer() {
+    var existing = document.getElementById("sqHeroBrandBlock");
+    if (existing) return existing;
+
+    var header = document.querySelector("header") || document.body;
+    if (!header) return null;
+
+    // Look for the exact compact flex container holding [IQ] icon + SportIQ + OPEN LOUNGE + subtitle
+    var candidates = header.querySelectorAll("a, div");
+    var best = null;
+    for (var i = 0; i < candidates.length; i++) {
+      var el = candidates[i];
+      if (!el || el.id === "sqDualFloatingDock") continue;
+      // Must not contain header right-side action buttons
+      if (el.querySelector("#pointsBadge, #sqOpenMemberHubBtn, #sqOpenMyPageBtn, #sqNotifBellBtn")) continue;
+      var txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (txt.length < 10 || txt.length > 95) continue;
+      if (txt.indexOf("SportIQ") !== -1 && (txt.indexOf("OPEN LOUNGE") !== -1 || txt.indexOf("인사이트") !== -1)) {
+        // Prefer the outermost wrapper that still ONLY wraps the logo + title block (typically has 2 direct children: icon box + text col)
+        if (!best || (el.children && el.children.length === 2 && txt.indexOf("IQ") === 0)) {
+          best = el;
+          if (el.children && el.children.length === 2 && txt.indexOf("IQ") === 0) break;
+        }
+      }
+    }
+    return best;
+  }
+
+  function upgradeHeaderBrandBlock() {
+    if (document.getElementById("sqHeroBrandBlock")) return;
+    var target = findHeaderBrandContainer();
+    if (!target) return;
+
+    target.id = "sqHeroBrandBlock";
+    target.classList.add("sq-brand-hero");
+    target.setAttribute("title", "SportIQ — 실시간 분석 스포츠IQ 인사이트 홈");
+    target.innerHTML = [
+      "<div class='sq-brand-emblem' aria-hidden='true'>",
+      "  <span class='sq-brand-emblem-bolt'>⚡</span>",
+      "  <span class='sq-brand-emblem-iq'>IQ</span>",
+      "</div>",
+      "<div class='sq-brand-text-col'>",
+      "  <div class='sq-brand-top-row'>",
+      "    <span class='sq-brand-wordmark'>Sport<span class='sq-brand-wordmark-iq'>IQ</span></span>",
+      "    <span class='sq-brand-lounge-pill'><span class='sq-brand-lounge-dot'></span>OPEN LOUNGE</span>",
+      "  </div>",
+      "  <div class='sq-brand-tagline'>",
+      "    <span>⚡ 실시간 분석</span>",
+      "    <span class='sq-brand-tagline-accent'>스포츠IQ</span>",
+      "    <span>인사이트</span>",
+      "  </div>",
+      "</div>"
+    ].join("");
+
+    if (target.tagName !== "A" && !target.__sqHomeClickBound) {
+      target.__sqHomeClickBound = true;
+      target.addEventListener("click", function () {
+        if (typeof window.switchTab === "function") {
+          try { window.switchTab("feed"); } catch (e) {}
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
+  }
+
+  setTimeout(upgradeHeaderBrandBlock, 80);
+  setInterval(upgradeHeaderBrandBlock, 900);
+})();
+"""
+
+UPGRADE_JS = UPGRADE_JS + "\n" + BRAND_CREST_V13_JS
