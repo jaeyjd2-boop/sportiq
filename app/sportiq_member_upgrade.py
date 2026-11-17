@@ -600,7 +600,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "4.3",
+        "version": "4.4",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -621,6 +621,7 @@ def member_upgrade_status():
         "mobile_nav_auto_scroll_v16": True,
         "hybrid_seed_sanitation_v17": True,
         "scrollbar_smooth_glide_v18": True,
+        "strip_toolbar_aligned_v19": True,
     }
 
 
@@ -3482,9 +3483,9 @@ def inject_upgrade_into_html(raw_html: str) -> str:
             count=1,
             flags=re.IGNORECASE,
         )
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=18" defer></script>'
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=19" defer></script>'
     if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=18', out)
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=19', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
@@ -4580,25 +4581,26 @@ P3_AND_CHRONO_JS = r"""
     };
   }
 
-  // Inject sleek dark horizontal scrollbar CSS so there is never an ugly bright white OS scrollbar
+  // Inject sleek unified toolbar & dark horizontal scrollbar CSS (v19.0)
   (function injectSmoothStripCss() {
-    if (document.getElementById("sqSmoothStripV18Css")) return;
+    if (document.getElementById("sqSmoothStripV19Css")) return;
     var ss = document.createElement("style");
-    ss.id = "sqSmoothStripV18Css";
+    ss.id = "sqSmoothStripV19Css";
     ss.textContent = [
       ".sq-smooth-hstrip {",
       "  scrollbar-width: thin !important;",
-      "  scrollbar-color: #38bdf8 #0f172a !important;",
+      "  scrollbar-color: #38bdf8 #0b1220 !important;",
       "  -webkit-overflow-scrolling: touch !important;",
+      "  scroll-behavior: smooth;",
       "  padding-bottom: 8px !important;",
       "}",
       ".sq-smooth-hstrip::-webkit-scrollbar {",
-      "  height: 9px !important;",
+      "  height: 8px !important;",
       "}",
       ".sq-smooth-hstrip::-webkit-scrollbar-track {",
       "  background: #0b1220 !important;",
       "  border-radius: 999px !important;",
-      "  border: 1px solid #1e293b !important;",
+      "  border: 1px solid rgba(51, 65, 85, .55) !important;",
       "}",
       ".sq-smooth-hstrip::-webkit-scrollbar-thumb {",
       "  background: linear-gradient(90deg, #0284c7, #10b981) !important;",
@@ -4609,18 +4611,81 @@ P3_AND_CHRONO_JS = r"""
       "  cursor: grabbing !important;",
       "  background: #38bdf8 !important;",
       "}",
+      ".sq-match-sort-bar {",
+      "  box-sizing: border-box !important;",
+      "  width: 100% !important;",
+      "  max-width: 1280px !important;",
+      "  margin: 8px auto 8px auto !important;",
+      "  padding: 7px 12px !important;",
+      "  background: rgba(15, 23, 42, .72) !important;",
+      "  border: 1px solid rgba(51, 65, 85, .65) !important;",
+      "  border-radius: 12px !important;",
+      "  display: flex !important;",
+      "  justify-content: space-between !important;",
+      "  align-items: center !important;",
+      "  flex-wrap: wrap !important;",
+      "  gap: 8px !important;",
+      "  backdrop-filter: blur(6px) !important;",
+      "}",
+      ".sq-strip-sort-group {",
+      "  display: inline-flex !important;",
+      "  align-items: center !important;",
+      "  gap: 6px !important;",
+      "  flex-wrap: wrap !important;",
+      "}",
+      ".sq-strip-sort-label {",
+      "  font-size: 11.5px !important;",
+      "  font-weight: 800 !important;",
+      "  color: #94a3b8 !important;",
+      "  margin-right: 2px !important;",
+      "}",
+      ".sq-strip-nav-group {",
+      "  display: inline-flex !important;",
+      "  align-items: center !important;",
+      "  gap: 5px !important;",
+      "  margin-left: auto !important;",
+      "}",
+      ".sq-strip-nav-hint {",
+      "  font-size: 11px !important;",
+      "  color: #64748b !important;",
+      "  margin-right: 4px !important;",
+      "  font-weight: 600 !important;",
+      "}",
       ".sq-strip-nav-btn {",
       "  background: #0f172a !important;",
-      "  border: 1px solid #38bdf8 !important;",
+      "  border: 1px solid rgba(56, 189, 248, .55) !important;",
       "  color: #e0f2fe !important;",
-      "  border-radius: 8px !important;",
-      "  padding: 2px 9px !important;",
+      "  border-radius: 999px !important;",
+      "  padding: 4px 11px !important;",
       "  font-size: 11.5px !important;",
-      "  font-weight: 900 !important;",
+      "  font-weight: 800 !important;",
+      "  line-height: 1.1 !important;",
       "  cursor: pointer !important;",
-      "  transition: filter .14s ease, transform .12s ease !important;",
+      "  display: inline-flex !important;",
+      "  align-items: center !important;",
+      "  gap: 4px !important;",
+      "  transition: all .15s ease !important;",
       "}",
-      ".sq-strip-nav-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }"
+      ".sq-strip-nav-btn:hover:not(:disabled) {",
+      "  background: rgba(14, 165, 233, .2) !important;",
+      "  border-color: #38bdf8 !important;",
+      "  transform: translateY(-1px) !important;",
+      "}",
+      ".sq-strip-nav-btn:active:not(:disabled) {",
+      "  transform: scale(0.96) !important;",
+      "}",
+      ".sq-strip-nav-btn:disabled {",
+      "  opacity: 0.36 !important;",
+      "  border-color: #334155 !important;",
+      "  color: #64748b !important;",
+      "  cursor: default !important;",
+      "}",
+      "@media (max-width: 640px) {",
+      "  .sq-match-sort-bar { padding: 6px 10px !important; margin: 6px 0 !important; border-radius: 10px !important; }",
+      "  .sq-strip-nav-hint { display: none !important; }",
+      "  .sq-strip-sort-label { display: none !important; }",
+      "  .sq-strip-nav-btn { padding: 4px 9px !important; font-size: 11px !important; }",
+      "}"
     ].join("\n");
     document.head.appendChild(ss);
   })();
@@ -4631,34 +4696,92 @@ P3_AND_CHRONO_JS = r"""
   window.addEventListener("touchstart", function () { globalPointerDown = true; }, { passive: true, capture: true });
   window.addEventListener("touchend", function () { globalPointerDown = false; }, { passive: true, capture: true });
 
-  function bindSmoothHorizontalControls(stripEl) {
-    if (!stripEl || stripEl.__sqStripControlsBound) return;
-    stripEl.__sqStripControlsBound = true;
-    stripEl.classList.add("sq-smooth-hstrip");
-    stripEl.__sqBusyUntil = 0;
+  // Finds the ACTUAL horizontally scrollable viewport element (whether it's `container`, a parent wrapper with `overflow-x: auto`, or a direct child track!)
+  function resolveActualScrollViewport(container) {
+    if (!container) return null;
+    function isScrollableX(el) {
+      if (!el || el === document.body || el === document.documentElement) return false;
+      if ((el.scrollWidth || 0) > (el.clientWidth || 0) + 12) {
+        var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+        if (!cs || cs.overflowX === "auto" || cs.overflowX === "scroll" || cs.overflow === "auto" || cs.overflow === "scroll") {
+          return true;
+        }
+      }
+      return false;
+    }
+    if (isScrollableX(container)) return container;
+    var cur = container.parentElement;
+    for (var d = 0; d < 4 && cur && cur !== document.body; d++) {
+      if (isScrollableX(cur)) return cur;
+      cur = cur.parentElement;
+    }
+    // Fallback: check if any ancestor up to 3 levels has overflow-x: auto/scroll even before cards overflow
+    cur = container;
+    for (var k = 0; k < 4 && cur && cur !== document.body; k++) {
+      var cstyle = window.getComputedStyle ? window.getComputedStyle(cur) : null;
+      if (cstyle && (cstyle.overflowX === "auto" || cstyle.overflowX === "scroll")) return cur;
+      cur = cur.parentElement;
+    }
+    return container;
+  }
 
-    function markStripBusy(ms) {
-      stripEl.__sqBusyUntil = Math.max(stripEl.__sqBusyUntil || 0, Date.now() + (ms || 2500));
+  function updateNavButtonEdgeStates(barEl, scroller) {
+    if (!barEl || !scroller) return;
+    var prevBtn = barEl.querySelector("[data-sq-slide='-1']");
+    var nextBtn = barEl.querySelector("[data-sq-slide='1']");
+    var maxScroll = Math.max(0, (scroller.scrollWidth || 0) - (scroller.clientWidth || 0));
+    var curLeft = scroller.scrollLeft || 0;
+    if (prevBtn) prevBtn.disabled = (maxScroll <= 6) || (curLeft <= 4);
+    if (nextBtn) nextBtn.disabled = (maxScroll <= 6) || (curLeft >= maxScroll - 4);
+  }
+
+  function bindSmoothHorizontalControls(container) {
+    if (!container) return;
+    var scroller = resolveActualScrollViewport(container);
+    if (!scroller) return;
+    scroller.classList.add("sq-smooth-hstrip");
+
+    if (scroller.__sqStripControlsBound) return;
+    scroller.__sqStripControlsBound = true;
+    scroller.__sqBusyUntil = 0;
+
+    function markBusy(ms) {
+      var until = Date.now() + (ms || 2500);
+      scroller.__sqBusyUntil = Math.max(scroller.__sqBusyUntil || 0, until);
+      container.__sqBusyUntil = Math.max(container.__sqBusyUntil || 0, until);
     }
 
-    stripEl.addEventListener("scroll", function () { markStripBusy(2600); }, { passive: true });
-    stripEl.addEventListener("mouseenter", function () { stripEl.__sqMouseInside = true; }, { passive: true });
-    stripEl.addEventListener("mouseleave", function () { stripEl.__sqMouseInside = false; }, { passive: true });
-    stripEl.addEventListener("pointerdown", function () { markStripBusy(4000); }, { passive: true });
-    stripEl.addEventListener("touchstart", function () { markStripBusy(4000); }, { passive: true });
+    scroller.addEventListener("scroll", function () {
+      markBusy(2600);
+      if (container.__sqToolbarEl) {
+        updateNavButtonEdgeStates(container.__sqToolbarEl, scroller);
+      }
+    }, { passive: true });
+    scroller.addEventListener("mouseenter", function () {
+      scroller.__sqMouseInside = true;
+      container.__sqMouseInside = true;
+    }, { passive: true });
+    scroller.addEventListener("mouseleave", function () {
+      scroller.__sqMouseInside = false;
+      container.__sqMouseInside = false;
+    }, { passive: true });
+    scroller.addEventListener("pointerdown", function () { markBusy(4000); }, { passive: true });
+    scroller.addEventListener("touchstart", function () { markBusy(4000); }, { passive: true });
 
-    // Allow desktop mouse wheel over the horizontal card strip to glide smoothly left/right!
-    stripEl.addEventListener("wheel", function (ev) {
-      if (stripEl.scrollWidth <= stripEl.clientWidth + 12) return;
+    // Desktop mouse wheel over the horizontal card strip glides smoothly left/right!
+    scroller.addEventListener("wheel", function (ev) {
+      var targetScroller = resolveActualScrollViewport(container) || scroller;
+      if ((targetScroller.scrollWidth || 0) <= (targetScroller.clientWidth || 0) + 12) return;
       var dy = ev.deltaY || 0;
       var dx = ev.deltaX || 0;
       if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 0) {
-        var atStart = stripEl.scrollLeft <= 1 && dy < 0;
-        var atEnd = (stripEl.scrollLeft + stripEl.clientWidth >= stripEl.scrollWidth - 2) && dy > 0;
+        var atStart = targetScroller.scrollLeft <= 1 && dy < 0;
+        var atEnd = (targetScroller.scrollLeft + targetScroller.clientWidth >= targetScroller.scrollWidth - 2) && dy > 0;
         if (!atStart && !atEnd) {
           ev.preventDefault();
-          markStripBusy(2600);
-          stripEl.scrollLeft += dy;
+          markBusy(2600);
+          targetScroller.scrollLeft += dy;
+          if (container.__sqToolbarEl) updateNavButtonEdgeStates(container.__sqToolbarEl, targetScroller);
         }
       }
     }, { passive: false });
@@ -4669,6 +4792,10 @@ P3_AND_CHRONO_JS = r"""
     if (globalPointerDown) return true;
     if (stripEl.__sqMouseInside) return true;
     if (stripEl.__sqBusyUntil && Date.now() < stripEl.__sqBusyUntil) return true;
+    var scroller = resolveActualScrollViewport(stripEl);
+    if (scroller && (scroller.__sqMouseInside || (scroller.__sqBusyUntil && Date.now() < scroller.__sqBusyUntil))) {
+      return true;
+    }
     return false;
   }
   window.__sqIsStripUserInteracting = isStripUserInteracting;
@@ -4690,10 +4817,14 @@ P3_AND_CHRONO_JS = r"""
       bindSmoothHorizontalControls(container);
       mountSortToggleAboveStrip(container);
 
-      // CRITICAL: Never reorder DOM nodes while user is hovering, dragging scrollbar, or scrolling!
+      var scroller = resolveActualScrollViewport(container);
+      if (container.__sqToolbarEl && scroller) {
+        updateNavButtonEdgeStates(container.__sqToolbarEl, scroller);
+      }
+
+      // Never reorder DOM nodes while user is hovering, dragging scrollbar, or scrolling!
       if (!forceResort && isStripUserInteracting(container)) return;
 
-      // Compute content fingerprint so we only sort ONCE per data update (zero repeated DOM churn!)
       var firstTxt = (kids[0].textContent || "").slice(0, 48);
       var lastTxt = (kids[kids.length - 1].textContent || "").slice(0, 48);
       var sig = matchSortMode + "|" + kids.length + "|" + firstTxt + "|" + lastTxt;
@@ -4722,44 +4853,68 @@ P3_AND_CHRONO_JS = r"""
         }
       }
       if (changed) {
-        var prevScrollLeft = container.scrollLeft || 0;
+        var prevScrollLeft = scroller ? (scroller.scrollLeft || 0) : (container.scrollLeft || 0);
         sorted.forEach(function (item) { container.appendChild(item.el); });
-        container.scrollLeft = forceResort ? 0 : prevScrollLeft;
+        if (scroller) scroller.scrollLeft = forceResort ? 0 : prevScrollLeft;
       }
       var newKids = container.children;
       container.__sqSortedSig = matchSortMode + "|" + newKids.length + "|" +
         ((newKids[0] && newKids[0].textContent) || "").slice(0, 48) + "|" +
         ((newKids[newKids.length - 1] && newKids[newKids.length - 1].textContent) || "").slice(0, 48);
+      if (container.__sqToolbarEl && scroller) {
+        updateNavButtonEdgeStates(container.__sqToolbarEl, scroller);
+      }
     });
   }
 
   function mountSortToggleAboveStrip(stripEl) {
     if (!stripEl || !stripEl.parentNode) return;
-    if (stripEl.parentNode.querySelector(".sq-match-sort-bar")) return;
+    if (stripEl.__sqToolbarEl && document.body.contains(stripEl.__sqToolbarEl)) return;
+
+    var scroller = resolveActualScrollViewport(stripEl) || stripEl;
+    // Anchor the toolbar directly above `scroller` so it sits INSIDE the exact same card/section container width (never flushed to 0px screen edge!)
+    var anchorNode = scroller;
+    if (!anchorNode.parentNode) anchorNode = stripEl;
+    if (anchorNode.parentNode.querySelector(":scope > .sq-match-sort-bar")) {
+      stripEl.__sqToolbarEl = anchorNode.parentNode.querySelector(":scope > .sq-match-sort-bar");
+      return;
+    }
+
     var bar = document.createElement("div");
     bar.className = "sq-match-sort-bar";
-    bar.style.cssText = "display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin:0 0 7px 0;font-size:11px;color:#94a3b8;";
     bar.innerHTML = [
-      "<div style='display:inline-flex;align-items:center;gap:5px;'>",
+      "<div class='sq-strip-sort-group'>",
+      "  <span class='sq-strip-sort-label'>⚡ 경기 정렬</span>",
+      "  <button type='button' data-sq-msort='NEAREST' class='dc-pill' style='padding:4px 10px;font-size:11.5px;font-weight:800;'>🕒 가까운·최근 시간순</button>",
+      "  <button type='button' data-sq-msort='DESC' class='dc-pill' style='padding:4px 10px;font-size:11.5px;font-weight:800;'>📅 최신 날짜순</button>",
+      "</div>",
+      "<div class='sq-strip-nav-group'>",
+      "  <span class='sq-strip-nav-hint'>휠·드래그 이동</span>",
       "  <button type='button' data-sq-slide='-1' class='sq-strip-nav-btn' title='왼쪽 경기로 이동'>◀ 이전</button>",
       "  <button type='button' data-sq-slide='1' class='sq-strip-nav-btn' title='오른쪽 경기로 이동'>다음 ▶</button>",
-      "  <span style='font-size:10.5px;color:#64748b;margin-left:2px;'>마우스 휠·슬라이드 지원</span>",
-      "</div>",
-      "<div style='display:inline-flex;align-items:center;gap:6px;'>",
-      "  <span>시간·날짜 정렬:</span>",
-      "  <button type='button' data-sq-msort='NEAREST' class='dc-pill' style='padding:2px 9px;font-size:11px;font-weight:800;'>🕒 가까운·최근 시간순</button>",
-      "  <button type='button' data-sq-msort='DESC' class='dc-pill' style='padding:2px 9px;font-size:11px;font-weight:800;'>📅 최신 날짜순</button>",
       "</div>"
     ].join("");
-    stripEl.parentNode.insertBefore(bar, stripEl);
+    anchorNode.parentNode.insertBefore(bar, anchorNode);
+    stripEl.__sqToolbarEl = bar;
 
+    // Match horizontal side margins if anchorNode has auto-centered container padding
     bar.querySelectorAll("[data-sq-slide]").forEach(function (sb) {
-      sb.onclick = function () {
+      sb.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var activeScroller = resolveActualScrollViewport(stripEl) || scroller;
         var dir = Number(sb.getAttribute("data-sq-slide") || 1);
-        var step = Math.max(280, Math.round((stripEl.clientWidth || 640) * 0.72));
+        var step = Math.max(300, Math.round((activeScroller.clientWidth || 640) * 0.78));
+        activeScroller.__sqBusyUntil = Date.now() + 3000;
         stripEl.__sqBusyUntil = Date.now() + 3000;
-        stripEl.scrollBy({ left: dir * step, behavior: "smooth" });
-      };
+        var targetLeft = Math.max(0, (activeScroller.scrollLeft || 0) + dir * step);
+        try {
+          activeScroller.scrollTo({ left: targetLeft, behavior: "smooth" });
+        } catch (err) {
+          activeScroller.scrollLeft = targetLeft;
+        }
+        setTimeout(function () { updateNavButtonEdgeStates(bar, activeScroller); }, 320);
+      });
     });
 
     function syncBtnStyle() {
@@ -4767,6 +4922,7 @@ P3_AND_CHRONO_JS = r"""
         var on = b.getAttribute("data-sq-msort") === matchSortMode;
         b.style.borderColor = on ? "#38bdf8" : "";
         b.style.color = on ? "#e0f2fe" : "";
+        b.style.background = on ? "rgba(14, 165, 233, .18)" : "";
       });
     }
     syncBtnStyle();
@@ -4778,10 +4934,15 @@ P3_AND_CHRONO_JS = r"""
           var on = x.getAttribute("data-sq-msort") === matchSortMode;
           x.style.borderColor = on ? "#38bdf8" : "";
           x.style.color = on ? "#e0f2fe" : "";
+          x.style.background = on ? "rgba(14, 165, 233, .18)" : "";
         });
         sortRenderedMatchCardStrips(true);
       };
     });
+
+    setTimeout(function () {
+      updateNavButtonEdgeStates(bar, resolveActualScrollViewport(stripEl) || scroller);
+    }, 80);
   }
 
   // --- P3-A & P3-B: Guaranteed Header Buttons + Floating Quick Dock Fallback ---
