@@ -600,7 +600,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "4.1",
+        "version": "4.2",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -619,6 +619,7 @@ def member_upgrade_status():
         "mobile_bottom_clearance_v14": True,
         "mobile_slim_dock_v15": True,
         "mobile_nav_auto_scroll_v16": True,
+        "hybrid_seed_sanitation_v17": True,
     }
 
 
@@ -3480,9 +3481,9 @@ def inject_upgrade_into_html(raw_html: str) -> str:
             count=1,
             flags=re.IGNORECASE,
         )
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=16" defer></script>'
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=17" defer></script>'
     if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=16', out)
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=17', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
@@ -3579,12 +3580,176 @@ def _parse_match_kst_epoch(item: Dict[str, Any]) -> Optional[float]:
     return None
 
 
+# Known domestic/esports fallback seed signatures & seasonal / physical rules
+_KNOWN_SEED_PAIR_KEYWORDS: Tuple[Tuple[str, str], ...] = (
+    ("한화생명", "dk"),
+    ("한화생명", "디플러스"),
+    ("t1", "젠지"),
+    ("한국전력", "ok저축은행"),
+    ("대한항공", "현대캐피탈"),
+    ("ibk기업은행", "흥국생명"),
+    ("정관장", "현대건설"),
+    ("lg 트윈스", "삼성 라이온즈"),
+    ("lg", "삼성"),
+    ("기아", "두산"),
+    ("kia", "두산"),
+    ("울산", "포항"),
+    ("전북", "서울"),
+)
+
+
+def _is_seed_or_contradictory_match(m: Dict[str, Any], now_ts: Optional[float] = None) -> bool:
+    """
+    Detects fallback/seed or fake-date/fake-live match records with 5 independent checks:
+      1. Explicit seed/mock/sample/demo flags or IDs
+      2. Off-season league check (e.g., KBO in Dec/Jan/Feb or mid-Nov after Korean Series, LCK in Nov/Dec)
+      3. Kickoff-in-the-future contradiction: status claims 'in-progress/LIVE' while kickoff_ts is >20 min in the future
+         OR elapsed >7 hours ago and still stuck on '진행중'
+      4. Score-state contradiction: Volleyball score >=3 while claiming '3세트/4세트 진행중', or Bo3 score >=2 while '2세트'
+      5. Known hardcoded fallback seed pairs when lacking numeric external provider fixture ID
+    """
+    if not isinstance(m, dict):
+        return False
+    if m.get("is_seed") or m.get("is_fallback") or m.get("is_mock") or m.get("seed_archive"):
+        return True
+
+    raw_id = str(m.get("id") or m.get("match_id") or m.get("fixture_id") or "").strip().lower()
+    src_tag = str(m.get("source") or m.get("provider") or m.get("data_source") or "").strip().lower()
+    if any(k in raw_id for k in ("seed", "mock", "sample", "fallback", "demo", "static", "kr_")):
+        return True
+    if any(k in src_tag for k in ("seed", "mock", "sample", "fallback", "demo", "static")):
+        return True
+
+    now_epoch = float(now_ts if now_ts is not None else time.time())
+    now_kst = datetime.fromtimestamp(now_epoch, tz=KST)
+    cur_month, cur_day = now_kst.month, now_kst.day
+
+    lg = str(m.get("league") or m.get("league_code") or "").strip().upper()
+    sp = str(m.get("sport") or "").strip().lower()
+    home = str(m.get("home") or m.get("home_team") or "").strip().lower()
+    away = str(m.get("away") or m.get("away_team") or "").strip().lower()
+    matchup = f"{home} {away} {str(m.get('matchup') or '').lower()}"
+
+    state_raw = " ".join(str(m.get(k) or "") for k in ("state", "status", "status_badge")).lower()
+    is_sched = "scheduled" in state_raw or "예정" in state_raw or state_raw.strip() == "pre"
+    is_live = (not is_sched) and (
+        state_raw.strip() in ("in", "live")
+        or any(w in state_raw for w in ("live", "진행", "전반", "후반", "ht", "q1", "q2", "q3", "q4", "세트", "회초", "회말"))
+    )
+
+    # Check 2: Off-season domestic/esports leagues claiming today/live
+    if ("KBO" in lg or ("트윈스" in matchup and "라이온즈" in matchup)) and (
+        cur_month in (12, 1, 2) or (cur_month == 11 and cur_day >= 10)
+    ):
+        return True
+    if "LCK" in lg and cur_month in (10, 11, 12):
+        return True
+
+    # Check 3: Time travel / stuck-live contradiction (e.g. 08:28 AM KST but 19:00 KST today is marked '진행중')
+    ts = _parse_match_kst_epoch(m)
+    if is_live and ts is not None:
+        if ts - now_epoch > 20 * 60:
+            return True
+        if now_epoch - ts > 7 * 3600:
+            return True
+
+    # Check 4: Score vs set/period contradiction
+    try:
+        hs = int(m.get("home_score") if m.get("home_score") is not None else 0)
+        as_ = int(m.get("away_score") if m.get("away_score") is not None else 0)
+    except Exception:
+        hs, as_ = 0, 0
+
+    if ("VLEAGUE" in lg or sp == "volleyball") and max(hs, as_) >= 3 and "진행" in state_raw:
+        return True
+    if "bo3" in state_raw and max(hs, as_) >= 2 and "진행" in state_raw:
+        return True
+
+    # Check 5: Known hardcoded domestic fallback pairs without numeric live API ID
+    has_numeric_api_id = bool(re.fullmatch(r"\d{5,}", raw_id))
+    if not has_numeric_api_id:
+        for kw_a, kw_b in _KNOWN_SEED_PAIR_KEYWORDS:
+            if kw_a in matchup and kw_b in matchup and is_live:
+                return True
+
+    return False
+
+
+def _convert_seed_to_honest_archive(m: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Plan 2 transformation: strips fake today-date, fake LIVE badge, and fake dropping-odds alert
+    so when viewed inside a specific league/sport tab it is honestly labeled as a past archive record.
+    """
+    out = dict(m)
+    out["is_seed_archive"] = True
+    out["state"] = "post"
+    out["status"] = "FT"
+    out["status_badge"] = "시즌 기록 · 종료"
+    out["match_dt_kst"] = "최근 시즌 기록 (참고용)"
+    if "kickoff_kst" in out:
+        out["kickoff_kst"] = "최근 시즌 기록"
+    if "schedule_venue" in out and re.search(r"\d{1,2}\.\d{1,2}", str(out.get("schedule_venue") or "")):
+        out["schedule_venue"] = "지난 시즌 기록"
+    # Remove fake dropping-odds badges on seed archives so users are never misled
+    out["drop_pct"] = 0.0
+    out["drop_badge"] = ""
+    out["is_dropping"] = False
+    return out
+
+
+def sanitize_and_sort_matches_hybrid(
+    items: List[Any],
+    *,
+    view_sport: str = "all",
+    view_league: str = "all",
+    date_offset: int = 0,
+    is_dropping_odds: bool = False,
+) -> List[Any]:
+    """
+    Combines Plan 1 + Plan 2:
+      - Plan 1 (Default '오늘·실시간' / 전체 종목 / 드롭오즈 / 어제·내일 날짜 이동):
+        Completely hides fake-date/fake-live seed matches so 100% real fixtures appear!
+      - Plan 2 (Specific sport or league tab selected, e.g. KBO / VLEAGUE / LCK):
+        Keeps real fixtures first; if a sport/league only has seed records (off-season),
+        converts them via _convert_seed_to_honest_archive() ('최근 시즌 기록 · 종료') at the bottom!
+    """
+    if not isinstance(items, list) or not items:
+        return items
+
+    now_ts = time.time()
+    sp_norm = (view_sport or "all").strip().lower()
+    lg_norm = (view_league or "all").strip().lower()
+    is_all_today_view = sp_norm in ("", "all", "전체", "today", "live") and lg_norm in ("", "all", "전체")
+
+    cleaned: List[Any] = []
+    archived_seeds: List[Any] = []
+
+    for raw_item in items:
+        if not isinstance(raw_item, dict):
+            cleaned.append(raw_item)
+            continue
+        if _is_seed_or_contradictory_match(raw_item, now_ts=now_ts):
+            if is_dropping_odds or is_all_today_view or int(date_offset or 0) != 0:
+                # Plan 1: Completely exclude from '오늘·실시간' (all), date-shifted views, and dropping-odds!
+                continue
+            # Plan 2: In a specific sport/league tab, convert to honest finished season archive
+            archived_seeds.append(_convert_seed_to_honest_archive(raw_item))
+        else:
+            cleaned.append(raw_item)
+
+    sorted_real = sort_matches_nearest_recent(cleaned)
+    if archived_seeds:
+        return sorted_real + archived_seeds
+    return sorted_real
+
+
 def sort_matches_nearest_recent(items: List[Any]) -> List[Any]:
     """
     Orders match cards by nearest/recent date & time:
-      Bucket 0: LIVE / in-progress games first (most recent kickoff first)
-      Bucket 1: Upcoming / Scheduled games in ascending chronological order (today 11.17 -> ... -> 11.21 04:30 -> 11.21 04:45)
+      Bucket 0: Real LIVE / in-progress games first (most recent kickoff first)
+      Bucket 1: Upcoming / Scheduled games in ascending chronological order (nearest to now first)
       Bucket 2: Finished / FT games in descending chronological order (most recently finished first)
+      Bucket 8: Honest season archive records ('is_seed_archive') always last
     """
     if not isinstance(items, list) or len(items) < 2:
         return items
@@ -3594,6 +3759,8 @@ def sort_matches_nearest_recent(items: List[Any]) -> List[Any]:
         idx, m = entry
         if not isinstance(m, dict):
             return (9, float(idx), 1, idx)
+        if m.get("is_seed_archive"):
+            return (8, float(idx), 1, idx)
         ts = _parse_match_kst_epoch(m)
         state_raw = " ".join(
             str(m.get(k) or "") for k in ("state", "status", "status_badge")
@@ -3620,18 +3787,78 @@ def sort_matches_nearest_recent(items: List[Any]) -> List[Any]:
     return [x[1] for x in sorted(enumerate(items), key=_sort_key)]
 
 
-def _sort_datacenter_payload_any(payload: Any) -> Any:
+def _extract_filter_params_from_call(r_path: str, args: tuple, kwargs: dict) -> Tuple[str, str, int, bool]:
+    sport_val = str(kwargs.get("sport") or kwargs.get("category") or "all")
+    league_val = str(kwargs.get("league") or "all")
+    offset_val = 0
+    try:
+        offset_val = int(kwargs.get("date_offset") or kwargs.get("offset") or 0)
+    except Exception:
+        offset_val = 0
+
+    # Also check Starlette Request object if passed in args or kwargs
+    for candidate in list(args) + list(kwargs.values()):
+        qp = getattr(candidate, "query_params", None)
+        if qp is not None and hasattr(qp, "get"):
+            if sport_val == "all" and qp.get("sport"):
+                sport_val = str(qp.get("sport"))
+            if league_val == "all" and qp.get("league"):
+                league_val = str(qp.get("league"))
+            if offset_val == 0 and qp.get("date_offset"):
+                try:
+                    offset_val = int(qp.get("date_offset"))
+                except Exception:
+                    pass
+
+    is_drop = "dropping-odds" in (r_path or "")
+    return sport_val, league_val, offset_val, is_drop
+
+
+def _sort_datacenter_payload_any(
+    payload: Any,
+    *,
+    view_sport: str = "all",
+    view_league: str = "all",
+    date_offset: int = 0,
+    is_dropping_odds: bool = False,
+) -> Any:
     if isinstance(payload, dict):
         out = dict(payload)
+        # Check if payload itself carries sport/league metadata
+        sp = view_sport if view_sport != "all" else str(out.get("sport") or "all")
+        lg = view_league if view_league != "all" else str(out.get("league") or "all")
         for key in ("items", "matches", "alerts", "rows", "games", "fixtures"):
-            if isinstance(out.get(key), list) and len(out[key]) > 1:
-                out[key] = sort_matches_nearest_recent(out[key])
+            if isinstance(out.get(key), list):
+                is_drop_key = is_dropping_odds or (key == "alerts")
+                out[key] = sanitize_and_sort_matches_hybrid(
+                    out[key],
+                    view_sport=sp,
+                    view_league=lg,
+                    date_offset=date_offset,
+                    is_dropping_odds=is_drop_key,
+                )
+                if key in ("items", "matches", "alerts") and "count" in out:
+                    out["count"] = len(out[key])
+                if key in ("items", "matches") and "live_count" in out:
+                    out["live_count"] = sum(
+                        1
+                        for x in out[key]
+                        if isinstance(x, dict)
+                        and not x.get("is_seed_archive")
+                        and str(x.get("state") or "").lower() in ("in", "live")
+                    )
         return out
     if isinstance(payload, Response) and getattr(payload, "body", None):
         try:
             parsed = json.loads(payload.body.decode("utf-8"))
             if isinstance(parsed, dict):
-                sorted_dict = _sort_datacenter_payload_any(parsed)
+                sorted_dict = _sort_datacenter_payload_any(
+                    parsed,
+                    view_sport=view_sport,
+                    view_league=view_league,
+                    date_offset=date_offset,
+                    is_dropping_odds=is_dropping_odds,
+                )
                 return Response(
                     content=json.dumps(sorted_dict, ensure_ascii=False),
                     status_code=payload.status_code,
@@ -3646,16 +3873,26 @@ def _install_datacenter_chronological_patch() -> bool:
     patched_any = False
     try:
         from app import sportiq_datacenter as _dc
-        if not getattr(_dc, "__sq_chrono_sorted_v7__", False):
+        if not getattr(_dc, "__sq_chrono_sorted_v17__", False):
             orig_collect = getattr(_dc, "_collect_all_matches", None)
             if callable(orig_collect):
                 @functools.wraps(orig_collect)
                 def _sorted_collect(*args, **kwargs):
                     res = orig_collect(*args, **kwargs)
-                    return sort_matches_nearest_recent(res) if isinstance(res, list) else res
+                    if not isinstance(res, list):
+                        return res
+                    # Convert any fake-date/fake-live seed items into honest archive items right at collection source!
+                    now_ts = time.time()
+                    normalized = [
+                        _convert_seed_to_honest_archive(m)
+                        if (isinstance(m, dict) and _is_seed_or_contradictory_match(m, now_ts=now_ts))
+                        else m
+                        for m in res
+                    ]
+                    return sort_matches_nearest_recent(normalized)
 
                 _dc._collect_all_matches = _sorted_collect
-                _dc.__sq_chrono_sorted_v7__ = True
+                _dc.__sq_chrono_sorted_v17__ = True
                 patched_any = True
                 try:
                     from app import sportiq_lounge_router as _lr
@@ -3682,23 +3919,37 @@ def _install_datacenter_chronological_patch() -> bool:
                         continue
                     dep = getattr(r, "dependant", None)
                     call_fn = getattr(dep, "call", None) if dep is not None else None
-                    if callable(call_fn) and not getattr(call_fn, "__sq_route_sorted_v7__", False):
+                    if callable(call_fn) and not getattr(call_fn, "__sq_route_sorted_v17__", False):
                         if inspect.iscoroutinefunction(call_fn):
                             @functools.wraps(call_fn)
-                            async def _async_sorted_ep(*args, __orig=call_fn, **kwargs):
+                            async def _async_sorted_ep(*args, __orig=call_fn, __rpath=r_path, **kwargs):
+                                sp, lg, off, is_drop = _extract_filter_params_from_call(__rpath, args, kwargs)
                                 res = await __orig(*args, **kwargs)
-                                return _sort_datacenter_payload_any(res)
+                                return _sort_datacenter_payload_any(
+                                    res,
+                                    view_sport=sp,
+                                    view_league=lg,
+                                    date_offset=off,
+                                    is_dropping_odds=is_drop,
+                                )
 
-                            _async_sorted_ep.__sq_route_sorted_v7__ = True
+                            _async_sorted_ep.__sq_route_sorted_v17__ = True
                             dep.call = _async_sorted_ep
                             r.endpoint = _async_sorted_ep
                         else:
                             @functools.wraps(call_fn)
-                            def _sync_sorted_ep(*args, __orig=call_fn, **kwargs):
+                            def _sync_sorted_ep(*args, __orig=call_fn, __rpath=r_path, **kwargs):
+                                sp, lg, off, is_drop = _extract_filter_params_from_call(__rpath, args, kwargs)
                                 res = __orig(*args, **kwargs)
-                                return _sort_datacenter_payload_any(res)
+                                return _sort_datacenter_payload_any(
+                                    res,
+                                    view_sport=sp,
+                                    view_league=lg,
+                                    date_offset=off,
+                                    is_dropping_odds=is_drop,
+                                )
 
-                            _sync_sorted_ep.__sq_route_sorted_v7__ = True
+                            _sync_sorted_ep.__sq_route_sorted_v17__ = True
                             dep.call = _sync_sorted_ep
                             r.endpoint = _sync_sorted_ep
                         patched_any = True
@@ -7048,3 +7299,212 @@ MOBILE_NAV_ENHANCER_V16_JS = r"""
 """
 
 UPGRADE_JS = UPGRADE_JS + "\n" + MOBILE_NAV_ENHANCER_V16_JS
+# ============================================================================
+# STAGE P10 (v4.2 / ?v=17): Frontend Hybrid Seed Filter (Plan 1 + Plan 2)
+#   - Plan 1: Hides fake-date/seed archive cards when '오늘·실시간' + '전체 종목' (or Dropping Odds) is active
+#   - Plan 2: Shows them as clean '[시즌 기록 · 종료]' gray reference cards (without fake LIVE or fake today date)
+#             ONLY when the user clicks a specific sport/league tab (e.g., 야구/KBO, 배구/V-리그, E스포츠/LCK)!
+# ============================================================================
+HYBRID_SEED_GUARD_V17_JS = r"""
+/* SportIQ v17.0: Hybrid Seed Match Sanitizer & Context-Aware Filter (Plan 1 + Plan 2) */
+(function () {
+  if (window.__SPORTIQ_V17_HYBRID_SEED__) return;
+  window.__SPORTIQ_V17_HYBRID_SEED__ = true;
+
+  var KNOWN_SEED_PAIRS = [
+    ["한화생명", "dk"],
+    ["한화생명", "디플러스"],
+    ["한국전력", "ok저축은행"],
+    ["대한항공", "현대캐피탈"],
+    ["ibk기업은행", "흥국생명"],
+    ["정관장", "현대건설"],
+    ["lg 트윈스", "삼성 라이온즈"],
+    ["울산", "포항"]
+  ];
+
+  var st = document.createElement("style");
+  st.id = "sqSeedArchiveV17Css";
+  st.textContent = [
+    ".sq-seed-archive-card {",
+    "  opacity: 0.78 !important;",
+    "  border-color: rgba(71, 85, 105, .45) !important;",
+    "}",
+    ".sq-seed-archive-pill {",
+    "  background: rgba(51, 65, 85, .65) !important;",
+    "  color: #cbd5e1 !important;",
+    "  border: 1px solid rgba(148, 163, 184, .35) !important;",
+    "  border-radius: 6px !important;",
+    "  padding: 2px 7px !important;",
+    "  font-size: 10.5px !important;",
+    "  font-weight: 800 !important;",
+    "}"
+  ].join("\n");
+  document.head.appendChild(st);
+
+  function parseCardKickoffTodayOrFutureMs(txt) {
+    var s = String(txt || "");
+    var now = new Date();
+    var md = s.match(/(\d{1,2})\.(\d{1,2})\s*(?:\([^)]*\))?\s*(\d{1,2}):(\d{2})/);
+    if (!md) return null;
+    var t = new Date(now.getFullYear(), Number(md[1]) - 1, Number(md[2]), Number(md[3]), Number(md[4])).getTime();
+    return t;
+  }
+
+  function isDomCardFakeLiveOrSeed(cardEl) {
+    if (!cardEl) return false;
+    if (cardEl.getAttribute("data-sq-seed-archive") === "1") return true;
+    var txt = (cardEl.textContent || "").replace(/\s+/g, " ").trim();
+    if (!txt) return false;
+    if (txt.indexOf("최근 시즌 기록") !== -1 || txt.indexOf("시즌 기록 · 종료") !== -1) {
+      cardEl.setAttribute("data-sq-seed-archive", "1");
+      return true;
+    }
+
+    var low = txt.toLowerCase();
+    var hasLiveClaim = /진행중|진행 중|bo3\s*\d세트|\d세트\s*진행|\d회[초말]\s*진행|\bLIVE\b/i.test(txt);
+    if (!hasLiveClaim) return false;
+
+    var now = new Date();
+    var mo = now.getMonth() + 1;
+    var da = now.getDate();
+
+    // 1. Off-season KBO / LCK claiming live today
+    if ((/\bKBO\b/.test(txt) || (low.indexOf("트윈스") !== -1 && low.indexOf("라이온즈") !== -1)) && (mo === 12 || mo <= 2 || (mo === 11 && da >= 10))) {
+      return true;
+    }
+    if (/\bLCK\b/.test(txt) && mo >= 10) {
+      return true;
+    }
+
+    // 2. Kickoff time is still >20 minutes in the future OR >7 hours in the past while claiming '진행중'
+    var koMs = parseCardKickoffTodayOrFutureMs(txt);
+    if (koMs != null) {
+      if (koMs - now.getTime() > 20 * 60 * 1000) return true;
+      if (now.getTime() - koMs > 7 * 3600 * 1000) return true;
+    }
+
+    // 3. Known hardcoded domestic seed pairs
+    for (var i = 0; i < KNOWN_SEED_PAIRS.length; i++) {
+      if (low.indexOf(KNOWN_SEED_PAIRS[i][0]) !== -1 && low.indexOf(KNOWN_SEED_PAIRS[i][1]) !== -1) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Detect whether the user currently has '전체 종목 (ALL)' selected or a specific sport/league tab (축구/야구/배구/E스포츠...)
+  function isSpecificSportFilterSelected(stripEl) {
+    // Check global JS state variables if sportiq_community.html exposes them
+    try {
+      var candVars = ["dcActiveSport", "currentSport", "activeSportFilter", "selectedSport"];
+      for (var i = 0; i < candVars.length; i++) {
+        var v = window[candVars[i]];
+        if (typeof v === "string" && v && v.toLowerCase() !== "all" && v !== "전체") {
+          return true;
+        }
+      }
+    } catch (e) {}
+
+    // Inspect active sport filter pill buttons near the live-score section
+    var scope = (stripEl && stripEl.closest("section")) || document;
+    var buttons = scope.querySelectorAll("button, [role='tab']");
+    for (var j = 0; j < buttons.length; j++) {
+      var b = buttons[j];
+      var t = (b.textContent || "").replace(/\s+/g, " ").trim();
+      if (!t || t.length > 18) continue;
+      // Sport filter tabs typically say 전체 / 축구 / 농구 / 야구 / 배구 / 하키 / E스포츠 / UFC
+      if (/^(?:⚽|🏀|⚾|🏐|🏒|🎮|🥊)?\s*(?:야구|배구|E스포츠|하키|미식축구|UFC|테니스|KBO|V-?리그|LCK)/i.test(t)) {
+        var cls = (b.className || "") + " " + (b.getAttribute("aria-selected") || "");
+        var bg = window.getComputedStyle ? window.getComputedStyle(b).backgroundColor : "";
+        var borderCol = window.getComputedStyle ? window.getComputedStyle(b).borderColor : "";
+        var isActive = /\bactive\b|bg-sky|bg-emerald|bg-cyan|bg-blue|border-sky|border-emerald|text-sky-300|true/i.test(cls) ||
+          (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "rgb(15, 23, 42)" && bg !== "rgb(2, 6, 23)" && bg !== "rgb(30, 41, 59)");
+        if (isActive) return true;
+      }
+    }
+    return false;
+  }
+
+  function sanitizeSeedDomCardAppearance(cardEl) {
+    if (!cardEl || cardEl.getAttribute("data-sq-seed-cleaned") === "1") return;
+    cardEl.setAttribute("data-sq-seed-archive", "1");
+    cardEl.setAttribute("data-sq-seed-cleaned", "1");
+    cardEl.classList.add("sq-seed-archive-card");
+
+    // 1. Replace fake today date ('📅 11.18 (수) 19:00') with '📌 최근 시즌 기록'
+    var walker = document.createTreeWalker(cardEl, NodeFilter.SHOW_TEXT, null, false);
+    var n;
+    while ((n = walker.nextNode())) {
+      var v = n.nodeValue || "";
+      if (/\d{1,2}\.\d{1,2}\s*\([^)]+\)\s*\d{1,2}:\d{2}/.test(v)) {
+        n.nodeValue = v.replace(/(?:📅\s*)?\d{1,2}\.\d{1,2}\s*\([^)]+\)\s*\d{1,2}:\d{2}/g, "📌 최근 시즌 기록");
+      }
+    }
+
+    // 2. Replace red '3세트 진행중' / '7회말 진행중' / 'Bo3 2세트' badge with neutral '시즌 기록 · 종료'
+    cardEl.querySelectorAll("span, div").forEach(function (badge) {
+      if (badge.children && badge.children.length > 1) return;
+      var bt = (badge.textContent || "").replace(/\s+/g, " ").trim();
+      if (/^(?:Bo\d\s*\d세트|\d세트\s*진행\s*중?|\d회[초말]\s*진행\s*중?|LIVE|진행\s*중)$/i.test(bt)) {
+        badge.textContent = "시즌 기록 · 종료";
+        badge.className = "sq-seed-archive-pill";
+      }
+      // Hide misleading '-21.1%' dropping-odds circle on static seed archive cards
+      if (/^📉?\s*-\d+(?:\.\d+)?%$/.test(bt) || (bt.indexOf("-") !== -1 && bt.indexOf("%") !== -1 && bt.length <= 10)) {
+        badge.style.display = "none";
+      }
+    });
+  }
+
+  function enforceHybridSeedPolicyOnDom() {
+    document.querySelectorAll("div, section, ul").forEach(function (container) {
+      if (!container.children || container.children.length < 2 || container.children.length > 500) return;
+      if (container.id === "feedList" || container.id === "dcLauncherGrid" || container.id === "globalTop10Grid") return;
+
+      var kids = Array.prototype.slice.call(container.children);
+      var matchCards = kids.filter(function (ch) {
+        var t = ch.textContent || "";
+        return /Scheduled|예정|종료|진행|LIVE|배당|최근 시즌 기록/i.test(t) && (t.indexOf("AI ") !== -1 || t.indexOf("배당") !== -1 || /:\d/.test(t));
+      });
+      if (matchCards.length < 2) return;
+
+      var specificSportTab = isSpecificSportFilterSelected(container);
+      var realCount = 0;
+      var seedCards = [];
+
+      kids.forEach(function (card) {
+        if (isDomCardFakeLiveOrSeed(card)) {
+          sanitizeSeedDomCardAppearance(card);
+          seedCards.push(card);
+        } else {
+          realCount++;
+        }
+      });
+
+      if (!seedCards.length) return;
+
+      seedCards.forEach(function (sc) {
+        if (!specificSportTab && realCount > 0) {
+          // Plan 1: In '오늘·실시간' (All Sports), completely hide seed cards so only 100% real matches show!
+          sc.style.display = "none";
+        } else {
+          // Plan 2: In a specific sport tab (e.g., KBO / V-League / LCK), show cleanly at the end as '[시즌 기록 · 종료]'!
+          sc.style.display = "";
+          container.appendChild(sc);
+        }
+      });
+    });
+  }
+
+  // Re-run immediately whenever any filter pill / tab button is clicked
+  document.addEventListener("click", function () {
+    setTimeout(enforceHybridSeedPolicyOnDom, 40);
+    setTimeout(enforceHybridSeedPolicyOnDom, 220);
+  }, true);
+
+  setTimeout(enforceHybridSeedPolicyOnDom, 150);
+  setInterval(enforceHybridSeedPolicyOnDom, 850);
+})();
+"""
+
+UPGRADE_JS = UPGRADE_JS + "\n" + HYBRID_SEED_GUARD_V17_JS
