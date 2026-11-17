@@ -16,10 +16,12 @@ from app.sqlite_guard import (
     managed_sqlite_conn,
     run_with_db_retry,
 )
+from app.sportiq_member_upgrade import inject_upgrade_into_html, upgrade_router
 
 install_sqlite_guard()
 
 router = APIRouter()
+router.include_router(upgrade_router)
 
 KST = timezone(timedelta(hours=9))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -223,11 +225,9 @@ def install_datacenter_swr_accelerator(dc_mod: Any) -> bool:
             ts, cached_list = entry
             if (now_m - ts) <= _fresh_ttl(offset):
                 return cached_list
-            # Stale-while-revalidate: return instant cached data & refresh asynchronously
             _refresh_in_bg(offset)
             return cached_list
 
-        # Cold cache only before background pre-warmer completes
         data = orig_collect(offset)
         if isinstance(data, list):
             with _DC_SWR_LOCK:
@@ -258,28 +258,15 @@ def _datacenter_prewarm_daemon() -> None:
     tick = 0
     while True:
         try:
-            # Pre-warm live matches (offset=0, used by dropping-odds & live ticker) every 35s
-            orig = dc_mod._collect_all_matches
             with _DC_SWR_LOCK:
                 e0 = _DC_SWR_CACHE.get(0)
-            if e0 is None or (time.monotonic() - e0[0]) >= 32.0:
-                # Trigger non-blocking refresh if already warm, or warm directly on boot
-                if e0 is None:
-                    orig(0)
-                else:
-                    orig(0)  # triggers async refresh if >45s, or force warm below
-            # Force proactive refresh before 45s TTL expires so cache never goes stale
-            if tick == 0 or tick % 1 == 0:
-                try:
-                    # Run underlying collector via background refresh helper by aging timestamp slightly past TTL
-                    if tick > 0 and e0 is not None and (time.monotonic() - e0[0]) >= 32.0:
-                        with _DC_SWR_LOCK:
-                            _DC_SWR_CACHE[0] = (time.monotonic() - 46.0, e0[1])
-                        dc_mod._collect_all_matches(0)
-                except Exception:
-                    pass
+            if e0 is None:
+                dc_mod._collect_all_matches(0)
+            elif (time.monotonic() - e0[0]) >= 32.0:
+                with _DC_SWR_LOCK:
+                    _DC_SWR_CACHE[0] = (time.monotonic() - 46.0, e0[1])
+                dc_mod._collect_all_matches(0)
 
-            # Pre-warm yesterday's finished matches (offset=-1, used by scorecard) on boot & every ~10m
             if tick % 15 == 0:
                 with _DC_SWR_LOCK:
                     em1 = _DC_SWR_CACHE.get(-1)
@@ -331,7 +318,12 @@ class ReportIn(BaseModel):
 @router.get("/", response_class=HTMLResponse)
 def serve_lounge_home():
     if os.path.exists(HTML_PATH):
-        return FileResponse(HTML_PATH, media_type="text/html; charset=utf-8")
+        try:
+            with open(HTML_PATH, "r", encoding="utf-8") as f:
+                raw_html = f.read()
+            return HTMLResponse(inject_upgrade_into_html(raw_html), media_type="text/html; charset=utf-8")
+        except Exception:
+            return FileResponse(HTML_PATH, media_type="text/html; charset=utf-8")
     return HTMLResponse("<h1>SportIQ Lounge</h1><p>HTML file missing.</p>", status_code=200)
 
 
@@ -348,6 +340,7 @@ def lounge_health():
         "storage": "sqlite-wal",
         "busy_timeout_ms": DEFAULT_BUSY_TIMEOUT_MS,
         "datacenter_swr_active": _DC_SWR_INSTALLED,
+        "member_upgrade_v1": True,
     }
 
 
