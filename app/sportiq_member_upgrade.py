@@ -600,7 +600,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "4.0",
+        "version": "4.1",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -618,6 +618,7 @@ def member_upgrade_status():
         "hero_brand_crest_v13": True,
         "mobile_bottom_clearance_v14": True,
         "mobile_slim_dock_v15": True,
+        "mobile_nav_auto_scroll_v16": True,
     }
 
 
@@ -3479,9 +3480,9 @@ def inject_upgrade_into_html(raw_html: str) -> str:
             count=1,
             flags=re.IGNORECASE,
         )
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=15" defer></script>'
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=16" defer></script>'
     if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=15', out)
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=16', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
@@ -6861,3 +6862,189 @@ IQ_DUAL_DOCK_AND_MOBILE_V15_JS = r"""
 """
 
 UPGRADE_JS = UPGRADE_JS + "\n" + IQ_DUAL_DOCK_AND_MOBILE_V15_JS
+# ============================================================================
+# STAGE P9 (v4.1 / ?v=16): Mobile 6-Tab Bottom Nav Bar Enhancer & Auto-Scroller
+#   - Guarantees top touch priority (z-index: 9999) for 피드·일정·숏츠·이슈/톡·랭킹·실험실
+#   - Wraps window.switchTab() + binds direct mobile tap handlers so tapping any tab
+#     smoothly scrolls directly to the newly opened tab section (instead of staying
+#     stranded at the top Big-Match banner where nothing appears to change!)
+# ============================================================================
+MOBILE_NAV_ENHANCER_V16_JS = r"""
+/* SportIQ v16.0: Mobile 6-Tab Navigation Auto-Scroll, Z-Index Shield & Active Tab Feedback */
+(function () {
+  if (window.__SPORTIQ_V16_MOBILE_NAV__) return;
+  window.__SPORTIQ_V16_MOBILE_NAV__ = true;
+
+  var st = document.createElement("style");
+  st.id = "sqMobileNavV16Css";
+  st.textContent = [
+    ".sq-mobile-bottom-nav-bar {",
+    "  z-index: 9999 !important;",
+    "  pointer-events: auto !important;",
+    "  touch-action: manipulation !important;",
+    "}",
+    ".sq-mobile-bottom-nav-bar button,",
+    ".sq-mobile-bottom-nav-bar a {",
+    "  pointer-events: auto !important;",
+    "  touch-action: manipulation !important;",
+    "  cursor: pointer !important;",
+    "  -webkit-tap-highlight-color: rgba(56, 189, 248, .22) !important;",
+    "  transition: color .15s ease, transform .12s ease !important;",
+    "}",
+    ".sq-mobile-bottom-nav-bar button:active,",
+    ".sq-mobile-bottom-nav-bar a:active {",
+    "  transform: scale(0.94) !important;",
+    "}"
+  ].join("\n");
+  document.head.appendChild(st);
+
+  var TAB_META = {
+    feed:     { label: "📰 분석 피드",   selectors: ["#tab-feed", "#feedSection", "#sqP3FeedToolbar", "#feedList"] },
+    schedule: { label: "📅 경기 일정",   selectors: ["#tab-schedule", "#scheduleSection", "#scheduleTab", "[data-tab-panel='schedule']"] },
+    shorts:   { label: "🎬 AI 숏츠",     selectors: ["#tab-shorts", "#shortsSection", "#shortsGrid", "[data-tab-panel='shorts']"] },
+    issue:    { label: "💬 이슈 · 응원톡", selectors: ["#tab-issue", "#tab-talk", "#issueSection", "#cheerInput", "[data-tab-panel='issue']"] },
+    talk:     { label: "💬 이슈 · 응원톡", selectors: ["#tab-talk", "#tab-issue", "#issueSection", "#cheerInput"] },
+    ranking:  { label: "🏆 명예 랭킹",   selectors: ["#tab-ranking", "#tab-rankings", "#rankingSection", "#leaderboardList", "[data-tab-panel='ranking']"] },
+    rankings: { label: "🏆 명예 랭킹",   selectors: ["#tab-rankings", "#tab-ranking", "#rankingSection", "#leaderboardList"] },
+    lab:      { label: "🧪 전술 실험실", selectors: ["#tab-lab", "#labSection", "#tacticsCanvas", "[data-tab-panel='lab']"] }
+  };
+
+  function detectMobileBottomNav() {
+    var existing = document.querySelector(".sq-mobile-bottom-nav-bar");
+    if (existing) return existing;
+    var nodes = document.querySelectorAll("nav, footer, div");
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      if (!el || el.id === "sqDualFloatingDock" || el.id === "sqPwaInstallBanner") continue;
+      if (el.children && el.children.length >= 5 && el.children.length <= 8) {
+        var txt = (el.textContent || "").replace(/\s+/g, " ");
+        if (txt.indexOf("피드") !== -1 && txt.indexOf("일정") !== -1 && txt.indexOf("숏츠") !== -1 && txt.indexOf("실험실") !== -1) {
+          el.classList.add("sq-mobile-bottom-nav-bar");
+          return el;
+        }
+      }
+    }
+    return null;
+  }
+
+  function findVisibleTabSection(tabKey) {
+    var key = String(tabKey || "").toLowerCase().trim();
+    var meta = TAB_META[key];
+    var candidates = [];
+    if (meta && meta.selectors) {
+      candidates = candidates.concat(meta.selectors);
+    }
+    candidates.push("#tab-" + key, "#" + key + "Tab", "#" + key + "Section", "[id*='tab'][id*='" + key + "']");
+
+    for (var i = 0; i < candidates.length; i++) {
+      var el = null;
+      try { el = document.querySelector(candidates[i]); } catch (e) {}
+      if (el && !el.classList.contains("hidden")) {
+        var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+        if (!cs || cs.display !== "none") return el;
+      }
+    }
+
+    // Fallback: locate any visible tab-content container near #feedList's parent area
+    var feedBox = document.getElementById("feedList");
+    if (feedBox) {
+      var host = feedBox.closest("main") || feedBox.parentElement;
+      if (host) {
+        var secs = host.querySelectorAll("[id^='tab-'], section");
+        for (var j = 0; j < secs.length; j++) {
+          var s = secs[j];
+          if (!s.classList.contains("hidden")) {
+            var scs = window.getComputedStyle ? window.getComputedStyle(s) : null;
+            if (scs && scs.display !== "none" && s.offsetHeight > 40 && s.id !== "globalTop10Section") {
+              return s;
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function scrollSmoothlyToTabPanel(tabKey) {
+    var target = findVisibleTabSection(tabKey);
+    if (!target || !target.getBoundingClientRect) return;
+    var hdr = document.querySelector("header");
+    var hdrH = (hdr && hdr.offsetHeight) ? hdr.offsetHeight : 64;
+    var rect = target.getBoundingClientRect();
+    // Scroll if the target section is below the fold OR way above the viewport on mobile/desktop
+    if (rect.top > window.innerHeight * 0.58 || rect.top < -80) {
+      var destY = Math.max(0, (window.pageYOffset || document.documentElement.scrollTop || 0) + rect.top - hdrH - 12);
+      window.scrollTo({ top: destY, behavior: "smooth" });
+    }
+  }
+
+  function closeOpenOverlaysOnNavTap() {
+    ["sqAiIqModal", "sqIqTvModal", "sqMemberHubModal", "sqMyPageModal", "sqNotifModal", "sqAdminRaffleModal", "sqPwaIosModal"].forEach(function (id) {
+      var m = document.getElementById(id);
+      if (m && m.style.display === "flex") m.style.display = "none";
+    });
+  }
+
+  function inferTabKeyFromButton(btn) {
+    if (!btn) return "";
+    var oc = btn.getAttribute("onclick") || "";
+    var m = oc.match(/switchTab\(\s*['"]([^'"]+)['"]\s*\)/);
+    if (m && m[1]) return m[1];
+    var dt = btn.getAttribute("data-tab") || btn.getAttribute("data-target") || "";
+    if (dt) return dt;
+    var t = (btn.textContent || "").replace(/\s+/g, "");
+    if (t.indexOf("피드") !== -1) return "feed";
+    if (t.indexOf("일정") !== -1) return "schedule";
+    if (t.indexOf("숏츠") !== -1 || t.indexOf("쇼츠") !== -1) return "shorts";
+    if (t.indexOf("이슈") !== -1 || t.indexOf("톡") !== -1) return "issue";
+    if (t.indexOf("랭킹") !== -1) return "ranking";
+    if (t.indexOf("실험실") !== -1) return "lab";
+    return "";
+  }
+
+  var userJustTappedBottomNav = false;
+
+  function installSwitchTabHookAndBarBinding() {
+    if (typeof window.switchTab === "function" && !window.switchTab.__sqV16Wrapped) {
+      var origSwitchTab = window.switchTab;
+      var wrapped = function (tabName) {
+        var res = origSwitchTab.apply(this, arguments);
+        if (userJustTappedBottomNav || (window.innerWidth || 1024) <= 768) {
+          setTimeout(function () {
+            scrollSmoothlyToTabPanel(tabName);
+          }, 60);
+        }
+        return res;
+      };
+      wrapped.__sqV16Wrapped = true;
+      window.switchTab = wrapped;
+    }
+
+    var navBar = detectMobileBottomNav();
+    if (navBar && !navBar.__sqNavTapBound) {
+      navBar.__sqNavTapBound = true;
+      Array.prototype.slice.call(navBar.querySelectorAll("button, a")).forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          userJustTappedBottomNav = true;
+          closeOpenOverlaysOnNavTap();
+          var tk = inferTabKeyFromButton(btn);
+          // If the button didn't already have an inline switchTab() call, invoke switchTab safely
+          var hasInline = /switchTab/.test(btn.getAttribute("onclick") || "");
+          if (!hasInline && tk && typeof window.switchTab === "function") {
+            try { window.switchTab(tk); } catch (e) {}
+          }
+          setTimeout(function () {
+            if (tk) scrollSmoothlyToTabPanel(tk);
+            userJustTappedBottomNav = false;
+          }, 80);
+        });
+      });
+    }
+  }
+
+  setTimeout(installSwitchTabHookAndBarBinding, 120);
+  setInterval(installSwitchTabHookAndBarBinding, 900);
+})();
+"""
+
+UPGRADE_JS = UPGRADE_JS + "\n" + MOBILE_NAV_ENHANCER_V16_JS
