@@ -600,7 +600,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "3.6",
+        "version": "3.7",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -614,6 +614,7 @@ def member_upgrade_status():
         "header_tagline": "실시간 분석 스포츠IQ 인사이트",
         "odds_alert_off_toggle": True,
         "iq_live_tv_tab": "https://jjangdoltv.com/",
+        "floating_tabs_aligned_v12": True,
     }
 
 
@@ -3467,9 +3468,9 @@ def inject_upgrade_into_html(raw_html: str) -> str:
         if h_idx != -1:
             out = out[:h_idx] + pwa_head + "\n" + out[h_idx:]
 
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=11" defer></script>'
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=12" defer></script>'
     if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=11', out)
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=12', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
@@ -6071,43 +6072,138 @@ ODDS_ALERT_TOGGLE_JS = r"""
 """
 
 UPGRADE_JS = UPGRADE_JS + "\n" + ODDS_ALERT_TOGGLE_JS
+
 # ============================================================================
-# STAGE P6 (v3.6 / ?v=11): "📺 IQ중계티비" Floating Tab (Above AI 아이큐) -> 짱돌티비 바로가기
+# STAGE P6 (v3.7 / ?v=12): Unified Equal-Size High-Visibility Floating Tabs
+#   - Top Pill    : 🔴 LIVE 📺 IQ중계티비 (-> 짱돌티비 바로가기 https://jjangdoltv.com/)
+#   - Bottom Pill : ✨ AI   🤖 AI 아이큐   (-> 실시간 온라인 AI 검색 모달)
+#   - Identical 194px x 50px dimensions, locked vertical alignment, neon border & glow
 # ============================================================================
 IQ_LIVE_TV_JS = r"""
-/* SportIQ v11.0: 'IQ중계티비' Floating Tab Above 'AI 아이큐' + 짱돌티비 바로가기 Modal */
+/* SportIQ v12.0: Equal-Size High-Visibility Dual Floating Tabs (IQ중계티비 + AI 아이큐) */
 (function () {
-  if (window.__SPORTIQ_V11_IQ_TV__) return;
-  window.__SPORTIQ_V11_IQ_TV__ = true;
+  if (window.__SPORTIQ_V12_DUAL_DOCK__) return;
+  window.__SPORTIQ_V12_DUAL_DOCK__ = true;
 
   var JJANGDOL_URL = "https://jjangdoltv.com/";
 
   var st = document.createElement("style");
-  st.id = "sqIqLiveTvCss";
+  st.id = "sqDualFloatingDockCss";
   st.textContent = [
-    ".sq-iq-tv-fab {",
-    "  position: fixed;",
-    "  right: 20px;",
-    "  bottom: 76px;",
-    "  z-index: 9996;",
-    "  background: linear-gradient(135deg, #06b6d4, #10b981);",
-    "  color: #020617;",
-    "  border: 0;",
-    "  border-radius: 999px;",
-    "  padding: 11px 20px;",
-    "  font-size: 14px;",
-    "  font-weight: 900;",
-    "  cursor: pointer;",
-    "  display: inline-flex;",
-    "  align-items: center;",
-    "  justify-content: center;",
-    "  gap: 7px;",
-    "  box-shadow: 0 10px 28px rgba(6, 182, 212, .42);",
-    "  transition: transform .16s ease, filter .16s ease;",
-    "  letter-spacing: -0.2px;",
-    "  white-space: nowrap;",
+    "@keyframes sqFabGlowPulse {",
+    "  0%, 100% { box-shadow: 0 10px 26px rgba(6, 182, 212, .46), 0 0 0 2px rgba(255, 255, 255, .22), inset 0 1px 1px rgba(255, 255, 255, .45); }",
+    "  50% { box-shadow: 0 12px 34px rgba(16, 185, 129, .68), 0 0 18px rgba(34, 211, 238, .55), 0 0 0 2px rgba(165, 243, 252, .65), inset 0 1px 2px rgba(255, 255, 255, .65); }",
     "}",
-    ".sq-iq-tv-fab:hover { transform: translateY(-2px) scale(1.02); filter: brightness(1.06); }",
+    "@keyframes sqLiveDotBlink {",
+    "  0%, 100% { opacity: 1; transform: scale(1); }",
+    "  50% { opacity: 0.35; transform: scale(0.82); }",
+    "}",
+    "#sqDualFloatingDock {",
+    "  position: fixed !important;",
+    "  right: 18px !important;",
+    "  bottom: 18px !important;",
+    "  z-index: 9998 !important;",
+    "  display: flex !important;",
+    "  flex-direction: column !important;",
+    "  align-items: stretch !important;",
+    "  gap: 10px !important;",
+    "  width: 196px !important;",
+    "  pointer-events: none !important;",
+    "}",
+    ".sq-dock-pill {",
+    "  pointer-events: auto !important;",
+    "  box-sizing: border-box !important;",
+    "  width: 196px !important;",
+    "  min-width: 196px !important;",
+    "  max-width: 196px !important;",
+    "  height: 50px !important;",
+    "  min-height: 50px !important;",
+    "  max-height: 50px !important;",
+    "  margin: 0 !important;",
+    "  padding: 0 14px !important;",
+    "  border-radius: 999px !important;",
+    "  border: 1.5px solid rgba(224, 242, 254, .75) !important;",
+    "  cursor: pointer !important;",
+    "  display: inline-flex !important;",
+    "  align-items: center !important;",
+    "  justify-content: space-between !important;",
+    "  gap: 8px !important;",
+    "  font-family: inherit !important;",
+    "  font-size: 15px !important;",
+    "  font-weight: 900 !important;",
+    "  letter-spacing: -0.3px !important;",
+    "  line-height: 1 !important;",
+    "  white-space: nowrap !important;",
+    "  text-decoration: none !important;",
+    "  transition: transform .16s cubic-bezier(.2,.8,.2,1), filter .16s ease !important;",
+    "  animation: sqFabGlowPulse 2.8s ease-in-out infinite !important;",
+    "}",
+    ".sq-dock-pill:hover {",
+    "  transform: translateY(-2px) scale(1.03) !important;",
+    "  filter: brightness(1.08) !important;",
+    "}",
+    ".sq-dock-pill:active {",
+    "  transform: translateY(0) scale(0.99) !important;",
+    "}",
+    ".sq-dock-pill--tv {",
+    "  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 48%, #10b981 100%) !important;",
+    "  color: #020617 !important;",
+    "}",
+    ".sq-dock-pill--ai {",
+    "  background: linear-gradient(135deg, #06b6d4 0%, #14b8a6 52%, #22c55e 100%) !important;",
+    "  color: #020617 !important;",
+    "  animation-delay: 1.4s !important;",
+    "}",
+    ".sq-dock-pill-main {",
+    "  display: inline-flex !important;",
+    "  align-items: center !important;",
+    "  gap: 7px !important;",
+    "  font-size: 15px !important;",
+    "  font-weight: 900 !important;",
+    "  color: #020617 !important;",
+    "  text-shadow: 0 1px 0 rgba(255, 255, 255, .35) !important;",
+    "}",
+    ".sq-dock-pill-icon {",
+    "  font-size: 17px !important;",
+    "  line-height: 1 !important;",
+    "}",
+    ".sq-dock-badge-live {",
+    "  display: inline-flex !important;",
+    "  align-items: center !important;",
+    "  gap: 4px !important;",
+    "  background: #dc2626 !important;",
+    "  color: #ffffff !important;",
+    "  font-size: 10px !important;",
+    "  font-weight: 900 !important;",
+    "  padding: 3px 7px !important;",
+    "  border-radius: 999px !important;",
+    "  letter-spacing: 0.3px !important;",
+    "  box-shadow: 0 2px 8px rgba(220, 38, 38, .55) !important;",
+    "}",
+    ".sq-dock-badge-live-dot {",
+    "  width: 5px !important;",
+    "  height: 5px !important;",
+    "  border-radius: 50% !important;",
+    "  background: #ffffff !important;",
+    "  animation: sqLiveDotBlink 1.1s infinite !important;",
+    "}",
+    ".sq-dock-badge-ai {",
+    "  display: inline-flex !important;",
+    "  align-items: center !important;",
+    "  background: #0f172a !important;",
+    "  color: #67e8f9 !important;",
+    "  border: 1px solid rgba(103, 232, 249, .5) !important;",
+    "  font-size: 10px !important;",
+    "  font-weight: 900 !important;",
+    "  padding: 3px 7px !important;",
+    "  border-radius: 999px !important;",
+    "  letter-spacing: 0.2px !important;",
+    "}",
+    "@media (max-width: 640px) {",
+    "  #sqDualFloatingDock { right: 12px !important; bottom: 14px !important; width: 178px !important; gap: 8px !important; }",
+    "  .sq-dock-pill { width: 178px !important; min-width: 178px !important; max-width: 178px !important; height: 46px !important; min-height: 46px !important; max-height: 46px !important; padding: 0 12px !important; font-size: 13.5px !important; }",
+    "  .sq-dock-pill-main { font-size: 13.5px !important; gap: 5px !important; }",
+    "}",
     ".sq-jjangdol-cta {",
     "  display: flex;",
     "  align-items: center;",
@@ -6117,50 +6213,36 @@ IQ_LIVE_TV_JS = r"""
     "  background: linear-gradient(135deg, #06b6d4, #10b981);",
     "  color: #020617 !important;",
     "  text-decoration: none !important;",
+    "  border: 1.5px solid rgba(224, 242, 254, .7);",
     "  border-radius: 13px;",
     "  padding: 14px 18px;",
     "  font-size: 15.5px;",
     "  font-weight: 900;",
-    "  box-shadow: 0 10px 26px rgba(16, 185, 129, .32);",
+    "  box-shadow: 0 10px 26px rgba(16, 185, 129, .36);",
     "  transition: transform .15s ease, filter .15s ease;",
     "}",
-    ".sq-jjangdol-cta:hover { transform: translateY(-1px); filter: brightness(1.06); }"
+    ".sq-jjangdol-cta:hover { transform: translateY(-1px); filter: brightness(1.07); }"
   ].join("\n");
   document.head.appendChild(st);
 
-  function findAiIqFloatingButton() {
-    var byId = document.getElementById("sqAiIqFloatingFab");
-    if (byId) return byId;
+  // Hide any standalone/legacy floating AI 아이큐 or AI 스코비 pills outside #sqDualFloatingDock so there is zero misalignment or duplication
+  function hideStandaloneLegacyFabs() {
     var cands = document.querySelectorAll("button, a, div[role='button']");
     for (var i = 0; i < cands.length; i++) {
       var el = cands[i];
-      if (!el || el.id === "sqIqTvFloatingFab" || el.id === "sqFeedAiIqBtn" || el.id === "sqFeedIqTvBtn") continue;
-      if (el.closest("#sqAiIqModal") || el.closest("#sqIqTvModal")) continue;
-      var txt = (el.textContent || "").replace(/\s+/g, " ").trim();
-      if (txt.length <= 28 && (txt.indexOf("AI 아이큐") !== -1 || txt.indexOf("AI아이큐") !== -1)) {
-        var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
-        if (cs && cs.position === "fixed") return el;
+      if (!el || el.closest("#sqDualFloatingDock") || el.closest("#sqAiIqModal") || el.closest("#sqIqTvModal")) continue;
+      if (el.id === "sqFeedAiIqBtn" || el.id === "sqHeaderAiIqBtn") continue;
+      if (el.id === "sqAiIqFloatingFab" || el.id === "sqIqTvFloatingFab") {
+        el.style.setProperty("display", "none", "important");
+        continue;
       }
-    }
-    return null;
-  }
-
-  function alignIqTvAboveAiIq(tvFab) {
-    if (!tvFab) return;
-    var aiBtn = findAiIqFloatingButton();
-    if (!aiBtn || !aiBtn.getBoundingClientRect) return;
-    var rect = aiBtn.getBoundingClientRect();
-    if (rect.width < 40 || rect.height < 24) return;
-    var viewportW = window.innerWidth || document.documentElement.clientWidth || 1280;
-    var viewportH = window.innerHeight || document.documentElement.clientHeight || 800;
-    var computedRight = Math.max(12, Math.round(viewportW - rect.right));
-    var computedBottom = Math.max(64, Math.round(viewportH - rect.top + 10));
-    tvFab.style.right = computedRight + "px";
-    tvFab.style.bottom = computedBottom + "px";
-    tvFab.style.minWidth = Math.round(rect.width) + "px";
-    var aiZ = parseInt((window.getComputedStyle(aiBtn).zIndex || "9995"), 10);
-    if (!isNaN(aiZ) && aiZ > 0) {
-      tvFab.style.zIndex = String(aiZ);
+      var txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (txt.length > 0 && txt.length <= 28 && (txt.indexOf("AI 아이큐") !== -1 || txt.indexOf("AI 스코비") !== -1 || txt.indexOf("AI아이큐") !== -1)) {
+        var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+        if (cs && cs.position === "fixed") {
+          el.style.setProperty("display", "none", "important");
+        }
+      }
     }
   }
 
@@ -6173,7 +6255,7 @@ IQ_LIVE_TV_JS = r"""
     m.className = "sq-modal-backdrop";
     m.style.zIndex = "100060";
     m.innerHTML = [
-      "<div class='sq-modal-panel' style='max-width:440px;padding:22px;border-color:rgba(6,182,212,.55);'>",
+      "<div class='sq-modal-panel' style='max-width:440px;padding:22px;border-color:rgba(6,182,212,.6);'>",
       "  <div style='display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;'>",
       "    <div style='display:flex;align-items:center;gap:8px;'>",
       "      <span style='background:linear-gradient(135deg,#06b6d4,#10b981);color:#020617;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:900;'>📺 IQ중계티비</span>",
@@ -6181,7 +6263,7 @@ IQ_LIVE_TV_JS = r"""
       "    </div>",
       "    <button type='button' id='sqCloseIqTvModalBtn' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:800;'>✕ 닫기 (Esc)</button>",
       "  </div>",
-      "  <div style='background:linear-gradient(145deg,rgba(6,182,212,.12),rgba(15,23,42,.98));border:1px solid rgba(56,189,248,.35);border-radius:15px;padding:18px;text-align:center;'>",
+      "  <div style='background:linear-gradient(145deg,rgba(6,182,212,.14),rgba(15,23,42,.98));border:1px solid rgba(56,189,248,.4);border-radius:15px;padding:18px;text-align:center;'>",
       "    <div style='font-size:15px;font-weight:900;color:#f8fafc;margin-bottom:6px;'>⚡ 전 종목 고화질 실시간 라이브 중계</div>",
       "    <div style='font-size:12.5px;color:#94a3b8;line-height:1.6;margin-bottom:16px;'>해외축구 · 야구 · 농구 · 배구 · 하키 · E스포츠 실시간 생중계를<br/><strong style='color:#67e8f9;'>짱돌티비</strong>에서 끊김 없이 바로 시청하실 수 있습니다.</div>",
       "    <a id='sqGoJjangdolTvLink' href='" + JJANGDOL_URL + "' target='_blank' rel='noopener noreferrer' class='sq-jjangdol-cta'>",
@@ -6213,23 +6295,40 @@ IQ_LIVE_TV_JS = r"""
   }
   window.__openSportiqIqTv = openIqTvModal;
 
-  function ensureIqTvFloatingTab() {
-    var tvFab = document.getElementById("sqIqTvFloatingFab");
-    if (!tvFab && document.body) {
-      tvFab = document.createElement("button");
-      tvFab.id = "sqIqTvFloatingFab";
-      tvFab.type = "button";
-      tvFab.className = "sq-iq-tv-fab";
-      tvFab.innerHTML = "📺 <span>IQ중계티비</span>";
-      tvFab.title = "IQ중계티비 — 짱돌티비 실시간 스포츠 중계 바로가기";
-      tvFab.onclick = function (ev) {
+  function ensureUnifiedDualDock() {
+    if (!document.body) return;
+    hideStandaloneLegacyFabs();
+
+    var dock = document.getElementById("sqDualFloatingDock");
+    if (!dock) {
+      dock = document.createElement("div");
+      dock.id = "sqDualFloatingDock";
+      dock.innerHTML = [
+        "<button type='button' id='sqDockIqTvBtn' class='sq-dock-pill sq-dock-pill--tv' title='IQ중계티비 — 짱돌티비 실시간 중계 바로가기'>",
+        "  <span class='sq-dock-pill-main'><span class='sq-dock-pill-icon'>📺</span><span>IQ중계티비</span></span>",
+        "  <span class='sq-dock-badge-live'><span class='sq-dock-badge-live-dot'></span>LIVE</span>",
+        "</button>",
+        "<button type='button' id='sqDockAiIqBtn' class='sq-dock-pill sq-dock-pill--ai' data-sq-ai-iq-trigger='1' title='AI 아이큐 — 실시간 온라인 AI 검색 (Ctrl+K)'>",
+        "  <span class='sq-dock-pill-main'><span class='sq-dock-pill-icon'>🤖</span><span>AI 아이큐</span></span>",
+        "  <span class='sq-dock-badge-ai'>검색</span>",
+        "</button>"
+      ].join("");
+      document.body.appendChild(dock);
+
+      document.getElementById("sqDockIqTvBtn").addEventListener("click", function (ev) {
         ev.preventDefault();
         ev.stopPropagation();
         openIqTvModal();
-      };
-      document.body.appendChild(tvFab);
+      });
+
+      document.getElementById("sqDockAiIqBtn").addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (typeof window.__openSportiqAiIq === "function") {
+          window.__openSportiqAiIq();
+        }
+      });
     }
-    alignIqTvAboveAiIq(tvFab);
   }
 
   window.addEventListener("keydown", function (ev) {
@@ -6243,12 +6342,8 @@ IQ_LIVE_TV_JS = r"""
     }
   }, true);
 
-  window.addEventListener("resize", function () {
-    alignIqTvAboveAiIq(document.getElementById("sqIqTvFloatingFab"));
-  });
-
-  setTimeout(ensureIqTvFloatingTab, 160);
-  setInterval(ensureIqTvFloatingTab, 900);
+  setTimeout(ensureUnifiedDualDock, 120);
+  setInterval(ensureUnifiedDualDock, 700);
 })();
 """
 
