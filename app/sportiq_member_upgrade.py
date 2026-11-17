@@ -600,7 +600,7 @@ class RaffleEnterIn(BaseModel):
 def member_upgrade_status():
     return {
         "ok": True,
-        "version": "3.8",
+        "version": "3.9",
         "pg_sync": _PG_SYNC_STATE,
         "shop_items": len(SHOP_CATALOG),
         "pwa_enabled": True,
@@ -616,6 +616,7 @@ def member_upgrade_status():
         "iq_live_tv_tab": "https://jjangdoltv.com/",
         "floating_tabs_aligned_v12": True,
         "hero_brand_crest_v13": True,
+        "mobile_bottom_clearance_v14": True,
     }
 
 
@@ -3469,9 +3470,17 @@ def inject_upgrade_into_html(raw_html: str) -> str:
         if h_idx != -1:
             out = out[:h_idx] + pwa_head + "\n" + out[h_idx:]
 
-    tag = '<script src="/api/member/p0p1-upgrade.js?v=13" defer></script>'
+    if "viewport-fit=cover" not in out:
+        out = re.sub(
+            r'(<meta[^>]+name=["\']viewport["\'][^>]+content=["\'])([^"\']+)(["\'])',
+            r'\1\2, viewport-fit=cover\3',
+            out,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+    tag = '<script src="/api/member/p0p1-upgrade.js?v=14" defer></script>'
     if "/api/member/p0p1-upgrade.js" in out:
-        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=13', out)
+        return re.sub(r'/api/member/p0p1-upgrade\.js(?:\?v=\d+)?', '/api/member/p0p1-upgrade.js?v=14', out)
     idx = out.rfind("</body>")
     if idx != -1:
         return out[:idx] + "\n" + tag + "\n" + out[idx:]
@@ -6575,3 +6584,273 @@ BRAND_CREST_V13_JS = r"""
 """
 
 UPGRADE_JS = UPGRADE_JS + "\n" + BRAND_CREST_V13_JS
+# ============================================================================
+# STAGE P8 (v3.9 / ?v=14): Mobile Bottom Safe-Zone & Smart Adaptive Floating UX
+#   - Safe-area bottom clearance (148px + env(safe-area-inset-bottom)) on mobile
+#   - Smart scroll-down translucent compact glide (restores instantly on scroll-up/touch/bottom)
+#   - Virtual keyboard & modal open auto-retract (zero overlap when typing posts/comments/cheers)
+#   - Zero collision between #sqPwaInstallBanner and #sqDualFloatingDock on narrow screens
+# ============================================================================
+MOBILE_BOTTOM_UX_V14_JS = r"""
+/* SportIQ v14.0: Smart Mobile Bottom Clearance, Keyboard Retract & Adaptive Floating Dock */
+(function () {
+  if (window.__SPORTIQ_V14_MOBILE_CLEARANCE__) return;
+  window.__SPORTIQ_V14_MOBILE_CLEARANCE__ = true;
+
+  var st = document.createElement("style");
+  st.id = "sqMobileClearanceV14Css";
+  st.textContent = [
+    "/* Smooth transitions for Dual Floating Dock & PWA Install Banner */",
+    "#sqDualFloatingDock {",
+    "  transition: transform .26s cubic-bezier(.22, 1, .36, 1), opacity .24s ease, bottom .24s ease !important;",
+    "  will-change: transform, opacity;",
+    "}",
+    "#sqPwaInstallBanner {",
+    "  transition: transform .26s cubic-bezier(.22, 1, .36, 1), opacity .24s ease, bottom .24s ease !important;",
+    "}",
+    "",
+    "/* Desktop subtle bottom cushion so footer/last post never touches dock */",
+    "@media (min-width: 769px) {",
+    "  body { padding-bottom: 84px !important; }",
+    "}",
+    "",
+    "/* Mobile & Tablet (< 768px): Full Safe-Zone Cushion + iOS Home-Indicator Support */",
+    "@media (max-width: 768px) {",
+    "  body {",
+    "    padding-bottom: calc(144px + env(safe-area-inset-bottom, 0px)) !important;",
+    "  }",
+    "  body.sq-pwa-banner-visible {",
+    "    padding-bottom: calc(214px + env(safe-area-inset-bottom, 0px)) !important;",
+    "  }",
+    "  footer, #feedList {",
+    "    scroll-margin-bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important;",
+    "  }",
+    "  #feedList > article:last-child {",
+    "    margin-bottom: 18px !important;",
+    "  }",
+    "  /* Respect iOS notch / home bar on Dual Floating Dock */",
+    "  #sqDualFloatingDock {",
+    "    right: 12px !important;",
+    "    bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;",
+    "  }",
+    "  /* Stack Dual Dock cleanly ABOVE PWA install banner when banner is open on mobile */",
+    "  body.sq-pwa-banner-visible #sqPwaInstallBanner {",
+    "    left: 10px !important;",
+    "    right: 10px !important;",
+    "    max-width: calc(100vw - 20px) !important;",
+    "    bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;",
+    "  }",
+    "  body.sq-pwa-banner-visible #sqDualFloatingDock {",
+    "    bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important;",
+    "  }",
+    "  /* Smart Scroll-Down Compact Glide: keeps buttons tappable while freeing 45% visual space */",
+    "  #sqDualFloatingDock.sq-dock-scroll-compact {",
+    "    transform: translate3d(6px, 6px, 0) scale(0.88) !important;",
+    "    transform-origin: bottom right !important;",
+    "    opacity: 0.80 !important;",
+    "  }",
+    "  #sqDualFloatingDock.sq-dock-scroll-compact:hover,",
+    "  #sqDualFloatingDock.sq-dock-scroll-compact:active {",
+    "    transform: translate3d(0, 0, 0) scale(1) !important;",
+    "    opacity: 1 !important;",
+    "  }",
+    "  /* Auto-retract when typing in inputs/textareas or when any full modal is open */",
+    "  body.sq-kb-typing #sqDualFloatingDock,",
+    "  body.sq-kb-typing #sqPwaInstallBanner,",
+    "  body.sq-modal-active #sqDualFloatingDock,",
+    "  body.sq-modal-active #sqPwaInstallBanner {",
+    "    opacity: 0 !important;",
+    "    pointer-events: none !important;",
+    "    transform: translate3d(0, 28px, 0) scale(0.92) !important;",
+    "  }",
+    "  /* Ensure modals fit comfortably inside mobile dynamic viewport height */",
+    "  .sq-modal-panel {",
+    "    max-height: calc(86dvh - env(safe-area-inset-bottom, 0px)) !important;",
+    "    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)) !important;",
+    "  }",
+    "}",
+    "",
+    "/* Dedicated bottom breathing room spacer at end of main container */",
+    "#sqMobileBottomSafeSpacer {",
+    "  display: none;",
+    "  width: 100%;",
+    "  height: 0;",
+    "  pointer-events: none;",
+    "}",
+    "@media (max-width: 768px) {",
+    "  #sqMobileBottomSafeSpacer {",
+    "    display: block;",
+    "    height: calc(36px + env(safe-area-inset-bottom, 0px));",
+    "  }",
+    "}"
+  ].join("\n");
+  document.head.appendChild(st);
+
+  function isMobileViewport() {
+    return (window.innerWidth || document.documentElement.clientWidth || 1024) <= 768;
+  }
+
+  function ensureBottomSafeSpacer() {
+    if (!document.body || document.getElementById("sqMobileBottomSafeSpacer")) return;
+    var sp = document.createElement("div");
+    sp.id = "sqMobileBottomSafeSpacer";
+    sp.setAttribute("aria-hidden", "true");
+    var mainEl = document.querySelector("main") || document.querySelector("footer") || document.body;
+    if (mainEl === document.body) {
+      document.body.appendChild(sp);
+    } else if (mainEl.parentNode) {
+      mainEl.insertAdjacentElement("afterend", sp);
+    }
+  }
+
+  // Track whether PWA install banner is currently visible so Dual Dock stacks cleanly above it
+  function syncPwaBannerBodyClass() {
+    if (!document.body) return;
+    var banner = document.getElementById("sqPwaInstallBanner");
+    var visible = false;
+    if (banner) {
+      var cs = window.getComputedStyle ? window.getComputedStyle(banner) : null;
+      visible = Boolean(cs && cs.display !== "none" && cs.visibility !== "hidden" && banner.offsetHeight > 10);
+    }
+    if (visible) {
+      document.body.classList.add("sq-pwa-banner-visible");
+    } else {
+      document.body.classList.remove("sq-pwa-banner-visible");
+    }
+  }
+
+  // Track whether any modal dialog is open so floating dock never floats over modal close/submit buttons
+  function syncModalActiveBodyClass() {
+    if (!document.body) return;
+    var modalIds = [
+      "sqAiIqModal",
+      "sqIqTvModal",
+      "sqMemberHubModal",
+      "sqMyPageModal",
+      "sqNotifModal",
+      "sqAdminRaffleModal",
+      "sqPwaIosModal",
+      "writeModal",
+      "commentModal",
+      "dcMatchModal",
+      "dcMatchDetailModal"
+    ];
+    var anyOpen = false;
+    for (var i = 0; i < modalIds.length; i++) {
+      var m = document.getElementById(modalIds[i]);
+      if (!m) continue;
+      if (m.classList && m.classList.contains("hidden")) continue;
+      var cs = window.getComputedStyle ? window.getComputedStyle(m) : null;
+      if (cs && cs.display !== "none" && cs.visibility !== "hidden" && m.offsetHeight > 20) {
+        anyOpen = true;
+        break;
+      }
+    }
+    if (anyOpen) {
+      document.body.classList.add("sq-modal-active");
+    } else {
+      document.body.classList.remove("sq-modal-active");
+    }
+  }
+
+  // Track mobile virtual keyboard / input focus so typing comments, cheer talk, or search is 100% unobstructed
+  function isTextEditingElement(el) {
+    if (!el || !el.tagName) return false;
+    var tag = el.tagName.toUpperCase();
+    if (tag === "TEXTAREA" || tag === "SELECT") return true;
+    if (tag === "INPUT") {
+      var tp = (el.getAttribute("type") || "text").toLowerCase();
+      return ["button", "checkbox", "radio", "submit", "reset", "range", "file"].indexOf(tp) === -1;
+    }
+    return el.isContentEditable === true;
+  }
+
+  document.addEventListener("focusin", function (ev) {
+    if (!isMobileViewport() || !document.body) return;
+    if (isTextEditingElement(ev.target)) {
+      document.body.classList.add("sq-kb-typing");
+    }
+  }, true);
+
+  document.addEventListener("focusout", function () {
+    if (!document.body) return;
+    setTimeout(function () {
+      if (!isTextEditingElement(document.activeElement)) {
+        document.body.classList.remove("sq-kb-typing");
+      }
+    }, 140);
+  }, true);
+
+  if (window.visualViewport) {
+    var baseHeight = window.visualViewport.height || window.innerHeight || 800;
+    window.visualViewport.addEventListener("resize", function () {
+      if (!isMobileViewport() || !document.body) return;
+      var curH = window.visualViewport.height || window.innerHeight || 800;
+      if (curH > baseHeight) baseHeight = curH;
+      // If viewport shrinks by >140px on mobile, soft keyboard is open
+      if (baseHeight - curH > 140 && isTextEditingElement(document.activeElement)) {
+        document.body.classList.add("sq-kb-typing");
+      } else if (!isTextEditingElement(document.activeElement)) {
+        document.body.classList.remove("sq-kb-typing");
+      }
+    });
+  }
+
+  // Smart Scroll Direction Detector: compact glide when reading downward, instant full restore on scroll-up or page bottom
+  var lastScrollY = window.pageYOffset || 0;
+  var scrollIdleTimer = null;
+
+  function handleSmartMobileScroll() {
+    var dock = document.getElementById("sqDualFloatingDock");
+    if (!dock) return;
+    if (!isMobileViewport()) {
+      dock.classList.remove("sq-dock-scroll-compact");
+      return;
+    }
+    var curY = window.pageYOffset || document.documentElement.scrollTop || 0;
+    var docH = Math.max(
+      document.body ? document.body.scrollHeight : 0,
+      document.documentElement ? document.documentElement.scrollHeight : 0
+    );
+    var winH = window.innerHeight || document.documentElement.clientHeight || 800;
+    var nearTop = curY < 90;
+    var nearBottom = (curY + winH) >= (docH - 120);
+    var delta = curY - lastScrollY;
+
+    if (nearTop || nearBottom || delta < -8) {
+      // Near top, reached bottom cushion, or scrolling UP -> full vivid size!
+      dock.classList.remove("sq-dock-scroll-compact");
+    } else if (delta > 12 && curY > 140) {
+      // Actively reading/scrolling DOWN -> sleek compact mode so feed actions stay wide open
+      dock.classList.add("sq-dock-scroll-compact");
+    }
+    lastScrollY = curY;
+
+    if (scrollIdleTimer) clearTimeout(scrollIdleTimer);
+    scrollIdleTimer = setTimeout(function () {
+      var d = document.getElementById("sqDualFloatingDock");
+      if (d) d.classList.remove("sq-dock-scroll-compact");
+    }, 1600);
+  }
+
+  window.addEventListener("scroll", handleSmartMobileScroll, { passive: true });
+  window.addEventListener("resize", function () {
+    syncPwaBannerBodyClass();
+    handleSmartMobileScroll();
+  });
+
+  setTimeout(function () {
+    ensureBottomSafeSpacer();
+    syncPwaBannerBodyClass();
+    syncModalActiveBodyClass();
+  }, 140);
+
+  setInterval(function () {
+    ensureBottomSafeSpacer();
+    syncPwaBannerBodyClass();
+    syncModalActiveBodyClass();
+  }, 650);
+})();
+"""
+
+UPGRADE_JS = UPGRADE_JS + "\n" + MOBILE_BOTTOM_UX_V14_JS
