@@ -1,8 +1,9 @@
 import os
 import sqlite3
+import threading
 import time
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -24,6 +25,43 @@ KST = timezone(timedelta(hours=9))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 HTML_PATH = os.path.join(BASE_DIR, "sportiq_community.html")
 DB_PATH = os.environ.get("SPORTIQ_LOUNGE_DB", "/tmp/sportiq_lounge.db")
+
+
+def _to_epoch_ts(val: Any) -> Optional[float]:
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    s = str(val).strip()
+    if not s:
+        return None
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        pass
+    try:
+        iso = s.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(iso)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=KST)
+        return dt.timestamp()
+    except Exception:
+        return None
+
+
+def _format_cheer_time(val: Any) -> str:
+    ts = _to_epoch_ts(val)
+    if ts is not None:
+        try:
+            return datetime.fromtimestamp(ts, tz=KST).strftime("%H:%M:%S")
+        except (OSError, OverflowError, ValueError):
+            pass
+    s = str(val or "").strip()
+    if len(s) >= 8 and ":" in s:
+        for token in s.split():
+            if token.count(":") >= 1 and token[0].isdigit():
+                return token[:8]
+    return datetime.now(KST).strftime("%H:%M:%S")
 
 
 def _get_conn() -> sqlite3.Connection:
@@ -135,6 +173,131 @@ UPDATE global_match_rankings SET votes = 2980 WHERE match_key = 'epl-liv-mun' AN
 _init_db()
 
 
+# --- Stale-While-Revalidate (SWR) & Background Pre-Warmer for DataCenter Tabs ---
+_DC_SWR_CACHE: Dict[int, tuple[float, list]] = {}
+_DC_SWR_REFRESHING: set[int] = set()
+_DC_SWR_LOCK = threading.Lock()
+_DC_SWR_INSTALLED = False
+
+
+def install_datacenter_swr_accelerator(dc_mod: Any) -> bool:
+    global _DC_SWR_INSTALLED
+    if getattr(dc_mod, "__swr_accelerated__", False):
+        return True
+    orig_collect = getattr(dc_mod, "_collect_all_matches", None)
+    if not callable(orig_collect):
+        return False
+
+    def _fresh_ttl(offset: int) -> float:
+        return 45.0 if offset == 0 else 600.0
+
+    def _refresh_in_bg(offset: int) -> None:
+        with _DC_SWR_LOCK:
+            if offset in _DC_SWR_REFRESHING:
+                return
+            _DC_SWR_REFRESHING.add(offset)
+
+        def _job() -> None:
+            try:
+                data = orig_collect(offset)
+                if isinstance(data, list):
+                    with _DC_SWR_LOCK:
+                        _DC_SWR_CACHE[offset] = (time.monotonic(), data)
+            except Exception:
+                pass
+            finally:
+                with _DC_SWR_LOCK:
+                    _DC_SWR_REFRESHING.discard(offset)
+
+        threading.Thread(target=_job, daemon=True, name=f"dc-swr-{offset}").start()
+
+    def _swr_collect(date_offset: int = 0):
+        try:
+            offset = int(date_offset)
+        except (TypeError, ValueError):
+            offset = 0
+        now_m = time.monotonic()
+        with _DC_SWR_LOCK:
+            entry = _DC_SWR_CACHE.get(offset)
+        if entry is not None:
+            ts, cached_list = entry
+            if (now_m - ts) <= _fresh_ttl(offset):
+                return cached_list
+            # Stale-while-revalidate: return instant cached data & refresh asynchronously
+            _refresh_in_bg(offset)
+            return cached_list
+
+        # Cold cache only before background pre-warmer completes
+        data = orig_collect(offset)
+        if isinstance(data, list):
+            with _DC_SWR_LOCK:
+                _DC_SWR_CACHE[offset] = (time.monotonic(), data)
+        return data
+
+    dc_mod._collect_all_matches = _swr_collect
+    dc_mod.__swr_accelerated__ = True
+    _DC_SWR_INSTALLED = True
+    return True
+
+
+def _datacenter_prewarm_daemon() -> None:
+    time.sleep(1.5)
+    dc_mod = None
+    for _ in range(20):
+        try:
+            from app import sportiq_datacenter as _dc
+            if install_datacenter_swr_accelerator(_dc):
+                dc_mod = _dc
+                break
+        except Exception:
+            pass
+        time.sleep(1.0)
+    if dc_mod is None:
+        return
+
+    tick = 0
+    while True:
+        try:
+            # Pre-warm live matches (offset=0, used by dropping-odds & live ticker) every 35s
+            orig = dc_mod._collect_all_matches
+            with _DC_SWR_LOCK:
+                e0 = _DC_SWR_CACHE.get(0)
+            if e0 is None or (time.monotonic() - e0[0]) >= 32.0:
+                # Trigger non-blocking refresh if already warm, or warm directly on boot
+                if e0 is None:
+                    orig(0)
+                else:
+                    orig(0)  # triggers async refresh if >45s, or force warm below
+            # Force proactive refresh before 45s TTL expires so cache never goes stale
+            if tick == 0 or tick % 1 == 0:
+                try:
+                    # Run underlying collector via background refresh helper by aging timestamp slightly past TTL
+                    if tick > 0 and e0 is not None and (time.monotonic() - e0[0]) >= 32.0:
+                        with _DC_SWR_LOCK:
+                            _DC_SWR_CACHE[0] = (time.monotonic() - 46.0, e0[1])
+                        dc_mod._collect_all_matches(0)
+                except Exception:
+                    pass
+
+            # Pre-warm yesterday's finished matches (offset=-1, used by scorecard) on boot & every ~10m
+            if tick % 15 == 0:
+                with _DC_SWR_LOCK:
+                    em1 = _DC_SWR_CACHE.get(-1)
+                if em1 is None:
+                    dc_mod._collect_all_matches(-1)
+                else:
+                    with _DC_SWR_LOCK:
+                        _DC_SWR_CACHE[-1] = (time.monotonic() - 601.0, em1[1])
+                    dc_mod._collect_all_matches(-1)
+        except Exception:
+            pass
+        tick += 1
+        time.sleep(35.0)
+
+
+threading.Thread(target=_datacenter_prewarm_daemon, daemon=True, name="sportiq-dc-prewarm").start()
+
+
 class PresencePingIn(BaseModel):
     session_id: str = "anon"
     role: Optional[str] = "GUEST"
@@ -179,7 +342,13 @@ def lounge_health():
             conn.execute("SELECT 1").fetchone()
 
     run_with_db_retry(_op)
-    return {"status": "ok", "service": "sportiq-lounge", "storage": "sqlite-wal", "busy_timeout_ms": DEFAULT_BUSY_TIMEOUT_MS}
+    return {
+        "status": "ok",
+        "service": "sportiq-lounge",
+        "storage": "sqlite-wal",
+        "busy_timeout_ms": DEFAULT_BUSY_TIMEOUT_MS,
+        "datacenter_swr_active": _DC_SWR_INSTALLED,
+    }
 
 
 def _presence_stats(conn: sqlite3.Connection) -> dict:
@@ -348,8 +517,9 @@ def list_cheers():
     rows = run_with_db_retry(_op)
     result = []
     for r in rows:
-        dt = datetime.fromtimestamp(r["created_at"], tz=KST).strftime("%H:%M:%S")
-        result.append({**r, "time_label": dt})
+        dt = _format_cheer_time(r.get("created_at"))
+        ts = _to_epoch_ts(r.get("created_at"))
+        result.append({**r, "created_at": ts if ts is not None else r.get("created_at"), "time_label": dt})
     return {"cheers": result}
 
 
@@ -370,8 +540,9 @@ def post_cheer(payload: CheerIn, request: Request):
             last = conn.execute(
                 "SELECT created_at FROM cheers WHERE session_id = ? ORDER BY id DESC LIMIT 1", (sid,)
             ).fetchone()
-            if last and (now - last["created_at"]) < 5.0:
-                remain = max(1, int(round(5.0 - (now - last["created_at"]))))
+            last_ts = _to_epoch_ts(last["created_at"]) if last else None
+            if last_ts is not None and (now - last_ts) < 5.0:
+                remain = max(1, int(round(5.0 - (now - last_ts))))
                 raise HTTPException(status_code=429, detail=f"도배 방지를 위해 {remain}초 후 다시 전송할 수 있습니다.")
             cur = conn.execute(
                 "INSERT INTO cheers(session_id, author, role, team, message, created_at) VALUES (?, ?, ?, ?, ?, ?)",
