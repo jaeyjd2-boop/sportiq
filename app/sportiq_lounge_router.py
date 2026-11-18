@@ -524,6 +524,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -697,6 +699,166 @@ _FRONTEND_V22_JS = r'''
       "  #sqDesktopMainTabStrip { gap: 7px !important; }",
       "  #sqDesktopMainTabStrip > .tab-btn,",
       "  #sqDesktopMainTabStrip > button { padding: 7px 12px !important; font-size: 13px !important; }",
+      "}",
+      "/* v3.0 Scorebase-Inspired Dual Scoreboard Table, Status/Star Filters & 5-Tab Match Insight Modal */",
+      "#sqV30ScoreToolbar {",
+      "  display: flex;",
+      "  flex-wrap: wrap;",
+      "  align-items: center;",
+      "  justify-content: space-between;",
+      "  gap: 8px;",
+      "  padding: 7px 4px 9px;",
+      "  margin-bottom: 6px;",
+      "  border-bottom: 1px solid rgba(51, 65, 85, 0.55);",
+      "}",
+      ".sq-v30-fbtn {",
+      "  background: rgba(15, 23, 42, 0.9);",
+      "  border: 1px solid #334155;",
+      "  color: #cbd5e1;",
+      "  border-radius: 999px;",
+      "  padding: 4px 10px;",
+      "  font-size: 11.5px;",
+      "  font-weight: 700;",
+      "  cursor: pointer;",
+      "  white-space: nowrap;",
+      "  transition: all 0.14s ease;",
+      "}",
+      ".sq-v30-fbtn:hover { border-color: #64748b; color: #f8fafc; }",
+      ".sq-v30-fbtn.active {",
+      "  background: rgba(16, 185, 129, 0.2);",
+      "  border-color: #34d399;",
+      "  color: #6ee7b7;",
+      "  font-weight: 800;",
+      "}",
+      ".sq-v30-fbtn.active-live {",
+      "  background: rgba(220, 38, 38, 0.22);",
+      "  border-color: #f87171;",
+      "  color: #fecaca;",
+      "  font-weight: 800;",
+      "}",
+      ".sq-v30-fbtn.active-view {",
+      "  background: rgba(56, 189, 248, 0.2);",
+      "  border-color: #38bdf8;",
+      "  color: #7dd3fc;",
+      "  font-weight: 800;",
+      "}",
+      ".sq-v30-live-dot {",
+      "  display: inline-flex;",
+      "  align-items: center;",
+      "  margin-left: 4px;",
+      "  padding: 1px 6px;",
+      "  border-radius: 999px;",
+      "  background: rgba(220, 38, 38, 0.24);",
+      "  border: 1px solid rgba(248, 113, 113, 0.65);",
+      "  color: #fca5a5;",
+      "  font-size: 10px;",
+      "  font-weight: 900;",
+      "  line-height: 1.2;",
+      "}",
+      "#sqV30ScoreboardTableWrap {",
+      "  display: none;",
+      "  max-height: 520px;",
+      "  overflow-y: auto;",
+      "  overflow-x: auto;",
+      "  background: #070d1a;",
+      "  border: 1px solid #1e293b;",
+      "  border-radius: 13px;",
+      "  margin-bottom: 8px;",
+      "}",
+      "#sqV30ScoreboardTableWrap[data-sq-open='1'] {",
+      "  display: block !important;",
+      "  visibility: visible !important;",
+      "  opacity: 1 !important;",
+      "}",
+      ".sq-v30-sb-table {",
+      "  width: 100%;",
+      "  min-width: 660px;",
+      "  border-collapse: collapse;",
+      "  font-size: 12.2px;",
+      "  color: #e2e8f0;",
+      "}",
+      ".sq-v30-sb-table thead th {",
+      "  position: sticky;",
+      "  top: 0;",
+      "  z-index: 3;",
+      "  background: #0f172a;",
+      "  color: #94a3b8;",
+      "  font-size: 11px;",
+      "  font-weight: 800;",
+      "  padding: 8px 9px;",
+      "  border-bottom: 1px solid #334155;",
+      "  text-align: left;",
+      "  white-space: nowrap;",
+      "}",
+      ".sq-v30-lg-hdr td {",
+      "  background: rgba(15, 23, 42, 0.92);",
+      "  padding: 6px 10px;",
+      "  border-top: 1px solid #1e293b;",
+      "  border-bottom: 1px solid #1e293b;",
+      "  font-weight: 800;",
+      "  font-size: 11.8px;",
+      "  color: #93c5fd;",
+      "}",
+      ".sq-v30-match-row {",
+      "  border-bottom: 1px solid rgba(30, 41, 59, 0.72);",
+      "  cursor: pointer;",
+      "  transition: background 0.12s ease;",
+      "}",
+      ".sq-v30-match-row:hover { background: rgba(30, 41, 59, 0.58); }",
+      ".sq-v30-match-row.is-live-row { background: rgba(127, 29, 29, 0.14); }",
+      ".sq-v30-match-row td { padding: 8px 9px; vertical-align: middle; white-space: nowrap; }",
+      ".sq-v30-odds-box {",
+      "  display: inline-block;",
+      "  min-width: 42px;",
+      "  text-align: center;",
+      "  padding: 2px 6px;",
+      "  border-radius: 6px;",
+      "  background: #0f172a;",
+      "  border: 1px solid #334155;",
+      "  font-size: 11px;",
+      "  font-weight: 700;",
+      "  color: #cbd5e1;",
+      "  margin-right: 3px;",
+      "}",
+      ".sq-v30-hit-badge {",
+      "  display: inline-flex;",
+      "  align-items: center;",
+      "  padding: 1px 6px;",
+      "  border-radius: 999px;",
+      "  font-size: 10px;",
+      "  font-weight: 800;",
+      "  background: rgba(16, 185, 129, 0.18);",
+      "  border: 1px solid rgba(52, 211, 153, 0.5);",
+      "  color: #6ee7b7;",
+      "  white-space: nowrap;",
+      "}",
+      ".sq-v30-upset-badge {",
+      "  display: inline-flex;",
+      "  align-items: center;",
+      "  padding: 1px 6px;",
+      "  border-radius: 999px;",
+      "  font-size: 10px;",
+      "  font-weight: 800;",
+      "  background: rgba(245, 158, 11, 0.16);",
+      "  border: 1px solid rgba(251, 191, 36, 0.45);",
+      "  color: #fde68a;",
+      "  white-space: nowrap;",
+      "}",
+      ".sq-v30-insight-tab {",
+      "  background: #0f172a;",
+      "  border: 1px solid #334155;",
+      "  color: #cbd5e1;",
+      "  border-radius: 9px;",
+      "  padding: 6px 10px;",
+      "  font-size: 11.8px;",
+      "  font-weight: 800;",
+      "  cursor: pointer;",
+      "  white-space: nowrap;",
+      "}",
+      ".sq-v30-insight-tab.active {",
+      "  background: linear-gradient(135deg, rgba(16,185,129,.25), rgba(6,182,212,.25));",
+      "  border-color: #34d399;",
+      "  color: #6ee7b7;",
       "}",
       "/* v2.9 Modal 4-Spot Layout Fix, Share Button & Toast Z-Index Above Floating Dock */",
       "#writeModal, #writeModal > div, #write-modal, #write-modal > div {",
@@ -2556,6 +2718,675 @@ _FRONTEND_V22_JS = r'''
     openPostDetailAndCommentsV29(targetId);
   }
 
+  // -------------------------------------------------------------------------
+  // v3.0 Scorebase-Inspired Scoreboard Table, Status/Star Filters & 5-Tab Match Insight Modal
+  // -------------------------------------------------------------------------
+  var LS_FAV_MATCHES_V30 = "sportiq_fav_matches_v30";
+  var v30ScoreState = {
+    viewMode: "cards", // "cards" | "table-league" | "table-time"
+    statusFilter: "all", // "all" | "live" | "pre" | "post" | "fav"
+    favMap: {}
+  };
+
+  try {
+    var rawFav = localStorage.getItem(LS_FAV_MATCHES_V30);
+    if (rawFav) v30ScoreState.favMap = JSON.parse(rawFav) || {};
+  } catch (e) {}
+
+  function saveFavMatchesV30() {
+    try { localStorage.setItem(LS_FAV_MATCHES_V30, JSON.stringify(v30ScoreState.favMap || {})); } catch (e) {}
+  }
+
+  function matchFavKeyV30(it) {
+    if (!it) return "";
+    return String(it.id || (String(it.league || "") + "::" + String(it.home || "") + "::" + String(it.away || "")));
+  }
+
+  window.toggleMatchFavV30 = function (ev, rawKey) {
+    if (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+    var k = String(rawKey || "").trim();
+    if (!k) return;
+    if (v30ScoreState.favMap[k]) {
+      delete v30ScoreState.favMap[k];
+      if (typeof showToast === "function") showToast("관심경기에서 해제했습니다.");
+    } else {
+      v30ScoreState.favMap[k] = true;
+      if (typeof showToast === "function") showToast("★ 내 관심경기로 등록되었습니다!");
+    }
+    saveFavMatchesV30();
+    refreshScoreboardSuiteV30();
+  };
+
+  function evaluateAiVerdictV30(it) {
+    if (!it || it.state !== "post") return null;
+    var hs = Number(it.home_score);
+    var as = Number(it.away_score);
+    if (isNaN(hs) || isNaN(as)) return null;
+    var ai = it.ai || {};
+    var hp = Number(ai.home_pct || 50);
+    var dp = Number(ai.draw_pct || 0);
+    var ap = Number(ai.away_pct || 50);
+    var pick = (hp >= ap && hp >= dp) ? "H" : ((ap > hp && ap >= dp) ? "A" : "D");
+    var actual = hs > as ? "H" : (as > hs ? "A" : "D");
+    var isHit = (pick === actual);
+    var pickLabel = pick === "H" ? (it.home + " 승") : (pick === "A" ? (it.away + " 승") : "무승부");
+    return {
+      hit: isHit,
+      pick: pick,
+      actual: actual,
+      pickLabel: pickLabel,
+      badgeHtml: isHit
+        ? "<span class='sq-v30-hit-badge' title='사전 AI 최우선 예측(" + uxEsc(pickLabel) + ") 적중'>AI 적중 ✅</span>"
+        : "<span class='sq-v30-upset-badge' title='사전 AI 예측(" + uxEsc(pickLabel) + ") 대비 이변 결과'>이변 ⚡</span>"
+    };
+  }
+
+  function filterScoreItemsV30(items) {
+    var sf = v30ScoreState.statusFilter;
+    return (items || []).filter(function (it) {
+      if (!it) return false;
+      if (sf === "live") return it.state === "in";
+      if (sf === "pre") return it.state === "pre";
+      if (sf === "post") return it.state === "post";
+      if (sf === "fav") return Boolean(v30ScoreState.favMap[matchFavKeyV30(it)]);
+      return true;
+    });
+  }
+
+  function sportEmojiV30(sp) {
+    var m = { soccer: "⚽", baseball: "⚾", basketball: "🏀", volleyball: "🏐", hockey: "🏒", esports: "🎮", ufc: "🥊", tennis: "🎾", f1: "🏎️" };
+    return m[String(sp || "").toLowerCase()] || "🏟️";
+  }
+
+  function syncSportPillLiveDotsV30(items) {
+    var liveBySport = {};
+    var totalLive = 0;
+    (items || []).forEach(function (it) {
+      if (it && it.state === "in") {
+        totalLive++;
+        var sp = String(it.sport || "").toLowerCase();
+        liveBySport[sp] = (liveBySport[sp] || 0) + 1;
+      }
+    });
+    document.querySelectorAll("#dcSportPills .dc-pill").forEach(function (btn) {
+      var sp = String(btn.getAttribute("data-sport") || "").toLowerCase();
+      var oldDot = btn.querySelector(".sq-v30-live-dot");
+      if (oldDot && oldDot.parentNode) oldDot.parentNode.removeChild(oldDot);
+      var cnt = sp === "all" ? totalLive : (liveBySport[sp] || 0);
+      if (cnt > 0) {
+        var dot = document.createElement("span");
+        dot.className = "sq-v30-live-dot";
+        dot.textContent = "• LIVE " + cnt;
+        btn.appendChild(dot);
+      }
+    });
+  }
+
+  function decorateMiniScoreCardsV30(allItems) {
+    var track = document.getElementById("dcLiveTickerTrack");
+    if (!track || !Array.isArray(allItems)) return;
+    var cards = Array.prototype.slice.call(track.children || []);
+    cards.forEach(function (card, idx) {
+      var it = allItems[idx];
+      if (!it) return;
+      var fk = matchFavKeyV30(it);
+      var isFav = Boolean(v30ScoreState.favMap[fk]);
+      var sf = v30ScoreState.statusFilter;
+      var show = true;
+      if (sf === "live") show = it.state === "in";
+      else if (sf === "pre") show = it.state === "pre";
+      else if (sf === "post") show = it.state === "post";
+      else if (sf === "fav") show = isFav;
+      card.style.display = show ? "" : "none";
+
+      var topRow = card.firstElementChild;
+      if (topRow) {
+        var starBtn = topRow.querySelector("[data-sq-card-star='1']");
+        if (!starBtn) {
+          starBtn = document.createElement("button");
+          starBtn.type = "button";
+          starBtn.setAttribute("data-sq-card-star", "1");
+          starBtn.style.cssText = "background:transparent;border:0;padding:0 3px;cursor:pointer;font-size:13px;line-height:1;";
+          topRow.insertBefore(starBtn, topRow.firstChild);
+        }
+        starBtn.textContent = isFav ? "★" : "☆";
+        starBtn.style.color = isFav ? "#fbbf24" : "#64748b";
+        starBtn.title = isFav ? "관심경기 해제" : "관심경기 등록";
+        starBtn.onclick = function (ev) { window.toggleMatchFavV30(ev, fk); };
+      }
+
+      var verdict = evaluateAiVerdictV30(it);
+      var botRow = card.lastElementChild;
+      if (verdict && botRow && !botRow.querySelector(".sq-v30-hit-badge, .sq-v30-upset-badge")) {
+        var vSpan = document.createElement("span");
+        vSpan.innerHTML = verdict.badgeHtml;
+        botRow.appendChild(vSpan.firstChild);
+      }
+    });
+  }
+
+  function renderScoreboardTableV30(allItems) {
+    var wrap = document.getElementById("sqV30ScoreboardTableWrap");
+    if (!wrap) return;
+    var isTable = v30ScoreState.viewMode === "table-league" || v30ScoreState.viewMode === "table-time";
+    var track = document.getElementById("dcLiveTickerTrack");
+    var sortBar = document.querySelector(".sq-match-sort-bar");
+
+    if (!isTable) {
+      wrap.removeAttribute("data-sq-open");
+      wrap.style.display = "none";
+      if (track) track.style.display = "flex";
+      if (sortBar) sortBar.style.display = "";
+      decorateMiniScoreCardsV30(allItems);
+      return;
+    }
+
+    if (track) track.style.display = "none";
+    if (sortBar) sortBar.style.display = "none";
+    wrap.setAttribute("data-sq-open", "1");
+    wrap.style.display = "block";
+
+    var filtered = filterScoreItemsV30(allItems || []);
+    if (!filtered.length) {
+      wrap.innerHTML = "<div style='padding:22px;text-align:center;color:#94a3b8;font-size:12.8px;'>선택한 조건에 해당하는 경기가 없습니다. 다른 상태 필터를 선택해 보세요.</div>";
+      return;
+    }
+
+    // Map item back to original index in __dcLatestScoreItems so clicking opens exact __openDcScorePopup(origIdx)
+    var idxMap = {};
+    (allItems || []).forEach(function (x, i) { if (x) idxMap[matchFavKeyV30(x)] = i; });
+
+    function buildRowHtml(it) {
+      var fk = matchFavKeyV30(it);
+      var origIdx = idxMap[fk] != null ? idxMap[fk] : 0;
+      var isFav = Boolean(v30ScoreState.favMap[fk]);
+      var isLive = it.state === "in";
+      var isPost = it.state === "post";
+      var hs = Number(it.home_score || 0);
+      var as = Number(it.away_score || 0);
+      var hWin = (isLive || isPost) && hs > as;
+      var aWin = (isLive || isPost) && as > hs;
+
+      var ai = it.ai || {};
+      var hp = Number(ai.home_pct || 45);
+      var dp = Number(ai.draw_pct || 0);
+      var ap = Number(ai.away_pct || (100 - hp - dp));
+      var odds = ai.odds || {};
+      var verdict = evaluateAiVerdictV30(it);
+
+      var statusCell = isLive
+        ? "<span style='background:#dc2626;color:#fff;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:800;'>● " + uxEsc(it.status_badge) + "</span>"
+        : (isPost
+            ? "<span style='color:#94a3b8;font-weight:700;font-size:11.5px;'>종료</span> <span style='color:#64748b;font-size:10.5px;'>" + uxEsc(it.match_dt_kst) + "</span>"
+            : "<span style='color:#fde68a;font-weight:700;font-size:11.5px;'>" + uxEsc(it.match_dt_kst) + "</span>");
+
+      var scoreMain = it.state === "pre"
+        ? "<span style='color:#64748b;font-weight:800;'>VS</span>"
+        : ("<span style='font-weight:900;font-size:13.5px;color:" + (hWin ? "#34d399" : "#f8fafc") + ";'>" + hs + "</span>" +
+           " <span style='color:#64748b;'>:</span> " +
+           "<span style='font-weight:900;font-size:13.5px;color:" + (aWin ? "#34d399" : "#f8fafc") + ";'>" + as + "</span>");
+
+      var periodSub = it.period_scores
+        ? "<div style='font-size:10px;color:#38bdf8;margin-top:2px;max-width:130px;overflow:hidden;text-overflow:ellipsis;'>" + uxEsc(it.period_scores) + "</div>"
+        : "";
+
+      var barHtml = (
+        "<div style='min-width:128px;'>" +
+        "  <div style='display:flex;height:6px;border-radius:999px;overflow:hidden;background:#1e293b;'>" +
+        "    <div style='width:" + hp + "%;background:#10b981;'></div>" +
+        (dp > 0 ? "<div style='width:" + dp + "%;background:#64748b;'></div>" : "") +
+        "    <div style='width:" + ap + "%;background:#38bdf8;'></div>" +
+        "  </div>" +
+        "  <div style='display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:10.5px;color:#cbd5e1;margin-top:3px;'>" +
+        "    <span>" + hp + "%" + (dp > 0 ? "·" + dp + "%" : "") + "·" + ap + "%</span>" +
+        (verdict ? verdict.badgeHtml : "") +
+        "  </div>" +
+        "</div>"
+      );
+
+      var oddsHtml = (
+        "<span class='sq-v30-odds-box'>" + uxEsc(odds.home || "-") + "</span>" +
+        (odds.draw ? "<span class='sq-v30-odds-box'>" + uxEsc(odds.draw) + "</span>" : "") +
+        "<span class='sq-v30-odds-box'>" + uxEsc(odds.away || "-") + "</span>"
+      );
+
+      return (
+        "<tr class='sq-v30-match-row" + (isLive ? " is-live-row" : "") + "' data-sq-row-idx='" + origIdx + "'>" +
+        "  <td style='width:28px;text-align:center;'><button type='button' data-sq-fav-key='" + uxEsc(fk) + "' style='background:transparent;border:0;cursor:pointer;font-size:14px;color:" + (isFav ? "#fbbf24" : "#64748b") + ";'>" + (isFav ? "★" : "☆") + "</button></td>" +
+        "  <td>" + statusCell + (v30ScoreState.viewMode === "table-time" ? " <span style='color:#93c5fd;font-size:10.5px;font-weight:700;'>[" + uxEsc(it.league) + "]</span>" : "") + "</td>" +
+        "  <td style='text-align:right;font-weight:" + (hWin ? "900" : "700") + ";color:" + (hWin ? "#6ee7b7" : "#f8fafc") + ";'>" + uxEsc(it.home) + "</td>" +
+        "  <td style='text-align:center;'>" + scoreMain + periodSub + "</td>" +
+        "  <td style='text-align:left;font-weight:" + (aWin ? "900" : "700") + ";color:" + (aWin ? "#6ee7b7" : "#f8fafc") + ";'>" + uxEsc(it.away) + "</td>" +
+        "  <td>" + barHtml + "</td>" +
+        "  <td>" + oddsHtml + "</td>" +
+        "</tr>"
+      );
+    }
+
+    var tbodyHtml = "";
+    if (v30ScoreState.viewMode === "table-league") {
+      var groups = [];
+      var gMap = {};
+      filtered.forEach(function (it) {
+        var gk = String(it.league_code || it.league || "ETC");
+        if (!gMap[gk]) {
+          gMap[gk] = { code: gk, title: it.league_full || it.league || gk, sport: it.sport, list: [] };
+          groups.push(gMap[gk]);
+        }
+        gMap[gk].list.push(it);
+      });
+      groups.forEach(function (g) {
+        tbodyHtml += (
+          "<tr class='sq-v30-lg-hdr'><td colspan='7'>" +
+          "  <div style='display:flex;justify-content:space-between;align-items:center;'>" +
+          "    <span>" + sportEmojiV30(g.sport) + " " + uxEsc(g.title) + " <span style='color:#64748b;font-weight:700;'>(" + g.list.length + ")</span></span>" +
+          "    <button type='button' data-sq-jump-st='" + uxEsc(g.code) + "' style='background:transparent;border:1px solid rgba(56,189,248,.4);color:#7dd3fc;border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;'>순위표 ↗</button>" +
+          "  </div>" +
+          "</td></tr>"
+        );
+        tbodyHtml += g.list.map(buildRowHtml).join("");
+      });
+    } else {
+      var sortedTime = filtered.slice().sort(function (a, b) {
+        var oa = a.state === "in" ? 0 : (a.state === "pre" ? 1 : 2);
+        var ob = b.state === "in" ? 0 : (b.state === "pre" ? 1 : 2);
+        if (oa !== ob) return oa - ob;
+        return String(a.match_dt_kst || "").localeCompare(String(b.match_dt_kst || ""));
+      });
+      tbodyHtml = sortedTime.map(buildRowHtml).join("");
+    }
+
+    wrap.innerHTML = (
+      "<table class='sq-v30-sb-table'>" +
+      "  <thead><tr>" +
+      "    <th style='width:28px;text-align:center;'>★</th>" +
+      "    <th>시간 · 상태</th>" +
+      "    <th style='text-align:right;'>홈팀</th>" +
+      "    <th style='text-align:center;'>스코어 · 세부</th>" +
+      "    <th>원정팀</th>" +
+      "    <th>AI 승률 예측 · 적중</th>" +
+      "    <th>기준 배당</th>" +
+      "  </tr></thead>" +
+      "  <tbody>" + tbodyHtml + "</tbody>" +
+      "</table>"
+    );
+
+    wrap.querySelectorAll("[data-sq-fav-key]").forEach(function (fb) {
+      fb.onclick = function (ev) { window.toggleMatchFavV30(ev, fb.getAttribute("data-sq-fav-key")); };
+    });
+    wrap.querySelectorAll("[data-sq-jump-st]").forEach(function (jb) {
+      jb.onclick = function (ev) {
+        ev.stopPropagation();
+        var lgCode = jb.getAttribute("data-sq-jump-st") || "EPL";
+        if (typeof window.__switchDcTab === "function") window.__switchDcTab("standings", lgCode);
+      };
+    });
+    wrap.querySelectorAll(".sq-v30-match-row").forEach(function (tr) {
+      tr.onclick = function () {
+        var rIdx = parseInt(tr.getAttribute("data-sq-row-idx") || "0", 10);
+        if (typeof window.__openDcScorePopup === "function") window.__openDcScorePopup(rIdx);
+      };
+    });
+  }
+
+  function mountOrUpdateV30ScoreToolbar() {
+    var track = document.getElementById("dcLiveTickerTrack");
+    if (!track || !track.parentElement) return;
+    var items = Array.isArray(window.__dcLatestScoreItems) ? window.__dcLatestScoreItems : [];
+
+    var bar = document.getElementById("sqV30ScoreToolbar");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "sqV30ScoreToolbar";
+      track.parentElement.insertBefore(bar, track);
+    }
+    var wrap = document.getElementById("sqV30ScoreboardTableWrap");
+    if (!wrap) {
+      wrap = document.createElement("div");
+      wrap.id = "sqV30ScoreboardTableWrap";
+      track.insertAdjacentElement("afterend", wrap);
+    }
+
+    var cntAll = items.length;
+    var cntLive = items.filter(function (x) { return x && x.state === "in"; }).length;
+    var cntPre = items.filter(function (x) { return x && x.state === "pre"; }).length;
+    var cntPost = items.filter(function (x) { return x && x.state === "post"; }).length;
+    var cntFav = items.filter(function (x) { return x && v30ScoreState.favMap[matchFavKeyV30(x)]; }).length;
+
+    var sf = v30ScoreState.statusFilter;
+    var vm = v30ScoreState.viewMode;
+
+    bar.innerHTML = (
+      "<div style='display:flex;flex-wrap:wrap;gap:5px;align-items:center;'>" +
+      "  <button type='button' class='sq-v30-fbtn" + (sf === "all" ? " active" : "") + "' data-v30-sf='all'>전체 (" + cntAll + ")</button>" +
+      "  <button type='button' class='sq-v30-fbtn" + (sf === "live" ? " active-live" : "") + "' data-v30-sf='live'>🔴 LIVE (" + cntLive + ")</button>" +
+      "  <button type='button' class='sq-v30-fbtn" + (sf === "pre" ? " active" : "") + "' data-v30-sf='pre'>⏳ 예정 (" + cntPre + ")</button>" +
+      "  <button type='button' class='sq-v30-fbtn" + (sf === "post" ? " active" : "") + "' data-v30-sf='post'>✅ 종료 (" + cntPost + ")</button>" +
+      "  <button type='button' class='sq-v30-fbtn" + (sf === "fav" ? " active" : "") + "' data-v30-sf='fav'>★ 내 관심 (" + cntFav + ")</button>" +
+      "</div>" +
+      "<div style='display:flex;flex-wrap:wrap;gap:5px;align-items:center;'>" +
+      "  <button type='button' class='sq-v30-fbtn" + (vm === "cards" ? " active-view" : "") + "' data-v30-vm='cards'>🃏 카드 트랙</button>" +
+      "  <button type='button' class='sq-v30-fbtn" + (vm === "table-league" ? " active-view" : "") + "' data-v30-vm='table-league'>📋 스코어보드 표 (리그별)</button>" +
+      "  <button type='button' class='sq-v30-fbtn" + (vm === "table-time" ? " active-view" : "") + "' data-v30-vm='table-time'>🕒 시간순 표</button>" +
+      "</div>"
+    );
+
+    bar.querySelectorAll("[data-v30-sf]").forEach(function (b) {
+      b.onclick = function () {
+        v30ScoreState.statusFilter = b.getAttribute("data-v30-sf") || "all";
+        refreshScoreboardSuiteV30();
+      };
+    });
+    bar.querySelectorAll("[data-v30-vm]").forEach(function (b) {
+      b.onclick = function () {
+        v30ScoreState.viewMode = b.getAttribute("data-v30-vm") || "cards";
+        refreshScoreboardSuiteV30();
+      };
+    });
+  }
+
+  function refreshScoreboardSuiteV30() {
+    var items = Array.isArray(window.__dcLatestScoreItems) ? window.__dcLatestScoreItems : [];
+    syncSportPillLiveDotsV30(items);
+    mountOrUpdateV30ScoreToolbar();
+    renderScoreboardTableV30(items);
+  }
+
+  // 5-Tab Match Insight Modal + Tactical Board & Write Analysis (+15P) One-Click Bridge!
+  function installMatchInsightModalV30() {
+    window.__openDcScorePopup = function (idx) {
+      var items = window.__dcLatestScoreItems || [];
+      var it = items[idx];
+      if (!it) return;
+      var modal = document.getElementById("dcQuickMatchModal");
+      if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "dcQuickMatchModal";
+        modal.style.cssText = "position:fixed;inset:0;background:rgba(2,6,23,0.82);backdrop-filter:blur(4px);z-index:10005;display:flex;align-items:center;justify-content:center;padding:14px;";
+        modal.addEventListener("click", function (ev) {
+          if (ev.target === modal) modal.style.display = "none";
+        });
+        document.body.appendChild(modal);
+      }
+
+      var fk = matchFavKeyV30(it);
+      var isFav = Boolean(v30ScoreState.favMap[fk]);
+      var ai = it.ai || {};
+      var odds = ai.odds || {};
+      var hp = Number(ai.home_pct || 45);
+      var dp = Number(ai.draw_pct || 0);
+      var ap = Number(ai.away_pct || (100 - hp - dp));
+
+      // Compute Market Implied Probabilities vs SportIQ AI Edge!
+      var oh = parseFloat(odds.home) || 0;
+      var od = parseFloat(odds.draw) || 0;
+      var oa = parseFloat(odds.away) || 0;
+      var invSum = (oh > 0 ? 1 / oh : 0) + (od > 0 ? 1 / od : 0) + (oa > 0 ? 1 / oa : 0);
+      var mktH = invSum > 0 && oh > 0 ? Math.round(((1 / oh) / invSum) * 1000) / 10 : hp;
+      var mktD = invSum > 0 && od > 0 ? Math.round(((1 / od) / invSum) * 1000) / 10 : dp;
+      var mktA = invSum > 0 && oa > 0 ? Math.round(((1 / oa) / invSum) * 1000) / 10 : ap;
+      var edgeH = Math.round((hp - mktH) * 10) / 10;
+      var edgeA = Math.round((ap - mktA) * 10) / 10;
+      var verdict = evaluateAiVerdictV30(it);
+
+      modal.style.display = "flex";
+      modal.innerHTML = [
+        "<div style='background:#0f172a;border:1px solid #334155;border-radius:18px;max-width:620px;width:100%;max-height:88vh;display:flex;flex-direction:column;color:#f8fafc;box-shadow:0 24px 55px rgba(0,0,0,0.65);overflow:hidden;'>",
+        "  <div style='padding:14px 16px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;gap:8px;'>",
+        "    <div style='display:flex;align-items:center;gap:7px;flex-wrap:wrap;'>",
+        "      <span style='background:#2563eb;color:#fff;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:800;'>" + sportEmojiV30(it.sport) + " " + uxEsc(it.league_full || it.league) + " · " + uxEsc(it.status_badge) + "</span>",
+        (verdict ? verdict.badgeHtml : ""),
+        "    </div>",
+        "    <div style='display:flex;align-items:center;gap:6px;'>",
+        "      <button type='button' id='sqModalFavBtnV30' style='background:#1e293b;border:1px solid #334155;color:" + (isFav ? "#fbbf24" : "#cbd5e1") + ";border-radius:8px;padding:4px 9px;font-size:11.5px;font-weight:800;cursor:pointer;'>" + (isFav ? "★ 관심됨" : "☆ 관심등록") + "</button>",
+        "      <button type='button' id='sqCloseMatchInsightV30' style='background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:4px 10px;font-size:11.5px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:4px;'><svg data-sq-x-svg='1' viewBox='0 0 14 14' width='11' height='11' fill='none'><path d='M3 3L11 11M11 3L3 11' stroke='currentColor' stroke-width='2.2' stroke-linecap='round'/></svg><span>닫기</span></button>",
+        "    </div>",
+        "  </div>",
+        "  <div style='padding:14px 16px;overflow-y:auto;flex:1;'>",
+        "    <div style='font-size:12px;color:#fde68a;font-weight:700;margin-bottom:8px;'>📅 " + uxEsc(it.match_dt_full_kst || it.match_dt_kst) + (it.venue ? " · 🏟️ " + uxEsc(it.venue) : "") + "</div>",
+        "    <div style='background:linear-gradient(135deg,#020617,#1e293b);border:1px solid #334155;border-radius:14px;padding:14px 16px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin-bottom:12px;'>",
+        "      <div style='font-weight:900;font-size:15.5px;'>" + uxEsc(it.home) + "</div>",
+        "      <div style='text-align:center;'>",
+        "        <div style='font-weight:900;font-size:24px;color:#38bdf8;'>" + (it.state === "pre" ? "VS" : (uxEsc(it.home_score) + " : " + uxEsc(it.away_score))) + "</div>",
+        (it.period_scores ? "<div style='font-size:11px;color:#93c5fd;margin-top:2px;'>" + uxEsc(it.period_scores) + "</div>" : ""),
+        "      </div>",
+        "      <div style='font-weight:900;font-size:15.5px;text-align:right;'>" + uxEsc(it.away) + "</div>",
+        "    </div>",
+        "    <div id='sqMatchInsightTabsV30' style='display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px;'>",
+        "      <button type='button' class='sq-v30-insight-tab active' data-mitab='summary'>📊 요약 · 확률격차</button>",
+        "      <button type='button' class='sq-v30-insight-tab' data-mitab='stats'>📈 스탯 · 흐름</button>",
+        "      <button type='button' class='sq-v30-insight-tab' data-mitab='h2h'>⚔️ 전력 · 순위 · 부상</button>",
+        "      <button type='button' class='sq-v30-insight-tab' data-mitab='lineup'>📋 포메이션 · 전술</button>",
+        "      <button type='button' class='sq-v30-insight-tab' data-mitab='talk'>💬 이 경기 한줄톡</button>",
+        "    </div>",
+        "    <div id='sqMatchInsightBodyV30' style='background:#020617;border:1px solid #1e293b;border-radius:12px;padding:13px;min-height:150px;font-size:12.5px;line-height:1.6;'></div>",
+        "  </div>",
+        "  <div style='padding:12px 16px;border-top:1px solid #1e293b;background:#090f1f;display:flex;flex-wrap:wrap;gap:7px;'>",
+        "    <button type='button' id='sqBridgeTacticalV30' style='flex:1;min-width:150px;background:rgba(56,189,248,.16);border:1px solid rgba(56,189,248,.5);color:#7dd3fc;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:800;cursor:pointer;'>🧪 전술판으로 매치업 불러오기</button>",
+        "    <button type='button' id='sqBridgeWritePostV30' style='flex:1;min-width:165px;background:linear-gradient(135deg,#10b981,#059669);border:0;color:#020617;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:900;cursor:pointer;'>✍️ 이 경기로 분석글 쓰기 (+15P)</button>",
+        "    <button type='button' id='sqBridgeStandingsV30' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:10px;padding:8px 11px;font-size:12px;font-weight:800;cursor:pointer;'>🔢 순위표</button>",
+        "  </div>",
+        "</div>"
+      ].join("");
+
+      document.getElementById("sqCloseMatchInsightV30").onclick = function () { modal.style.display = "none"; };
+      document.getElementById("sqModalFavBtnV30").onclick = function (ev) {
+        window.toggleMatchFavV30(ev, fk);
+        var nowFav = Boolean(v30ScoreState.favMap[fk]);
+        var b = document.getElementById("sqModalFavBtnV30");
+        if (b) {
+          b.textContent = nowFav ? "★ 관심됨" : "☆ 관심등록";
+          b.style.color = nowFav ? "#fbbf24" : "#cbd5e1";
+        }
+      };
+
+      function renderInsightTab(tabKey) {
+        var box = document.getElementById("sqMatchInsightBodyV30");
+        if (!box) return;
+        if (tabKey === "summary") {
+          var edgeNote = Math.abs(edgeH) >= Math.abs(edgeA)
+            ? (uxEsc(it.home) + " 측 AI 확률(" + hp + "%)이 배당 내재확률(" + mktH + "%) 대비 <strong style='color:" + (edgeH >= 0 ? "#34d399" : "#fbbf24") + ";'>" + (edgeH >= 0 ? "+" : "") + edgeH + "%p</strong> 차이를 보입니다.")
+            : (uxEsc(it.away) + " 측 AI 확률(" + ap + "%)이 배당 내재확률(" + mktA + "%) 대비 <strong style='color:" + (edgeA >= 0 ? "#34d399" : "#fbbf24") + ";'>" + (edgeA >= 0 ? "+" : "") + edgeA + "%p</strong> 차이를 보입니다.");
+          box.innerHTML = [
+            "<div style='font-weight:800;color:#6ee7b7;margin-bottom:8px;'>🤖 SportIQ 앙상블 확률 vs 시장 배당 내재확률 비교</div>",
+            "<div style='display:flex;height:10px;border-radius:999px;overflow:hidden;background:#1e293b;margin-bottom:6px;'>",
+            "  <div style='width:" + hp + "%;background:#10b981;'></div>",
+            (dp > 0 ? "<div style='width:" + dp + "%;background:#64748b;'></div>" : ""),
+            "  <div style='width:" + ap + "%;background:#38bdf8;'></div>",
+            "</div>",
+            "<div style='display:grid;grid-template-columns:repeat(" + (dp > 0 ? 3 : 2) + ",1fr);gap:8px;text-align:center;margin-bottom:10px;'>",
+            "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:7px;'><div style='color:#94a3b8;font-size:11px;'>홈승 (" + uxEsc(it.home) + ")</div><strong style='color:#34d399;font-size:14px;'>AI " + hp + "%</strong><div style='color:#64748b;font-size:10.5px;'>시장 " + mktH + "% · 배당 " + uxEsc(odds.home || "-") + "</div></div>",
+            (dp > 0 ? "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:7px;'><div style='color:#94a3b8;font-size:11px;'>무승부</div><strong style='color:#cbd5e1;font-size:14px;'>AI " + dp + "%</strong><div style='color:#64748b;font-size:10.5px;'>시장 " + mktD + "% · 배당 " + uxEsc(odds.draw || "-") + "</div></div>" : ""),
+            "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:7px;'><div style='color:#94a3b8;font-size:11px;'>원정승 (" + uxEsc(it.away) + ")</div><strong style='color:#38bdf8;font-size:14px;'>AI " + ap + "%</strong><div style='color:#64748b;font-size:10.5px;'>시장 " + mktA + "% · 배당 " + uxEsc(odds.away || "-") + "</div></div>",
+            "</div>",
+            "<div style='background:rgba(16,185,129,.08);border:1px solid rgba(52,211,153,.3);border-radius:9px;padding:9px 11px;color:#e2e8f0;'>💡 <strong>밸류 핵심 요약:</strong> " + edgeNote + "</div>"
+          ].join("");
+        } else if (tabKey === "stats") {
+          var domH = Math.max(22, Math.min(78, Math.round(hp + (dp * 0.5))));
+          var domA = 100 - domH;
+          box.innerHTML = [
+            "<div style='font-weight:800;color:#7dd3fc;margin-bottom:8px;'>📈 세부 스코어 · 전술 주도권 비교</div>",
+            "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:9px 11px;margin-bottom:10px;'>",
+            "  <div style='color:#94a3b8;font-size:11px;'>전·후반 / 쿼터 / 이닝 기록</div>",
+            "  <div style='color:#f8fafc;font-weight:700;margin-top:2px;'>" + uxEsc(it.period_scores || "킥오프 이후 실시간 쿼터·이닝·전후반 세부 기록이 자동 집계됩니다.") + "</div>",
+            "</div>",
+            "<div style='margin-bottom:8px;'>",
+            "  <div style='display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;'><span>" + uxEsc(it.home) + " " + domH + "%</span><span style='color:#94a3b8;'>예상 주도권 · 압박 지수</span><span>" + domA + "% " + uxEsc(it.away) + "</span></div>",
+            "  <div style='display:flex;height:8px;border-radius:999px;overflow:hidden;background:#1e293b;'><div style='width:" + domH + "%;background:#10b981;'></div><div style='width:" + domA + "%;background:#38bdf8;'></div></div>",
+            "</div>",
+            "<div>",
+            "  <div style='display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;'><span>" + (hp / 25).toFixed(2) + " xG</span><span style='color:#94a3b8;'>모델 기대 득점력 지수</span><span>" + (ap / 25).toFixed(2) + " xG</span></div>",
+            "  <div style='display:flex;height:8px;border-radius:999px;overflow:hidden;background:#1e293b;'><div style='width:" + Math.round((hp / Math.max(1, hp + ap)) * 100) + "%;background:#34d399;'></div><div style='flex:1;background:#60a5fa;'></div></div>",
+            "</div>"
+          ].join("");
+        } else if (tabKey === "h2h") {
+          box.innerHTML = "<div style='color:#94a3b8;'>⚔️ 양 팀 실시간 리그 순위·최근 폼 및 결장자 명단을 조회 중입니다...</div>";
+          var lgc = encodeURIComponent(it.league_code || "EPL");
+          Promise.all([
+            fetch("/api/datacenter/standings?league=" + lgc).then(function (r) { return r.json(); }).catch(function () { return {}; }),
+            fetch("/api/datacenter/injuries?league=" + lgc).then(function (r) { return r.json(); }).catch(function () { return {}; })
+          ]).then(function (arr) {
+            var stData = arr[0] || {};
+            var injData = arr[1] || {};
+            var rows = stData.standings || [];
+            function matchTeamRow(name) {
+              var n = String(name || "").toLowerCase();
+              return rows.find(function (r) {
+                var rt = String(r.team || "").toLowerCase();
+                return rt === n || rt.indexOf(n) !== -1 || n.indexOf(rt) !== -1;
+              });
+            }
+            var hRow = matchTeamRow(it.home);
+            var aRow = matchTeamRow(it.away);
+            function fmtStanding(tName, rObj) {
+              if (!rObj) return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;'><strong>" + uxEsc(tName) + "</strong>: 대회 통합 토너먼트 / 별도 순위 집계 대상</div>";
+              var fm = Array.isArray(rObj.form) ? rObj.form.join("·") : String(rObj.form || "-");
+              return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;'><span><strong style='color:#fde68a;'>#" + uxEsc(rObj.rank) + "</strong> <strong>" + uxEsc(rObj.team) + "</strong> (" + uxEsc(rObj.w) + "승 " + uxEsc(rObj.d) + "무 " + uxEsc(rObj.l) + "패 · 승점 " + uxEsc(rObj.pts) + ")</span><span style='font-size:11px;color:#34d399;font-weight:800;'>최근폼 " + uxEsc(fm) + "</span></div>";
+            }
+            var teamInjs = (injData.items || []).filter(function (x) {
+              var tm = String(x.team || "");
+              return tm.indexOf(it.home) !== -1 || it.home.indexOf(tm) !== -1 || tm.indexOf(it.away) !== -1 || it.away.indexOf(tm) !== -1;
+            }).slice(0, 5);
+            var injHtml = teamInjs.length
+              ? teamInjs.map(function (x) {
+                  return "<div style='font-size:11.5px;padding:4px 0;border-bottom:1px solid #1e293b;'>🏥 <strong>[" + uxEsc(x.team) + "] " + uxEsc(x.player) + "</strong> · " + uxEsc(x.reason) + " <span style='color:#fbbf24;'>(" + uxEsc(x.severity) + ")</span></div>";
+                }).join("")
+              : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>";
+            box.innerHTML = (
+              "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 성적 & 최근 5경기 흐름</div>" +
+              "<div style='display:grid;gap:6px;margin-bottom:10px;'>" + fmtStanding(it.home, hRow) + fmtStanding(it.away, aRow) + "</div>" +
+              "<div style='font-weight:800;color:#fca5a5;margin-bottom:4px;'>🏥 양 팀 주요 결장 · 부상 체크</div>" + injHtml
+            );
+          });
+        } else if (tabKey === "lineup") {
+          box.innerHTML = [
+            "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>",
+            "  <span style='font-weight:800;color:#6ee7b7;'>📋 기본 전술 포메이션 매치업 프리뷰</span>",
+            "  <span style='font-size:11px;color:#94a3b8;'>홈 4-2-3-1 vs 원정 4-3-3 기준</span>",
+            "</div>",
+            "<svg viewBox='0 0 460 190' width='100%' style='background:#064e3b;border:2px solid rgba(255,255,255,.25);border-radius:10px;display:block;'>",
+            "  <line x1='230' y1='0' x2='230' y2='190' stroke='rgba(255,255,255,.3)' stroke-width='1.5'/>",
+            "  <circle cx='230' cy='95' r='28' fill='none' stroke='rgba(255,255,255,.3)' stroke-width='1.5'/>",
+            "  <rect x='0' y='45' width='42' height='100' fill='none' stroke='rgba(255,255,255,.3)' stroke-width='1.5'/>",
+            "  <rect x='418' y='45' width='42' height='100' fill='none' stroke='rgba(255,255,255,.3)' stroke-width='1.5'/>",
+            "  <circle cx='22' cy='95' r='8' fill='#10b981'/><circle cx='72' cy='35' r='8' fill='#10b981'/><circle cx='72' cy='75' r='8' fill='#10b981'/><circle cx='72' cy='115' r='8' fill='#10b981'/><circle cx='72' cy='155' r='8' fill='#10b981'/>",
+            "  <circle cx='122' cy='70' r='8' fill='#10b981'/><circle cx='122' cy='120' r='8' fill='#10b981'/>",
+            "  <circle cx='168' cy='42' r='8' fill='#10b981'/><circle cx='168' cy='95' r='8' fill='#10b981'/><circle cx='168' cy='148' r='8' fill='#10b981'/><circle cx='206' cy='95' r='9' fill='#34d399'/>",
+            "  <circle cx='438' cy='95' r='8' fill='#38bdf8'/><circle cx='388' cy='35' r='8' fill='#38bdf8'/><circle cx='388' cy='75' r='8' fill='#38bdf8'/><circle cx='388' cy='115' r='8' fill='#38bdf8'/><circle cx='388' cy='155' r='8' fill='#38bdf8'/>",
+            "  <circle cx='332' cy='52' r='8' fill='#38bdf8'/><circle cx='332' cy='95' r='8' fill='#38bdf8'/><circle cx='332' cy='138' r='8' fill='#38bdf8'/>",
+            "  <circle cx='272' cy='45' r='8' fill='#7dd3fc'/><circle cx='256' cy='95' r='9' fill='#7dd3fc'/><circle cx='272' cy='145' r='8' fill='#7dd3fc'/>",
+            "  <text x='14' y='18' fill='#a7f3d0' font-size='11' font-weight='800'>" + uxEsc(it.home) + "</text>",
+            "  <text x='446' y='18' text-anchor='end' fill='#bae6fd' font-size='11' font-weight='800'>" + uxEsc(it.away) + "</text>",
+            "</svg>",
+            "<div style='font-size:11.5px;color:#cbd5e1;margin-top:8px;'>하단 <strong>🧪 전술판으로 매치업 불러오기</strong>를 누르면 직접 선수 위치를 드래그해 커스텀 전술을 공유할 수 있습니다.</div>"
+          ].join("");
+        } else if (tabKey === "talk") {
+          box.innerHTML = [
+            "<div style='display:flex;gap:6px;margin-bottom:10px;'>",
+            "  <input id='sqMatchTalkInpV30' placeholder='" + uxEsc(it.home + " vs " + it.away) + " 한줄 응원·예측 남기기...' style='flex:1;min-width:0;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:7px 10px;color:#fff;font-size:12px;' />",
+            "  <button type='button' id='sqMatchTalkSendV30' style='background:#10b981;border:0;color:#020617;border-radius:8px;padding:7px 12px;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;'>등록</button>",
+            "</div>",
+            "<div id='sqMatchTalkListV30' style='color:#94a3b8;font-size:12px;'>실시간 응원톡을 불러오는 중입니다...</div>"
+          ].join("");
+
+          function loadMatchCheers() {
+            fetch("/api/cheers").then(function (r) { return r.json(); }).then(function (d) {
+              var allC = (d && (d.cheers || d.items)) || [];
+              var rel = allC.filter(function (c) {
+                var m = String(c.message || "");
+                return m.indexOf(it.home) !== -1 || m.indexOf(it.away) !== -1;
+              });
+              var showList = (rel.length ? rel : allC).slice(0, 6);
+              var lBox = document.getElementById("sqMatchTalkListV30");
+              if (!lBox) return;
+              if (!showList.length) {
+                lBox.innerHTML = "첫 번째 한줄 응원톡을 남겨보세요!";
+                return;
+              }
+              lBox.innerHTML = showList.map(function (c) {
+                return "<div style='padding:5px 0;border-bottom:1px solid #1e293b;color:#e2e8f0;'><strong style='color:#34d399;'>" + uxEsc(c.nickname || "스포츠팬") + "</strong>: " + uxEsc(c.message) + "</div>";
+              }).join("");
+            }).catch(function () {});
+          }
+          loadMatchCheers();
+          var sBtn = document.getElementById("sqMatchTalkSendV30");
+          if (sBtn) {
+            sBtn.onclick = function () {
+              var inp = document.getElementById("sqMatchTalkInpV30");
+              var msg = inp ? inp.value.trim() : "";
+              if (!msg) return;
+              var nk = getSavedNickV22() || "라운지팬";
+              fetch("/api/cheers", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nickname: nk, team: it.league || "ALL", message: "[" + it.home + " vs " + it.away + "] " + msg })
+              }).then(function () {
+                if (inp) inp.value = "";
+                loadMatchCheers();
+                if (typeof showToast === "function") showToast("💬 이 경기 한줄 응원톡이 등록되었습니다!");
+              });
+            };
+          }
+        }
+      }
+
+      renderInsightTab("summary");
+      modal.querySelectorAll("[data-mitab]").forEach(function (tb) {
+        tb.onclick = function () {
+          modal.querySelectorAll("[data-mitab]").forEach(function (x) { x.classList.remove("active"); });
+          tb.classList.add("active");
+          renderInsightTab(tb.getAttribute("data-mitab") || "summary");
+        };
+      });
+
+      document.getElementById("sqBridgeTacticalV30").onclick = function () {
+        modal.style.display = "none";
+        if (typeof window.switchTab === "function") window.switchTab("lab");
+        var labSec = document.getElementById("tab-lab");
+        if (labSec && labSec.scrollIntoView) labSec.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (typeof showToast === "function") showToast("🧪 [" + it.home + " vs " + it.away + "] 전술 시뮬레이션 탭으로 이동했습니다.");
+      };
+
+      document.getElementById("sqBridgeWritePostV30").onclick = function () {
+        modal.style.display = "none";
+        var wm = document.getElementById("writeModal");
+        if (typeof window.openModal === "function") window.openModal("writeModal");
+        else if (wm) { wm.classList.remove("hidden"); wm.style.display = "flex"; }
+        var tEl = document.getElementById("postTitle");
+        var bEl = document.getElementById("postContent");
+        var lEl = document.getElementById("postLeague");
+        var gEl = document.getElementById("postTags");
+        if (lEl && it.league_code) {
+          Array.prototype.forEach.call(lEl.options || [], function (opt) {
+            if (opt.value.toUpperCase() === String(it.league_code).toUpperCase()) lEl.value = opt.value;
+          });
+        }
+        if (tEl) tEl.value = "[매치 프리뷰] " + it.home + " vs " + it.away + " 전력·배당 핵심 분석";
+        if (bEl) {
+          bEl.value = [
+            "■ 매치업: " + (it.league_full || it.league) + " — " + it.home + " vs " + it.away + " (" + (it.match_dt_full_kst || it.match_dt_kst) + ")",
+            "■ AI 승률 / 기준 배당: 홈 " + hp + "%" + (dp > 0 ? " · 무 " + dp + "%" : "") + " · 원정 " + ap + "% (배당 " + (odds.home || "-") + (odds.draw ? "/" + odds.draw : "") + "/" + (odds.away || "-") + ")",
+            "",
+            "■ 핵심 전술 관전 포인트:",
+            "1. ",
+            "2. ",
+            "■ 최종 승부 예측 픽: "
+          ].join("\n");
+        }
+        if (gEl) gEl.value = "#" + String(it.league || "스포츠").replace(/\s+/g, "") + " #" + String(it.home).replace(/\s+/g, "") + " #" + String(it.away).replace(/\s+/g, "");
+        polishModalsAndCloseIconsV29();
+      };
+
+      document.getElementById("sqBridgeStandingsV30").onclick = function () {
+        modal.style.display = "none";
+        if (typeof window.__switchDcTab === "function") window.__switchDcTab("standings", it.league_code || "EPL");
+      };
+    };
+  }
+
   function bootMemberUxV22() {
     injectUxV22Styles();
     enforceSingleLineMainTabBar();
@@ -2584,6 +3415,8 @@ _FRONTEND_V22_JS = r'''
     window.addEventListener("resize", harmonizeMobileFloatingOverlaysV26);
     polishModalsAndCloseIconsV29();
     stabilizeHofLaunchCardV29();
+    installMatchInsightModalV30();
+    refreshScoreboardSuiteV30();
     handleDeepLinkPostOnBootV29();
     if (typeof window.submitComment === "function" && !window.__sqSubmitCommentWrappedV29) {
       window.__sqSubmitCommentWrappedV29 = true;
@@ -2611,6 +3444,8 @@ _FRONTEND_V22_JS = r'''
         harmonizeMobileFloatingOverlaysV26();
         stabilizeHofLaunchCardV29();
         polishModalsAndCloseIconsV29();
+        installMatchInsightModalV30();
+        refreshScoreboardSuiteV30();
         applyReactionStateToPosts();
         syncRenderedFeedReactionButtonsDom();
       }
@@ -2640,6 +3475,8 @@ _FRONTEND_V22_JS = r'''
       enforceSingleLineMainTabBar();
       stabilizeHofLaunchCardV29();
       polishModalsAndCloseIconsV29();
+      installMatchInsightModalV30();
+      refreshScoreboardSuiteV30();
       harmonizeMobileFloatingOverlaysV26();
       installDataCenterPersistenceGuardV28();
       syncTop20MatchCountBadge();
@@ -2695,7 +3532,7 @@ def _ensure_upgrade_js_dedup_patched() -> bool:
     # Prevent HYBRID_SEED_GUARD_V17_JS (L7773) from treating <div id="feedList"> inside #tab-feed as a match seed card and setting display:none!
     updated = updated.replace(
         'if (container.id === "feedList" || container.id === "dcLauncherGrid" || container.id === "globalTop10Grid") return;',
-        'if (container.id === "feedList" || container.id === "tab-feed" || container.id === "dcLauncherGrid" || container.id === "dcLaunchCards" || container.id === "dcHubBody" || container.id === "dcHubCollapsible" || container.id === "dcMainHubSection" || container.id === "tab-datacenter" || container.id === "globalTop10Grid" || (container.querySelector && (container.querySelector("#feedList") || container.querySelector("#dcHubBody") || container.querySelector("#dcLauncherGrid"))) || (container.closest && container.closest("#tab-feed, #dcMainHubSection, #dcHubCollapsible, #dcHubBody, #dcLauncherGrid, #dcLaunchCards, #tab-datacenter"))) return;',
+        'if (container.id === "feedList" || container.id === "tab-feed" || container.id === "dcLauncherGrid" || container.id === "dcLaunchCards" || container.id === "dcHubBody" || container.id === "sqV30ScoreToolbar" || container.id === "sqV30ScoreboardTableWrap" || container.id === "dcHubCollapsible" || container.id === "dcMainHubSection" || container.id === "tab-datacenter" || container.id === "globalTop10Grid" || (container.querySelector && (container.querySelector("#feedList") || container.querySelector("#dcHubBody") || container.querySelector("#dcLauncherGrid"))) || (container.closest && container.closest("#tab-feed, #dcMainHubSection, #dcHubCollapsible, #dcHubBody, #dcLauncherGrid, #sqV30ScoreToolbar, #sqV30ScoreboardTableWrap, #dcLaunchCards, #tab-datacenter"))) return;',
     )
     updated = updated.replace(
         'art.style.display = (matchTab && matchSearch) ? "" : "none";',
@@ -4160,6 +4997,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
         "updated_points": updated_pts,
         **cached_payload,
     }
+
 
 
 
@@ -5940,7 +6778,7 @@ def serve_lounge_home(request: Request):
             rendered = inject_upgrade_into_html(raw_html)
             rendered = re.sub(
                 r'(/api/member/p0p1-upgrade\.js\?v=)(\d+)',
-                lambda m: m.group(1) + str(int(m.group(2)) + 1100),
+                lambda m: m.group(1) + str(int(m.group(2)) + 1200),
                 rendered,
             )
             rendered = inject_seo_and_og_head_v27(rendered)
