@@ -616,6 +616,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -3409,6 +3411,9 @@ _FRONTEND_V22_JS = r'''
             }
           }
           dcJson.items = curItems;
+          if (spReq === "all" && lgReq === "ALL" && curItems.length > 0 && (!v30ScoreState.customDateRendered || offReq === v30ScoreState.selectedDateOffset)) {
+            setTimeout(function () { mergeRawScoreItemsV30(curItems, true); }, 0);
+          }
           return new Response(JSON.stringify(dcJson), { status: 200, headers: { "Content-Type": "application/json" } });
         });
       }
@@ -7700,6 +7705,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -7890,7 +7896,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3520_{int(time.time())}"
+_BOOT_VER_V30 = f"3530_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -9905,7 +9911,10 @@ def api_member_scoreboard_v30(date_offset: int = 0):
             collect_all = getattr(_dc, "_collect_all_matches", None)
             api_ls_fn = getattr(_dc, "api_live_scores", None)
             if callable(collect_dict):
-                d_res = collect_dict(date_offset)
+                try:
+                    d_res = collect_dict(date_offset=date_offset)
+                except TypeError:
+                    d_res = collect_dict(date_offset)
                 if isinstance(d_res, dict):
                     target_date_kst = str(d_res.get("target_date_kst") or target_date_kst)
                     server_now_kst = str(d_res.get("server_now_kst") or server_now_kst)
