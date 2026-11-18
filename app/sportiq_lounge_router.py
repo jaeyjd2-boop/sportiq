@@ -562,6 +562,12 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -4466,6 +4472,310 @@ _FRONTEND_V22_JS = r'''
     renderScoreboardTableV30(items);
   }
 
+  function getSportTacticalViewV33(it, hp, ap) {
+    var sp = String((it && it.sport) || "soccer").toLowerCase();
+    var h = uxEsc((it && it.home) || "홈팀");
+    var a = uxEsc((it && it.away) || "원정팀");
+
+    if (sp === "baseball") {
+      return {
+        tabLabel: "⚾ 수비시프트 · 타순",
+        hdrTitle: "⚾ 내·외야 수비 시프트 & 투타 매치업 구도",
+        hdrSub: "수비 " + h + " vs 공격 " + a + " 기준",
+        statLabel: "예상 투타 주도권 · 불펜 안정감",
+        expTitle: "모델 예상 기대득점 (xR)",
+        expHome: (2.3 + (hp * 0.046)).toFixed(1) + "점",
+        expAway: (2.3 + (ap * 0.046)).toFixed(1) + "점",
+        labPresetKw: "야구",
+        footNote: "하단 <strong>🧪 전술판으로 매치업 불러오기</strong>를 누르면 <strong>⚾ 야구 다이아몬드</strong> 전술판으로 즉시 전환됩니다.",
+        svgHtml: [
+          "<svg viewBox='0 0 460 205' width='100%' style='max-height:195px;height:auto;background:linear-gradient(180deg,#064e3b 0%,#065f46 100%);border:2px solid rgba(255,255,255,.24);border-radius:10px;display:block;'>",
+          "  <path d='M 65 162 A 185 165 0 0 1 395 162 L 230 192 Z' fill='rgba(16,185,129,.16)' stroke='rgba(255,255,255,.32)' stroke-width='1.5'/>",
+          "  <line x1='230' y1='186' x2='78' y2='62' stroke='rgba(255,255,255,.45)' stroke-width='1.6'/>",
+          "  <line x1='230' y1='186' x2='382' y2='62' stroke='rgba(255,255,255,.45)' stroke-width='1.6'/>",
+          "  <polygon points='230,96 292,141 230,186 168,141' fill='rgba(180,83,9,.46)' stroke='rgba(253,230,138,.65)' stroke-width='1.6'/>",
+          "  <circle cx='230' cy='142' r='10' fill='rgba(217,119,6,.65)' stroke='rgba(255,255,255,.4)' stroke-width='1'/>",
+          "  <rect x='226' y='92' width='8' height='8' fill='#fff' transform='rotate(45 230 96)'/>",
+          "  <rect x='288' y='137' width='8' height='8' fill='#fff' transform='rotate(45 292 141)'/>",
+          "  <rect x='164' y='137' width='8' height='8' fill='#fff' transform='rotate(45 168 141)'/>",
+          "  <polygon points='225,183 235,183 235,188 230,192 225,188' fill='#fff'/>",
+          "  <circle cx='126' cy='58' r='9' fill='#10b981'/><text x='126' y='61' text-anchor='middle' fill='#022c22' font-size='8.5' font-weight='900'>LF</text>",
+          "  <circle cx='230' cy='40' r='9' fill='#10b981'/><text x='230' y='43' text-anchor='middle' fill='#022c22' font-size='8.5' font-weight='900'>CF</text>",
+          "  <circle cx='334' cy='58' r='9' fill='#10b981'/><text x='334' y='61' text-anchor='middle' fill='#022c22' font-size='8.5' font-weight='900'>RF</text>",
+          "  <circle cx='196' cy='106' r='8.5' fill='#34d399'/><text x='196' y='109' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>SS</text>",
+          "  <circle cx='264' cy='106' r='8.5' fill='#34d399'/><text x='264' y='109' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>2B</text>",
+          "  <circle cx='160' cy='132' r='8.5' fill='#34d399'/><text x='160' y='135' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>3B</text>",
+          "  <circle cx='300' cy='132' r='8.5' fill='#34d399'/><text x='300' y='135' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>1B</text>",
+          "  <circle cx='230' cy='142' r='8.5' fill='#fde68a'/><text x='230' y='145' text-anchor='middle' fill='#0f172a' font-size='8.5' font-weight='900'>P</text>",
+          "  <circle cx='230' cy='196' r='8' fill='#10b981'/><text x='230' y='199' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>C</text>",
+          "  <circle cx='246' cy='184' r='8.5' fill='#38bdf8'/><text x='246' y='187' text-anchor='middle' fill='#082f49' font-size='7.5' font-weight='900'>타자</text>",
+          "  <circle cx='304' cy='147' r='7.5' fill='#7dd3fc'/><text x='304' y='150' text-anchor='middle' fill='#082f49' font-size='7' font-weight='900'>주자</text>",
+          "  <text x='14' y='20' fill='#a7f3d0' font-size='11' font-weight='800'>🟢 수비·마운드: " + h + "</text>",
+          "  <text x='446' y='20' text-anchor='end' fill='#bae6fd' font-size='11' font-weight='800'>🔵 타선·주루: " + a + "</text>",
+          "</svg>"
+        ].join("")
+      };
+    }
+
+    if (sp === "basketball") {
+      return {
+        tabLabel: "🏀 5-Out 코트전술",
+        hdrTitle: "🏀 하프코트 5-Out 스페이싱 vs 스위치 로테이션",
+        hdrSub: "홈 5-Out 오펜스 vs 원정 2-3/스위치 수비",
+        statLabel: "리바운드 · 클러치 페이스 주도권",
+        expTitle: "모델 예상 최종 득점치 (PTS)",
+        expHome: Math.round(99 + (hp * 0.30)) + "점",
+        expAway: Math.round(99 + (ap * 0.30)) + "점",
+        labPresetKw: "농구",
+        footNote: "하단 <strong>🧪 전술판으로 매치업 불러오기</strong>를 누르면 <strong>🏀 농구 5-Out</strong> 코트 전술판으로 즉시 전환됩니다.",
+        svgHtml: [
+          "<svg viewBox='0 0 460 195' width='100%' style='max-height:195px;height:auto;background:linear-gradient(90deg,#3b2314 0%,#4a2c18 50%,#3b2314 100%);border:2px solid rgba(253,230,138,.35);border-radius:10px;display:block;'>",
+          "  <line x1='230' y1='0' x2='230' y2='195' stroke='rgba(255,255,255,.38)' stroke-width='1.6'/>",
+          "  <circle cx='230' cy='97.5' r='26' fill='none' stroke='rgba(255,255,255,.38)' stroke-width='1.6'/>",
+          "  <rect x='0' y='58' width='76' height='79' fill='rgba(16,185,129,.18)' stroke='rgba(255,255,255,.4)' stroke-width='1.5'/>",
+          "  <rect x='384' y='58' width='76' height='79' fill='rgba(56,189,248,.18)' stroke='rgba(255,255,255,.4)' stroke-width='1.5'/>",
+          "  <path d='M 0 22 L 54 22 A 82 82 0 0 1 54 173 L 0 173' fill='none' stroke='rgba(255,255,255,.42)' stroke-width='1.6'/>",
+          "  <path d='M 460 22 L 406 22 A 82 82 0 0 0 406 173 L 460 173' fill='none' stroke='rgba(255,255,255,.42)' stroke-width='1.6'/>",
+          "  <circle cx='148' cy='97.5' r='9.5' fill='#10b981'/><text x='148' y='101' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>PG</text>",
+          "  <circle cx='112' cy='38' r='9.5' fill='#10b981'/><text x='112' y='41.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>SG</text>",
+          "  <circle cx='112' cy='157' r='9.5' fill='#10b981'/><text x='112' y='160.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>SF</text>",
+          "  <circle cx='46' cy='46' r='9.5' fill='#34d399'/><text x='46' y='49.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>PF</text>",
+          "  <circle cx='58' cy='108' r='10' fill='#fde68a'/><text x='58' y='111.5' text-anchor='middle' fill='#0f172a' font-size='8.5' font-weight='900'>C</text>",
+          "  <circle cx='312' cy='97.5' r='9.5' fill='#38bdf8'/><text x='312' y='101' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>PG</text>",
+          "  <circle cx='348' cy='40' r='9.5' fill='#38bdf8'/><text x='348' y='43.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>SG</text>",
+          "  <circle cx='348' cy='155' r='9.5' fill='#38bdf8'/><text x='348' y='158.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>SF</text>",
+          "  <circle cx='406' cy='68' r='9.5' fill='#7dd3fc'/><text x='406' y='71.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>PF</text>",
+          "  <circle cx='402' cy='124' r='10' fill='#bae6fd'/><text x='402' y='127.5' text-anchor='middle' fill='#082f49' font-size='8.5' font-weight='900'>C</text>",
+          "  <text x='14' y='16' fill='#fde68a' font-size='11' font-weight='800'>" + h + " (5-Out)</text>",
+          "  <text x='446' y='16' text-anchor='end' fill='#bae6fd' font-size='11' font-weight='800'>" + a + " (Switch)</text>",
+          "</svg>"
+        ].join("")
+      };
+    }
+
+    if (sp === "hockey") {
+      return {
+        tabLabel: "🏒 라인배치 · 링크",
+        hdrTitle: "🏒 1라인 포체킹(2-1-2) vs 블루라인 수비 대형",
+        hdrSub: "LW·C·RW·LD·RD·G 6인 매치업",
+        statLabel: "5v5 점유율(Corsi) · 파워플레이 압박",
+        expTitle: "모델 기대 득점 (xG · 60분)",
+        expHome: (1.7 + (hp * 0.031)).toFixed(2) + " xG",
+        expAway: (1.7 + (ap * 0.031)).toFixed(2) + " xG",
+        labPresetKw: "",
+        footNote: "블루라인 진입 성공률과 스페셜팀(파워플레이·페널티킬) 효율이 승부를 좌우합니다.",
+        svgHtml: [
+          "<svg viewBox='0 0 460 190' width='100%' style='max-height:195px;height:auto;background:#0c2d48;border:2px solid rgba(186,230,253,.45);border-radius:26px;display:block;'>",
+          "  <line x1='155' y1='0' x2='155' y2='190' stroke='rgba(56,189,248,.65)' stroke-width='3'/>",
+          "  <line x1='305' y1='0' x2='305' y2='190' stroke='rgba(56,189,248,.65)' stroke-width='3'/>",
+          "  <line x1='230' y1='0' x2='230' y2='190' stroke='rgba(239,68,68,.7)' stroke-width='2.5' stroke-dasharray='6,4'/>",
+          "  <circle cx='230' cy='95' r='24' fill='none' stroke='rgba(56,189,248,.45)' stroke-width='1.5'/>",
+          "  <circle cx='85' cy='52' r='18' fill='none' stroke='rgba(239,68,68,.45)' stroke-width='1.3'/><circle cx='85' cy='138' r='18' fill='none' stroke='rgba(239,68,68,.45)' stroke-width='1.3'/>",
+          "  <circle cx='375' cy='52' r='18' fill='none' stroke='rgba(239,68,68,.45)' stroke-width='1.3'/><circle cx='375' cy='138' r='18' fill='none' stroke='rgba(239,68,68,.45)' stroke-width='1.3'/>",
+          "  <circle cx='26' cy='95' r='9' fill='#fde68a'/><text x='26' y='98' text-anchor='middle' fill='#0f172a' font-size='8' font-weight='900'>G</text>",
+          "  <circle cx='96' cy='62' r='9' fill='#10b981'/><text x='96' y='65' text-anchor='middle' fill='#022c22' font-size='7.5' font-weight='900'>LD</text>",
+          "  <circle cx='96' cy='128' r='9' fill='#10b981'/><text x='96' y='131' text-anchor='middle' fill='#022c22' font-size='7.5' font-weight='900'>RD</text>",
+          "  <circle cx='182' cy='46' r='9' fill='#34d399'/><text x='182' y='49' text-anchor='middle' fill='#022c22' font-size='7.5' font-weight='900'>LW</text>",
+          "  <circle cx='198' cy='95' r='9.5' fill='#34d399'/><text x='198' y='98' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>C</text>",
+          "  <circle cx='182' cy='144' r='9' fill='#34d399'/><text x='182' y='147' text-anchor='middle' fill='#022c22' font-size='7.5' font-weight='900'>RW</text>",
+          "  <circle cx='434' cy='95' r='9' fill='#fde68a'/><text x='434' y='98' text-anchor='middle' fill='#0f172a' font-size='8' font-weight='900'>G</text>",
+          "  <circle cx='364' cy='62' r='9' fill='#38bdf8'/><text x='364' y='65' text-anchor='middle' fill='#082f49' font-size='7.5' font-weight='900'>LD</text>",
+          "  <circle cx='364' cy='128' r='9' fill='#38bdf8'/><text x='364' y='131' text-anchor='middle' fill='#082f49' font-size='7.5' font-weight='900'>RD</text>",
+          "  <circle cx='278' cy='46' r='9' fill='#7dd3fc'/><text x='278' y='49' text-anchor='middle' fill='#082f49' font-size='7.5' font-weight='900'>LW</text>",
+          "  <circle cx='262' cy='95' r='9.5' fill='#7dd3fc'/><text x='262' y='98' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>C</text>",
+          "  <circle cx='278' cy='144' r='9' fill='#7dd3fc'/><text x='278' y='147' text-anchor='middle' fill='#082f49' font-size='7.5' font-weight='900'>RW</text>",
+          "  <text x='22' y='20' fill='#a7f3d0' font-size='11' font-weight='800'>" + h + "</text>",
+          "  <text x='438' y='20' text-anchor='end' fill='#bae6fd' font-size='11' font-weight='800'>" + a + "</text>",
+          "</svg>"
+        ].join("")
+      };
+    }
+
+    if (sp === "volleyball") {
+      return {
+        tabLabel: "🏐 로테이션 · 코트",
+        hdrTitle: "🏐 6인 로테이션(전위·후위) & 서브 리시브 배치",
+        hdrSub: "전위 블로킹 3인 · 후위 디그/파이프 3인",
+        statLabel: "서브 에이스 · 리시브 효율 우위",
+        expTitle: "모델 예상 세트 획득 기대치",
+        expHome: (1.2 + (hp * 0.026)).toFixed(1) + "세트",
+        expAway: (1.2 + (ap * 0.026)).toFixed(1) + "세트",
+        labPresetKw: "",
+        footNote: "사이드아웃 성공률과 중앙 속공·블로킹 벽 높이가 세트 후반 승부처를 결정합니다.",
+        svgHtml: [
+          "<svg viewBox='0 0 460 190' width='100%' style='max-height:195px;height:auto;background:#0f3d56;border:2px solid rgba(255,255,255,.32);border-radius:10px;display:block;'>",
+          "  <rect x='24' y='18' width='412' height='154' fill='rgba(234,88,12,.22)' stroke='#f8fafc' stroke-width='1.8'/>",
+          "  <line x1='230' y1='12' x2='230' y2='178' stroke='#fde68a' stroke-width='3'/>",
+          "  <line x1='162' y1='18' x2='162' y2='172' stroke='rgba(255,255,255,.45)' stroke-width='1.4' stroke-dasharray='5,4'/>",
+          "  <line x1='298' y1='18' x2='298' y2='172' stroke='rgba(255,255,255,.45)' stroke-width='1.4' stroke-dasharray='5,4'/>",
+          "  <circle cx='78' cy='48' r='10' fill='#10b981'/><text x='78' y='51.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>OH</text>",
+          "  <circle cx='78' cy='95' r='10' fill='#34d399'/><text x='78' y='98.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>L</text>",
+          "  <circle cx='78' cy='142' r='10' fill='#10b981'/><text x='78' y='145.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>S</text>",
+          "  <circle cx='188' cy='48' r='10' fill='#10b981'/><text x='188' y='51.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>OP</text>",
+          "  <circle cx='188' cy='95' r='10' fill='#fde68a'/><text x='188' y='98.5' text-anchor='middle' fill='#0f172a' font-size='8' font-weight='900'>MB</text>",
+          "  <circle cx='188' cy='142' r='10' fill='#10b981'/><text x='188' y='145.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>OH</text>",
+          "  <circle cx='272' cy='48' r='10' fill='#38bdf8'/><text x='272' y='51.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>OH</text>",
+          "  <circle cx='272' cy='95' r='10' fill='#fde68a'/><text x='272' y='98.5' text-anchor='middle' fill='#0f172a' font-size='8' font-weight='900'>MB</text>",
+          "  <circle cx='272' cy='142' r='10' fill='#38bdf8'/><text x='272' y='145.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>OP</text>",
+          "  <circle cx='382' cy='48' r='10' fill='#38bdf8'/><text x='382' y='51.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>S</text>",
+          "  <circle cx='382' cy='95' r='10' fill='#7dd3fc'/><text x='382' y='98.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>L</text>",
+          "  <circle cx='382' cy='142' r='10' fill='#38bdf8'/><text x='382' y='145.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>OH</text>",
+          "  <text x='30' y='32' fill='#a7f3d0' font-size='11' font-weight='800'>" + h + "</text>",
+          "  <text x='430' y='32' text-anchor='end' fill='#bae6fd' font-size='11' font-weight='800'>" + a + "</text>",
+          "</svg>"
+        ].join("")
+      };
+    }
+
+    if (sp === "esports") {
+      return {
+        tabLabel: "🎮 협곡라인 · 오브젝트",
+        hdrTitle: "🎮 소환사의 협곡 3라인 · 바론/드래곤 시야 배치",
+        hdrSub: "블루 " + h + " vs 레드 " + a + " (TOP·JGL·MID·ADC·SUP)",
+        statLabel: "초중반 라인전 · 오브젝트 교전 지수",
+        expTitle: "15분 골드·오브젝트 우위 확률",
+        expHome: hp + "%",
+        expAway: ap + "%",
+        labPresetKw: "",
+        footNote: "유충·첫 드래곤 타이밍의 정글-서포터 턴 활용과 미드 라인 주도권이 핵심 관전 포인트입니다.",
+        svgHtml: [
+          "<svg viewBox='0 0 460 195' width='100%' style='max-height:195px;height:auto;background:linear-gradient(135deg,#0f172a 0%,#132a1e 50%,#1e1b4b 100%);border:2px solid rgba(99,102,241,.4);border-radius:10px;display:block;'>",
+          "  <polyline points='44,168 44,26 416,26' fill='none' stroke='rgba(148,163,184,.35)' stroke-width='10' stroke-linejoin='round'/>",
+          "  <polyline points='44,168 416,168 416,26' fill='none' stroke='rgba(148,163,184,.35)' stroke-width='10' stroke-linejoin='round'/>",
+          "  <line x1='44' y1='168' x2='416' y2='26' stroke='rgba(148,163,184,.38)' stroke-width='10'/>",
+          "  <line x1='125' y1='35' x2='335' y2='160' stroke='rgba(56,189,248,.22)' stroke-width='12'/>",
+          "  <circle cx='168' cy='62' r='11' fill='rgba(168,85,247,.38)' stroke='#c084fc' stroke-width='1.5'/><text x='168' y='65.5' text-anchor='middle' fill='#f3e8ff' font-size='7.5' font-weight='900'>바론</text>",
+          "  <circle cx='292' cy='132' r='11' fill='rgba(245,158,11,.35)' stroke='#fbbf24' stroke-width='1.5'/><text x='292' y='135.5' text-anchor='middle' fill='#fef3c7' font-size='7.5' font-weight='900'>용</text>",
+          "  <circle cx='66' cy='52' r='9' fill='#10b981'/><text x='66' y='55' text-anchor='middle' fill='#022c22' font-size='7' font-weight='900'>TOP</text>",
+          "  <circle cx='146' cy='96' r='9' fill='#34d399'/><text x='146' y='99' text-anchor='middle' fill='#022c22' font-size='7' font-weight='900'>JGL</text>",
+          "  <circle cx='208' cy='106' r='9.5' fill='#10b981'/><text x='208' y='109' text-anchor='middle' fill='#022c22' font-size='7' font-weight='900'>MID</text>",
+          "  <circle cx='302' cy='168' r='9' fill='#10b981'/><text x='302' y='171' text-anchor='middle' fill='#022c22' font-size='7' font-weight='900'>ADC</text>",
+          "  <circle cx='326' cy='168' r='8.5' fill='#6ee7b7'/><text x='326' y='171' text-anchor='middle' fill='#022c22' font-size='7' font-weight='900'>SUP</text>",
+          "  <circle cx='106' cy='28' r='9' fill='#38bdf8'/><text x='106' y='31' text-anchor='middle' fill='#082f49' font-size='7' font-weight='900'>TOP</text>",
+          "  <circle cx='302' cy='92' r='9' fill='#7dd3fc'/><text x='302' y='95' text-anchor='middle' fill='#082f49' font-size='7' font-weight='900'>JGL</text>",
+          "  <circle cx='252' cy='88' r='9.5' fill='#38bdf8'/><text x='252' y='91' text-anchor='middle' fill='#082f49' font-size='7' font-weight='900'>MID</text>",
+          "  <circle cx='398' cy='142' r='9' fill='#38bdf8'/><text x='398' y='145' text-anchor='middle' fill='#082f49' font-size='7' font-weight='900'>ADC</text>",
+          "  <circle cx='376' cy='158' r='8.5' fill='#bae6fd'/><text x='376' y='161' text-anchor='middle' fill='#082f49' font-size='7' font-weight='900'>SUP</text>",
+          "  <text x='14' y='18' fill='#6ee7b7' font-size='11' font-weight='800'>🟦 블루: " + h + "</text>",
+          "  <text x='446' y='188' text-anchor='end' fill='#93c5fd' font-size='11' font-weight='800'>🟥 레드: " + a + "</text>",
+          "</svg>"
+        ].join("")
+      };
+    }
+
+    if (sp === "ufc") {
+      return {
+        tabLabel: "🥊 옥타곤 · 스타일",
+        hdrTitle: "🥊 UFC 옥타곤 중앙 점유 & 타격·그래플링 거리 구도",
+        hdrSub: "레드코너 " + h + " vs 블루코너 " + a,
+        statLabel: "케이지 압박 · 유효타 & 테이크다운 방어",
+        expTitle: "피니시 · 라운드 우위 지수",
+        expHome: Math.round(hp * 1.18) + " pt",
+        expAway: Math.round(ap * 1.18) + " pt",
+        labPresetKw: "",
+        footNote: "옥타곤 중앙 스텝 컨트롤과 클린치·케이지 레슬링 체력 소모전이 핵심 승부처입니다.",
+        svgHtml: [
+          "<svg viewBox='0 0 460 195' width='100%' style='max-height:195px;height:auto;background:radial-gradient(circle,#1e293b 0%,#090d16 100%);border:2px solid rgba(244,63,94,.42);border-radius:10px;display:block;'>",
+          "  <polygon points='196,16 264,16 306,58 306,137 264,179 196,179 154,137 154,58' fill='rgba(15,23,42,.92)' stroke='#94a3b8' stroke-width='3'/>",
+          "  <polygon points='208,48 252,48 280,76 280,119 252,147 208,147 180,119 180,76' fill='none' stroke='rgba(248,113,113,.45)' stroke-width='1.5' stroke-dasharray='4,4'/>",
+          "  <circle cx='230' cy='97.5' r='24' fill='rgba(244,63,94,.12)' stroke='rgba(253,230,138,.5)' stroke-width='1.4'/>",
+          "  <circle cx='198' cy='97.5' r='15' fill='#ef4444'/><text x='198' y='101.5' text-anchor='middle' fill='#fff' font-size='9' font-weight='900'>RED</text>",
+          "  <circle cx='262' cy='97.5' r='15' fill='#3b82f6'/><text x='262' y='101.5' text-anchor='middle' fill='#fff' font-size='9' font-weight='900'>BLUE</text>",
+          "  <text x='18' y='34' fill='#fca5a5' font-size='11.5' font-weight='900'>🥊 " + h + "</text>",
+          "  <text x='18' y='52' fill='#cbd5e1' font-size='10'>AI 우세율 " + hp + "% · 중앙 압박</text>",
+          "  <text x='442' y='34' text-anchor='end' fill='#93c5fd' font-size='11.5' font-weight='900'>" + a + " 🥊</text>",
+          "  <text x='442' y='52' text-anchor='end' fill='#cbd5e1' font-size='10'>AI 우세율 " + ap + "% · 카운터·전환</text>",
+          "</svg>"
+        ].join("")
+      };
+    }
+
+    if (sp === "tennis") {
+      return {
+        tabLabel: "🎾 서브 · 랠리존",
+        hdrTitle: "🎾 퍼스트 서브 코스 & 베이스라인 랠리 타점 구도",
+        hdrSub: h + " vs " + a + " 코트 포지셔닝",
+        statLabel: "퍼스트 서브 득점률 · 브레이크 방어력",
+        expTitle: "서비스게임 유지 기대율",
+        expHome: Math.min(94, Math.round(62 + (hp * 0.30))) + "%",
+        expAway: Math.min(94, Math.round(62 + (ap * 0.30))) + "%",
+        labPresetKw: "",
+        footNote: "세컨드 서브 리턴 공략 깊이와 듀스 코트 크로스 랠리 주도권이 승부를 가릅니다.",
+        svgHtml: [
+          "<svg viewBox='0 0 460 190' width='100%' style='max-height:195px;height:auto;background:#1e3a8a;border:2px solid rgba(255,255,255,.35);border-radius:10px;display:block;'>",
+          "  <rect x='36' y='20' width='388' height='150' fill='#1d4ed8' stroke='#fff' stroke-width='2'/>",
+          "  <line x1='36' y1='38' x2='424' y2='38' stroke='#fff' stroke-width='1.3'/><line x1='36' y1='152' x2='424' y2='152' stroke='#fff' stroke-width='1.3'/>",
+          "  <line x1='230' y1='14' x2='230' y2='176' stroke='#fde68a' stroke-width='2.8'/>",
+          "  <line x1='132' y1='38' x2='132' y2='152' stroke='#fff' stroke-width='1.4'/><line x1='328' y1='38' x2='328' y2='152' stroke='#fff' stroke-width='1.4'/>",
+          "  <line x1='132' y1='95' x2='328' y2='95' stroke='#fff' stroke-width='1.4'/>",
+          "  <line x1='52' y1='118' x2='312' y2='58' stroke='rgba(163,230,53,.8)' stroke-width='2' stroke-dasharray='5,4'/>",
+          "  <circle cx='50' cy='120' r='11' fill='#10b981'/><text x='50' y='123.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>P1</text>",
+          "  <circle cx='408' cy='68' r='11' fill='#fde047'/><text x='408' y='71.5' text-anchor='middle' fill='#0f172a' font-size='8' font-weight='900'>P2</text>",
+          "  <text x='42' y='15' fill='#a7f3d0' font-size='11' font-weight='800'>" + h + "</text>",
+          "  <text x='418' y='15' text-anchor='end' fill='#fef08a' font-size='11' font-weight='800'>" + a + "</text>",
+          "</svg>"
+        ].join("")
+      };
+    }
+
+    if (sp === "f1") {
+      return {
+        tabLabel: "🏎️ 서킷 · 피트전략",
+        hdrTitle: "🏎️ 섹터별(S1·S2·S3) 랩페이스 & DRS·타이어 피트 전략",
+        hdrSub: h + " vs " + a + " 헤드투헤드",
+        statLabel: "직선 최고속도(DRS) · 타이어 데그 관리",
+        expTitle: "퀄리파잉 · 레이스 페이스 지수",
+        expHome: hp + " pt",
+        expAway: ap + " pt",
+        labPresetKw: "",
+        footNote: "DRS 추월 스트레이트 구간 슬립스트림과 미디엄→하드 언더컷 피트스톱 타이밍이 핵심입니다.",
+        svgHtml: [
+          "<svg viewBox='0 0 460 190' width='100%' style='max-height:195px;height:auto;background:#090f1f;border:2px solid rgba(250,204,21,.4);border-radius:10px;display:block;'>",
+          "  <path d='M 78 144 C 42 144, 42 54, 96 46 L 298 46 C 368 46, 408 82, 392 126 C 378 158, 318 152, 268 134 L 182 144 Z' fill='none' stroke='#334155' stroke-width='18' stroke-linejoin='round'/>",
+          "  <path d='M 78 144 C 42 144, 42 54, 96 46 L 298 46 C 368 46, 408 82, 392 126 C 378 158, 318 152, 268 134 L 182 144 Z' fill='none' stroke='#e2e8f0' stroke-width='1.5' stroke-dasharray='6,5'/>",
+          "  <line x1='110' y1='46' x2='275' y2='46' stroke='#22c55e' stroke-width='4'/>",
+          "  <text x='192' y='35' text-anchor='middle' fill='#4ade80' font-size='9.5' font-weight='900'>⚡ DRS OVERTAKE ZONE (S1)</text>",
+          "  <circle cx='146' cy='46' r='9' fill='#ef4444'/><text x='146' y='49' text-anchor='middle' fill='#fff' font-size='7.5' font-weight='900'>P1</text>",
+          "  <circle cx='182' cy='46' r='9' fill='#38bdf8'/><text x='182' y='49' text-anchor='middle' fill='#082f49' font-size='7.5' font-weight='900'>P2</text>",
+          "  <text x='382' y='72' fill='#fde68a' font-size='9.5' font-weight='800'>S2 고속코너</text>",
+          "  <text x='230' y='172' text-anchor='middle' fill='#93c5fd' font-size='9.5' font-weight='800'>🔧 PIT LANE · 언더컷 윈도우 (S3)</text>",
+          "  <text x='16' y='20' fill='#fca5a5' font-size='11' font-weight='800'>🏎️ " + h + "</text>",
+          "  <text x='444' y='20' text-anchor='end' fill='#bae6fd' font-size='11' font-weight='800'>" + a + " 🏎️</text>",
+          "</svg>"
+        ].join("")
+      };
+    }
+
+    // Default: Soccer (4-2-3-1 vs 4-3-3)
+    return {
+      tabLabel: "📋 포메이션 · 전술",
+      hdrTitle: "📋 기본 전술 포메이션 매치업 프리뷰",
+      hdrSub: "홈 4-2-3-1 vs 원정 4-3-3 기준",
+      statLabel: "예상 점유율 · 전방 압박 지수",
+      expTitle: "모델 기대 득점력 (xG)",
+      expHome: (hp / 25).toFixed(2) + " xG",
+      expAway: (ap / 25).toFixed(2) + " xG",
+      labPresetKw: "축구 4-2-3-1",
+      footNote: "하단 <strong>🧪 전술판으로 매치업 불러오기</strong>를 누르면 직접 선수 위치를 드래그해 커스텀 전술을 공유할 수 있습니다.",
+      svgHtml: [
+        "<svg viewBox='0 0 460 190' width='100%' style='max-height:195px;height:auto;background:#064e3b;border:2px solid rgba(255,255,255,.25);border-radius:10px;display:block;'>",
+        "  <line x1='230' y1='0' x2='230' y2='190' stroke='rgba(255,255,255,.3)' stroke-width='1.5'/>",
+        "  <circle cx='230' cy='95' r='28' fill='none' stroke='rgba(255,255,255,.3)' stroke-width='1.5'/>",
+        "  <rect x='0' y='45' width='42' height='100' fill='none' stroke='rgba(255,255,255,.3)' stroke-width='1.5'/>",
+        "  <rect x='418' y='45' width='42' height='100' fill='none' stroke='rgba(255,255,255,.3)' stroke-width='1.5'/>",
+        "  <circle cx='22' cy='95' r='8' fill='#10b981'/><circle cx='72' cy='35' r='8' fill='#10b981'/><circle cx='72' cy='75' r='8' fill='#10b981'/><circle cx='72' cy='115' r='8' fill='#10b981'/><circle cx='72' cy='155' r='8' fill='#10b981'/>",
+        "  <circle cx='122' cy='70' r='8' fill='#10b981'/><circle cx='122' cy='120' r='8' fill='#10b981'/>",
+        "  <circle cx='168' cy='42' r='8' fill='#10b981'/><circle cx='168' cy='95' r='8' fill='#10b981'/><circle cx='168' cy='148' r='8' fill='#10b981'/><circle cx='206' cy='95' r='9' fill='#34d399'/>",
+        "  <circle cx='438' cy='95' r='8' fill='#38bdf8'/><circle cx='388' cy='35' r='8' fill='#38bdf8'/><circle cx='388' cy='75' r='8' fill='#38bdf8'/><circle cx='388' cy='115' r='8' fill='#38bdf8'/><circle cx='388' cy='155' r='8' fill='#38bdf8'/>",
+        "  <circle cx='332' cy='52' r='8' fill='#38bdf8'/><circle cx='332' cy='95' r='8' fill='#38bdf8'/><circle cx='332' cy='138' r='8' fill='#38bdf8'/>",
+        "  <circle cx='272' cy='45' r='8' fill='#7dd3fc'/><circle cx='256' cy='95' r='9' fill='#7dd3fc'/><circle cx='272' cy='145' r='8' fill='#7dd3fc'/>",
+        "  <text x='14' y='18' fill='#a7f3d0' font-size='11' font-weight='800'>" + h + "</text>",
+        "  <text x='446' y='18' text-anchor='end' fill='#bae6fd' font-size='11' font-weight='800'>" + a + "</text>",
+        "</svg>"
+      ].join("")
+    };
+  }
+
   function openMatchInsightModalByItemV30(it) {
     if (!it) return;
     hideRowHoverPreviewV31();
@@ -4503,6 +4813,7 @@ _FRONTEND_V22_JS = r'''
     var edgeH = Math.round((hp - mktH) * 10) / 10;
     var edgeA = Math.round((ap - mktA) * 10) / 10;
     var verdict = evaluateAiVerdictV30(it);
+    var tacMeta = getSportTacticalViewV33(it, hp, ap);
 
     modal.style.display = "flex";
     modal.innerHTML = [
@@ -4531,7 +4842,7 @@ _FRONTEND_V22_JS = r'''
       "      <button type='button' class='sq-v30-insight-tab active' data-mitab='summary'>📊 요약 · 확률격차</button>",
       "      <button type='button' class='sq-v30-insight-tab' data-mitab='stats'>📈 스탯 · 흐름</button>",
       "      <button type='button' class='sq-v30-insight-tab' data-mitab='h2h'>⚔️ 전력 · 순위 · 부상</button>",
-      "      <button type='button' class='sq-v30-insight-tab' data-mitab='lineup'>📋 포메이션 · 전술</button>",
+      "      <button type='button' class='sq-v30-insight-tab' data-mitab='lineup'>" + tacMeta.tabLabel + "</button>",
       "      <button type='button' class='sq-v30-insight-tab' data-mitab='talk'>💬 이 경기 한줄톡</button>",
       "    </div>",
       "    <div id='sqMatchInsightBodyV30' style='background:#020617;border:1px solid #1e293b;border-radius:12px;padding:13px;min-height:150px;font-size:12.5px;line-height:1.6;'></div>",
@@ -4733,17 +5044,17 @@ _FRONTEND_V22_JS = r'''
         var domH = Math.max(22, Math.min(78, Math.round(hp + (dp * 0.5))));
         var domA = 100 - domH;
         box.innerHTML = [
-          "<div style='font-weight:800;color:#7dd3fc;margin-bottom:8px;'>📈 세부 스코어 · 전술 주도권 비교</div>",
+          "<div style='font-weight:800;color:#7dd3fc;margin-bottom:8px;'>📈 세부 스코어 · 종목 맞춤 주도권 비교</div>",
           "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:9px 11px;margin-bottom:10px;'>",
-          "  <div style='color:#94a3b8;font-size:11px;'>전·후반 / 쿼터 / 이닝 / 라운드 기록</div>",
-          "  <div style='color:#f8fafc;font-weight:700;margin-top:2px;'>" + uxEsc(it.period_scores || "킥오프 이후 실시간 쿼터·이닝·전후반 세부 기록이 자동 집계됩니다.") + "</div>",
+          "  <div style='color:#94a3b8;font-size:11px;'>전·후반 / 쿼터 / 이닝 / 세트 / 라운드 기록</div>",
+          "  <div style='color:#f8fafc;font-weight:700;margin-top:2px;'>" + uxEsc(it.period_scores || "킥오프·경기 시작 이후 실시간 세부 스코어가 자동 집계됩니다.") + "</div>",
           "</div>",
           "<div style='margin-bottom:8px;'>",
-          "  <div style='display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;'><span>" + uxEsc(it.home) + " " + domH + "%</span><span style='color:#94a3b8;'>예상 주도권 · 압박 지수</span><span>" + domA + "% " + uxEsc(it.away) + "</span></div>",
+          "  <div style='display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;'><span>" + uxEsc(it.home) + " " + domH + "%</span><span style='color:#94a3b8;'>" + tacMeta.statLabel + "</span><span>" + domA + "% " + uxEsc(it.away) + "</span></div>",
           "  <div style='display:flex;height:8px;border-radius:999px;overflow:hidden;background:#1e293b;'><div style='width:" + domH + "%;background:#10b981;'></div><div style='width:" + domA + "%;background:#38bdf8;'></div></div>",
           "</div>",
           "<div>",
-          "  <div style='display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;'><span>" + (hp / 25).toFixed(2) + " xG</span><span style='color:#94a3b8;'>모델 기대 득점력 지수</span><span>" + (ap / 25).toFixed(2) + " xG</span></div>",
+          "  <div style='display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;'><span style='font-weight:800;color:#6ee7b7;'>" + tacMeta.expHome + "</span><span style='color:#94a3b8;'>" + tacMeta.expTitle + "</span><span style='font-weight:800;color:#7dd3fc;'>" + tacMeta.expAway + "</span></div>",
           "  <div style='display:flex;height:8px;border-radius:999px;overflow:hidden;background:#1e293b;'><div style='width:" + Math.round((hp / Math.max(1, hp + ap)) * 100) + "%;background:#34d399;'></div><div style='flex:1;background:#60a5fa;'></div></div>",
           "</div>"
         ].join("");
@@ -4788,25 +5099,12 @@ _FRONTEND_V22_JS = r'''
         });
       } else if (tabKey === "lineup") {
         box.innerHTML = [
-          "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>",
-          "  <span style='font-weight:800;color:#6ee7b7;'>📋 기본 전술 포메이션 매치업 프리뷰</span>",
-          "  <span style='font-size:11px;color:#94a3b8;'>홈 4-2-3-1 vs 원정 4-3-3 기준</span>",
+          "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;'>",
+          "  <span style='font-weight:800;color:#6ee7b7;'>" + tacMeta.hdrTitle + "</span>",
+          "  <span style='font-size:11px;color:#94a3b8;'>" + tacMeta.hdrSub + "</span>",
           "</div>",
-          "<svg viewBox='0 0 460 190' width='100%' style='background:#064e3b;border:2px solid rgba(255,255,255,.25);border-radius:10px;display:block;'>",
-          "  <line x1='230' y1='0' x2='230' y2='190' stroke='rgba(255,255,255,.3)' stroke-width='1.5'/>",
-          "  <circle cx='230' cy='95' r='28' fill='none' stroke='rgba(255,255,255,.3)' stroke-width='1.5'/>",
-          "  <rect x='0' y='45' width='42' height='100' fill='none' stroke='rgba(255,255,255,.3)' stroke-width='1.5'/>",
-          "  <rect x='418' y='45' width='42' height='100' fill='none' stroke='rgba(255,255,255,.3)' stroke-width='1.5'/>",
-          "  <circle cx='22' cy='95' r='8' fill='#10b981'/><circle cx='72' cy='35' r='8' fill='#10b981'/><circle cx='72' cy='75' r='8' fill='#10b981'/><circle cx='72' cy='115' r='8' fill='#10b981'/><circle cx='72' cy='155' r='8' fill='#10b981'/>",
-          "  <circle cx='122' cy='70' r='8' fill='#10b981'/><circle cx='122' cy='120' r='8' fill='#10b981'/>",
-          "  <circle cx='168' cy='42' r='8' fill='#10b981'/><circle cx='168' cy='95' r='8' fill='#10b981'/><circle cx='168' cy='148' r='8' fill='#10b981'/><circle cx='206' cy='95' r='9' fill='#34d399'/>",
-          "  <circle cx='438' cy='95' r='8' fill='#38bdf8'/><circle cx='388' cy='35' r='8' fill='#38bdf8'/><circle cx='388' cy='75' r='8' fill='#38bdf8'/><circle cx='388' cy='115' r='8' fill='#38bdf8'/><circle cx='388' cy='155' r='8' fill='#38bdf8'/>",
-          "  <circle cx='332' cy='52' r='8' fill='#38bdf8'/><circle cx='332' cy='95' r='8' fill='#38bdf8'/><circle cx='332' cy='138' r='8' fill='#38bdf8'/>",
-          "  <circle cx='272' cy='45' r='8' fill='#7dd3fc'/><circle cx='256' cy='95' r='9' fill='#7dd3fc'/><circle cx='272' cy='145' r='8' fill='#7dd3fc'/>",
-          "  <text x='14' y='18' fill='#a7f3d0' font-size='11' font-weight='800'>" + uxEsc(it.home) + "</text>",
-          "  <text x='446' y='18' text-anchor='end' fill='#bae6fd' font-size='11' font-weight='800'>" + uxEsc(it.away) + "</text>",
-          "</svg>",
-          "<div style='font-size:11.5px;color:#cbd5e1;margin-top:8px;'>하단 <strong>🧪 전술판으로 매치업 불러오기</strong>를 누르면 직접 선수 위치를 드래그해 커스텀 전술을 공유할 수 있습니다.</div>"
+          tacMeta.svgHtml,
+          "<div style='font-size:11.5px;color:#cbd5e1;margin-top:8px;'>" + tacMeta.footNote + "</div>"
         ].join("");
       } else if (tabKey === "talk") {
         box.innerHTML = [
@@ -4870,9 +5168,21 @@ _FRONTEND_V22_JS = r'''
     document.getElementById("sqBridgeTacticalV30").onclick = function () {
       modal.style.display = "none";
       if (typeof window.switchTab === "function") window.switchTab("lab");
-      var labSec = document.getElementById("tab-lab");
-      if (labSec && labSec.scrollIntoView) labSec.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (typeof showToast === "function") showToast("🧪 [" + it.home + " vs " + it.away + "] 전술 시뮬레이션 탭으로 이동했습니다.");
+      setTimeout(function () {
+        var labSec = document.getElementById("tab-lab") || document.body;
+        if (tacMeta.labPresetKw) {
+          var pBtns = labSec.querySelectorAll("button");
+          for (var i = 0; i < pBtns.length; i++) {
+            var bt = String(pBtns[i].textContent || "");
+            if (bt.indexOf(tacMeta.labPresetKw) !== -1) {
+              try { pBtns[i].click(); } catch (e) {}
+              break;
+            }
+          }
+        }
+        if (labSec && labSec.scrollIntoView) labSec.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 60);
+      if (typeof showToast === "function") showToast("🧪 [" + it.home + " vs " + it.away + "] 종목 맞춤 전술판으로 이동했습니다.");
     };
 
     document.getElementById("sqBridgeWritePostV30").onclick = function (ev) {
@@ -6593,6 +6903,9 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -6783,7 +7096,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3220_{int(time.time())}"
+_BOOT_VER_V30 = f"3300_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
