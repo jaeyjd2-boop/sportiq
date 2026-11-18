@@ -540,6 +540,14 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -2791,7 +2799,7 @@ _FRONTEND_V22_JS = r'''
       bd.indexOf("진행") !== -1 ||
       /\b([1-4]Q|[1-3]P|HT|OT)\b/.test(bdu) ||
       /\d+:\d+\s*-\s*(1ST|2ND|3RD|4TH|OT)/i.test(bd) ||
-      /\b\d{1,3}\s*'/.test(bd)
+      /\b\d{1,3}\s*'|\d+\s*회(초|말)?|[1-5]\s*세트/.test(bd)
     ) {
       return "in";
     }
@@ -3982,11 +3990,21 @@ _FRONTEND_V22_JS = r'''
       if (typeof showToast === "function") showToast("🧪 [" + it.home + " vs " + it.away + "] 전술 시뮬레이션 탭으로 이동했습니다.");
     };
 
-    document.getElementById("sqBridgeWritePostV30").onclick = function () {
+    document.getElementById("sqBridgeWritePostV30").onclick = function (ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
       modal.style.display = "none";
-      var wm = document.getElementById("writeModal");
-      if (typeof window.openModal === "function") window.openModal("writeModal");
-      else if (wm) { wm.classList.remove("hidden"); wm.style.display = "flex"; }
+      if (typeof window.openWriteModal === "function") {
+        try { window.openWriteModal(); } catch (e) {}
+      } else if (typeof window.openModal === "function") {
+        try { window.openModal("writeModal"); } catch (e) {}
+      }
+      var wm = document.getElementById("writeModal") || document.getElementById("write-modal");
+      if (wm) {
+        wm.classList.remove("hidden");
+        wm.style.setProperty("display", "flex", "important");
+        wm.style.setProperty("visibility", "visible", "important");
+        wm.style.setProperty("opacity", "1", "important");
+      }
       var tEl = document.getElementById("postTitle");
       var bEl = document.getElementById("postContent");
       var lEl = document.getElementById("postLeague");
@@ -5674,6 +5692,10 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -5848,7 +5870,11 @@ class LoungeCheckinIn(BaseModel):
 
 
 
+_BOOT_VER_V30 = f"3030_{int(time.time())}"
+
+
 @router.get("/api/member/p0p1-upgrade.js")
+@router.get("/api/member/p0p1-upgrade-bundle")
 def serve_patched_upgrade_js_v22():
     from fastapi.responses import Response
     _ensure_upgrade_js_dedup_patched()
@@ -5856,7 +5882,12 @@ def serve_patched_upgrade_js_v22():
     return Response(
         content=body,
         media_type="application/javascript; charset=utf-8",
-        headers={"Cache-Control": "no-cache, max-age=0, must-revalidate"},
+        headers={
+            "Cache-Control": "private, no-store, no-cache, must-revalidate, max-age=0",
+            "CDN-Cache-Control": "no-store",
+            "Cloudflare-CDN-Cache-Control": "no-store",
+            "Pragma": "no-cache",
+        },
     )
 
 
@@ -7461,15 +7492,15 @@ def serve_lounge_home(request: Request):
                 raw_html = f.read()
             rendered = inject_upgrade_into_html(raw_html)
             rendered = re.sub(
-                r'(/api/member/p0p1-upgrade\.js\?v=)(\d+)',
-                lambda m: m.group(1) + str(int(m.group(2)) + 1450),
+                r'/api/member/p0p1-upgrade\.js(?:\?[^"\'\s>]*)?',
+                f'/api/member/p0p1-upgrade-bundle?v={_BOOT_VER_V30}',
                 rendered,
             )
             rendered = inject_seo_and_og_head_v27(rendered)
             _pq = (request.query_params.get("post") if request and hasattr(request, "query_params") else "") or ""
             if _pq:
                 rendered = apply_dynamic_post_og_v29(rendered, resolve_post_og_meta_v29(_pq))
-            return HTMLResponse(rendered, media_type="text/html; charset=utf-8")
+            return HTMLResponse(rendered, media_type="text/html; charset=utf-8", headers={"Cache-Control": "private, no-store, no-cache, must-revalidate", "CDN-Cache-Control": "no-store", "Cloudflare-CDN-Cache-Control": "no-store"})
         except Exception:
             return FileResponse(HTML_PATH, media_type="text/html; charset=utf-8")
     return HTMLResponse("<h1>SportIQ Lounge</h1><p>HTML file missing.</p>", status_code=200)
