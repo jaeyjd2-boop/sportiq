@@ -548,6 +548,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -2752,12 +2754,16 @@ _FRONTEND_V22_JS = r'''
   }
 
   // -------------------------------------------------------------------------
-  // v3.0.2 Scorebase-Inspired Scoreboard Table, Server Bridge Sync & 5-Tab Match Insight Modal
+  // v3.0.4 Scorebase-Inspired 10-Sport Scoreboard Table, Live-Dot Sync & 5-Tab Match Insight Modal
   // -------------------------------------------------------------------------
   var LS_FAV_MATCHES_V30 = "sportiq_fav_matches_v30";
   var v30ScoreState = {
     viewMode: "cards", // "cards" | "table-league" | "table-time"
     statusFilter: "all", // "all" | "live" | "pre" | "post" | "fav"
+    selectedSport: "all", // "all" | "soccer" | "baseball" | "basketball" | "volleyball" | "hockey" | "esports" | "ufc" | "tennis" | "f1"
+    selectedLeague: "all",
+    selectedDateOffset: 0,
+    userPickedSport: false,
     favMap: {},
     rawAllItems: [],
     items: [],
@@ -2806,17 +2812,167 @@ _FRONTEND_V22_JS = r'''
     return "pre";
   }
 
-  function inferSportFromLeagueV30(lg) {
-    var u = String(lg || "").toUpperCase();
-    if (/NBA|WNBA|KBL|WKBL/.test(u)) return "basketball";
-    if (/KBO|MLB|NPB|ABL/.test(u)) return "baseball";
-    if (/NHL/.test(u)) return "hockey";
-    if (/VLEAGUE|V-리그|배구/.test(u)) return "volleyball";
-    if (/LCK|LOL|ESPORTS/.test(u)) return "esports";
-    if (/UFC|MMA/.test(u)) return "ufc";
-    if (/ATP|WTA|TENNIS/.test(u)) return "tennis";
-    if (/\bF1\b/.test(u)) return "f1";
+  function canonicalSportKeyV304(rawSport, lgHint) {
+    var s = String(rawSport || "").trim().toLowerCase();
+    var u = String(lgHint || "").toUpperCase();
+    if (s === "volleyball" || s === "vleague" || /VLEAGUE|V-리그|배구/.test(u)) return "volleyball";
+    if (s === "ufc" || s === "mma" || s === "fighting" || /UFC|MMA|격투/.test(u)) return "ufc";
+    if (s === "tennis" || s === "atp" || s === "wta" || /\b(ATP|WTA)\b|테니스/.test(u)) return "tennis";
+    if (s === "f1" || s === "motorsport" || s === "racing" || /\bF1\b|포뮬러/.test(u)) return "f1";
+    if (s === "esports" || s === "lck" || s === "lol" || /\bLCK\b|LOL|ESPORTS|리그\s*오브\s*레전드/.test(u)) return "esports";
+    if (s === "basketball" || s === "nba" || s === "wnba" || /\b(NBA|WNBA|KBL|WKBL)\b/.test(u)) return "basketball";
+    if (s === "baseball" || s === "mlb" || s === "kbo" || s === "npb" || /\b(KBO|MLB|NPB|ABL)\b/.test(u)) return "baseball";
+    if (s === "hockey" || s === "nhl" || /\bNHL\b|하키/.test(u)) return "hockey";
+    if (s === "soccer" || s === "football") return "soccer";
     return "soccer";
+  }
+
+  function parseSportKeyFromBtnV304(btn) {
+    if (!btn) return "";
+    var ds = String(btn.getAttribute("data-sport") || "").trim().toLowerCase();
+    if (ds) {
+      if (ds === "all") return "all";
+      return canonicalSportKeyV304(ds, ds);
+    }
+    var cloneTxt = String(btn.textContent || "").replace(/•\s*LIVE\s*\d+/gi, "").trim();
+    if (!cloneTxt) return "";
+    if (/^(🌐\s*)?(전체|\d+종목\s*전체)\s*(\(\d+\))?$/.test(cloneTxt) || (/전체\s*\(\d+\)/.test(cloneTxt) && cloneTxt.indexOf("TOP") === -1 && cloneTxt.indexOf("리그") === -1)) return "all";
+    if (cloneTxt.indexOf("축구") !== -1) return "soccer";
+    if (cloneTxt.indexOf("야구") !== -1) return "baseball";
+    if (cloneTxt.indexOf("농구") !== -1) return "basketball";
+    if (cloneTxt.indexOf("배구") !== -1 || /V-리그/i.test(cloneTxt)) return "volleyball";
+    if (cloneTxt.indexOf("하키") !== -1) return "hockey";
+    if (/LCK|e스포츠/i.test(cloneTxt)) return "esports";
+    if (/UFC|MMA|격투/i.test(cloneTxt)) return "ufc";
+    if (cloneTxt.indexOf("테니스") !== -1 || /\b(ATP|WTA)\b/.test(cloneTxt)) return "tennis";
+    if (/\bF1\b|포뮬러/i.test(cloneTxt)) return "f1";
+    return "";
+  }
+
+  function isExcludedSectionForTopScoreBarV304(el) {
+    if (!el || !el.closest) return true;
+    return Boolean(
+      el.closest(
+        "#sqV30ScoreToolbar, #sqV30ScoreboardTableWrap, #dcMainHubSection, #dcHubCollapsible, #dcHubBody, " +
+        "#rssSportFilters, #tab-feed, #tab-schedule, #tab-shorts, #tab-issues, #tab-ranking, #tab-lab, " +
+        "#globalTop10Grid, #sqOfficialLegalFooter, .sq-match-sort-bar"
+      )
+    );
+  }
+
+  function discoverTopSportButtonsV304() {
+    var out = [];
+    // 1. Direct #dcSportPills if present
+    var pillWrap = document.getElementById("dcSportPills");
+    if (pillWrap) {
+      Array.prototype.forEach.call(pillWrap.querySelectorAll("button"), function (b) {
+        var sp = parseSportKeyFromBtnV304(b);
+        if (sp) {
+          b.setAttribute("data-sq-v304-sport", sp);
+          out.push(b);
+        }
+      });
+      if (out.length >= 3) {
+        ensureSportPillMutationObserverV304(pillWrap);
+        return out;
+      }
+    }
+
+    // 2. Structural scan for the 5~10 sport button strip in the top live-score area
+    var roots = [];
+    var pb = document.getElementById("proLiveTickerBar");
+    if (pb) roots.push(pb);
+    var tb = document.getElementById("sqV30ScoreToolbar");
+    if (tb && tb.parentElement && roots.indexOf(tb.parentElement) === -1) roots.push(tb.parentElement);
+    roots.push(document.body);
+
+    for (var r = 0; r < roots.length; r++) {
+      var rt = roots[r];
+      if (!rt || !rt.querySelectorAll) continue;
+      var containers = rt.querySelectorAll("div, nav");
+      for (var i = 0; i < containers.length; i++) {
+        var c = containers[i];
+        if (isExcludedSectionForTopScoreBarV304(c)) continue;
+        var directBtns = Array.prototype.filter.call(c.children || [], function (ch) { return ch && ch.tagName === "BUTTON"; });
+        if (directBtns.length < 4 || directBtns.length > 16) continue;
+        var matched = [];
+        var hasSoccer = false, hasBaseball = false;
+        for (var j = 0; j < directBtns.length; j++) {
+          var k = parseSportKeyFromBtnV304(directBtns[j]);
+          if (k) {
+            if (k === "soccer") hasSoccer = true;
+            if (k === "baseball") hasBaseball = true;
+            matched.push({ btn: directBtns[j], key: k });
+          }
+        }
+        if (hasSoccer && hasBaseball && matched.length >= 4) {
+          matched.forEach(function (m) {
+            m.btn.setAttribute("data-sq-v304-sport", m.key);
+            out.push(m.btn);
+          });
+          ensureSportPillMutationObserverV304(c);
+          return out;
+        }
+      }
+    }
+    return out;
+  }
+
+  function discoverTopLeagueSelectV304() {
+    var direct = document.getElementById("dcTickerLeagueSel");
+    if (direct) return direct;
+    var selects = document.querySelectorAll("select");
+    for (var i = 0; i < selects.length; i++) {
+      var s = selects[i];
+      if (isExcludedSectionForTopScoreBarV304(s) || s.id === "postLeague") continue;
+      var firstTxt = (s.options && s.options[0]) ? String(s.options[0].textContent || "") : "";
+      if (firstTxt.indexOf("전체") !== -1 && firstTxt.indexOf("리그") !== -1) {
+        return s;
+      }
+    }
+    return null;
+  }
+
+  function discoverTopDateButtonsV304() {
+    var out = [];
+    var direct = document.querySelectorAll(".dc-date-btn");
+    if (direct && direct.length) {
+      Array.prototype.forEach.call(direct, function (b) { out.push(b); });
+      return out;
+    }
+    document.querySelectorAll("button").forEach(function (b) {
+      if (isExcludedSectionForTopScoreBarV304(b)) return;
+      var t = String(b.textContent || "").trim();
+      if (/^(◀\s*어제|어제|오늘\s*·\s*실시간|오늘|내일\s*▶|내일|\+2일)$/.test(t)) {
+        out.push(b);
+      }
+    });
+    return out;
+  }
+
+  var _inSportDotMutationV304 = false;
+  function ensureSportPillMutationObserverV304(container) {
+    if (!container || container.__sqSportDotObsV304 || typeof MutationObserver === "undefined") return;
+    container.__sqSportDotObsV304 = true;
+    var obs = new MutationObserver(function () {
+      if (_inSportDotMutationV304) return;
+      syncSportPillLiveDotsV30();
+    });
+    obs.observe(container, { childList: true, subtree: true, characterData: true });
+  }
+
+  function detectVisuallyActiveSportFromDomV304(sportBtns) {
+    for (var i = 0; i < sportBtns.length; i++) {
+      var b = sportBtns[i];
+      var sp = b.getAttribute("data-sq-v304-sport") || parseSportKeyFromBtnV304(b);
+      if (!sp) continue;
+      if (b.classList && b.classList.contains("active")) return sp;
+      var bg = String((b.style && b.style.background) || (b.style && b.style.backgroundColor) || "").toLowerCase();
+      if (/2563eb|1d4ed8|3b82f6|0284c7|rgb\(37,\s*99,\s*235\)|rgb\(29,\s*78,\s*216\)|rgb\(2,\s*132,\s*199\)/.test(bg)) {
+        return sp;
+      }
+    }
+    return "";
   }
 
   function normalizeScoreItemV30(raw, idx) {
@@ -2833,7 +2989,7 @@ _FRONTEND_V22_JS = r'''
     var lgShort = String(raw.league || raw.league_short || raw.league_code || "LEAGUE").trim();
     var lgCode = String(raw.league_code || lgShort || "EPL").trim();
     var lgFull = String(raw.league_full || raw.league_name || lgShort).trim();
-    var sport = String(raw.sport || raw.sport_key || inferSportFromLeagueV30(lgCode)).toLowerCase();
+    var sport = canonicalSportKeyV304(raw.sport || raw.sport_key || "", lgCode + " " + lgShort + " " + lgFull);
 
     var rawAi = raw.ai || {};
     var rawOdds = rawAi.odds || raw.odds || {};
@@ -2878,31 +3034,21 @@ _FRONTEND_V22_JS = r'''
   }
 
   function getActiveDcControlsV30() {
-    var spBtn = document.querySelector("#dcSportPills .dc-pill.active");
-    var sp = "all";
-    if (spBtn) {
-      sp = String(spBtn.getAttribute("data-sport") || "").trim().toLowerCase();
-      if (!sp) {
-        var bt = spBtn.textContent || "";
-        if (bt.indexOf("축구") !== -1) sp = "soccer";
-        else if (bt.indexOf("야구") !== -1) sp = "baseball";
-        else if (bt.indexOf("농구") !== -1) sp = "basketball";
-        else if (bt.indexOf("배구") !== -1) sp = "volleyball";
-        else if (bt.indexOf("하키") !== -1) sp = "hockey";
-        else if (bt.indexOf("LCK") !== -1) sp = "esports";
-        else if (bt.indexOf("UFC") !== -1) sp = "ufc";
-        else if (bt.indexOf("테니스") !== -1) sp = "tennis";
-        else if (bt.indexOf("F1") !== -1) sp = "f1";
-        else sp = "all";
-      }
+    var sportBtns = discoverTopSportButtonsV304();
+    if (!v30ScoreState.userPickedSport && sportBtns.length) {
+      var domActive = detectVisuallyActiveSportFromDomV304(sportBtns);
+      if (domActive) v30ScoreState.selectedSport = domActive;
     }
-    var lgSel = document.getElementById("dcTickerLeagueSel");
-    var lgRaw = lgSel ? String(lgSel.value || "").trim() : "all";
-    var lg = (!lgRaw || lgRaw.toLowerCase() === "all" || lgRaw.indexOf("전체") !== -1) ? "all" : lgRaw;
-    var dtBtn = document.querySelector(".dc-date-btn.active");
-    var off = dtBtn ? parseInt(dtBtn.getAttribute("data-off") || "0", 10) : 0;
-    if (isNaN(off)) off = 0;
-    return { sport: sp, league: lg, dateOffset: off };
+    var lgSel = discoverTopLeagueSelectV304();
+    if (lgSel) {
+      var lgRaw = String(lgSel.value || "").trim();
+      v30ScoreState.selectedLeague = (!lgRaw || lgRaw.toLowerCase() === "all" || lgRaw.indexOf("전체") !== -1) ? "all" : lgRaw;
+    }
+    return {
+      sport: v30ScoreState.selectedSport || "all",
+      league: v30ScoreState.selectedLeague || "all",
+      dateOffset: v30ScoreState.selectedDateOffset || 0
+    };
   }
 
   function recomputeScopedItemsV30() {
@@ -2911,14 +3057,7 @@ _FRONTEND_V22_JS = r'''
     var scoped = all.filter(function (it) {
       if (!it) return false;
       if (ctl.sport !== "all") {
-        var sp = String(it.sport || "").toLowerCase();
-        if (ctl.sport === "esports" || ctl.sport === "lck") {
-          if (sp !== "esports" && sp !== "lck") return false;
-        } else if (ctl.sport === "ufc" || ctl.sport === "mma") {
-          if (sp !== "ufc" && sp !== "mma") return false;
-        } else if (sp !== ctl.sport) {
-          return false;
-        }
+        if (it.sport !== ctl.sport) return false;
       }
       if (ctl.league !== "all") {
         var lu = ctl.league.toUpperCase();
@@ -2953,8 +3092,8 @@ _FRONTEND_V22_JS = r'''
     v30ScoreState.lastToolbarSig = "";
     v30ScoreState.lastTableSig = "";
     refreshScoreboardSuiteV30();
-    setTimeout(refreshScoreboardSuiteV30, 80);
-    setTimeout(refreshScoreboardSuiteV30, 260);
+    setTimeout(refreshScoreboardSuiteV30, 75);
+    setTimeout(refreshScoreboardSuiteV30, 240);
   }
 
   function installLiveScoresFetchTapV30() {
@@ -2965,10 +3104,35 @@ _FRONTEND_V22_JS = r'''
       var u = typeof input === "string" ? input : (input && input.url ? input.url : "");
       return origFetch(input, init).then(function (resp) {
         if (u.indexOf("/api/datacenter/live-scores") !== -1) {
+          // Also capture sport/league/date_offset directly from the URL that widget.js just requested!
+          try {
+            var qIdx = u.indexOf("?");
+            if (qIdx !== -1) {
+              var spParams = new URLSearchParams(u.slice(qIdx + 1));
+              var qSp = spParams.get("sport");
+              var qLg = spParams.get("league");
+              var qOff = spParams.get("date_offset");
+              if (qSp) {
+                v30ScoreState.userPickedSport = true;
+                v30ScoreState.selectedSport = (qSp === "all") ? "all" : canonicalSportKeyV304(qSp, qSp);
+              }
+              if (qLg != null) {
+                v30ScoreState.selectedLeague = (!qLg || qLg === "all" || qLg.indexOf("전체") !== -1) ? "all" : qLg;
+              }
+              if (qOff != null && !isNaN(parseInt(qOff, 10))) {
+                v30ScoreState.selectedDateOffset = parseInt(qOff, 10);
+              }
+            }
+          } catch (e) {}
           resp.clone().json().then(function (d) {
             if (d && Array.isArray(d.items) && d.items.length > 0) {
               var isFullAll = (u.indexOf("sport=all") !== -1 && (u.indexOf("league=all") !== -1 || u.indexOf("league=") === -1));
               mergeRawScoreItemsV30(d.items, isFullAll);
+            } else {
+              recomputeScopedItemsV30();
+              v30ScoreState.lastToolbarSig = "";
+              v30ScoreState.lastTableSig = "";
+              refreshScoreboardSuiteV30();
             }
           }).catch(function () {});
         }
@@ -2978,8 +3142,9 @@ _FRONTEND_V22_JS = r'''
   }
 
   function fetchServerScoreboardBridgeV30(forceOffset) {
-    var ctl = getActiveDcControlsV30();
-    var targetOff = (typeof forceOffset === "number" && !isNaN(forceOffset)) ? forceOffset : ctl.dateOffset;
+    var targetOff = (typeof forceOffset === "number" && !isNaN(forceOffset))
+      ? forceOffset
+      : (v30ScoreState.selectedDateOffset || 0);
     if (v30ScoreState.rawAllItems.length > 0 && v30ScoreState.loadedDateOffset === targetOff) {
       return;
     }
@@ -2995,7 +3160,6 @@ _FRONTEND_V22_JS = r'''
           mergeRawScoreItemsV30(d.items, true);
           return;
         }
-        // Secondary fallback: clean /api/datacenter/live-scores?sport=all&league=all
         return fetch("/api/datacenter/live-scores?sport=all&league=all&date_offset=" + encodeURIComponent(targetOff))
           .then(function (r2) { return r2.json(); })
           .then(function (d2) {
@@ -3010,40 +3174,66 @@ _FRONTEND_V22_JS = r'''
       });
   }
 
-  function hookDcFilterControlsV30() {
-    document.querySelectorAll("#dcSportPills .dc-pill").forEach(function (btn) {
-      if (btn.getAttribute("data-sq-v30-sp-bound")) return;
-      btn.setAttribute("data-sq-v30-sp-bound", "1");
-      btn.addEventListener("click", function () {
-        setTimeout(function () {
+  function installTopControlCaptureSyncV304() {
+    if (window.__sqTopControlCaptureV304) return;
+    window.__sqTopControlCaptureV304 = true;
+
+    // Window capture listener catches clicks on ANY of the 10 sport buttons or date buttons in 0ms!
+    window.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var btn = t.closest("button");
+      if (!btn || isExcludedSectionForTopScoreBarV304(btn)) return;
+
+      // Check if it's one of the 10 sport buttons
+      var sportBtns = discoverTopSportButtonsV304();
+      if (sportBtns.indexOf(btn) !== -1 || btn.hasAttribute("data-sq-v304-sport")) {
+        var spKey = btn.getAttribute("data-sq-v304-sport") || parseSportKeyFromBtnV304(btn);
+        if (spKey) {
+          v30ScoreState.userPickedSport = true;
+          v30ScoreState.selectedSport = spKey;
+          v30ScoreState.selectedLeague = "all";
           recomputeScopedItemsV30();
           v30ScoreState.lastToolbarSig = "";
           v30ScoreState.lastTableSig = "";
           refreshScoreboardSuiteV30();
-        }, 30);
-      });
-    });
-    var lgSel = document.getElementById("dcTickerLeagueSel");
-    if (lgSel && !lgSel.getAttribute("data-sq-v30-lg-bound")) {
-      lgSel.setAttribute("data-sq-v30-lg-bound", "1");
-      lgSel.addEventListener("change", function () {
-        setTimeout(function () {
-          recomputeScopedItemsV30();
-          v30ScoreState.lastToolbarSig = "";
-          v30ScoreState.lastTableSig = "";
-          refreshScoreboardSuiteV30();
-        }, 30);
-      });
-    }
-    document.querySelectorAll(".dc-date-btn").forEach(function (db) {
-      if (db.getAttribute("data-sq-v30-dt-bound")) return;
-      db.setAttribute("data-sq-v30-dt-bound", "1");
-      db.addEventListener("click", function () {
-        var off = parseInt(db.getAttribute("data-off") || "0", 10);
+          setTimeout(refreshScoreboardSuiteV30, 50);
+          return;
+        }
+      }
+
+      // Check if it's a date button (◀ 어제 / 오늘 · 실시간 / 내일 ▶ / +2일)
+      var dtBtns = discoverTopDateButtonsV304();
+      if (dtBtns.indexOf(btn) !== -1) {
+        var offAttr = btn.getAttribute("data-off");
+        var offVal = 0;
+        if (offAttr != null && !isNaN(parseInt(offAttr, 10))) {
+          offVal = parseInt(offAttr, 10);
+        } else {
+          var btxt = String(btn.textContent || "");
+          if (btxt.indexOf("어제") !== -1) offVal = -1;
+          else if (btxt.indexOf("내일") !== -1) offVal = 1;
+          else if (btxt.indexOf("+2") !== -1) offVal = 2;
+          else offVal = 0;
+        }
+        v30ScoreState.selectedDateOffset = offVal;
         v30ScoreState.loadedDateOffset = null;
-        setTimeout(function () { fetchServerScoreboardBridgeV30(isNaN(off) ? 0 : off); }, 25);
-      });
-    });
+        fetchServerScoreboardBridgeV30(offVal);
+      }
+    }, true);
+
+    window.addEventListener("change", function (ev) {
+      var t = ev.target;
+      var lgSel = discoverTopLeagueSelectV304();
+      if (t && lgSel && t === lgSel) {
+        var rawV = String(lgSel.value || "").trim();
+        v30ScoreState.selectedLeague = (!rawV || rawV.toLowerCase() === "all" || rawV.indexOf("전체") !== -1) ? "all" : rawV;
+        recomputeScopedItemsV30();
+        v30ScoreState.lastToolbarSig = "";
+        v30ScoreState.lastTableSig = "";
+        refreshScoreboardSuiteV30();
+      }
+    }, true);
   }
 
   function isHelperControlBarV30(el) {
@@ -3065,8 +3255,8 @@ _FRONTEND_V22_JS = r'''
     }
     if (el.classList && el.classList.contains("sq-match-sort-bar")) return true;
     var txt = String(el.textContent || "");
-    if (/휠·드래그|경기\s*정렬|전체\s*\(\d+\)\s*⚽/.test(txt) && el.children && el.children.length <= 6) return true;
-    if (el.querySelector && (el.querySelector("#dcSportPills") || el.querySelector("#dcTickerLeagueSel") || el.querySelector("#feedList"))) return true;
+    if (/휠·드래그|경기\s*정렬|전체\s*\(\d+\)\s*⚽/.test(txt) && el.children && el.children.length <= 14) return true;
+    if (el.querySelector && (el.querySelector("#dcSportPills") || el.querySelector("#dcTickerLeagueSel") || el.querySelector("#feedList") || el.querySelector("[data-sq-v304-sport]"))) return true;
     return false;
   }
 
@@ -3097,7 +3287,9 @@ _FRONTEND_V22_JS = r'''
     var list = [];
     function addUniq(el) {
       if (el && list.indexOf(el) === -1 && el.id !== "sqV30ScoreToolbar" && el.id !== "sqV30ScoreboardTableWrap" && el.id !== "dcTickerControls") {
-        list.push(el);
+        if (!el.querySelector || !el.querySelector("[data-sq-v304-sport]")) {
+          list.push(el);
+        }
       }
     }
     addUniq(primaryTrack);
@@ -3105,10 +3297,9 @@ _FRONTEND_V22_JS = r'''
     addUniq(dcTrack);
     var legacyList = document.getElementById("proTickerList");
     addUniq(legacyList);
-    // If proTickerList sits inside a separate mini-ticker wrapper above dcTickerControls, hide its header/wrapper only if it does NOT contain dcTickerControls or sqV30ScoreToolbar!
     if (legacyList && legacyList.parentElement) {
       var lp = legacyList.parentElement;
-      if (!lp.querySelector("#dcTickerControls") && !lp.querySelector("#sqV30ScoreToolbar") && !lp.querySelector("#sqV30ScoreboardTableWrap") && lp.id !== "proLiveTickerBar") {
+      if (!lp.querySelector("#dcTickerControls") && !lp.querySelector("[data-sq-v304-sport]") && !lp.querySelector("#sqV30ScoreToolbar") && !lp.querySelector("#sqV30ScoreboardTableWrap") && lp.id !== "proLiveTickerBar") {
         addUniq(lp);
       }
     }
@@ -3121,7 +3312,7 @@ _FRONTEND_V22_JS = r'''
     roots.forEach(function (rt) {
       Array.prototype.forEach.call(rt.querySelectorAll("div"), function (d) {
         if (!d || d === rt || d.id === "sqV30ScoreToolbar" || d.id === "sqV30ScoreboardTableWrap" || d.id === "dcTickerControls" || d.id === "dcSportPills") return;
-        if (d.contains && (d.contains(document.getElementById("dcTickerControls")) || d.contains(document.getElementById("sqV30ScoreToolbar")) || d.contains(document.getElementById("sqV30ScoreboardTableWrap")))) return;
+        if (d.contains && (d.contains(document.getElementById("dcTickerControls")) || d.contains(document.getElementById("sqV30ScoreToolbar")) || d.contains(document.getElementById("sqV30ScoreboardTableWrap")) || (d.querySelector && d.querySelector("[data-sq-v304-sport]")))) return;
         var txt = String(d.textContent || "");
         if ((d.classList && d.classList.contains("sq-match-sort-bar")) || (/휠·드래그|◀\s*이전|경기\s*정렬/.test(txt) && d.children && d.children.length <= 8)) {
           addUniq(d);
@@ -3217,22 +3408,29 @@ _FRONTEND_V22_JS = r'''
         liveBySport[sp] = (liveBySport[sp] || 0) + 1;
       }
     });
-    document.querySelectorAll("#dcSportPills .dc-pill, #proLiveTickerBar [data-sport]").forEach(function (btn) {
-      var sp = String(btn.getAttribute("data-sport") || "").toLowerCase();
-      var oldDot = btn.querySelector(".sq-v30-live-dot");
-      var cnt = sp === "all" ? totalLive : (liveBySport[sp] || 0);
-      if (cnt > 0) {
-        var wantTxt = "• LIVE " + cnt;
-        if (!oldDot) {
-          oldDot = document.createElement("span");
-          oldDot.className = "sq-v30-live-dot";
-          btn.appendChild(oldDot);
+    var sportBtns = discoverTopSportButtonsV304();
+    _inSportDotMutationV304 = true;
+    try {
+      sportBtns.forEach(function (btn) {
+        var sp = btn.getAttribute("data-sq-v304-sport") || parseSportKeyFromBtnV304(btn);
+        if (!sp) return;
+        var oldDot = btn.querySelector(".sq-v30-live-dot");
+        var cnt = sp === "all" ? totalLive : (liveBySport[sp] || 0);
+        if (cnt > 0) {
+          var wantTxt = "• LIVE " + cnt;
+          if (!oldDot) {
+            oldDot = document.createElement("span");
+            oldDot.className = "sq-v30-live-dot";
+            btn.appendChild(oldDot);
+          }
+          if (oldDot.textContent !== wantTxt) oldDot.textContent = wantTxt;
+        } else if (oldDot && oldDot.parentNode) {
+          oldDot.parentNode.removeChild(oldDot);
         }
-        if (oldDot.textContent !== wantTxt) oldDot.textContent = wantTxt;
-      } else if (oldDot && oldDot.parentNode) {
-        oldDot.parentNode.removeChild(oldDot);
-      }
-    });
+      });
+    } finally {
+      _inSportDotMutationV304 = false;
+    }
   }
 
   function parseCleanDomCardV30(card) {
@@ -3253,8 +3451,8 @@ _FRONTEND_V22_JS = r'''
     if (/시즌\s*기록\s*·\s*종료|종료|Final\/OT|Final|\bFT\b|판정승|\dR\s*(?:SUB|TKO|KO)/i.test(fullTxt)) {
       var bm = fullTxt.match(/(Final\/OT|Final|\bFT\b|판정승|\dR\s*(?:SUB|TKO|KO)|종료)/i);
       badge = bm ? bm[1] : "종료";
-    } else if (/LIVE|\d+:\d+\s*-\s*(?:1st|2nd|3rd|4th|OT)|\b[1-4]Q\b|\b[1-3]P\b|\d+\s*'/i.test(fullTxt)) {
-      var lm = fullTxt.match(/(\d+:\d+\s*-\s*(?:1st|2nd|3rd|4th|OT)|LIVE\s*[^\s📌]*)/i);
+    } else if (/LIVE|\d+:\d+\s*-\s*(?:1st|2nd|3rd|4th|OT)|\b[1-4]Q\b|\b[1-3]P\b|\d+\s*'|\d+\s*회(초|말)?/i.test(fullTxt)) {
+      var lm = fullTxt.match(/(\d+:\d+\s*-\s*(?:1st|2nd|3rd|4th|OT)|\d+\s*회(?:초|말)?\s*(?:진행중)?|LIVE\s*[^\s📌]*)/i);
       badge = lm ? lm[1].trim() : "LIVE";
     }
 
@@ -3279,7 +3477,6 @@ _FRONTEND_V22_JS = r'''
         else if (om2) { oh = om2[1]; od = ""; oa = om2[2]; }
         continue;
       }
-      // Match 'Bosnia-Herz 2:1 Romania' or 'Bosnia-Herz 2 : 1 Romania' (exclude date/time strings like '11/21 - 10:00 AM EST'!)
       if (!/\b(AM|PM|EST|KST|UTC)\b/i.test(ln) && !/^\d{1,2}\/\d{1,2}/.test(ln) && !/^[1-4][QP]\b/.test(ln)) {
         var mInline = ln.match(/^([A-Za-z가-힣][A-Za-z0-9가-힣\s.'()\-]{1,28}?)\s*(\d+)\s*[:\-]\s*(\d+)\s*([A-Za-z가-힣][A-Za-z0-9가-힣\s.'()\-]{1,28})$/);
         if (mInline && !home) {
@@ -3291,7 +3488,6 @@ _FRONTEND_V22_JS = r'''
       }
     }
 
-    // Flex multi-line team+score pairs: ['Lakers', '96', 'Hornets', '102'] or ['Lakers96', 'Hornets102']
     if (!home) {
       for (var j = 1; j < lines.length - 1; j++) {
         if (lines[j + 3] !== undefined && /^\d+$/.test(lines[j + 1]) && /^\d+$/.test(lines[j + 3]) && !/^\d/.test(lines[j]) && !/^\d/.test(lines[j + 2])) {
@@ -3316,7 +3512,7 @@ _FRONTEND_V22_JS = r'''
     if (!home || !away) return null;
     return normalizeScoreItemV30({
       id: lg + "::" + home + "::" + away,
-      sport: inferSportFromLeagueV30(lg),
+      sport: canonicalSportKeyV304("", lg),
       league: lg,
       league_code: lg,
       league_full: lg,
@@ -3356,7 +3552,6 @@ _FRONTEND_V22_JS = r'''
         return it;
       }
     }
-    // NEVER guess by array index (cards may be sorted or in #proTickerList); parse this exact card cleanly!
     return parseCleanDomCardV30(card);
   }
 
@@ -3368,6 +3563,7 @@ _FRONTEND_V22_JS = r'''
       if (!t || !t.closest) return;
       if (
         t.closest("[data-sq-card-star='1']") ||
+        t.closest("[data-sq-v304-sport]") ||
         t.closest("#sqV30ScoreToolbar") ||
         t.closest("#sqV30ScoreboardTableWrap") ||
         t.closest("#dcQuickMatchModal") ||
@@ -3429,7 +3625,15 @@ _FRONTEND_V22_JS = r'''
           else if (sf === "pre") show = it.state === "pre";
           else if (sf === "post") show = it.state === "post";
           else if (sf === "fav") show = isFav;
-          card.style.display = show ? "" : "none";
+          if (show) {
+            card.removeAttribute("data-sq-v30-card-filtered");
+            if (card.style.getPropertyValue("display") === "none") {
+              card.style.removeProperty("display");
+            }
+          } else {
+            card.setAttribute("data-sq-v30-card-filtered", "1");
+            card.style.setProperty("display", "none", "important");
+          }
         }
 
         var topRow = card.firstElementChild;
@@ -3497,7 +3701,7 @@ _FRONTEND_V22_JS = r'''
     var filtered = filterScoreItemsV30(allItems || []);
     var favKeysSig = Object.keys(v30ScoreState.favMap || {}).sort().join(",");
     var itemsSig = filtered.map(function (x) { return matchFavKeyV30(x) + ":" + x.state + ":" + x.home_score + "-" + x.away_score; }).join("|");
-    var nextSig = v30ScoreState.viewMode + "||" + v30ScoreState.statusFilter + "||" + favKeysSig + "||" + itemsSig;
+    var nextSig = [v30ScoreState.viewMode, v30ScoreState.statusFilter, v30ScoreState.selectedSport, v30ScoreState.selectedLeague, favKeysSig, itemsSig].join("||");
     if (v30ScoreState.lastTableSig === nextSig && wrap.children.length > 0) {
       return;
     }
@@ -3656,6 +3860,15 @@ _FRONTEND_V22_JS = r'''
     var items = v30ScoreState.items || [];
 
     var ctrl = document.getElementById("dcTickerControls");
+    if (!ctrl) {
+      var spBtns = discoverTopSportButtonsV304();
+      if (spBtns.length) {
+        var p = spBtns[0].parentElement;
+        while (p && p.parentElement && p.parentElement !== track.parentElement) p = p.parentElement;
+        if (p && p.parentElement === track.parentElement) ctrl = p;
+      }
+    }
+
     var bar = document.getElementById("sqV30ScoreToolbar");
     if (!bar) {
       bar = document.createElement("div");
@@ -3681,7 +3894,7 @@ _FRONTEND_V22_JS = r'''
 
     var sf = v30ScoreState.statusFilter;
     var vm = v30ScoreState.viewMode;
-    var tbSig = [cntAll, cntLive, cntPre, cntPost, cntFav, sf, vm].join("|");
+    var tbSig = [cntAll, cntLive, cntPre, cntPost, cntFav, sf, vm, v30ScoreState.selectedSport, v30ScoreState.selectedLeague].join("|");
     if (v30ScoreState.lastToolbarSig === tbSig && bar.children.length > 0) {
       return;
     }
@@ -3727,7 +3940,7 @@ _FRONTEND_V22_JS = r'''
   }
 
   function refreshScoreboardSuiteV30() {
-    hookDcFilterControlsV30();
+    installTopControlCaptureSyncV304();
     fetchServerScoreboardBridgeV30();
     var items = recomputeScopedItemsV30();
     syncSportPillLiveDotsV30();
@@ -4038,6 +4251,7 @@ _FRONTEND_V22_JS = r'''
 
   function installMatchInsightModalV30() {
     installLiveScoresFetchTapV30();
+    installTopControlCaptureSyncV304();
     installGlobalCardClickCaptureV30();
     window.__openDcScorePopup = function (idx) {
       var items = v30ScoreState.items || window.__dcLatestScoreItems || [];
@@ -4151,6 +4365,7 @@ _FRONTEND_V22_JS = r'''
   }
 
   installLiveScoresFetchTapV30();
+  installTopControlCaptureSyncV304();
   installGlobalCardClickCaptureV30();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootMemberUxV22);
@@ -5696,6 +5911,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -5870,7 +6086,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3030_{int(time.time())}"
+_BOOT_VER_V30 = f"3040_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
