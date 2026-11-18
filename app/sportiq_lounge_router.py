@@ -620,6 +620,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -1458,16 +1460,19 @@ _FRONTEND_V22_JS = r'''
         }
 
         var hostPanel = (!dcTabPanel && dcHub && dcHub.closest) ? dcHub.closest("[id^='tab-']") : null;
-        document.querySelectorAll("[id^='tab-']").forEach(function (sec) {
-          if (sec === dcTabPanel || sec === hostPanel) {
-            sec.classList.remove("hidden");
-            sec.style.setProperty("display", "block", "important");
-          } else {
-            sec.setAttribute("data-sq-hidden-by-dc", "1");
-            sec.style.setProperty("display", "none", "important");
-          }
-        });
+        if (dcTabPanel || hostPanel) {
+          document.querySelectorAll("[id^='tab-']").forEach(function (sec) {
+            if (sec === dcTabPanel || sec === hostPanel) {
+              sec.classList.remove("hidden");
+              sec.style.setProperty("display", "block", "important");
+            } else {
+              sec.setAttribute("data-sq-hidden-by-dc", "1");
+              sec.style.setProperty("display", "none", "important");
+            }
+          });
+        }
 
+        ensureDcHubExpandedForStandingsV344();
         if (dcHub) {
           if (!dcHub.hasAttribute("data-sq-dc-was-hidden")) {
             var initHidden = (window.getComputedStyle(dcHub).display === "none") || dcHub.classList.contains("hidden");
@@ -1475,7 +1480,14 @@ _FRONTEND_V22_JS = r'''
           }
           dcHub.classList.remove("hidden");
           dcHub.style.setProperty("display", "block", "important");
+          Array.prototype.forEach.call(dcHub.querySelectorAll("button, a"), function (b) {
+            var tx = String(b.textContent || "").trim();
+            if (/^펼치기\s*▼?$/.test(tx) || tx === "표 바로 펼치기 ▼") {
+              try { b.click(); } catch (e0) {}
+            }
+          });
         }
+        ensureDcHubExpandedForStandingsV344();
         var dcBody = document.getElementById("dcHubBody");
         if (dcBody) {
           dcBody.setAttribute("data-sq-dc-user-open", "1");
@@ -1487,8 +1499,19 @@ _FRONTEND_V22_JS = r'''
         if (dcTog && (dcTog.textContent || "").indexOf("펼치기") !== -1) {
           dcTog.textContent = "접기 ▲";
         }
-        if (typeof window.__switchDcTab === "function" && dcBody && (!dcBody.children.length || /로딩\s*중/.test(dcBody.textContent || ""))) {
-          try { window.__switchDcTab("standings"); } catch (e) {}
+        if (dcBody && (!dcBody.children.length || /로딩\s*중/.test(dcBody.textContent || ""))) {
+          if (typeof window.__switchDcTab === "function") {
+            try { window.__switchDcTab("standings"); } catch (e) {}
+          } else if (dcHub) {
+            var lCards = dcHub.querySelectorAll("div, button, article");
+            for (var lcI = 0; lcI < lCards.length; lcI++) {
+              var lTxt = String(lCards[lcI].textContent || "");
+              if (lTxt.indexOf("리그 순위") !== -1 && lTxt.length < 60) {
+                try { lCards[lcI].click(); } catch (e1) {}
+                break;
+              }
+            }
+          }
         }
 
         bar.setAttribute("data-sq-dc-mode", "1");
@@ -3207,20 +3230,45 @@ _FRONTEND_V22_JS = r'''
       if (code === "KBL" || code === "WKBL") {
         triggerDomesticDcStandingsV341(code, "");
       } else if (hubBody) {
-        var alias = code;
-        if (code === "VLEAGUE_M" || code === "VLEAGUE_W") alias = "V-리그";
+        var aliasCandidates = [code];
+        var fallbackSwitchCode = code;
+        if (code === "VLEAGUE_M" || code === "VLEAGUE_W" || code === "VLEAGUE") {
+          aliasCandidates = ["V-리그", "VLEAGUE"];
+          fallbackSwitchCode = "VLEAGUE";
+        } else if (code === "WTA" || code === "ATP" || code === "TENNIS") {
+          aliasCandidates = [code, "ATP 랭킹", "ATP", "테니스"];
+          fallbackSwitchCode = "ATP";
+        } else if (code === "UFC" || code === "MMA") {
+          aliasCandidates = ["UFC 랭킹", "UFC"];
+          fallbackSwitchCode = "UFC";
+        } else if (code === "F1") {
+          aliasCandidates = ["F1 랭킹", "F1", "포뮬러"];
+          fallbackSwitchCode = "F1";
+        } else if (code === "WNBA") {
+          aliasCandidates = ["WNBA", "NBA"];
+          fallbackSwitchCode = "NBA";
+        } else if (code === "UNL" || code === "UCL" || code === "UEL" || code === "MLS" || code === "J1") {
+          aliasCandidates = [code, "EPL"];
+          fallbackSwitchCode = "EPL";
+        }
         var btns = hubBody.querySelectorAll("button");
         var clicked = false;
-        for (var j = 0; j < btns.length; j++) {
-          var bt = String(btns[j].textContent || "").trim();
-          if (bt.toUpperCase() === code || bt.indexOf(alias) !== -1) {
-            clicked = true;
-            try { btns[j].click(); } catch (e3) {}
-            break;
+        for (var aIdx = 0; aIdx < aliasCandidates.length && !clicked; aIdx++) {
+          var cand = aliasCandidates[aIdx];
+          for (var j = 0; j < btns.length; j++) {
+            var bt = String(btns[j].textContent || "").trim();
+            if (bt.toUpperCase() === cand.toUpperCase() || bt.toUpperCase().indexOf(cand.toUpperCase()) !== -1) {
+              clicked = true;
+              try { btns[j].click(); } catch (e3) {}
+              break;
+            }
           }
         }
         if (!clicked && typeof window.__switchDcTab === "function") {
-          try { window.__switchDcTab("standings", code); } catch (e4) {}
+          try { window.__switchDcTab("standings", fallbackSwitchCode); } catch (e4) {}
+        }
+        if (code === "WTA" && typeof showToast === "function") {
+          showToast("🎾 테니스 투어 랭킹(ATP·WTA) 보드로 이동했습니다.");
         }
       }
       var scrollTarget = document.getElementById("dcHubBody") || document.getElementById("dcMainHubSection");
@@ -5860,7 +5908,23 @@ _FRONTEND_V22_JS = r'''
           function fmtStanding(tName, rObj) {
             if (!rObj) return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;'><strong>" + uxEsc(tName) + "</strong>: 국제대회·토너먼트 매치업</div>";
             var fm = Array.isArray(rObj.form) ? rObj.form.join("·") : String(rObj.form || "-");
-            return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;'><span><strong style='color:#fde68a;'>#" + uxEsc(rObj.rank) + "</strong> <strong>" + uxEsc(rObj.team) + "</strong> (" + uxEsc(rObj.w) + "승 " + uxEsc(rObj.d) + "무 " + uxEsc(rObj.l) + "패 · 승점 " + uxEsc(rObj.pts) + ")</span><span style='font-size:11px;color:#34d399;font-weight:800;'>최근폼 " + uxEsc(fm) + "</span></div>";
+            var hasDrawStat = (it.sport === "soccer") || (Number(rObj.d || 0) > 0);
+            var recParts = [];
+            if (rObj.w !== undefined && rObj.w !== null && String(rObj.w) !== "") {
+              recParts.push(uxEsc(rObj.w) + "승" + (hasDrawStat ? " " + uxEsc(rObj.d || 0) + "무" : "") + " " + uxEsc(rObj.l != null ? rObj.l : 0) + "패");
+            } else if (rObj.record) {
+              recParts.push(uxEsc(rObj.record));
+            }
+            var ptsRaw = (rObj.pts !== undefined && rObj.pts !== null && String(rObj.pts).trim() !== "")
+              ? String(rObj.pts).trim()
+              : ((rObj.points !== undefined && rObj.points !== null && String(rObj.points).trim() !== "") ? String(rObj.points).trim() : "");
+            var pctRaw = (rObj.pct !== undefined && rObj.pct !== null && String(rObj.pct).trim() !== "")
+              ? String(rObj.pct).trim()
+              : ((rObj.win_pct !== undefined && rObj.win_pct !== null && String(rObj.win_pct).trim() !== "") ? String(rObj.win_pct).trim() : "");
+            if (ptsRaw) recParts.push("승점 " + uxEsc(ptsRaw));
+            else if (pctRaw) recParts.push("승률 " + uxEsc(pctRaw));
+            var recStr = recParts.length ? " (" + recParts.join(" · ") + ")" : "";
+            return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;'><span><strong style='color:#fde68a;'>#" + uxEsc(rObj.rank) + "</strong> <strong>" + uxEsc(rObj.team) + "</strong>" + recStr + "</span><span style='font-size:11px;color:#34d399;font-weight:800;'>최근폼 " + uxEsc(fm) + "</span></div>";
           }
           var teamInjs = (injData.items || []).filter(function (x) {
             var tm = String(x.team || "");
@@ -6022,6 +6086,65 @@ _FRONTEND_V22_JS = r'''
       if (it) openMatchInsightModalByItemV30(it);
     };
   }
+
+  function canonicalKellyTeamKeyV36(rawName) {
+    var s = String(rawName || "").toLowerCase().replace(/[^a-z0-9가-힣]/g, "");
+    var alias = {
+      "mancity": "맨체스터시티", "manchestercity": "맨체스터시티", "맨시티": "맨체스터시티", "맨체스터시티": "맨체스터시티",
+      "manutd": "맨체스터유나이티드", "manchesterunited": "맨체스터유나이티드", "맨유": "맨체스터유나이티드", "맨체스터유나이티드": "맨체스터유나이티드",
+      "fulham": "풀럼", "풀럼": "풀럼", "arsenal": "아스널", "아스널": "아스널", "아스날": "아스널",
+      "liverpool": "리버풀", "리버풀": "리버풀", "chelsea": "첼시", "첼시": "첼시",
+      "tottenham": "토트넘", "tottenhamhotspur": "토트넘", "spurs": "토트넘", "토트넘": "토트넘", "토트넘홋스퍼": "토트넘",
+      "newcastle": "뉴캐슬", "newcastleunited": "뉴캐슬", "뉴캐슬": "뉴캐슬",
+      "astonvilla": "애스턴빌라", "애스턴빌라": "애스턴빌라", "brighton": "브라이턴", "브라이턴": "브라이턴",
+      "nottinghamforest": "노팅엄포레스트", "노팅엄": "노팅엄포레스트", "westham": "웨스트햄", "웨스트햄": "웨스트햄",
+      "everton": "에버턴", "에버턴": "에버턴", "brentford": "브렌트퍼드", "브렌트퍼드": "브렌트퍼드",
+      "bournemouth": "본머스", "본머스": "본머스", "wolves": "울버햄프턴", "wolverhampton": "울버햄프턴", "울버햄프턴": "울버햄프턴",
+      "crystalpalace": "크리스털팰리스", "leicester": "레스터시티", "leicestercity": "레스터시티", "southampton": "사우샘프턴", "ipswich": "입스위치",
+      "realmadrid": "레알마드리드", "레알마드리드": "레알마드리드", "barcelona": "바르셀로나", "fcbarcelona": "바르셀로나", "바르셀로나": "바르셀로나",
+      "atleticomadrid": "아틀레티코마드리드", "bayern": "바이에른뮌헨", "bayernmunich": "바이에른뮌헨", "바이에른뮌헨": "바이에른뮌헨",
+      "dortmund": "도르트문트", "psg": "파리생제르맹", "parissaintgermain": "파리생제르맹", "inter": "인터밀란", "intermilan": "인터밀란",
+      "acmilan": "ac밀란", "juventus": "유벤투스", "napoli": "나폴리"
+    };
+    return alias[s] || s;
+  }
+
+  function dedupLabKellyMonitorV36() {
+    var lab = document.getElementById("tab-lab");
+    if (!lab) return;
+    var lists = lab.querySelectorAll("div, tbody, ul");
+    Array.prototype.forEach.call(lists, function (box) {
+      if (!box || !box.children || box.children.length < 2 || box.children.length > 40) return;
+      var rows = [];
+      for (var i = 0; i < box.children.length; i++) {
+        var ch = box.children[i];
+        var tx = String(ch.textContent || "").replace(/\s+/g, " ").trim();
+        var m = tx.match(/([A-Za-z가-힣][A-Za-z0-9가-힣\s.'-]{1,24}?)\s+vs\s+([A-Za-z가-힣][A-Za-z0-9가-힣\s.'-]{1,24})/i);
+        if (m && (tx.indexOf("켈리") !== -1 || tx.indexOf("배당") !== -1 || tx.indexOf("밸류") !== -1 || /\b[1-9]\.[0-9]{2}\b/.test(tx) || tx.indexOf("%") !== -1)) {
+          var k1 = canonicalKellyTeamKeyV36(m[1]);
+          var k2 = canonicalKellyTeamKeyV36(m[2]);
+          var hasKo = /[가-힣]/.test(m[1] + m[2]);
+          rows.push({ el: ch, pairKey: k1 + "::" + k2, hasKo: hasKo });
+        }
+      }
+      if (rows.length < 2) return;
+      var byPair = {};
+      rows.forEach(function (r) {
+        if (!byPair[r.pairKey]) {
+          byPair[r.pairKey] = r;
+        } else {
+          var prev = byPair[r.pairKey];
+          if (!prev.hasKo && r.hasKo) {
+            prev.el.style.setProperty("display", "none", "important");
+            byPair[r.pairKey] = r;
+          } else {
+            r.el.style.setProperty("display", "none", "important");
+          }
+        }
+      });
+    });
+  }
+
   function bootMemberUxV22() {
     injectUxV22Styles();
     enforceSingleLineMainTabBar();
@@ -6050,6 +6173,7 @@ _FRONTEND_V22_JS = r'''
     window.addEventListener("resize", harmonizeMobileFloatingOverlaysV26);
     polishModalsAndCloseIconsV29();
     stabilizeHofLaunchCardV29();
+    dedupLabKellyMonitorV36();
     installMatchInsightModalV30();
     refreshScoreboardSuiteV30();
     handleDeepLinkPostOnBootV29();
@@ -6078,6 +6202,7 @@ _FRONTEND_V22_JS = r'''
         enforceSingleLineMainTabBar();
         harmonizeMobileFloatingOverlaysV26();
         stabilizeHofLaunchCardV29();
+    dedupLabKellyMonitorV36();
         polishModalsAndCloseIconsV29();
         installMatchInsightModalV30();
         refreshScoreboardSuiteV30();
@@ -6095,6 +6220,7 @@ _FRONTEND_V22_JS = r'''
         harmonizeMobileFloatingOverlaysV26();
         installDataCenterPersistenceGuardV28();
         stabilizeHofLaunchCardV29();
+    dedupLabKellyMonitorV36();
         polishModalsAndCloseIconsV29();
         applyReactionStateToPosts();
         syncRenderedFeedReactionButtonsDom();
@@ -6111,6 +6237,7 @@ _FRONTEND_V22_JS = r'''
       if (typeof document !== "undefined" && document.hidden) return;
       enforceSingleLineMainTabBar();
       stabilizeHofLaunchCardV29();
+    dedupLabKellyMonitorV36();
       polishModalsAndCloseIconsV29();
       installMatchInsightModalV30();
       refreshScoreboardSuiteV30();
@@ -7712,6 +7839,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -7902,7 +8030,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3540_{int(time.time())}"
+_BOOT_VER_V30 = f"3600_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
