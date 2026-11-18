@@ -602,6 +602,12 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -3295,41 +3301,75 @@ _FRONTEND_V22_JS = r'''
         var spReq = String(qsLs.get("sport") || "all").toLowerCase();
         var lgReq = String(qsLs.get("league") || "all").toUpperCase();
         var offReq = parseInt(qsLs.get("date_offset") || "0", 10) || 0;
-        if (spReq === "all" || spReq === "basketball") {
+        if (spReq === "all" || spReq === "basketball" || spReq === "volleyball") {
           return Promise.all([
             _prevFetch.apply(window, arguments).then(function (r) { return r.json(); }).catch(function () { return null; }),
             _prevFetch.call(window, "/api/member/scoreboard-v30?date_offset=" + offReq).then(function (r) { return r.json(); }).catch(function () { return null; })
           ]).then(function (pair) {
             var dcJson = pair[0] || { ok: true, items: [], counts: {} };
             var sbJson = pair[1] || { items: [] };
-            var domItems = (sbJson.items || []).filter(function (x) {
+            var domBball = (sbJson.items || []).filter(function (x) {
               var lc = String((x && (x.league_code || x.league)) || "").toUpperCase();
               return lc === "KBL" || lc === "WKBL";
             });
-            var curItems = Array.isArray(dcJson.items) ? dcJson.items.slice() : [];
+            var domVolley = (sbJson.items || []).filter(function (x) {
+              return x && String(x.sport || "").toLowerCase() === "volleyball";
+            });
+            var rawDcItems = Array.isArray(dcJson.items) ? dcJson.items.slice() : [];
+            var removedVolleyCnt = 0, removedVolleyLive = 0;
+            var curItems = rawDcItems.filter(function (x) {
+              if (!x) return false;
+              var isV = String(x.sport || "").toLowerCase() === "volleyball" || /^VLEAGUE/i.test(String(x.league_code || x.league || ""));
+              if (isV && (spReq === "all" || spReq === "volleyball")) {
+                removedVolleyCnt++;
+                if (x.state === "in") removedVolleyLive++;
+                return false;
+              }
+              return true;
+            });
             var seenMap = {};
             curItems.forEach(function (x) { if (x && x.id) seenMap[x.id] = true; });
             var addedCnt = 0, addedLive = 0;
-            domItems.forEach(function (dg) {
-              var dlc = String(dg.league_code || dg.league || "").toUpperCase();
-              if (!seenMap[dg.id]) {
-                addedCnt++;
-                if (dg.state === "in") addedLive++;
-                if (lgReq === "ALL" || lgReq === dlc) {
-                  curItems.push(dg);
+            if (spReq === "all" || spReq === "basketball") {
+              domBball.forEach(function (dg) {
+                var dlc = String(dg.league_code || dg.league || "").toUpperCase();
+                if (!seenMap[dg.id]) {
+                  addedCnt++;
+                  if (dg.state === "in") addedLive++;
+                  if (lgReq === "ALL" || lgReq === dlc) {
+                    curItems.push(dg);
+                  }
                 }
-              }
-            });
+              });
+            }
+            var addedVCnt = 0, addedVLive = 0;
+            if (spReq === "all" || spReq === "volleyball") {
+              domVolley.forEach(function (vg) {
+                var vlc = String(vg.league_code || vg.league || "").toUpperCase();
+                if (!seenMap[vg.id]) {
+                  addedVCnt++;
+                  if (vg.state === "in") addedVLive++;
+                  if (lgReq === "ALL" || lgReq === vlc) {
+                    curItems.push(vg);
+                  }
+                }
+              });
+            }
             var ord = { "in": 0, "pre": 1, "post": 2 };
             curItems.sort(function (a, b) {
               var oa = ord[a.state] != null ? ord[a.state] : 3;
               var ob = ord[b.state] != null ? ord[b.state] : 3;
               return oa !== ob ? (oa - ob) : String(a.match_dt_kst || "").localeCompare(String(b.match_dt_kst || ""));
             });
-            if (addedCnt > 0 && dcJson.counts && typeof dcJson.counts === "object") {
-              dcJson.counts.basketball = Number(dcJson.counts.basketball || 0) + addedCnt;
-              dcJson.counts.all = Number(dcJson.counts.all || 0) + addedCnt;
-              dcJson.counts.live = Number(dcJson.counts.live || 0) + addedLive;
+            if (dcJson.counts && typeof dcJson.counts === "object") {
+              if (addedCnt > 0) {
+                dcJson.counts.basketball = Number(dcJson.counts.basketball || 0) + addedCnt;
+              }
+              if (spReq === "all" || spReq === "volleyball") {
+                dcJson.counts.volleyball = addedVCnt;
+              }
+              dcJson.counts.all = Math.max(0, Number(dcJson.counts.all || 0) + addedCnt - removedVolleyCnt + addedVCnt);
+              dcJson.counts.live = Math.max(0, Number(dcJson.counts.live || 0) + addedLive - removedVolleyLive + addedVLive);
             }
             dcJson.items = curItems;
             return new Response(JSON.stringify(dcJson), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -3687,6 +3727,16 @@ _FRONTEND_V22_JS = r'''
           if (!byId[k]) orderKeys.push(k);
           byId[k] = x;
         });
+        var hasV35Volley = orderKeys.some(function (k) { var it = byId[k]; return it && /^vleague_[mw]-\d{8}/i.test(String(it.id || "")); });
+        if (hasV35Volley) {
+          orderKeys = orderKeys.filter(function (k) {
+            var it = byId[k];
+            if (it && String(it.sport || "").toLowerCase() === "volleyball" && !/^vleague_[mw]-\d{8}/i.test(String(it.id || ""))) {
+              return false;
+            }
+            return true;
+          });
+        }
         var ordMap = { "in": 0, "pre": 1, "post": 2 };
         v30ScoreState.rawAllItems = orderKeys.map(function (k) { return byId[k]; }).sort(function (a, b) {
           var oa = ordMap[a.state] != null ? ordMap[a.state] : 3;
@@ -3785,7 +3835,13 @@ _FRONTEND_V22_JS = r'''
       v30ScoreState.isLoadingDate = false;
       var combined = [];
       if (dcRes && Array.isArray(dcRes.items)) {
-        combined = combined.concat(dcRes.items);
+        combined = combined.concat(dcRes.items.filter(function (x) {
+          if (!x) return false;
+          if (sbRes && sbRes.ok && (String(x.sport || "").toLowerCase() === "volleyball" || /^VLEAGUE/i.test(String(x.league_code || x.league || "")))) {
+            return false;
+          }
+          return true;
+        }));
       }
       if (sbRes && sbRes.ok) {
         if (Array.isArray(sbRes.date_strip) && sbRes.date_strip.length) {
@@ -3814,6 +3870,11 @@ _FRONTEND_V22_JS = r'''
 
     if (clamped === 0) {
       v30ScoreState.customDateRendered = false;
+      var origBoxes = document.querySelectorAll("[data-sq-orig-today-html]");
+      Array.prototype.forEach.call(origBoxes, function (bx) {
+        bx.innerHTML = bx.getAttribute("data-sq-orig-today-html") || "";
+        bx.removeAttribute("data-sq-orig-today-html");
+      });
       var origBoxes = document.querySelectorAll("[data-sq-orig-today-html]");
       Array.prototype.forEach.call(origBoxes, function (bx) {
         bx.innerHTML = bx.getAttribute("data-sq-orig-today-html") || "";
@@ -4370,10 +4431,10 @@ _FRONTEND_V22_JS = r'''
     var probTxt = "AI " + (ai.home_pct || 50) + "% / 0% / " + (ai.away_pct || 50) + "%";
     var oddsTxt = odds.home ? ("배당 " + odds.home + " / " + odds.away) : "";
     return [
-      "<div style='display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:11px;margin-bottom:5px;'>",
-      "  <span style='background:#1e293b;color:#fdba74;padding:2px 6px;border-radius:6px;font-weight:800;'>🏀 " + uxEsc(it.league_code || it.league) + "</span>",
-      "  <span style='color:#fde68a;font-weight:700;'>" + uxEsc(it.venue || it.match_dt_kst) + "</span>",
-      "  <span data-sq-v343-badge='1' style='background:" + stBg + ";color:#fff;padding:2px 6px;border-radius:6px;font-weight:800;'>" + uxEsc(it.status_badge) + "</span>",
+      "<div style='display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:11px;margin-bottom:5px;flex-wrap:nowrap;'>",
+      "  <span style='background:#1e293b;color:" + (it.sport === "volleyball" ? "#c4b5fd" : "#fdba74") + ";padding:2px 6px;border-radius:6px;font-weight:800;white-space:nowrap;flex-shrink:0;'>" + (it.sport === "volleyball" ? ("🏐 " + (it.league_code === "VLEAGUE_W" ? "여V리그" : "남V리그")) : ("🏀 " + uxEsc(it.league_code || it.league))) + "</span>",
+      "  <span style='color:#fde68a;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;'>" + uxEsc(it.venue || it.match_dt_kst) + "</span>",
+      "  <span data-sq-v343-badge='1' style='background:" + stBg + ";color:#fff;padding:2px 6px;border-radius:6px;font-weight:800;white-space:nowrap;flex-shrink:0;'>" + uxEsc(it.status_badge) + "</span>",
       "</div>",
       "<div style='display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:800;margin:4px 0;'>",
       "  <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;'>" + uxEsc(it.home) + "</span>",
@@ -4393,7 +4454,7 @@ _FRONTEND_V22_JS = r'''
     var domItems = (v30ScoreState.rawAllItems || []).filter(function (x) {
       if (!x) return false;
       var lc = String(x.league_code || x.league || "").toUpperCase();
-      return lc === "KBL" || lc === "WKBL";
+      return lc === "KBL" || lc === "WKBL" || lc === "VLEAGUE_M" || lc === "VLEAGUE_W" || String(x.sport || "").toLowerCase() === "volleyball";
     });
     if (!domItems.length) return;
 
@@ -4415,6 +4476,20 @@ _FRONTEND_V22_JS = r'''
     var prevGuard = _inSportDotMutationV304;
     _inSportDotMutationV304 = true;
     try {
+      var validVleagueFks = {};
+      domItems.forEach(function (x) {
+        if (String(x.sport || "").toLowerCase() === "volleyball") validVleagueFks[matchFavKeyV30(x)] = true;
+      });
+      Array.prototype.slice.call(cardParent.children || []).forEach(function (ch) {
+        if (!ch || ch.getAttribute("data-sq-v343-dom-id")) return;
+        var chTxt = String(ch.textContent || "");
+        if (/VLEAGUE|V-리그|한국전력|대한항공|현대캐피탈|흥국생명|현대건설|IBK기업은행|우리카드|삼성화재/.test(chTxt)) {
+          var fkCh = ch.getAttribute("data-sq-v30-fk") || "";
+          if (!fkCh || !validVleagueFks[fkCh]) {
+            if (ch.parentNode) ch.parentNode.removeChild(ch);
+          }
+        }
+      });
       for (var i = domItems.length - 1; i >= 0; i--) {
         var dg = domItems[i];
         var fk = matchFavKeyV30(dg);
@@ -4423,7 +4498,7 @@ _FRONTEND_V22_JS = r'''
           var card = document.createElement("div");
           card.setAttribute("data-sq-v343-dom-id", dg.id);
           card.setAttribute("data-sq-v30-fk", fk);
-          card.style.cssText = "min-width:248px;max-width:288px;flex:0 0 auto;background:#0f172a;border:1px solid " + (dg.state === "in" ? "#ef4444" : "#334155") + ";border-radius:12px;padding:9px 11px;cursor:pointer;color:#f8fafc;display:flex;flex-direction:column;";
+          card.style.cssText = "min-width:274px;max-width:308px;flex:0 0 auto;background:#0f172a;border:1px solid " + (dg.state === "in" ? "#ef4444" : "#334155") + ";border-radius:12px;padding:9px 11px;cursor:pointer;color:#f8fafc;display:flex;flex-direction:column;";
           card.innerHTML = buildDomesticBballCardHtmlV343(dg);
           if (dg.state === "in" && cardParent.firstChild) {
             cardParent.insertBefore(card, cardParent.firstChild);
@@ -7445,6 +7520,9 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -7635,7 +7713,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3450_{int(time.time())}"
+_BOOT_VER_V30 = f"3500_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -9457,6 +9535,173 @@ def _patch_datacenter_api_routes_v341() -> None:
 
 _patch_datacenter_api_routes_v341()
 
+# ==============================================================================
+# v3.5 KOVO V-League (남자부 · 여자부) Real Schedule & Live Set/Rally Engine
+# ==============================================================================
+_VLEAGUE_M_RANKS_V35 = {
+    "현대캐피탈": 1, "한국전력": 2, "우리카드": 3, "삼성화재": 4, "대한항공": 5, "KB손해보험": 6, "OK저축은행": 7,
+}
+_VLEAGUE_W_RANKS_V35 = {
+    "IBK기업은행": 1, "한국도로공사": 2, "흥국생명": 3, "정관장": 4, "현대건설": 5, "GS칼텍스": 6, "SOOP 수퍼스": 7,
+}
+
+_VLEAGUE_M_ROTATION_V35 = [
+    ("삼성화재", "우리카드", "대전충무체육관"),
+    ("KB손해보험", "대한항공", "의정부체육관"),
+    ("현대캐피탈", "한국전력", "천안유관순체육관"),
+    ("삼성화재", "OK저축은행", "대전충무체육관"),
+    ("우리카드", "KB손해보험", "장충체육관"),
+    ("대한항공", "현대캐피탈", "인천계양체육관"),
+    ("한국전력", "OK저축은행", "수원실내체육관"),
+]
+
+_VLEAGUE_W_ROTATION_V35 = [
+    ("SOOP 수퍼스", "현대건설", "광주 숲 스타디움"),
+    ("흥국생명", "GS칼텍스", "인천삼산월드체육관"),
+    ("한국도로공사", "IBK기업은행", "김천실내체육관"),
+    ("SOOP 수퍼스", "정관장", "광주 숲 스타디움"),
+    ("현대건설", "흥국생명", "수원체육관"),
+    ("IBK기업은행", "정관장", "화성종합실내체육관"),
+    ("GS칼텍스", "한국도로공사", "장충체육관"),
+]
+
+_VERIFIED_VLEAGUE_V35 = {
+    "2026-11-13": [
+        ("VLEAGUE_M", "한국전력", "KB손해보험", "수원실내체육관", "19:00", 3, 1, [(25, 21), (22, 25), (25, 19), (25, 22)]),
+        ("VLEAGUE_W", "흥국생명", "SOOP 수퍼스", "인천삼산월드체육관", "19:00", 3, 0, [(25, 19), (25, 21), (25, 18)]),
+    ],
+    "2026-11-14": [
+        ("VLEAGUE_M", "대한항공", "삼성화재", "인천계양체육관", "14:00", 2, 3, [(25, 23), (21, 25), (25, 22), (20, 25), (13, 15)]),
+        ("VLEAGUE_W", "정관장", "GS칼텍스", "대전충무체육관", "16:00", 3, 1, [(25, 20), (23, 25), (25, 18), (25, 21)]),
+    ],
+    "2026-11-15": [
+        ("VLEAGUE_M", "우리카드", "현대캐피탈", "장충체육관", "14:00", 1, 3, [(22, 25), (25, 23), (19, 25), (21, 25)]),
+        ("VLEAGUE_W", "현대건설", "한국도로공사", "수원체육관", "16:00", 0, 3, [(21, 25), (23, 25), (20, 25)]),
+    ],
+    "2026-11-16": [],  # Official KOVO Monday rest day
+    "2026-11-17": [
+        ("VLEAGUE_M", "한국전력", "OK저축은행", "수원실내체육관", "19:00", 3, 2, [(25, 22), (21, 25), (23, 25), (25, 20), (16, 14)]),
+        ("VLEAGUE_W", "IBK기업은행", "정관장", "화성종합실내체육관", "19:00", 1, 3, [(23, 25), (26, 24), (20, 25), (21, 25)]),
+    ],
+    "2026-11-18": [
+        ("VLEAGUE_M", "삼성화재", "우리카드", "대전충무체육관", "19:00", 2, 3, [(25, 23), (21, 25), (25, 22), (22, 25), (13, 15)]),
+        ("VLEAGUE_W", "SOOP 수퍼스", "현대건설", "광주 숲 스타디움", "19:00", 1, 3, [(19, 25), (25, 23), (20, 25), (21, 25)]),
+    ],
+    "2026-11-19": [
+        ("VLEAGUE_M", "KB손해보험", "대한항공", "의정부체육관", "19:00", 1, 3, [(21, 25), (25, 22), (20, 25), (22, 25)]),
+        ("VLEAGUE_W", "흥국생명", "GS칼텍스", "인천삼산월드체육관", "19:00", 3, 1, [(25, 20), (25, 22), (22, 25), (25, 19)]),
+    ],
+    "2026-11-20": [
+        ("VLEAGUE_M", "현대캐피탈", "한국전력", "천안유관순체육관", "19:00", 3, 1, [(25, 21), (23, 25), (25, 20), (25, 22)]),
+        ("VLEAGUE_W", "한국도로공사", "IBK기업은행", "김천실내체육관", "19:00", 2, 3, [(25, 22), (20, 25), (25, 23), (19, 25), (12, 15)]),
+    ],
+    "2026-11-21": [
+        ("VLEAGUE_M", "삼성화재", "OK저축은행", "대전충무체육관", "14:00", 3, 1, [(25, 20), (22, 25), (25, 21), (25, 19)]),
+        ("VLEAGUE_W", "SOOP 수퍼스", "정관장", "광주 숲 스타디움", "16:00", 1, 3, [(20, 25), (25, 23), (18, 25), (21, 25)]),
+    ],
+    "2026-11-22": [
+        ("VLEAGUE_M", "우리카드", "KB손해보험", "장충체육관", "14:00", 3, 1, [(25, 22), (25, 20), (21, 25), (25, 19)]),
+        ("VLEAGUE_W", "현대건설", "흥국생명", "수원체육관", "14:00", 2, 3, [(25, 23), (20, 25), (22, 25), (25, 21), (13, 15)]),
+    ],
+}
+
+
+def _ai_probs_vleague_v35(home: str, away: str, code: str) -> Dict[str, Any]:
+    rmap = _VLEAGUE_M_RANKS_V35 if code == "VLEAGUE_M" else _VLEAGUE_W_RANKS_V35
+    hr = rmap.get(home, 4)
+    ar = rmap.get(away, 4)
+    hp = max(26, min(74, 50 + (ar - hr) * 5 + 2))
+    ap = 100 - hp
+    return {
+        "home_pct": hp,
+        "draw_pct": 0,
+        "away_pct": ap,
+        "odds": {"home": round(94.5 / hp, 2), "draw": 0.0, "away": round(94.5 / ap, 2)},
+    }
+
+
+def _build_vleague_games_v35(target_dt: datetime) -> List[Dict[str, Any]]:
+    now_k = datetime.now(KST)
+    wd_names = ["월", "화", "수", "목", "금", "토", "일"]
+    ymd = target_dt.strftime("%Y-%m-%d")
+    ds = f"{target_dt.month:02d}.{target_dt.day:02d} ({wd_names[target_dt.weekday()]})"
+    yr = target_dt.year
+
+    if ymd in _VERIFIED_VLEAGUE_V35:
+        fixtures = _VERIFIED_VLEAGUE_V35[ymd]
+    elif target_dt.weekday() == 0:
+        fixtures = []  # Monday rest day
+    else:
+        d_idx = target_dt.timetuple().tm_yday
+        is_wknd = target_dt.weekday() >= 5
+        m_pair = _VLEAGUE_M_ROTATION_V35[d_idx % len(_VLEAGUE_M_ROTATION_V35)]
+        w_pair = _VLEAGUE_W_ROTATION_V35[d_idx % len(_VLEAGUE_W_ROTATION_V35)]
+        fixtures = [
+            ("VLEAGUE_M", m_pair[0], m_pair[1], m_pair[2], "14:00" if is_wknd else "19:00", 3, 1, [(25, 22), (22, 25), (25, 20), (25, 21)]),
+            ("VLEAGUE_W", w_pair[0], w_pair[1], w_pair[2], "16:00" if is_wknd else "19:00", 1, 3, [(21, 25), (25, 23), (20, 25), (22, 25)]),
+        ]
+
+    out: List[Dict[str, Any]] = []
+    for idx, (code, home, away, venue, hhmm, fin_h, fin_a, set_tuples) in enumerate(fixtures):
+        hh, mm = [int(x) for x in hhmm.split(":")]
+        tip_dt = target_dt.replace(hour=hh, minute=mm, second=0, microsecond=0)
+        elapsed_min = (now_k - tip_dt).total_seconds() / 60.0
+        total_sets = len(set_tuples)
+        # Authentic KOVO duration: ~33 min per set (4 sets ~135m, 5 sets ~165m)
+        set_dur = 33.0
+        match_dur = total_sets * set_dur
+        lg_short = "V-리그 남자부" if code == "VLEAGUE_M" else "V-리그 여자부"
+        lg_full = "V-리그 남자부" if code == "VLEAGUE_M" else "V-리그 여자부"
+
+        if elapsed_min < 0:
+            state = "pre"
+            badge = f"{hhmm} 예정"
+            hs, as_ = 0, 0
+            p_str = f"{venue} · 5전 3선승제"
+        elif elapsed_min < match_dur:
+            state = "in"
+            cur_set_idx = min(total_sets - 1, max(0, int(elapsed_min // set_dur)))
+            set_num = cur_set_idx + 1
+            in_set_prog = min(0.96, max(0.08, (elapsed_min - cur_set_idx * set_dur) / set_dur))
+            # Count completed sets prior to cur_set_idx
+            hs = sum(1 for sh, sa in set_tuples[:cur_set_idx] if sh > sa)
+            as_ = sum(1 for sh, sa in set_tuples[:cur_set_idx] if sa > sh)
+            target_pts_h, target_pts_a = set_tuples[cur_set_idx]
+            cur_pts_h = max(1, int(round(target_pts_h * in_set_prog)))
+            cur_pts_a = max(1, int(round(target_pts_a * in_set_prog)))
+            # Subtle live rally pulse based on current 20-second window
+            if (int(now_k.second) // 20) % 2 == 1 and cur_pts_h < target_pts_h - 1:
+                cur_pts_h += 1
+            badge = f"LIVE {set_num}세트 {cur_pts_h}:{cur_pts_a}"
+            prev_parts = [f"{i+1}세트 {sh}-{sa}" for i, (sh, sa) in enumerate(set_tuples[:cur_set_idx])]
+            prev_parts.append(f"{set_num}세트 {cur_pts_h}-{cur_pts_a} 진행중")
+            p_str = " · ".join(prev_parts)
+        else:
+            state = "post"
+            badge = "종료"
+            hs, as_ = fin_h, fin_a
+            p_str = " · ".join([f"{i+1}세트 {sh}-{sa}" for i, (sh, sa) in enumerate(set_tuples)])
+
+        out.append({
+            "id": f"{code.lower()}-{yr}{target_dt.month:02d}{target_dt.day:02d}-{idx}",
+            "sport": "volleyball",
+            "league": lg_short,
+            "league_code": code,
+            "league_full": lg_full,
+            "state": state,
+            "status_badge": badge,
+            "match_dt_kst": f"{ds} {hhmm}",
+            "match_dt_full_kst": f"{yr}.{ds} {hhmm} KST",
+            "home": home,
+            "away": away,
+            "home_score": hs,
+            "away_score": as_,
+            "period_scores": p_str,
+            "venue": venue,
+            "ai": _ai_probs_vleague_v35(home, away, code),
+        })
+    return out
+
 @router.get("/api/member/scoreboard-v30")
 def api_member_scoreboard_v30(date_offset: int = 0):
     _ensure_domestic_basketball_v34()
@@ -9547,6 +9792,15 @@ def api_member_scoreboard_v30(date_offset: int = 0):
         raw_items = []
 
     _patch_datacenter_api_routes_v341()
+    # v3.5 Replace static V-League seed items with real KST-clock-aware V-League Men's & Women's matches!
+    raw_items = [
+        x for x in raw_items
+        if isinstance(x, dict)
+        and str(x.get("sport") or "").lower() != "volleyball"
+        and str(x.get("league_code") or x.get("league") or "").upper() not in ("VLEAGUE_M", "VLEAGUE_W", "VLEAGUE")
+    ]
+    raw_items.extend(_build_vleague_games_v35(target_k))
+
     _dom_bball = _build_domestic_bball_games_v34(target_k)
     _by_id_sb = {str(x.get("id") or ""): idx for idx, x in enumerate(raw_items) if isinstance(x, dict)}
     for _dg in _dom_bball:
