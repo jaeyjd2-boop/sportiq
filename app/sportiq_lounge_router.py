@@ -558,6 +558,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -4543,7 +4545,7 @@ _FRONTEND_V22_JS = r'''
           if (rTag) {
             if (myP) {
               var myLbl = myP === "H" ? (it.home + " 승") : (myP === "A" ? (it.away + " 승") : "무승부");
-              rTag.textContent = "✅ +5P 적립됨 · 내 픽: " + myLbl;
+              var liveP = ((typeof state === "object" && state && state.points != null) ? state.points : ((vd && vd.points != null) ? vd.points : null)); rTag.textContent = "✅ +5P 적립됨" + (liveP != null ? " (보유 " + liveP + "P)" : "") + " · 내 픽: " + myLbl;
               rTag.style.background = "rgba(56,189,248,.2)";
               rTag.style.borderColor = "rgba(56,189,248,.55)";
               rTag.style.color = "#7dd3fc";
@@ -4596,16 +4598,9 @@ _FRONTEND_V22_JS = r'''
           grid.querySelectorAll("[data-sq-v32-pick]").forEach(function (vb) {
             vb.onclick = function () {
               var chosen = vb.getAttribute("data-sq-v32-pick") || "H";
-              var curPts = 120;
-              if (typeof window.state === "object" && window.state && typeof window.state.points === "number") {
-                curPts = window.state.points;
-              } else {
-                var pbEl = document.getElementById("pointsBadge");
-                if (pbEl) {
-                  var pm = String(pbEl.textContent || "").match(/\d+/);
-                  if (pm) curPts = parseInt(pm[0], 10);
-                }
-              }
+              var stRef = (typeof state === "object" && state) ? state : (window.state || null);
+              var curPts = (stRef && stRef.points != null) ? Number(stRef.points || 120) : 120;
+              if (isNaN(curPts) || curPts < 0) curPts = 120;
               fetch("/api/member/match-vote", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -4627,17 +4622,24 @@ _FRONTEND_V22_JS = r'''
                   if (!res || !res.ok) return;
                   renderFanVoteStateUI(res);
                   if (typeof res.points === "number" && res.awarded_points > 0) {
-                    if (typeof window.state === "object" && window.state) {
-                      window.state.points = res.points;
-                      if (res.role_tier) window.state.role = res.role_tier;
+                    var stTarget = (typeof state === "object" && state) ? state : (window.state || null);
+                    if (stTarget) {
+                      stTarget.points = Number(res.points);
+                      if (res.role_tier) stTarget.role = res.role_tier;
                     }
                     try { localStorage.setItem("sportiq_points", String(res.points)); } catch (e) {}
-                    var pb = document.getElementById("pointsBadge");
-                    if (pb) pb.textContent = res.points + " P";
                     if (typeof window.updatePointsUI === "function") {
                       try { window.updatePointsUI(); } catch (e) {}
                     }
+                    if (res.role_tier && typeof window.setRole === "function") {
+                      try { window.setRole(res.role_tier, false); } catch (e) {}
+                    }
+                    ["pointsBadge", "userPoints", "heroPoints", "quickPointsBadge"].forEach(function (pid) {
+                      var pel = document.getElementById(pid);
+                      if (pel) pel.textContent = res.points + " P";
+                    });
                     renderTierUpgradeSidebarCard();
+                    renderFanVoteStateUI(res);
                   }
                   if (res.message && typeof showToast === "function") {
                     showToast(res.message);
@@ -6525,6 +6527,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -6715,7 +6718,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3200_{int(time.time())}"
+_BOOT_VER_V30 = f"3210_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
