@@ -506,6 +506,10 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -679,6 +683,27 @@ _FRONTEND_V22_JS = r'''
       "  #sqDesktopMainTabStrip { gap: 7px !important; }",
       "  #sqDesktopMainTabStrip > .tab-btn,",
       "  #sqDesktopMainTabStrip > button { padding: 7px 12px !important; font-size: 13px !important; }",
+      "}",
+      "/* v2.8 Protect DataCenter #dcHubBody & Cards (배당 급변 드롭오즈 / 순위 / 적중률) from Seed-Guard Hiding */",
+      "#dcMainHubSection[data-sq-seed-archive],",
+      "#dcHubCollapsible[data-sq-seed-archive],",
+      "#dcHubBody[data-sq-seed-archive],",
+      "#dcMainHubSection.sq-seed-archive-card,",
+      "#dcHubCollapsible.sq-seed-archive-card,",
+      "#dcHubBody.sq-seed-archive-card {",
+      "  display: block !important;",
+      "  visibility: visible !important;",
+      "  opacity: 1 !important;",
+      "}",
+      "#dcHubBody[data-sq-dc-user-open='1'] {",
+      "  display: block !important;",
+      "  visibility: visible !important;",
+      "  opacity: 1 !important;",
+      "}",
+      "#dcHubBody [data-sq-seed-archive],",
+      "#dcHubBody .sq-seed-archive-card {",
+      "  visibility: visible !important;",
+      "  opacity: 1 !important;",
       "}",
       "/* Guarantee #feedList is NEVER hidden by match-strip seed guards */",
       "#feedList {",
@@ -969,8 +994,10 @@ _FRONTEND_V22_JS = r'''
         }
         var dcBody = document.getElementById("dcHubBody");
         if (dcBody) {
-          dcBody.classList.remove("hidden");
-          dcBody.style.display = "block";
+          dcBody.setAttribute("data-sq-dc-user-open", "1");
+          dcBody.classList.remove("hidden", "sq-seed-archive-card");
+          dcBody.removeAttribute("data-sq-seed-archive");
+          dcBody.style.setProperty("display", "block", "important");
         }
         var dcTog = document.getElementById("dcToggleHubBtn");
         if (dcTog && (dcTog.textContent || "").indexOf("펼치기") !== -1) {
@@ -2040,6 +2067,129 @@ _FRONTEND_V22_JS = r'''
     toolbar.appendChild(chip);
   }
 
+  function unblindDataCenterSubtreeV28() {
+    var hub = document.getElementById("dcMainHubSection");
+    var col = document.getElementById("dcHubCollapsible");
+    var body = document.getElementById("dcHubBody");
+    [hub, col, body].forEach(function (el) {
+      if (!el) return;
+      if (el.hasAttribute("data-sq-seed-archive")) el.removeAttribute("data-sq-seed-archive");
+      if (el.classList && el.classList.contains("sq-seed-archive-card")) {
+        el.classList.remove("sq-seed-archive-card");
+      }
+    });
+    if (!body) return;
+
+    // Unblind any child cards/rows inside #dcHubBody that a seed guard may have hidden
+    body.querySelectorAll("[data-sq-seed-archive], .sq-seed-archive-card").forEach(function (ch) {
+      ch.removeAttribute("data-sq-seed-archive");
+      ch.classList.remove("sq-seed-archive-card", "hidden");
+      if (ch.style && ch.style.display === "none") {
+        ch.style.removeProperty("display");
+      }
+    });
+    if (body.getAttribute("data-sq-dc-user-open") === "1" && body.children && body.children.length > 0) {
+      var kids = Array.prototype.slice.call(body.children);
+      var anyVis = kids.some(function (k) { return window.getComputedStyle(k).display !== "none"; });
+      if (!anyVis) {
+        kids.forEach(function (k) {
+          k.classList.remove("hidden", "sq-seed-archive-card");
+          if (k.style && k.style.display === "none") k.style.removeProperty("display");
+        });
+      }
+    }
+
+    if (body.getAttribute("data-sq-dc-user-open") === "1") {
+      body.classList.remove("hidden");
+      body.style.setProperty("display", "block", "important");
+      var hint = document.getElementById("dcQuickExpandHint");
+      if (hint) hint.style.display = "none";
+      var tog = document.getElementById("dcToggleHubBtn");
+      if (tog && (tog.textContent || "").indexOf("펼치기") !== -1) {
+        tog.textContent = "접기 ▲";
+      }
+    }
+  }
+
+  function installDataCenterPersistenceGuardV28() {
+    var grid = document.getElementById("dcLauncherGrid") || document.getElementById("dcLaunchCards");
+    var body = document.getElementById("dcHubBody");
+    var tog = document.getElementById("dcToggleHubBtn");
+    var hint = document.getElementById("dcQuickExpandHint");
+
+    function markDcBodyUserOpen() {
+      var b = document.getElementById("dcHubBody");
+      if (!b) return;
+      b.setAttribute("data-sq-dc-user-open", "1");
+      b.classList.remove("hidden", "sq-seed-archive-card");
+      b.removeAttribute("data-sq-seed-archive");
+      b.style.setProperty("display", "block", "important");
+      var h = document.getElementById("dcQuickExpandHint");
+      if (h) h.style.display = "none";
+      var t = document.getElementById("dcToggleHubBtn");
+      if (t && (t.textContent || "").indexOf("펼치기") !== -1) {
+        t.textContent = "접기 ▲";
+      }
+      setTimeout(unblindDataCenterSubtreeV28, 30);
+      setTimeout(unblindDataCenterSubtreeV28, 250);
+      setTimeout(unblindDataCenterSubtreeV28, 700);
+    }
+
+    if (grid && !grid.getAttribute("data-sq-dc-grid-bound-v28")) {
+      grid.setAttribute("data-sq-dc-grid-bound-v28", "1");
+      grid.addEventListener("click", function () {
+        markDcBodyUserOpen();
+      }, true);
+    }
+
+    if (hint && !hint.getAttribute("data-sq-dc-hint-bound-v28")) {
+      hint.setAttribute("data-sq-dc-hint-bound-v28", "1");
+      hint.addEventListener("click", function () {
+        markDcBodyUserOpen();
+      }, true);
+    }
+
+    if (tog && !tog.getAttribute("data-sq-dc-tog-bound-v28")) {
+      tog.setAttribute("data-sq-dc-tog-bound-v28", "1");
+      tog.addEventListener("click", function () {
+        setTimeout(function () {
+          var b = document.getElementById("dcHubBody");
+          if (!b) return;
+          var txt = tog.textContent || "";
+          if (txt.indexOf("펼치기") !== -1) {
+            b.removeAttribute("data-sq-dc-user-open");
+            b.style.setProperty("display", "none", "important");
+          } else {
+            b.setAttribute("data-sq-dc-user-open", "1");
+            b.style.setProperty("display", "block", "important");
+          }
+        }, 15);
+      });
+    }
+
+    if (typeof window.__switchDcTab === "function" && !window.__sqSwitchDcWrappedV28) {
+      window.__sqSwitchDcWrappedV28 = true;
+      var origSwDc = window.__switchDcTab;
+      window.__switchDcTab = function (tab, optLeague) {
+        markDcBodyUserOpen();
+        var res = origSwDc.apply(this, arguments);
+        markDcBodyUserOpen();
+        return res;
+      };
+    }
+
+    var obsTarget = document.getElementById("dcHubCollapsible") || document.getElementById("dcMainHubSection") || body;
+    if (obsTarget && typeof MutationObserver !== "undefined" && !obsTarget.__sqDcMutObsV28) {
+      obsTarget.__sqDcMutObsV28 = true;
+      var obs = new MutationObserver(function () {
+        unblindDataCenterSubtreeV28();
+      });
+      obs.observe(obsTarget, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-sq-seed-archive"] });
+    }
+
+    unblindDataCenterSubtreeV28();
+  }
+
   function bootMemberUxV22() {
     injectUxV22Styles();
     enforceSingleLineMainTabBar();
@@ -2064,6 +2214,7 @@ _FRONTEND_V22_JS = r'''
     installLiveHashtagSyncV25();
     mountOfficialLegalFooterV22();
     harmonizeMobileFloatingOverlaysV26();
+    installDataCenterPersistenceGuardV28();
     window.addEventListener("resize", harmonizeMobileFloatingOverlaysV26);
 
     // Keep dynamic UI states synchronized when tabs switch or async data arrives
@@ -2071,6 +2222,7 @@ _FRONTEND_V22_JS = r'''
       setTimeout(function () {
         enforceSingleLineMainTabBar();
         harmonizeMobileFloatingOverlaysV26();
+        installDataCenterPersistenceGuardV28();
         var fb = document.getElementById("feedList");
         if (fb) {
           fb.style.setProperty("display", "block", "important");
@@ -2082,6 +2234,7 @@ _FRONTEND_V22_JS = r'''
     setInterval(function () {
       enforceSingleLineMainTabBar();
       harmonizeMobileFloatingOverlaysV26();
+      installDataCenterPersistenceGuardV28();
       syncTop20MatchCountBadge();
       renderTierUpgradeSidebarCard();
       applyReactionStateToPosts();
@@ -2135,7 +2288,7 @@ def _ensure_upgrade_js_dedup_patched() -> bool:
     # Prevent HYBRID_SEED_GUARD_V17_JS (L7773) from treating <div id="feedList"> inside #tab-feed as a match seed card and setting display:none!
     updated = updated.replace(
         'if (container.id === "feedList" || container.id === "dcLauncherGrid" || container.id === "globalTop10Grid") return;',
-        'if (container.id === "feedList" || container.id === "tab-feed" || container.id === "dcLauncherGrid" || container.id === "globalTop10Grid" || (container.querySelector && container.querySelector("#feedList")) || (container.closest && container.closest("#tab-feed"))) return;',
+        'if (container.id === "feedList" || container.id === "tab-feed" || container.id === "dcLauncherGrid" || container.id === "dcLaunchCards" || container.id === "dcHubBody" || container.id === "dcHubCollapsible" || container.id === "dcMainHubSection" || container.id === "tab-datacenter" || container.id === "globalTop10Grid" || (container.querySelector && (container.querySelector("#feedList") || container.querySelector("#dcHubBody") || container.querySelector("#dcLauncherGrid"))) || (container.closest && container.closest("#tab-feed, #dcMainHubSection, #dcHubCollapsible, #dcHubBody, #dcLauncherGrid, #dcLaunchCards, #tab-datacenter"))) return;',
     )
     updated = updated.replace(
         'art.style.display = (matchTab && matchSearch) ? "" : "none";',
@@ -3600,6 +3753,8 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
         "updated_points": updated_pts,
         **cached_payload,
     }
+
+
 
 
 
@@ -5270,7 +5425,7 @@ def serve_lounge_home():
             rendered = inject_upgrade_into_html(raw_html)
             rendered = re.sub(
                 r'(/api/member/p0p1-upgrade\.js\?v=)(\d+)',
-                lambda m: m.group(1) + str(int(m.group(2)) + 900),
+                lambda m: m.group(1) + str(int(m.group(2)) + 1000),
                 rendered,
             )
             rendered = inject_seo_and_og_head_v27(rendered)
