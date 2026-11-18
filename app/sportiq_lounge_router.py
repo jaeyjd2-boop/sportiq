@@ -223,7 +223,8 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
     var totalCnt = Number(d.total_count || (know.length + games.length + insights.length + posts.length + news.length));
 
     var sqa = d.schedule_qa || null;
-    window.__lastAiSearchMatchesV37 = (sqa && Array.isArray(sqa.items) && sqa.items.length) ? sqa.items : games;
+    window.__lastAiSearchQaItemsV371 = (sqa && Array.isArray(sqa.items)) ? sqa.items : [];
+    window.__lastAiSearchMatchesV37 = games || [];
     var qaCardHtml = "";
     if (sqa) {
       var qaRows = (sqa.items || []).map(function (it, idx) {
@@ -252,25 +253,7 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
         qaRows = "<div style='padding:10px 12px;color:#cbd5e1;font-size:12.5px;background:rgba(2,6,23,.55);border-radius:9px;'>해당 일자에 편성된 경기가 없습니다. 우측 상단 날짜 버튼으로 전·후일 일정을 바로 조회해 보세요.</div>";
       }
       qaCardHtml = [
-        "<div data-sq-ai-qa-card='1' style='background:linear-gradient(145deg,rgba(16,185,129,.16),rgba(15,23,42,.98));border:1.5px solid rgba(52,211,153,.55);border-radius:14px;padding:14px 15px;margin-bottom:11px;box-shadow:0 12px 28px rgba(0,0,0,.35);'>",
-        "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;'>",
-        "    <div style='display:flex;align-items:center;gap:7px;flex-wrap:wrap;'>",
-        "      <span style='font-size:15px;font-weight:900;color:#ecfdf5;'>" + esc(sqa.emoji || "🏟️") + " " + esc(sqa.headline) + "</span>",
-        "      <span style='background:rgba(16,185,129,.24);border:1px solid rgba(52,211,153,.5);color:#6ee7b7;border-radius:999px;padding:1px 9px;font-size:11px;font-weight:800;'>총 " + esc(sqa.total_games || 0) + "경기 · KST</span>",
-        "    </div>",
-        "    <div style='display:flex;gap:4px;flex-wrap:wrap;'>",
-        "      <button type='button' data-ai-rel='" + esc(sqa.prev_query || "") + "' style='background:#0f172a;border:1px solid #334155;color:#cbd5e1;border-radius:7px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer;'>" + esc(sqa.prev_label || "◀ 전날") + "</button>",
-        "      <button type='button' data-ai-rel='" + esc(sqa.today_query || "") + "' style='background:#0f172a;border:1px solid #38bdf8;color:#7dd3fc;border-radius:7px;padding:2px 8px;font-size:11px;font-weight:800;cursor:pointer;'>오늘</button>",
-        "      <button type='button' data-ai-rel='" + esc(sqa.next_query || "") + "' style='background:#0f172a;border:1px solid #334155;color:#cbd5e1;border-radius:7px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer;'>" + esc(sqa.next_label || "다음날 ▶") + "</button>",
-        "    </div>",
-        "  </div>",
-        "  <div style='display:grid;gap:6px;'>" + qaRows + "</div>",
-        "</div>"
-      ].join("");
-    }
-    var out = [
-      qaCardHtml,
-      "<div style='background:linear-gradient(145deg,rgba(6,182,212,.15),rgba(15,23,42,.97));border:1px solid rgba(34,211,238,.48);border-radius:14px;padding:14px 15px;margin-bottom:10px;'>",
+        "<div data-sq-ai-qa-card='1' style='background:linear-gradient(145deg,rgba(16,185,129,.16),rgba(15,23,42,.97));border:1px solid rgba(34,211,238,.48);border-radius:14px;padding:14px 15px;margin-bottom:10px;'>",
       "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;'>",
       "    <div style='display:flex;align-items:center;gap:7px;flex-wrap:wrap;'>",
       "      <span style='font-weight:900;color:#67e8f9;font-size:13.5px;'>🧠 AI 아이큐 초정밀 통합 브리핑</span>",
@@ -451,8 +434,22 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
     }
 
     // Jump handlers for match, datacenter insight, and feed post cards
-    box.querySelectorAll("[data-ai-jump-match]").forEach(function (mc) {
+    box.querySelectorAll("[data-ai-open-qa-idx]").forEach(function (qb) {
+      qb.onclick = function (ev) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        var idx = parseInt(qb.getAttribute("data-ai-open-qa-idx") || "0", 10);
+        var list = (d.schedule_qa && d.schedule_qa.items) || [];
+        if (list[idx] && typeof window.__openMatchModalFromAiSearchV37 === "function") {
+          window.__openMatchModalFromAiSearchV37(list[idx]);
+        }
+      };
+    });
+    box.querySelectorAll("[data-ai-jump-match]").forEach(function (mc, mIdx) {
       mc.onclick = function () {
+        if (games[mIdx] && games[mIdx].home && typeof window.__openMatchModalFromAiSearchV37 === "function") {
+          window.__openMatchModalFromAiSearchV37(games[mIdx]);
+          return;
+        }
         var modal = document.getElementById("sqAiIqModal");
         if (modal) modal.style.display = "none";
         var liveBar = document.getElementById("proLiveTickerBar");
@@ -519,6 +516,12 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
   }'''
 
 _AI_SEARCH_UI_PATCHED = False
+
+
+
+
+
+
 
 
 
@@ -5675,7 +5678,7 @@ _FRONTEND_V22_JS = r'''
     if (!modal) {
       modal = document.createElement("div");
       modal.id = "dcQuickMatchModal";
-      modal.style.cssText = "position:fixed;inset:0;background:rgba(2,6,23,0.82);backdrop-filter:blur(4px);z-index:10008;display:flex;align-items:center;justify-content:center;padding:14px;";
+      modal.style.cssText = "position:fixed;inset:0;background:rgba(2,6,23,0.82);backdrop-filter:blur(4px);z-index:120050;display:flex;align-items:center;justify-content:center;padding:14px;";
       modal.addEventListener("click", function (ev) {
         if (ev.target === modal) modal.style.display = "none";
       });
@@ -6135,13 +6138,111 @@ _FRONTEND_V22_JS = r'''
   }
 
 
+  function findAiSearchModalContainerV371() {
+    var direct = document.getElementById("sqAiIqModal") || document.getElementById("aiIqModal") || document.getElementById("sqAiSearchModal");
+    var box = document.getElementById("sqAiIqResultArea") || document.getElementById("sqAiIqInput");
+    if (box) {
+      var cur = box.parentElement;
+      var bestFixed = null;
+      while (cur && cur !== document.body && cur !== document.documentElement) {
+        var cs = window.getComputedStyle ? window.getComputedStyle(cur) : null;
+        if (cs && cs.position === "fixed") {
+          bestFixed = cur;
+        }
+        cur = cur.parentElement;
+      }
+      if (bestFixed) return bestFixed;
+    }
+    return direct;
+  }
+
+  function closeAiSearchModalCompletelyV371() {
+    var aiModal = findAiSearchModalContainerV371();
+    if (!aiModal) return;
+    // Try native close button inside modal header first so internal state resets cleanly
+    var btns = aiModal.querySelectorAll("button, [role='button']");
+    for (var i = 0; i < btns.length; i++) {
+      var b = btns[i];
+      if (b.closest("#sqAiIqResultArea")) continue;
+      var tx = String(b.textContent || "").trim();
+      var ar = String(b.getAttribute("aria-label") || "").toLowerCase();
+      if (tx === "×" || tx === "✕" || tx === "✖" || tx === "닫기" || /close|닫기/.test(ar)) {
+        try { b.click(); } catch (e) {}
+        break;
+      }
+    }
+    aiModal.setAttribute("data-sq-ai-temp-closed", "1");
+    aiModal.classList.remove("open", "active", "show");
+    aiModal.style.setProperty("display", "none", "important");
+  }
+
+  function installAiSearchModalBridgeV371() {
+    if (window.__sqAiModalBridgeBoundV371) return;
+    window.__sqAiModalBridgeBoundV371 = true;
+
+    window.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+
+      // 1. Direct capture handler for `경기 상세 ↗` inside AI Search Schedule Q&A Card!
+      var qaBtn = t.closest("[data-ai-open-qa-idx]");
+      if (qaBtn) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+        var idx = parseInt(qaBtn.getAttribute("data-ai-open-qa-idx") || "0", 10);
+        var list = window.__lastAiSearchQaItemsV371 || window.__lastAiSearchMatchesV37 || [];
+        if (list[idx]) {
+          window.__openMatchModalFromAiSearchV37(list[idx]);
+        }
+        return;
+      }
+
+      // 2. If user clicks any AI Search launcher button (outside the AI modal), clear temp-closed inline display so it re-opens cleanly!
+      var inAiModal = t.closest("#sqAiIqResultArea") || (findAiSearchModalContainerV371() && findAiSearchModalContainerV371().contains(t));
+      if (!inAiModal) {
+        var btn = t.closest("button, a, [onclick]");
+        if (btn) {
+          var btxt = String(btn.textContent || "") + " " + String(btn.getAttribute("onclick") || "") + " " + String(btn.id || "");
+          if (/AI\s*아이큐|AI\s*검색|openAiIq|AiIq/i.test(btxt)) {
+            document.querySelectorAll("[data-sq-ai-temp-closed='1']").forEach(function (m) {
+              m.removeAttribute("data-sq-ai-temp-closed");
+              m.style.removeProperty("display");
+              m.style.display = "flex";
+            });
+          }
+        }
+      }
+    }, true);
+  }
+  installAiSearchModalBridgeV371();
+
   window.__openMatchModalFromAiSearchV37 = function (rawItem) {
     if (!rawItem) return;
-    var aiModal = document.getElementById("sqAiIqModal");
-    if (aiModal) aiModal.style.display = "none";
+    closeAiSearchModalCompletelyV371();
     var norm = normalizeScoreItemV30(rawItem, 0);
+    if (!norm && rawItem.matchup && rawItem.matchup.indexOf(" vs ") !== -1) {
+      var mp = String(rawItem.matchup).split(" vs ");
+      norm = normalizeScoreItemV30({
+        id: rawItem.id || (String(rawItem.league || "SPORT") + "::" + mp[0] + "::" + mp[1]),
+        sport: rawItem.sport || "",
+        league: rawItem.league || "SPORT",
+        league_code: rawItem.league_code || rawItem.league || "NBA",
+        status_badge: rawItem.status || rawItem.status_badge || "예정",
+        match_dt_kst: rawItem.dt_kst || rawItem.match_dt_kst || "",
+        home: mp[0].trim(),
+        away: mp[1].trim(),
+        home_score: rawItem.home_score || 0,
+        away_score: rawItem.away_score || 0
+      }, 0);
+    }
     if (norm) {
       openMatchInsightModalByItemV30(norm);
+      var qm = document.getElementById("dcQuickMatchModal");
+      if (qm) {
+        qm.style.setProperty("z-index", "120050", "important");
+        qm.style.setProperty("display", "flex", "important");
+      }
     }
   };
 
@@ -7996,6 +8097,9 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -8186,7 +8290,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3700_{int(time.time())}"
+_BOOT_VER_V30 = f"3710_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -10600,6 +10704,7 @@ def serve_enriched_sitemap_xml_v27():
         "</urlset>\n"
     )
     return Response(content=xml, media_type="application/xml; charset=utf-8")
+
 
 
 # ============================================================================
