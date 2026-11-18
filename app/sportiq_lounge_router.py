@@ -600,6 +600,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -3145,6 +3147,70 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
+  function jumpToLeagueStandingsV345(rawCode) {
+    var code = String(rawCode || "EPL").toUpperCase();
+    ensureDcHubExpandedForStandingsV344();
+
+    // 1. If DataCenter has a folded toggle button (`펼치기 ▼`), click it!
+    var dcSec = document.getElementById("dcMainHubSection") || document.querySelector(".dc-hub-wrap") || document.body;
+    Array.prototype.forEach.call(dcSec.querySelectorAll("button, a"), function (b) {
+      var tx = String(b.textContent || "").trim();
+      if (/^펼치기\s*▼?$/.test(tx) || tx === "표 바로 펼치기 ▼") {
+        try { b.click(); } catch (e) {}
+      }
+    });
+
+    // 2. Ensure `🔢 리그 순위` tab is active inside DataCenter so league buttons (`EPL`, `NBA`, ...) are mounted!
+    var hb = document.getElementById("dcHubBody");
+    var hasNbaBtn = false;
+    if (hb) {
+      Array.prototype.forEach.call(hb.querySelectorAll("button"), function (b) {
+        if (String(b.textContent || "").trim() === "NBA") hasNbaBtn = true;
+      });
+    }
+    if (!hasNbaBtn) {
+      var launchRoot = document.getElementById("dcLauncherGrid") || dcSec;
+      var cards = launchRoot.querySelectorAll("div, button, article");
+      for (var i = 0; i < cards.length; i++) {
+        var ct = String(cards[i].textContent || "");
+        if (ct.indexOf("리그 순위") !== -1 && ct.length < 60) {
+          try { cards[i].click(); } catch (e2) {}
+          break;
+        }
+      }
+    }
+
+    // 3. After standings bar mounts, ensure KBL/WKBL buttons exist, click target league, and scroll smoothly!
+    setTimeout(function () {
+      ensureDcHubExpandedForStandingsV344();
+      ensureDomesticBasketballUiControlsV34();
+      var hubBody = document.getElementById("dcHubBody");
+      if (code === "KBL" || code === "WKBL") {
+        triggerDomesticDcStandingsV341(code, "");
+      } else if (hubBody) {
+        var alias = code;
+        if (code === "VLEAGUE_M" || code === "VLEAGUE_W") alias = "V-리그";
+        var btns = hubBody.querySelectorAll("button");
+        var clicked = false;
+        for (var j = 0; j < btns.length; j++) {
+          var bt = String(btns[j].textContent || "").trim();
+          if (bt.toUpperCase() === code || bt.indexOf(alias) !== -1) {
+            clicked = true;
+            try { btns[j].click(); } catch (e3) {}
+            break;
+          }
+        }
+        if (!clicked && typeof window.__switchDcTab === "function") {
+          try { window.__switchDcTab("standings", code); } catch (e4) {}
+        }
+      }
+      var scrollTarget = document.getElementById("dcHubBody") || document.getElementById("dcMainHubSection");
+      if (scrollTarget && scrollTarget.scrollIntoView) {
+        try { scrollTarget.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e5) {}
+      }
+    }, 110);
+  }
+
   function triggerDomesticDcStandingsV341(code, targetTab) {
     ensureDcHubExpandedForStandingsV344();
     var cu = String(code || "KBL").toUpperCase();
@@ -3547,44 +3613,52 @@ _FRONTEND_V22_JS = r'''
 
   function renderCustomDateCardsIntoStripV31() {
     if (!v30ScoreState.customDateRendered) return;
-    var mainStrip = findPrimaryMainCardStripV30();
+    var mainStrip = document.getElementById("dcLiveTickerTrack") || findPrimaryMainCardStripV30();
     if (!mainStrip) return;
-    var targetBox = (mainStrip.children && mainStrip.children.length === 1 && mainStrip.children[0].children && mainStrip.children[0].children.length >= 2)
-      ? mainStrip.children[0]
-      : mainStrip;
-    var items = v30ScoreState.items || [];
+    var resolved = resolveIndividualCardElementsV31(mainStrip);
+    var targetBox = (resolved.length && resolved[0].parentElement) ? resolved[0].parentElement : mainStrip;
+    if (!targetBox.hasAttribute("data-sq-orig-today-html")) {
+      targetBox.setAttribute("data-sq-orig-today-html", targetBox.innerHTML);
+    }
+    var items = filterScoreItemsV30(v30ScoreState.items || []);
     if (!items.length) {
       targetBox.innerHTML = "<div data-sq-v31-empty='1' style='padding:14px 18px;color:#94a3b8;font-size:12.5px;'>선택한 날짜·종목에 예정된 경기가 없습니다.</div>";
       return;
     }
-    targetBox.innerHTML = items.map(function (it) {
-      var isLive = it.state === "in";
-      var stBg = isLive ? "#dc2626" : (it.state === "post" ? "#475569" : "#1d4ed8");
-      var ai = it.ai || {};
-      var odds = ai.odds || {};
-      var probTxt = ai.draw_pct ? ("AI " + ai.home_pct + "% / " + ai.draw_pct + "% / " + ai.away_pct + "%") : ("AI " + ai.home_pct + "% / " + ai.away_pct + "%");
-      var oddsTxt = odds.home ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
-      var fk = matchFavKeyV30(it);
-      return [
-        "<div data-sq-v30-fk='" + uxEsc(fk) + "' style='min-width:252px;max-width:292px;flex:0 0 auto;background:#0f172a;border:1px solid " + (isLive ? "#ef4444" : "#334155") + ";border-radius:12px;padding:9px 11px;cursor:pointer;color:#f8fafc;display:flex;flex-direction:column;'>",
-        "  <div style='display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:11px;margin-bottom:5px;'>",
-        "    <span style='background:#1e293b;color:#93c5fd;padding:2px 6px;border-radius:6px;font-weight:700;'>" + uxEsc(it.league) + "</span>",
-        "    <span style='color:#fde68a;font-weight:700;'>📅 " + uxEsc(it.match_dt_kst) + "</span>",
-        "    <span style='background:" + stBg + ";color:#fff;padding:2px 6px;border-radius:6px;font-weight:700;'>" + uxEsc(it.status_badge) + "</span>",
-        "  </div>",
-        "  <div style='display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:800;margin:4px 0;'>",
-        "    <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;'>" + uxEsc(it.home) + "</span>",
-        "    <span style='background:#1e293b;padding:2px 9px;border-radius:8px;color:#fff;font-size:14px;'>" + uxEsc(it.home_score) + " : " + uxEsc(it.away_score) + "</span>",
-        "    <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;text-align:right;'>" + uxEsc(it.away) + "</span>",
-        "  </div>",
-        (it.period_scores ? "<div style='font-size:11px;color:#38bdf8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>📊 " + uxEsc(it.period_scores) + "</div>" : ""),
-        "  <div style='display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#94a3b8;margin-top:4px;'>",
-        "    <span>🎯 " + uxEsc(probTxt) + "</span>",
-        "    <span>" + uxEsc(oddsTxt) + "</span>",
-        "  </div>",
-        "</div>"
-      ].join("");
-    }).join("");
+    var prevGuard = _inSportDotMutationV304;
+    _inSportDotMutationV304 = true;
+    try {
+      targetBox.innerHTML = items.map(function (it) {
+        var isLive = it.state === "in";
+        var stBg = isLive ? "#dc2626" : (it.state === "post" ? "#475569" : "#1d4ed8");
+        var ai = it.ai || {};
+        var odds = ai.odds || {};
+        var probTxt = ai.draw_pct ? ("AI " + ai.home_pct + "% / " + ai.draw_pct + "% / " + ai.away_pct + "%") : ("AI " + ai.home_pct + "% / " + ai.away_pct + "%");
+        var oddsTxt = odds.home ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
+        var fk = matchFavKeyV30(it);
+        return [
+          "<div data-sq-v30-fk='" + uxEsc(fk) + "' style='min-width:252px;max-width:292px;flex:0 0 auto;background:#0f172a;border:1px solid " + (isLive ? "#ef4444" : "#334155") + ";border-radius:12px;padding:9px 11px;cursor:pointer;color:#f8fafc;display:flex;flex-direction:column;'>",
+          "  <div style='display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:11px;margin-bottom:5px;'>",
+          "    <span style='background:#1e293b;color:#93c5fd;padding:2px 6px;border-radius:6px;font-weight:700;'>" + uxEsc(it.league) + "</span>",
+          "    <span style='color:#fde68a;font-weight:700;'>📅 " + uxEsc(it.match_dt_kst) + "</span>",
+          "    <span style='background:" + stBg + ";color:#fff;padding:2px 6px;border-radius:6px;font-weight:700;'>" + uxEsc(it.status_badge) + "</span>",
+          "  </div>",
+          "  <div style='display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:800;margin:4px 0;'>",
+          "    <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;'>" + uxEsc(it.home) + "</span>",
+          "    <span style='background:#1e293b;padding:2px 9px;border-radius:8px;color:#fff;font-size:14px;'>" + uxEsc(it.home_score) + " : " + uxEsc(it.away_score) + "</span>",
+          "    <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;text-align:right;'>" + uxEsc(it.away) + "</span>",
+          "  </div>",
+          (it.period_scores ? "<div style='font-size:11px;color:#38bdf8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>📊 " + uxEsc(it.period_scores) + "</div>" : ""),
+          "  <div style='display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#94a3b8;margin-top:4px;'>",
+          "    <span>🎯 " + uxEsc(probTxt) + "</span>",
+          "    <span>" + uxEsc(oddsTxt) + "</span>",
+          "  </div>",
+          "</div>"
+        ].join("");
+      }).join("");
+    } finally {
+      _inSportDotMutationV304 = prevGuard;
+    }
   }
 
   function mergeRawScoreItemsV30(rawList, replaceAll) {
@@ -3686,7 +3760,7 @@ _FRONTEND_V22_JS = r'''
     var targetOff = (typeof forceOffset === "number" && !isNaN(forceOffset))
       ? forceOffset
       : (v30ScoreState.selectedDateOffset || 0);
-    if (v30ScoreState.loadedDateOffset === targetOff && v30ScoreState.rawAllItems.length > 0) {
+    if (v30ScoreState.loadedDateOffset === targetOff && v30ScoreState.rawAllItems.length > 5) {
       return;
     }
     if (v30ScoreState.fetchingOffset === targetOff) return;
@@ -3695,24 +3769,40 @@ _FRONTEND_V22_JS = r'''
     v30ScoreState.lastCalSig = "";
     mountOrUpdateV30ScoreToolbar();
 
-    fetch("/api/member/scoreboard-v30?date_offset=" + encodeURIComponent(targetOff))
+    var pSb = fetch("/api/member/scoreboard-v30?date_offset=" + encodeURIComponent(targetOff))
       .then(function (r) { return r.json(); })
-      .then(function (d) {
-        v30ScoreState.fetchingOffset = null;
-        v30ScoreState.isLoadingDate = false;
-        if (d && d.ok) {
-          v30ScoreState.loadedDateOffset = targetOff;
-          if (Array.isArray(d.date_strip) && d.date_strip.length) {
-            v30ScoreState.dateStrip = d.date_strip;
-          }
-          mergeRawScoreItemsV30(d.items || [], Boolean(v30ScoreState.customDateRendered));
-          return;
+      .catch(function () { return null; });
+    var pDc = (targetOff === 0)
+      ? fetch("/api/datacenter/live-scores?sport=all&league=all&date_offset=0")
+          .then(function (r) { return r.json(); })
+          .catch(function () { return null; })
+      : Promise.resolve(null);
+
+    Promise.all([pDc, pSb]).then(function (pair) {
+      var dcRes = pair[0];
+      var sbRes = pair[1];
+      v30ScoreState.fetchingOffset = null;
+      v30ScoreState.isLoadingDate = false;
+      var combined = [];
+      if (dcRes && Array.isArray(dcRes.items)) {
+        combined = combined.concat(dcRes.items);
+      }
+      if (sbRes && sbRes.ok) {
+        if (Array.isArray(sbRes.date_strip) && sbRes.date_strip.length) {
+          v30ScoreState.dateStrip = sbRes.date_strip;
         }
-      })
-      .catch(function () {
-        v30ScoreState.fetchingOffset = null;
-        v30ScoreState.isLoadingDate = false;
-      });
+        if (Array.isArray(sbRes.items)) {
+          combined = combined.concat(sbRes.items);
+        }
+      }
+      if (combined.length > 0 || (sbRes && sbRes.ok)) {
+        v30ScoreState.loadedDateOffset = targetOff;
+        mergeRawScoreItemsV30(combined, Boolean(v30ScoreState.customDateRendered));
+      }
+    }).catch(function () {
+      v30ScoreState.fetchingOffset = null;
+      v30ScoreState.isLoadingDate = false;
+    });
   }
 
   function selectDateOffsetV31(newOff) {
@@ -3724,6 +3814,11 @@ _FRONTEND_V22_JS = r'''
 
     if (clamped === 0) {
       v30ScoreState.customDateRendered = false;
+      var origBoxes = document.querySelectorAll("[data-sq-orig-today-html]");
+      Array.prototype.forEach.call(origBoxes, function (bx) {
+        bx.innerHTML = bx.getAttribute("data-sq-orig-today-html") || "";
+        bx.removeAttribute("data-sq-orig-today-html");
+      });
       var dtBtns = discoverTopDateButtonsV304();
       for (var i = 0; i < dtBtns.length; i++) {
         var b = dtBtns[i];
@@ -4700,7 +4795,7 @@ _FRONTEND_V22_JS = r'''
         if (jumpBtn) {
           ev.stopPropagation();
           var lgCode = jumpBtn.getAttribute("data-sq-jump-st") || "EPL";
-          ensureDcHubExpandedForStandingsV344(); if (lgCode === "KBL" || lgCode === "WKBL") { triggerDomesticDcStandingsV341(lgCode, "standings"); } else if (typeof window.__switchDcTab === "function") { window.__switchDcTab("standings", lgCode); }
+          jumpToLeagueStandingsV345(lgCode);
           return;
         }
         var tr = t.closest(".sq-v30-match-row");
@@ -4886,6 +4981,9 @@ _FRONTEND_V22_JS = r'''
     installTopControlCaptureSyncV304();
     fetchServerScoreboardBridgeV30();
     var items = recomputeScopedItemsV30();
+    if (v30ScoreState.customDateRendered && v30ScoreState.viewMode === "cards") {
+      renderCustomDateCardsIntoStripV31();
+    }
     syncSportPillLiveDotsV30();
     mountOrUpdateV30ScoreToolbar();
     renderScoreboardTableV30(items);
@@ -5651,7 +5749,7 @@ _FRONTEND_V22_JS = r'''
 
     document.getElementById("sqBridgeStandingsV30").onclick = function () {
       modal.style.display = "none";
-      var _stLg = String(it.league_code || "EPL").toUpperCase(); if (_stLg === "KBL" || _stLg === "WKBL") { triggerDomesticDcStandingsV341(_stLg, "standings"); } else if (typeof window.__switchDcTab === "function") { window.__switchDcTab("standings", _stLg); }
+      jumpToLeagueStandingsV345(it.league_code || "EPL");
     };
   }
 
@@ -7346,6 +7444,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -7536,7 +7635,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3440_{int(time.time())}"
+_BOOT_VER_V30 = f"3450_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
