@@ -510,6 +510,20 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -525,7 +539,7 @@ _FRONTEND_V22_JS = r'''
   var LS_PIN = "sportiq_sync_pin";
   var LS_ACTOR = "sportiq_actor_uid_v22";
   var bookmarkOnlyFilter = false;
-  var reactionCache = { like_counts: {}, liked_ids: {}, bookmarked_ids: {}, bookmarked_titles: {} };
+  var reactionCache = { like_counts: {}, liked_ids: {}, bookmarked_ids: {}, bookmarked_titles: {}, extra_comments: {} };
 
   function fnv1aHexV24(str) {
     var s = String(str || "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -683,6 +697,59 @@ _FRONTEND_V22_JS = r'''
       "  #sqDesktopMainTabStrip { gap: 7px !important; }",
       "  #sqDesktopMainTabStrip > .tab-btn,",
       "  #sqDesktopMainTabStrip > button { padding: 7px 12px !important; font-size: 13px !important; }",
+      "}",
+      "/* v2.9 Modal 4-Spot Layout Fix, Share Button & Toast Z-Index Above Floating Dock */",
+      "#writeModal, #writeModal > div, #write-modal, #write-modal > div {",
+      "  overflow-x: hidden !important;",
+      "  box-sizing: border-box !important;",
+      "}",
+      "#sqPostAuthorInput, #sqPostPinInput, #sqSyncNickInput, #sqSyncPinInput {",
+      "  min-width: 0 !important;",
+      "  width: 100% !important;",
+      "  max-width: 100% !important;",
+      "  box-sizing: border-box !important;",
+      "}",
+      "[data-sq-write-pin-row='1'] {",
+      "  display: grid !important;",
+      "  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;",
+      "  gap: 8px !important;",
+      "  width: 100% !important;",
+      "  max-width: 100% !important;",
+      "  box-sizing: border-box !important;",
+      "}",
+      "#sqDoSyncBtn,",
+      "#commentModal button,",
+      "#post-modal button,",
+      "#sqMemberHubModal button {",
+      "  white-space: nowrap !important;",
+      "  word-break: keep-all !important;",
+      "  flex-shrink: 0 !important;",
+      "}",
+      "@media (max-width: 560px) {",
+      "  [data-sq-write-pin-row='1'] {",
+      "    grid-template-columns: 1fr !important;",
+      "  }",
+      "  [data-sq-sync-grid='1'] {",
+      "    grid-template-columns: minmax(0, 1fr) 110px !important;",
+      "  }",
+      "  [data-sq-sync-grid='1'] #sqDoSyncBtn {",
+      "    grid-column: 1 / -1 !important;",
+      "    width: 100% !important;",
+      "    justify-content: center !important;",
+      "  }",
+      "}",
+      "#toast, #toast-container, [id*='Toast'], .sq-toast {",
+      "  z-index: 100025 !important;",
+      "}",
+      "@keyframes sqDeepLinkPulse {",
+      "  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.75); }",
+      "  70% { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); }",
+      "  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }",
+      "}",
+      "article[data-sq-shared-highlight='1'] {",
+      "  border-color: #34d399 !important;",
+      "  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.65), 0 16px 36px rgba(16, 185, 129, 0.22) !important;",
+      "  animation: sqDeepLinkPulse 1.8s ease-out 2;",
       "}",
       "/* v2.8 Protect DataCenter #dcHubBody & Cards (배당 급변 드롭오즈 / 순위 / 적중률) from Seed-Guard Hiding */",
       "#dcMainHubSection[data-sq-seed-archive],",
@@ -1429,6 +1496,22 @@ _FRONTEND_V22_JS = r'''
       if (isBm) reactionCache.bookmarked_ids[pid] = true;
       p.bookmarked = isBm;
       if (isBm) activeBmCount++;
+      var extraC = (reactionCache.extra_comments && reactionCache.extra_comments[pid]) || [];
+      var curC = Array.isArray(p.comments) ? p.comments : [];
+      if ((extraC.length || curC.length > 1) && !p.isMemberServerPost) {
+        var combinedC = curC.concat(extraC);
+        var dedupC = [];
+        var seenC = {};
+        combinedC.forEach(function (c) {
+          if (!c || !c.text) return;
+          var ck = String(c.user || "").trim() + "::" + String(c.text || "").trim();
+          if (!seenC[ck]) {
+            seenC[ck] = true;
+            dedupC.push(c);
+          }
+        });
+        p.comments = dedupC;
+      }
     });
     reactionCache.__matchedBmCount = activeBmCount;
     updateBookmarkFilterPillCount();
@@ -1469,6 +1552,56 @@ _FRONTEND_V22_JS = r'''
       if (bmBtn) {
         bmBtn.textContent = "★ " + (effBm ? "저장됨" : "북마크");
         bmBtn.className = "rounded-lg px-2.5 py-1 " + (effBm ? "bg-amber-500/20 text-amber-300 font-bold" : "bg-slate-800 text-slate-300");
+      }
+      art.setAttribute("data-sq-post-id", cid);
+      if (h3 && !h3.getAttribute("data-sq-title-bound-v29")) {
+        h3.setAttribute("data-sq-title-bound-v29", "1");
+        h3.style.cursor = "pointer";
+        h3.title = "클릭하여 본문 상세 및 댓글 보기";
+        h3.addEventListener("click", function () {
+          openPostDetailAndCommentsV29(art.getAttribute("data-sq-post-id") || cid);
+        });
+      }
+      var cmtBtn = null;
+      art.querySelectorAll("button").forEach(function (b) {
+        if (!cmtBtn && (b.textContent || "").indexOf("댓글") !== -1) cmtBtn = b;
+      });
+      if (cmtBtn) {
+        var cCount = Array.isArray(postObj.comments) ? postObj.comments.length : 0;
+        cmtBtn.textContent = "💬 댓글 " + cCount;
+        var origOc = cmtBtn.getAttribute("onclick") || "";
+        if (origOc && origOc.indexOf("(") !== -1) {
+          var fnName = origOc.split("(")[0];
+          cmtBtn.setAttribute("onclick", fnName + "('" + cid + "')");
+        }
+        if (!cmtBtn.getAttribute("data-sq-preview-bound-v29")) {
+          cmtBtn.setAttribute("data-sq-preview-bound-v29", "1");
+          cmtBtn.addEventListener("click", function () {
+            var curId = art.getAttribute("data-sq-post-id") || cid;
+            var pFound = (state.posts || []).find(function (x) { return x && String(x.id) === curId; });
+            setTimeout(function () {
+              if (pFound) injectPostPreviewIntoCommentModalV29(pFound);
+              polishModalsAndCloseIconsV29();
+            }, 25);
+          });
+        }
+      }
+      var actionBar = (cmtBtn && cmtBtn.parentElement) || (bmBtn && bmBtn.parentElement);
+      if (actionBar && !actionBar.querySelector("[data-sq-share-btn='1']")) {
+        var shBtn = document.createElement("button");
+        shBtn.type = "button";
+        shBtn.setAttribute("data-sq-share-btn", "1");
+        shBtn.className = "rounded-lg px-2.5 py-1 bg-slate-800 text-sky-300 hover:bg-sky-500/20 font-semibold";
+        shBtn.textContent = "🔗 공유";
+        shBtn.onclick = function (ev) {
+          ev.stopPropagation();
+          window.shareSportiqPostV29(art.getAttribute("data-sq-post-id") || cid);
+        };
+        if (cmtBtn && cmtBtn.nextSibling) {
+          actionBar.insertBefore(shBtn, cmtBtn.nextSibling);
+        } else {
+          actionBar.appendChild(shBtn);
+        }
       }
     });
     // Also remove any duplicate rendered <article> cards with identical h3 title
@@ -1561,6 +1694,7 @@ _FRONTEND_V22_JS = r'''
       .then(function (d) {
         if (!d || !d.ok || typeof state !== "object" || !state) return;
         reactionCache.like_counts = d.like_counts || {};
+        reactionCache.extra_comments = d.extra_comments || {};
         reactionCache.liked_ids = {};
         (d.liked_ids || []).forEach(function (id) { reactionCache.liked_ids[id] = true; });
         reactionCache.bookmarked_ids = {};
@@ -1584,6 +1718,8 @@ _FRONTEND_V22_JS = r'''
         applyReactionStateToPosts();
         mountBookmarkFilterPill();
         if (typeof window.renderFeed === "function") window.renderFeed();
+        syncRenderedFeedReactionButtonsDom();
+        handleDeepLinkPostOnBootV29();
       })
       .catch(function () {});
   }
@@ -2190,6 +2326,236 @@ _FRONTEND_V22_JS = r'''
     unblindDataCenterSubtreeV28();
   }
 
+  function copyTextFallbackV29(text, okMsg) {
+    function done() {
+      if (typeof showToast === "function") {
+        showToast(okMsg || "🔗 링크가 클립보드에 복사되었습니다!");
+      }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function () {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.cssText = "position:fixed;left:-9999px;top:0;";
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+        done();
+      });
+    } else {
+      var ta2 = document.createElement("textarea");
+      ta2.value = text;
+      ta2.style.cssText = "position:fixed;left:-9999px;top:0;";
+      document.body.appendChild(ta2);
+      ta2.select();
+      try { document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta2);
+      done();
+    }
+  }
+
+  window.shareSportiqPostV29 = function (postId) {
+    var sid = String(postId || "").trim();
+    if (!sid) return;
+    var origin = (window.location && window.location.origin && window.location.origin !== "null")
+      ? window.location.origin
+      : "https://billnojay.com";
+    var url = origin.replace(/\/+$/, "") + "/?post=" + encodeURIComponent(sid);
+    copyTextFallbackV29(url, "🔗 이 분석글 공유 링크가 복사되었습니다! 카톡·커뮤니티에 바로 붙여넣으세요.");
+  };
+
+  function injectPostPreviewIntoCommentModalV29(postObj) {
+    var cm = document.getElementById("commentModal") || document.getElementById("post-modal");
+    if (!cm || !postObj) return;
+    var listEl = document.getElementById("commentModalList") || cm.querySelector("[id*='comment'][id*='List'], .space-y-2, .overflow-y-auto");
+    if (!listEl || !listEl.parentElement) return;
+
+    var box = document.getElementById("sqModalPostBodyBoxV29");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "sqModalPostBodyBoxV29";
+      box.style.cssText = "background:rgba(2,6,23,.72);border:1px solid rgba(51,65,85,.85);border-radius:12px;padding:12px 14px;margin-bottom:12px;max-height:210px;overflow-y:auto;font-size:12.8px;line-height:1.62;color:#cbd5e1;";
+      listEl.parentElement.insertBefore(box, listEl);
+    }
+    var bodyTxt = String(postObj.body || postObj.summary || postObj.content || "").trim();
+    var metaLine = uxEsc(postObj.league || "SPORTIQ") + " · " + uxEsc(postObj.author || "SportIQ 분석") + " · ♥ " + Number(postObj.likes || 0);
+    box.innerHTML = (
+      "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;'>" +
+      "  <span style='font-size:11.5px;font-weight:800;color:#34d399;'>" + metaLine + "</span>" +
+      "  <button type='button' id='sqModalCopyDeepLinkBtnV29' style='background:rgba(14,165,233,.16);border:1px solid rgba(56,189,248,.45);color:#7dd3fc;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;'>🔗 이 분석글 링크 복사</button>" +
+      "</div>" +
+      (bodyTxt ? "<div style='white-space:pre-line;color:#e2e8f0;'>" + uxEsc(bodyTxt) + "</div>" : "")
+    );
+    var cpBtn = document.getElementById("sqModalCopyDeepLinkBtnV29");
+    if (cpBtn) {
+      cpBtn.onclick = function () { window.shareSportiqPostV29(String(postObj.id)); };
+    }
+  }
+
+  function polishModalsAndCloseIconsV29() {
+    var pinInp = document.getElementById("sqPostPinInput");
+    if (pinInp && pinInp.parentElement) {
+      pinInp.parentElement.setAttribute("data-sq-write-pin-row", "1");
+    }
+    var syncBtn = document.getElementById("sqDoSyncBtn");
+    if (syncBtn && syncBtn.parentElement) {
+      syncBtn.parentElement.setAttribute("data-sq-sync-grid", "1");
+    }
+
+    // Fix vertical wrapping on #commentModal header & broken close glyph on Notification / Comment modals
+    var modals = document.querySelectorAll("#commentModal, #post-modal, #writeModal, #sqMemberHubModal, [id*='Notif'], [id*='notif'], [id*='Alert']");
+    modals.forEach(function (m) {
+      m.querySelectorAll("button").forEach(function (b) {
+        var raw = (b.textContent || "").replace(/\s+/g, " ").trim();
+        if (!raw) return;
+        // Fix header sibling title flex min-width so close buttons never wrap vertically
+        if (raw.indexOf("닫기") !== -1 || raw === "×" || raw === "✕" || raw === "X" || b.getAttribute("aria-label") === "닫기") {
+          b.style.setProperty("white-space", "nowrap", "important");
+          b.style.setProperty("flex-shrink", "0", "important");
+          b.style.setProperty("display", "inline-flex", "important");
+          b.style.setProperty("align-items", "center", "important");
+          b.style.setProperty("justify-content", "center", "important");
+          b.style.setProperty("gap", "4px", "important");
+          if (b.parentElement) {
+            var prevTitle = b.previousElementSibling;
+            if (prevTitle && prevTitle.style) {
+              prevTitle.style.minWidth = "0";
+              prevTitle.style.flex = "1 1 auto";
+            }
+          }
+          if (!b.querySelector("svg[data-sq-x-svg='1']")) {
+            var hasKorClose = raw.indexOf("닫기") !== -1;
+            var hasEsc = raw.indexOf("Esc") !== -1;
+            var svgHtml = "<svg data-sq-x-svg='1' viewBox='0 0 14 14' width='12' height='12' fill='none' aria-hidden='true' style='display:inline-block;flex-shrink:0;pointer-events:none;'><path d='M3 3L11 11M11 3L3 11' stroke='currentColor' stroke-width='2.2' stroke-linecap='round'/></svg>";
+            if (hasKorClose) {
+              b.innerHTML = svgHtml + "<span>" + (hasEsc ? "닫기 (Esc)" : "닫기") + "</span>";
+            } else if (raw.length <= 3) {
+              b.innerHTML = svgHtml;
+              b.style.setProperty("min-width", "28px", "important");
+              b.style.setProperty("height", "28px", "important");
+            }
+          }
+        }
+      });
+    });
+
+    // Also scan any dynamically created '실시간 알림 센터' modal not matching static IDs
+    document.querySelectorAll("div, section").forEach(function (panel) {
+      if (panel.offsetWidth > 0 && (panel.textContent || "").indexOf("실시간 알림 센터") !== -1 && panel.offsetHeight < 760) {
+        panel.querySelectorAll("button").forEach(function (b) {
+          var t = (b.textContent || "").trim();
+          if (t && t.indexOf("푸시") === -1 && t.indexOf("읽음") === -1 && t.length <= 4 && !b.querySelector("svg[data-sq-x-svg='1']")) {
+            b.innerHTML = "<svg data-sq-x-svg='1' viewBox='0 0 14 14' width='12' height='12' fill='none' aria-hidden='true' style='display:block;pointer-events:none;'><path d='M3 3L11 11M11 3L3 11' stroke='currentColor' stroke-width='2.2' stroke-linecap='round'/></svg>";
+            b.style.setProperty("display", "inline-flex", "important");
+            b.style.setProperty("align-items", "center", "important");
+            b.style.setProperty("justify-content", "center", "important");
+            b.style.setProperty("min-width", "28px", "important");
+            b.style.setProperty("height", "28px", "important");
+            b.style.setProperty("flex-shrink", "0", "important");
+          }
+        });
+      }
+    });
+  }
+
+  function ensureHofCardMountedSyncV29() {
+    var g = document.getElementById("dcLauncherGrid") || document.getElementById("dcLaunchCards");
+    if (!g || !g.children || g.children.length < 3) return;
+    if (document.getElementById("dcHofLaunchCard")) return;
+    var sample = g.children[0];
+    var tag = sample ? sample.tagName.toLowerCase() : "div";
+    var c = document.createElement(tag);
+    c.id = "dcHofLaunchCard";
+    if (tag === "button") c.type = "button";
+    c.className = sample ? sample.className.replace(/\bactive\b/g, "").trim() : "dc-launch-card";
+    c.setAttribute("data-dctab", "hall-of-fame");
+    c.setAttribute("data-tab", "hall-of-fame");
+    c.innerHTML = "<div style='display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:13.5px;color:#fbbf24;'><span>🏆 명예의 전당 랭킹</span><span style='color:#4ade80;font-size:10px;font-weight:800;'>• TOP 분석가</span></div><div style='font-size:11px;color:#94a3b8;margin-top:4px;'>베스트 수상·누적 보너스P·적중률 종합 순위</div>";
+    c.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+      if (typeof window.__openSportiqHallOfFame === "function") {
+        window.__openSportiqHallOfFame();
+      }
+    }, true);
+    g.appendChild(c);
+  }
+
+  function stabilizeHofLaunchCardV29() {
+    ensureHofCardMountedSyncV29();
+    var g = document.getElementById("dcLauncherGrid") || document.getElementById("dcLaunchCards");
+    if (g && typeof MutationObserver !== "undefined" && !g.__sqHofZeroFlickerObsV29) {
+      g.__sqHofZeroFlickerObsV29 = true;
+      var obs = new MutationObserver(function () {
+        ensureHofCardMountedSyncV29();
+      });
+      obs.observe(g, { childList: true });
+    }
+  }
+
+  function openPostDetailAndCommentsV29(cid) {
+    if (!cid || typeof state !== "object" || !state || !Array.isArray(state.posts)) return false;
+    var postObj = state.posts.find(function (x) { return x && String(x.id) === String(cid); });
+    if (!postObj) return false;
+    state.activePostId = String(postObj.id);
+    var cmFunc = window.openComments || window.openCommentModal;
+    if (typeof cmFunc === "function") {
+      try { cmFunc(String(postObj.id)); } catch (e) {}
+    } else {
+      var cm = document.getElementById("commentModal");
+      if (cm) {
+        cm.classList.remove("hidden");
+        cm.style.display = "flex";
+        var tEl = document.getElementById("commentModalTitle");
+        if (tEl) tEl.textContent = postObj.title || "분석글 상세 · 댓글";
+        if (typeof window.renderCommentModalList === "function") {
+          try { window.renderCommentModalList(postObj); } catch (e) {}
+        }
+      }
+    }
+    setTimeout(function () {
+      injectPostPreviewIntoCommentModalV29(postObj);
+      polishModalsAndCloseIconsV29();
+    }, 20);
+    return true;
+  }
+
+  function handleDeepLinkPostOnBootV29() {
+    if (window.__sqDeepLinkHandledV29) return;
+    var targetId = "";
+    try {
+      var sp = new URLSearchParams(window.location.search || "");
+      targetId = (sp.get("post") || "").trim();
+    } catch (e) {}
+    if (!targetId) return;
+    if (typeof state !== "object" || !state || !Array.isArray(state.posts) || !state.posts.length) return;
+    normalizeStatePostsV24();
+    var postObj = state.posts.find(function (x) { return x && String(x.id) === targetId; });
+    if (!postObj) return;
+
+    window.__sqDeepLinkHandledV29 = true;
+    if (typeof window.switchTab === "function") {
+      try { window.switchTab("feed"); } catch (e) {}
+    }
+    if (typeof window.renderFeed === "function") {
+      try { window.renderFeed(); } catch (e) {}
+    }
+    syncRenderedFeedReactionButtonsDom();
+
+    var box = document.getElementById("feedList");
+    if (box) {
+      box.querySelectorAll("article").forEach(function (art) {
+        if (art.getAttribute("data-sq-post-id") === targetId) {
+          art.setAttribute("data-sq-shared-highlight", "1");
+          if (art.scrollIntoView) art.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      });
+    }
+    openPostDetailAndCommentsV29(targetId);
+  }
+
   function bootMemberUxV22() {
     injectUxV22Styles();
     enforceSingleLineMainTabBar();
@@ -2216,6 +2582,39 @@ _FRONTEND_V22_JS = r'''
     harmonizeMobileFloatingOverlaysV26();
     installDataCenterPersistenceGuardV28();
     window.addEventListener("resize", harmonizeMobileFloatingOverlaysV26);
+    polishModalsAndCloseIconsV29();
+    stabilizeHofLaunchCardV29();
+    handleDeepLinkPostOnBootV29();
+    if (typeof window.submitComment === "function" && !window.__sqSubmitCommentWrappedV29) {
+      window.__sqSubmitCommentWrappedV29 = true;
+      var origSubCmt = window.submitComment;
+      window.submitComment = function () {
+        var inp = document.getElementById("commentModalInput");
+        var typed = inp ? inp.value.trim() : "";
+        var activeId = (typeof state === "object" && state && state.activePostId) ? String(state.activePostId) : "";
+        var r = origSubCmt.apply(this, arguments);
+        if (typed && activeId) {
+          var nk = getSavedNickV22() || ((typeof state === "object" && state && state.role === "PRO") ? "PRO분석가" : "오픈게스트");
+          reactionCache.extra_comments[activeId] = reactionCache.extra_comments[activeId] || [];
+          reactionCache.extra_comments[activeId].push({ user: nk, text: typed });
+          setTimeout(function () {
+            applyReactionStateToPosts();
+            syncRenderedFeedReactionButtonsDom();
+          }, 180);
+        }
+        return r;
+      };
+    }
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) {
+        enforceSingleLineMainTabBar();
+        harmonizeMobileFloatingOverlaysV26();
+        stabilizeHofLaunchCardV29();
+        polishModalsAndCloseIconsV29();
+        applyReactionStateToPosts();
+        syncRenderedFeedReactionButtonsDom();
+      }
+    });
 
     // Keep dynamic UI states synchronized when tabs switch or async data arrives
     [120, 400, 900, 1600].forEach(function (ms) {
@@ -2223,6 +2622,11 @@ _FRONTEND_V22_JS = r'''
         enforceSingleLineMainTabBar();
         harmonizeMobileFloatingOverlaysV26();
         installDataCenterPersistenceGuardV28();
+        stabilizeHofLaunchCardV29();
+        polishModalsAndCloseIconsV29();
+        applyReactionStateToPosts();
+        syncRenderedFeedReactionButtonsDom();
+        handleDeepLinkPostOnBootV29();
         var fb = document.getElementById("feedList");
         if (fb) {
           fb.style.setProperty("display", "block", "important");
@@ -2232,7 +2636,10 @@ _FRONTEND_V22_JS = r'''
       }, ms);
     });
     setInterval(function () {
+      if (typeof document !== "undefined" && document.hidden) return;
       enforceSingleLineMainTabBar();
+      stabilizeHofLaunchCardV29();
+      polishModalsAndCloseIconsV29();
       harmonizeMobileFloatingOverlaysV26();
       installDataCenterPersistenceGuardV28();
       syncTop20MatchCountBadge();
@@ -3773,6 +4180,13 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
+
+
+
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -5126,6 +5540,107 @@ def _get_branded_og_cover_v27_bytes() -> bytes:
     return _BRANDED_OG_COVER_V27_BYTES
 
 
+
+def _fnv1a_aa_id_py_v29(raw_title: str) -> str:
+    s = re.sub(r"\s+", " ", str(raw_title or "")).strip().lower()
+    h = 0x811C9DC5
+    for ch in s:
+        h ^= ord(ch)
+        h = (h * 0x01000193) & 0xFFFFFFFF
+    return "aa_" + format(h, "x")
+
+
+def resolve_post_og_meta_v29(post_id: str) -> Optional[Dict[str, str]]:
+    pid = (post_id or "").strip()[:64]
+    if not pid:
+        return None
+
+    def _lookup() -> Optional[Dict[str, str]]:
+        with _smu_db_session(write=False) as conn:
+            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            if "community_member_posts" in tables:
+                row = conn.execute(
+                    "SELECT id, title, body, league, author FROM community_member_posts WHERE id = ? LIMIT 1",
+                    (pid,),
+                ).fetchone()
+                if row and row["title"]:
+                    body_clean = re.sub(r"\s+", " ", str(row["body"] or "")).strip()
+                    return {
+                        "id": str(row["id"]),
+                        "title": str(row["title"]).strip(),
+                        "desc": (body_clean[:135] + ("..." if len(body_clean) > 135 else "")) or "SportIQ 실시간 스포츠 데이터 전술 분석 브리핑",
+                        "league": str(row["league"] or "SPORTIQ"),
+                    }
+            if "auto_analyst_posts" in tables:
+                try:
+                    arows = conn.execute("SELECT * FROM auto_analyst_posts ORDER BY rowid DESC LIMIT 40").fetchall()
+                    for ar in arows:
+                        rk = set(ar.keys())
+                        atitle = str((ar["title"] if "title" in rk else "") or "").strip()
+                        aid = str((ar["id"] if "id" in rk else "") or "").strip()
+                        if atitle and (aid == pid or _fnv1a_aa_id_py_v29(atitle) == pid):
+                            abody = re.sub(r"\s+", " ", str((ar["body"] if "body" in rk else "") or (ar["summary"] if "summary" in rk else "") or "")).strip()
+                            return {
+                                "id": pid,
+                                "title": atitle,
+                                "desc": (abody[:135] + ("..." if len(abody) > 135 else "")) or "SportIQ 00:00 AI 데이터 자동분석 브리핑",
+                                "league": "TOP20",
+                            }
+                except Exception:
+                    pass
+            if "member_post_bookmarks" in tables:
+                brow = conn.execute(
+                    "SELECT title, league FROM member_post_bookmarks WHERE post_id = ? AND title != '' LIMIT 1",
+                    (pid,),
+                ).fetchone()
+                if brow and brow["title"]:
+                    return {
+                        "id": pid,
+                        "title": str(brow["title"]).strip(),
+                        "desc": "SportIQ 오픈 라운지 실시간 경기 데이터 분석 및 팬 전술 브리핑",
+                        "league": str(brow["league"] or "SPORTIQ"),
+                    }
+        return None
+
+    try:
+        return run_with_db_retry(_lookup)
+    except Exception:
+        return None
+
+
+def apply_dynamic_post_og_v29(html_text: str, post_meta: Optional[Dict[str, str]]) -> str:
+    if not html_text or not post_meta or not post_meta.get("title"):
+        return html_text
+    esc_title = _html_lib.escape(f"{post_meta['title']} | SportIQ", quote=True)
+    esc_desc = _html_lib.escape(post_meta.get("desc") or "SportIQ 실시간 스포츠 데이터 분석 브리핑", quote=True)
+    esc_url = _html_lib.escape(f"https://billnojay.com/?post={urllib.parse.quote(post_meta['id'])}", quote=True)
+
+    out = re.sub(r"<title>.*?</title>", f"<title>{esc_title}</title>", html_text, count=1, flags=re.S)
+    out = re.sub(
+        r'(<meta\s+name=["\']description["\']\s+content=["\'])[^"\']*(["\'])',
+        lambda m: m.group(1) + esc_desc + m.group(2),
+        out,
+        count=1,
+    )
+    for prop, val in [("og:title", esc_title), ("og:description", esc_desc), ("og:url", esc_url)]:
+        if f'property="{prop}"' in out:
+            out = re.sub(
+                rf'(<meta\s+property=["\']{re.escape(prop)}["\']\s+content=["\'])[^"\']*(["\'])',
+                lambda m, v=val: m.group(1) + v + m.group(2),
+                out,
+                count=1,
+            )
+    for tname, val in [("twitter:title", esc_title), ("twitter:description", esc_desc)]:
+        if f'name="{tname}"' in out:
+            out = re.sub(
+                rf'(<meta\s+name=["\']{re.escape(tname)}["\']\s+content=["\'])[^"\']*(["\'])',
+                lambda m, v=val: m.group(1) + v + m.group(2),
+                out,
+                count=1,
+            )
+    return out
+
+
 def inject_seo_and_og_head_v27(html_text: str) -> str:
     if not html_text:
         return html_text
@@ -5416,7 +5931,7 @@ class ReportIn(BaseModel):
 
 
 @router.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
-def serve_lounge_home():
+def serve_lounge_home(request: Request):
     if os.path.exists(HTML_PATH):
         try:
             _ensure_upgrade_js_dedup_patched()
@@ -5425,10 +5940,13 @@ def serve_lounge_home():
             rendered = inject_upgrade_into_html(raw_html)
             rendered = re.sub(
                 r'(/api/member/p0p1-upgrade\.js\?v=)(\d+)',
-                lambda m: m.group(1) + str(int(m.group(2)) + 1000),
+                lambda m: m.group(1) + str(int(m.group(2)) + 1100),
                 rendered,
             )
             rendered = inject_seo_and_og_head_v27(rendered)
+            _pq = (request.query_params.get("post") if request and hasattr(request, "query_params") else "") or ""
+            if _pq:
+                rendered = apply_dynamic_post_og_v29(rendered, resolve_post_og_meta_v29(_pq))
             return HTMLResponse(rendered, media_type="text/html; charset=utf-8")
         except Exception:
             return FileResponse(HTML_PATH, media_type="text/html; charset=utf-8")
