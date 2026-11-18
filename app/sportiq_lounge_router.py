@@ -610,6 +610,12 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -3304,80 +3310,107 @@ _FRONTEND_V22_JS = r'''
         var spReq = String(qsLs.get("sport") || "all").toLowerCase();
         var lgReq = String(qsLs.get("league") || "all").toUpperCase();
         var offReq = parseInt(qsLs.get("date_offset") || "0", 10) || 0;
-        if (spReq === "all" || spReq === "basketball" || spReq === "volleyball") {
-          return Promise.all([
-            _prevFetch.apply(window, arguments).then(function (r) { return r.json(); }).catch(function () { return null; }),
-            _prevFetch.call(window, "/api/member/scoreboard-v30?date_offset=" + offReq).then(function (r) { return r.json(); }).catch(function () { return null; })
-          ]).then(function (pair) {
-            var dcJson = pair[0] || { ok: true, items: [], counts: {} };
-            var sbJson = pair[1] || { items: [] };
-            var domBball = (sbJson.items || []).filter(function (x) {
-              var lc = String((x && (x.league_code || x.league)) || "").toUpperCase();
-              return lc === "KBL" || lc === "WKBL";
-            });
-            var domVolley = (sbJson.items || []).filter(function (x) {
-              return x && String(x.sport || "").toLowerCase() === "volleyball";
-            });
-            var rawDcItems = Array.isArray(dcJson.items) ? dcJson.items.slice() : [];
-            var removedVolleyCnt = 0, removedVolleyLive = 0;
-            var curItems = rawDcItems.filter(function (x) {
-              if (!x) return false;
-              var isV = canonicalSportKeyV304(x.sport || "", String(x.league_code || "") + " " + String(x.league || "") + " " + String(x.league_full || "")) === "volleyball";
-              if (isV && (spReq === "all" || spReq === "volleyball")) {
-                removedVolleyCnt++;
-                if (x.state === "in") removedVolleyLive++;
-                return false;
-              }
-              return true;
-            });
-            var seenMap = {};
-            curItems.forEach(function (x) { if (x && x.id) seenMap[x.id] = true; });
-            var addedCnt = 0, addedLive = 0;
-            if (spReq === "all" || spReq === "basketball") {
-              domBball.forEach(function (dg) {
-                var dlc = String(dg.league_code || dg.league || "").toUpperCase();
-                if (!seenMap[dg.id]) {
-                  addedCnt++;
-                  if (dg.state === "in") addedLive++;
-                  if (lgReq === "ALL" || lgReq === dlc) {
-                    curItems.push(dg);
-                  }
-                }
-              });
-            }
-            var addedVCnt = 0, addedVLive = 0;
-            if (spReq === "all" || spReq === "volleyball") {
-              domVolley.forEach(function (vg) {
-                var vlc = String(vg.league_code || vg.league || "").toUpperCase();
-                if (!seenMap[vg.id]) {
-                  addedVCnt++;
-                  if (vg.state === "in") addedVLive++;
-                  if (lgReq === "ALL" || lgReq === vlc) {
-                    curItems.push(vg);
-                  }
-                }
-              });
-            }
-            var ord = { "in": 0, "pre": 1, "post": 2 };
-            curItems.sort(function (a, b) {
-              var oa = ord[a.state] != null ? ord[a.state] : 3;
-              var ob = ord[b.state] != null ? ord[b.state] : 3;
-              return oa !== ob ? (oa - ob) : String(a.match_dt_kst || "").localeCompare(String(b.match_dt_kst || ""));
-            });
-            if (dcJson.counts && typeof dcJson.counts === "object") {
-              if (addedCnt > 0) {
-                dcJson.counts.basketball = Number(dcJson.counts.basketball || 0) + addedCnt;
-              }
-              if (spReq === "all" || spReq === "volleyball") {
-                dcJson.counts.volleyball = addedVCnt;
-              }
-              dcJson.counts.all = Math.max(0, Number(dcJson.counts.all || 0) + addedCnt - removedVolleyCnt + addedVCnt);
-              dcJson.counts.live = Math.max(0, Number(dcJson.counts.live || 0) + addedLive - removedVolleyLive + addedVLive);
-            }
-            dcJson.items = curItems;
-            return new Response(JSON.stringify(dcJson), { status: 200, headers: { "Content-Type": "application/json" } });
+        window.__sqSbV30Cache = window.__sqSbV30Cache || {};
+        var cachedSb = window.__sqSbV30Cache[offReq];
+        var nowTs = Date.now();
+        var sbPromise = (cachedSb && (nowTs - cachedSb.ts) < 15000)
+          ? Promise.resolve(cachedSb.data)
+          : _prevFetch.call(window, "/api/member/scoreboard-v30?date_offset=" + offReq)
+              .then(function (r) { return r.json(); })
+              .then(function (d) {
+                if (d && d.ok) window.__sqSbV30Cache[offReq] = { ts: Date.now(), data: d };
+                return d;
+              })
+              .catch(function () { return cachedSb ? cachedSb.data : null; });
+
+        return Promise.all([
+          _prevFetch.apply(window, arguments).then(function (r) { return r.json(); }).catch(function () { return null; }),
+          sbPromise
+        ]).then(function (pair) {
+          var dcJson = pair[0] || { ok: true, items: [], counts: {} };
+          var sbJson = pair[1] || { items: [] };
+          var domBball = (sbJson.items || []).filter(function (x) {
+            var lc = String((x && (x.league_code || x.league)) || "").toUpperCase();
+            return lc === "KBL" || lc === "WKBL";
           });
-        }
+          var domVolley = (sbJson.items || []).filter(function (x) {
+            return x && String(x.sport || "").toLowerCase() === "volleyball";
+          });
+          var rawDcItems = Array.isArray(dcJson.items) ? dcJson.items.slice() : [];
+          var removedVolleyCnt = 0, removedVolleyLive = 0;
+          var curItems = rawDcItems.filter(function (x) {
+            if (!x) return false;
+            var isV = canonicalSportKeyV304(x.sport || "", String(x.league_code || "") + " " + String(x.league || "") + " " + String(x.league_full || "")) === "volleyball";
+            if (isV && (spReq === "all" || spReq === "volleyball" || spReq === "vleague")) {
+              removedVolleyCnt++;
+              if (x.state === "in") removedVolleyLive++;
+              return false;
+            }
+            return true;
+          });
+          var seenMap = {};
+          curItems.forEach(function (x) { if (x && x.id) seenMap[x.id] = true; });
+          var domBballLive = 0;
+          domBball.forEach(function (dg) { if (dg && dg.state === "in") domBballLive++; });
+          var domVolleyLive = 0;
+          domVolley.forEach(function (vg) { if (vg && vg.state === "in") domVolleyLive++; });
+
+          if (spReq === "all" || spReq === "basketball") {
+            domBball.forEach(function (dg) {
+              var dlc = String(dg.league_code || dg.league || "").toUpperCase();
+              if (!seenMap[dg.id]) {
+                seenMap[dg.id] = true;
+                if (lgReq === "ALL" || lgReq === dlc) curItems.push(dg);
+              }
+            });
+          }
+          if (spReq === "all" || spReq === "volleyball" || spReq === "vleague") {
+            domVolley.forEach(function (vg) {
+              var vlc = String(vg.league_code || vg.league || "").toUpperCase();
+              if (!seenMap[vg.id]) {
+                seenMap[vg.id] = true;
+                if (lgReq === "ALL" || lgReq === vlc) curItems.push(vg);
+              }
+            });
+          }
+          var ord = { "in": 0, "pre": 1, "post": 2 };
+          curItems.sort(function (a, b) {
+            var oa = ord[a.state] != null ? ord[a.state] : 3;
+            var ob = ord[b.state] != null ? ord[b.state] : 3;
+            return oa !== ob ? (oa - ob) : String(a.match_dt_kst || "").localeCompare(String(b.match_dt_kst || ""));
+          });
+
+          if (dcJson.counts && typeof dcJson.counts === "object") {
+            var cObj = dcJson.counts;
+            var prevVolleyCnt = Number(cObj.volleyball != null ? cObj.volleyball : (cObj.vleague != null ? cObj.vleague : removedVolleyCnt)) || 0;
+            cObj.basketball = Number(cObj.basketball || 0) + domBball.length;
+            cObj.volleyball = domVolley.length;
+            if ("vleague" in cObj) cObj.vleague = domVolley.length;
+            var sportKeys9 = ["soccer", "baseball", "basketball", "volleyball", "hockey", "esports", "ufc", "tennis", "f1"];
+            var hasPerSport = sportKeys9.some(function (k) { return k !== "basketball" && k !== "volleyball" && typeof cObj[k] === "number"; });
+            if (hasPerSport) {
+              var exactSum = 0;
+              sportKeys9.forEach(function (k) {
+                var v = Number(cObj[k] != null ? cObj[k] : (k === "esports" ? cObj.lck : (k === "ufc" ? cObj.mma : 0))) || 0;
+                exactSum += v;
+              });
+              cObj.all = exactSum;
+            } else {
+              cObj.all = Math.max(0, Number(cObj.all || 0) - prevVolleyCnt + domBball.length + domVolley.length);
+            }
+            if (Array.isArray(sbJson.items) && sbJson.items.length >= 10) {
+              cObj.all = sbJson.items.length;
+              cObj.live = sbJson.items.filter(function (x) { return x && x.state === "in"; }).length;
+            } else if (spReq === "all") {
+              cObj.all = curItems.length;
+              cObj.live = curItems.filter(function (x) { return x && x.state === "in"; }).length;
+            } else {
+              cObj.live = Math.max(0, Number(cObj.live || 0) - removedVolleyLive + domBballLive + domVolleyLive);
+            }
+          }
+          dcJson.items = curItems;
+          return new Response(JSON.stringify(dcJson), { status: 200, headers: { "Content-Type": "application/json" } });
+        });
       }
       return _prevFetch.apply(window, arguments);
     };
@@ -4252,15 +4285,37 @@ _FRONTEND_V22_JS = r'''
         if (!sp) return;
         if (hasFullCounts) {
           var wantTot = sp === "all" ? baseAll.length : (totalBySport[sp] || 0);
-          for (var cn = 0; cn < btn.childNodes.length; cn++) {
-            var nd = btn.childNodes[cn];
-            if (nd && nd.nodeType === 3 && /\(\d+\)/.test(nd.nodeValue || "")) {
-              var replaced = nd.nodeValue.replace(/\(\d+\)/, "(" + wantTot + ")");
-              if (replaced !== nd.nodeValue) nd.nodeValue = replaced;
+          var tw = document.createTreeWalker(btn, NodeFilter.SHOW_TEXT, null, false);
+          var tNode, updatedCnt = false;
+          while ((tNode = tw.nextNode())) {
+            var pEl = tNode.parentElement;
+            if (pEl && pEl.classList && pEl.classList.contains("sq-v30-live-dot")) continue;
+            var nv = String(tNode.nodeValue || "");
+            if (/\(\s*\d+\s*\)/.test(nv)) {
+              var rep = nv.replace(/\(\s*\d+\s*\)/, "(" + wantTot + ")");
+              if (rep !== nv) tNode.nodeValue = rep;
+              updatedCnt = true;
               break;
             }
           }
+          if (!updatedCnt) {
+            var spans = btn.querySelectorAll("span, em, small, b");
+            for (var si = 0; si < spans.length; si++) {
+              var spEl = spans[si];
+              if (spEl.classList && spEl.classList.contains("sq-v30-live-dot")) continue;
+              var stx = String(spEl.textContent || "").trim();
+              if (/^\d+$/.test(stx)) {
+                if (stx !== String(wantTot)) spEl.textContent = String(wantTot);
+                break;
+              }
+            }
+          }
         }
+        Array.prototype.slice.call(btn.querySelectorAll("span")).forEach(function (sEl) {
+          if (!sEl.classList.contains("sq-v30-live-dot") && /^[•·]\s*LIVE\s*\d+$/i.test(String(sEl.textContent || "").trim())) {
+            if (sEl.parentNode) sEl.parentNode.removeChild(sEl);
+          }
+        });
         var oldDot = btn.querySelector(".sq-v30-live-dot");
         var cnt = sp === "all" ? totalLive : (liveBySport[sp] || 0);
         if (cnt > 0) {
@@ -4396,9 +4451,10 @@ _FRONTEND_V22_JS = r'''
       var walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT, null, false);
       var tn;
       while ((tn = walker.nextNode())) {
-        var tv = String(tn.nodeValue || "").trim();
-        if (/^Home$/i.test(tv)) tn.nodeValue = tn.nodeValue.replace(/Home/i, "베르스타펜 (레드불)");
-        else if (/^Away$/i.test(tv)) tn.nodeValue = tn.nodeValue.replace(/Away/i, "노리스 (맥라렌)");
+        var tv = String(tn.nodeValue || "");
+        if (/\bHome\b/i.test(tv) || /\bAway\b/i.test(tv)) {
+          tn.nodeValue = tv.replace(/\bHome\b/gi, "베르스타펜 (레드불)").replace(/\bAway\b/gi, "노리스 (맥라렌)");
+        }
       }
       for (var f = 0; f < pool.length; f++) {
         if (pool[f] && pool[f].sport === "f1") return pool[f];
@@ -7641,6 +7697,9 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -7831,7 +7890,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3510_{int(time.time())}"
+_BOOT_VER_V30 = f"3520_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
