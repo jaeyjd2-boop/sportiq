@@ -500,6 +500,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -742,6 +744,47 @@ _FRONTEND_V22_JS = r'''
       "  font-weight: 900 !important;",
       "  border-color: #34d399 !important;",
       "  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;",
+      "}",
+      "/* v2.6.1 Global (Desktop + Mobile) Crisp 28x28 SVG Close Button & Non-Shrinking PWA Banner Controls */",
+      "#sqBannerInstallNow {",
+      "  flex-shrink: 0 !important;",
+      "  white-space: nowrap !important;",
+      "}",
+      "#sqBannerDismissPwa,",
+      "[data-sq-pwa-close='1'] {",
+      "  display: inline-flex !important;",
+      "  align-items: center !important;",
+      "  justify-content: center !important;",
+      "  width: 28px !important;",
+      "  min-width: 28px !important;",
+      "  height: 28px !important;",
+      "  min-height: 28px !important;",
+      "  padding: 0 !important;",
+      "  margin-left: 2px !important;",
+      "  border-radius: 8px !important;",
+      "  background: rgba(51, 65, 85, 0.88) !important;",
+      "  border: 1px solid rgba(148, 163, 184, 0.48) !important;",
+      "  color: #f8fafc !important;",
+      "  line-height: 1 !important;",
+      "  flex: 0 0 28px !important;",
+      "  flex-shrink: 0 !important;",
+      "  cursor: pointer !important;",
+      "  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;",
+      "}",
+      "#sqBannerDismissPwa:hover,",
+      "[data-sq-pwa-close='1']:hover {",
+      "  background: rgba(239, 68, 68, 0.24) !important;",
+      "  border-color: rgba(248, 113, 113, 0.72) !important;",
+      "  color: #fecaca !important;",
+      "}",
+      "@media (min-width: 821px) {",
+      "  #sqPwaInstallBanner,",
+      "  [data-sq-pwa-banner='1'] {",
+      "    max-width: 408px !important;",
+      "    width: auto !important;",
+      "    padding: 11px 14px !important;",
+      "    gap: 10px !important;",
+      "  }",
       "}",
       "/* v2.6 Mobile <=820px (390x844) Floating Banner / Dual Dock Separation & Footer Clearance */",
       "@media (max-width: 820px) {",
@@ -1038,8 +1081,8 @@ _FRONTEND_V22_JS = r'''
       closeBtn.setAttribute("data-sq-pwa-close", "1");
       closeBtn.setAttribute("aria-label", "앱 설치 배너 닫기");
       closeBtn.setAttribute("title", "닫기");
-      if ((closeBtn.textContent || "").trim().indexOf("✕") === -1 && (closeBtn.textContent || "").trim().indexOf("닫기") === -1) {
-        closeBtn.textContent = "✕";
+      if (!closeBtn.querySelector("svg[data-sq-x-svg='1']")) {
+        closeBtn.innerHTML = "<svg data-sq-x-svg='1' viewBox='0 0 14 14' width='12' height='12' fill='none' aria-hidden='true' style='display:block;pointer-events:none;'><path d='M3 3L11 11M11 3L3 11' stroke='currentColor' stroke-width='2.2' stroke-linecap='round'/></svg>";
       }
       if (!closeBtn.getAttribute("data-sq-close-bound-v26")) {
         closeBtn.setAttribute("data-sq-close-bound-v26", "1");
@@ -3568,6 +3611,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -5060,7 +5104,7 @@ def serve_lounge_home():
             rendered = inject_upgrade_into_html(raw_html)
             rendered = re.sub(
                 r'(/api/member/p0p1-upgrade\.js\?v=)(\d+)',
-                lambda m: m.group(1) + str(int(m.group(2)) + 700),
+                lambda m: m.group(1) + str(int(m.group(2)) + 800),
                 rendered,
             )
             return HTMLResponse(rendered, media_type="text/html; charset=utf-8")
