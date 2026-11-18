@@ -618,6 +618,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -3326,7 +3328,10 @@ _FRONTEND_V22_JS = r'''
               .catch(function () { return cachedSb ? cachedSb.data : null; });
 
         return Promise.all([
-          _prevFetch.apply(window, arguments).then(function (r) { return r.json(); }).catch(function () { return null; }),
+          (function () {
+            var cleanLsUrl = urlStr.replace(/([?&])league=all(&|$)/i, function (_m, p1, p2) { return p2 === "&" ? p1 : ""; }).replace(/[?&]$/, "");
+            return _prevFetch.call(window, cleanLsUrl, init).then(function (r) { return r.json(); }).catch(function () { return null; });
+          })(),
           sbPromise
         ]).then(function (pair) {
           var dcJson = pair[0] || { ok: true, items: [], counts: {} };
@@ -3411,8 +3416,8 @@ _FRONTEND_V22_JS = r'''
             }
           }
           dcJson.items = curItems;
-          if (spReq === "all" && lgReq === "ALL" && curItems.length > 0 && (!v30ScoreState.customDateRendered || offReq === v30ScoreState.selectedDateOffset)) {
-            setTimeout(function () { mergeRawScoreItemsV30(curItems, true); }, 0);
+          if (spReq === "all" && lgReq === "ALL" && (curItems.length >= 10 || !v30ScoreState.rawAllItems.length) && (!v30ScoreState.customDateRendered || offReq === v30ScoreState.selectedDateOffset)) {
+            setTimeout(function () { mergeRawScoreItemsV30(curItems, curItems.length >= 10); }, 0);
           }
           return new Response(JSON.stringify(dcJson), { status: 200, headers: { "Content-Type": "application/json" } });
         });
@@ -3754,9 +3759,9 @@ _FRONTEND_V22_JS = r'''
         if (n) norm.push(n);
       }
     }
-    if (replaceAll) {
+    if (replaceAll && (norm.length >= 10 || v30ScoreState.customDateRendered || !v30ScoreState.fullDateItems || norm.length >= v30ScoreState.fullDateItems.length)) {
       v30ScoreState.rawAllItems = norm;
-      if (norm.length >= 8 || v30ScoreState.customDateRendered) {
+      if (norm.length >= 10 || v30ScoreState.customDateRendered) {
         v30ScoreState.fullDateItems = norm.slice();
       }
     } else if (norm.length) {
@@ -3874,7 +3879,7 @@ _FRONTEND_V22_JS = r'''
       .then(function (r) { return r.json(); })
       .catch(function () { return null; });
     var pDc = (targetOff === 0)
-      ? fetch("/api/datacenter/live-scores?sport=all&league=all&date_offset=0")
+      ? fetch("/api/datacenter/live-scores?sport=all&date_offset=0")
           .then(function (r) { return r.json(); })
           .catch(function () { return null; })
       : Promise.resolve(null);
@@ -7706,6 +7711,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -7896,7 +7902,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3530_{int(time.time())}"
+_BOOT_VER_V30 = f"3540_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -9927,12 +9933,14 @@ def api_member_scoreboard_v30(date_offset: int = 0):
                 elif isinstance(a_res, dict) and isinstance(a_res.get("items"), list):
                     raw_items = list(a_res["items"])
             if not raw_items and callable(api_ls_fn):
-                try:
-                    ls_res = api_ls_fn(sport="all", league="all", date_offset=date_offset)
-                    if isinstance(ls_res, dict) and isinstance(ls_res.get("items"), list):
-                        raw_items = list(ls_res["items"])
-                except Exception:
-                    pass
+                for _lg_try in ("", "ALL", "all"):
+                    try:
+                        ls_res = api_ls_fn(sport="all", league=_lg_try, date_offset=int(date_offset))
+                        if isinstance(ls_res, dict) and isinstance(ls_res.get("items"), list) and len(ls_res["items"]) > 0:
+                            raw_items = list(ls_res["items"])
+                            break
+                    except Exception:
+                        continue
         else:
             # True KST lookup for -5 and -4 (bypassing collect_live_scores's -3 floor)
             cached = _V31_EXT_SCORE_CACHE.get(date_offset)
