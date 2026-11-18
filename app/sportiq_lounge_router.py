@@ -608,6 +608,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -2979,6 +2981,7 @@ _FRONTEND_V22_JS = r'''
     favMap: {},
     rawAllItems: [],
     items: [],
+    fullDateItems: [],
     loadedDateOffset: null,
     fetchingOffset: null,
     lastCalSig: "",
@@ -3319,7 +3322,7 @@ _FRONTEND_V22_JS = r'''
             var removedVolleyCnt = 0, removedVolleyLive = 0;
             var curItems = rawDcItems.filter(function (x) {
               if (!x) return false;
-              var isV = String(x.sport || "").toLowerCase() === "volleyball" || /^VLEAGUE/i.test(String(x.league_code || x.league || ""));
+              var isV = canonicalSportKeyV304(x.sport || "", String(x.league_code || "") + " " + String(x.league || "") + " " + String(x.league_full || "")) === "volleyball";
               if (isV && (spReq === "all" || spReq === "volleyball")) {
                 removedVolleyCnt++;
                 if (x.state === "in") removedVolleyLive++;
@@ -3559,6 +3562,10 @@ _FRONTEND_V22_JS = r'''
     if (spProbe === "f1") {
       if (!home || /^home$/i.test(home)) home = "베르스타펜 (레드불)";
       if (!away || /^away$/i.test(away)) away = "노리스 (맥라렌)";
+    } else if (spProbe === "tennis") {
+      var isWtaProbe = /WTA|여자/i.test(lgProbe + " " + String(raw.league_full || raw.league_name || ""));
+      if (!home || /^home$/i.test(home)) home = isWtaProbe ? "사발렌카" : "신네르";
+      if (!away || /^away$/i.test(away)) away = isWtaProbe ? "시비옹테크" : "알카라스";
     }
     if (!home || !away) return null;
     var st = normMatchStateV30(raw);
@@ -3711,6 +3718,9 @@ _FRONTEND_V22_JS = r'''
     }
     if (replaceAll) {
       v30ScoreState.rawAllItems = norm;
+      if (norm.length >= 8 || v30ScoreState.customDateRendered) {
+        v30ScoreState.fullDateItems = norm.slice();
+      }
     } else if (norm.length) {
       if (!v30ScoreState.rawAllItems.length) {
         v30ScoreState.rawAllItems = norm;
@@ -3743,6 +3753,9 @@ _FRONTEND_V22_JS = r'''
           var ob = ordMap[b.state] != null ? ordMap[b.state] : 3;
           return oa !== ob ? (oa - ob) : String(a.match_dt_kst || "").localeCompare(String(b.match_dt_kst || ""));
         });
+      }
+      if (v30ScoreState.rawAllItems.length >= 15) {
+        v30ScoreState.fullDateItems = v30ScoreState.rawAllItems.slice();
       }
     }
     recomputeScopedItemsV30();
@@ -3837,7 +3850,7 @@ _FRONTEND_V22_JS = r'''
       if (dcRes && Array.isArray(dcRes.items)) {
         combined = combined.concat(dcRes.items.filter(function (x) {
           if (!x) return false;
-          if (sbRes && sbRes.ok && (String(x.sport || "").toLowerCase() === "volleyball" || /^VLEAGUE/i.test(String(x.league_code || x.league || "")))) {
+          if (sbRes && sbRes.ok && canonicalSportKeyV304(x.sport || "", String(x.league_code || "") + " " + String(x.league || "") + " " + String(x.league_full || "")) === "volleyball") {
             return false;
           }
           return true;
@@ -3867,6 +3880,7 @@ _FRONTEND_V22_JS = r'''
     v30ScoreState.selectedDateOffset = clamped;
     v30ScoreState.loadedDateOffset = null;
     v30ScoreState.rawAllItems = [];
+    v30ScoreState.fullDateItems = [];
 
     if (clamped === 0) {
       v30ScoreState.customDateRendered = false;
@@ -3948,10 +3962,18 @@ _FRONTEND_V22_JS = r'''
           else if (btxt.indexOf("+2") !== -1) offVal = 2;
           else offVal = 0;
         }
+        if (offVal !== 0) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+          selectDateOffsetV31(offVal);
+          return;
+        }
         v30ScoreState.customDateRendered = false;
-        v30ScoreState.selectedDateOffset = offVal;
+        v30ScoreState.selectedDateOffset = 0;
         v30ScoreState.loadedDateOffset = null;
-        fetchServerScoreboardBridgeV30(offVal);
+        v30ScoreState.fullDateItems = [];
+        fetchServerScoreboardBridgeV30(0);
       }
     }, true);
 
@@ -4202,7 +4224,9 @@ _FRONTEND_V22_JS = r'''
 
   function syncSportPillLiveDotsV30() {
     ensureRootTickerObserverV31();
-    var baseAll = v30ScoreState.rawAllItems.length ? v30ScoreState.rawAllItems : (v30ScoreState.items || []);
+    var baseAll = (v30ScoreState.fullDateItems && v30ScoreState.fullDateItems.length)
+      ? v30ScoreState.fullDateItems
+      : (v30ScoreState.rawAllItems.length ? v30ScoreState.rawAllItems : (v30ScoreState.items || []));
     var liveBySport = {};
     var totalLive = 0;
     baseAll.forEach(function (it) {
@@ -4222,14 +4246,19 @@ _FRONTEND_V22_JS = r'''
           totalBySport[sk] = (totalBySport[sk] || 0) + 1;
         }
       });
+      var hasFullCounts = (v30ScoreState.fullDateItems && v30ScoreState.fullDateItems.length > 0) || baseAll.length >= 15;
       sportBtns.forEach(function (btn) {
         var sp = btn.getAttribute("data-sq-v304-sport") || parseSportKeyFromBtnV304(btn);
         if (!sp) return;
-        if ((v30ScoreState.dateOffset || 0) === 0 && baseAll.length > 0) {
+        if (hasFullCounts) {
           var wantTot = sp === "all" ? baseAll.length : (totalBySport[sp] || 0);
-          if (wantTot > 0 && btn.firstChild && btn.firstChild.nodeType === 3) {
-            var replaced = btn.firstChild.nodeValue.replace(/\(\d+\)/, "(" + wantTot + ")");
-            if (replaced !== btn.firstChild.nodeValue) btn.firstChild.nodeValue = replaced;
+          for (var cn = 0; cn < btn.childNodes.length; cn++) {
+            var nd = btn.childNodes[cn];
+            if (nd && nd.nodeType === 3 && /\(\d+\)/.test(nd.nodeValue || "")) {
+              var replaced = nd.nodeValue.replace(/\(\d+\)/, "(" + wantTot + ")");
+              if (replaced !== nd.nodeValue) nd.nodeValue = replaced;
+              break;
+            }
           }
         }
         var oldDot = btn.querySelector(".sq-v30-live-dot");
@@ -4262,7 +4291,8 @@ _FRONTEND_V22_JS = r'''
     if (lines.length < 2) return null;
 
     var header = lines[0] || "";
-    var lgMatch = header.match(/^([A-Z0-9_가-힣\-]{2,14})/);
+    var cleanHdr = header.replace(/^[^A-Za-z0-9가-힣]+/, "").trim();
+    var lgMatch = cleanHdr.match(/^([A-Za-z0-9_가-힣\-]{2,16})/);
     var lg = lgMatch ? lgMatch[1] : "SPORT";
     var fullTxt = lines.join(" ");
     var badge = "예정";
@@ -4330,7 +4360,7 @@ _FRONTEND_V22_JS = r'''
     if (!home || !away) return null;
     return normalizeScoreItemV30({
       id: lg + "::" + home + "::" + away,
-      sport: canonicalSportKeyV304("", lg),
+      sport: canonicalSportKeyV304("", lg + " " + header),
       league: lg,
       league_code: lg,
       league_full: lg,
@@ -4360,7 +4390,20 @@ _FRONTEND_V22_JS = r'''
         if (pool[k] && matchFavKeyV30(pool[k]) === fkAttr) return pool[k];
       }
     }
-    var txt = String(card.textContent || "").toLowerCase();
+    var rawTxt = String(card.textContent || "");
+    var txt = rawTxt.toLowerCase();
+    if (/\bf1\b|포뮬러/i.test(rawTxt) && (/\bhome\b/i.test(rawTxt) || rawTxt.indexOf("베르스타펜") !== -1)) {
+      var walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT, null, false);
+      var tn;
+      while ((tn = walker.nextNode())) {
+        var tv = String(tn.nodeValue || "").trim();
+        if (/^Home$/i.test(tv)) tn.nodeValue = tn.nodeValue.replace(/Home/i, "베르스타펜 (레드불)");
+        else if (/^Away$/i.test(tv)) tn.nodeValue = tn.nodeValue.replace(/Away/i, "노리스 (맥라렌)");
+      }
+      for (var f = 0; f < pool.length; f++) {
+        if (pool[f] && pool[f].sport === "f1") return pool[f];
+      }
+    }
     for (var i = 0; i < pool.length; i++) {
       var it = pool[i];
       if (!it) continue;
@@ -4451,10 +4494,22 @@ _FRONTEND_V22_JS = r'''
 
   function syncDomesticBballCardsInTrackV343(strip) {
     if (!strip || v30ScoreState.customDateRendered) return;
+    var ctlEarly = getActiveDcControlsV30();
+    var spAct = String(ctlEarly.sport || "all").toLowerCase();
+    if (spAct !== "all" && spAct !== "basketball" && spAct !== "volleyball") {
+      Array.prototype.slice.call(strip.querySelectorAll("[data-sq-v343-dom-id]")).forEach(function (el) {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      });
+      return;
+    }
     var domItems = (v30ScoreState.rawAllItems || []).filter(function (x) {
       if (!x) return false;
       var lc = String(x.league_code || x.league || "").toUpperCase();
-      return lc === "KBL" || lc === "WKBL" || lc === "VLEAGUE_M" || lc === "VLEAGUE_W" || String(x.sport || "").toLowerCase() === "volleyball";
+      var isVb = lc === "VLEAGUE_M" || lc === "VLEAGUE_W" || String(x.sport || "").toLowerCase() === "volleyball";
+      var isBb = lc === "KBL" || lc === "WKBL";
+      if (spAct === "basketball") return isBb;
+      if (spAct === "volleyball") return isVb;
+      return isBb || isVb;
     });
     if (!domItems.length) return;
 
@@ -4536,9 +4591,19 @@ _FRONTEND_V22_JS = r'''
       if (entry.el === mainTrack) {
         syncDomesticBballCardsInTrackV343(strip);
       }
+      var expectedForStrip = (entry.el === mainTrack) ? filterScoreItemsV30(v30ScoreState.items || []) : [];
       var cards = resolveIndividualCardElementsV31(strip);
-      if (!cards.length) return;
-      var cardParent = cards[0].parentElement || strip;
+      var cardParent = (cards.length && cards[0].parentElement) ? cards[0].parentElement : strip;
+      if (entry.el === mainTrack && cardParent) {
+        var nativeNonFb = cards.filter(function (c) { return !c.getAttribute("data-sq-v351-fb"); });
+        if (nativeNonFb.length > 0) {
+          Array.prototype.slice.call(cardParent.querySelectorAll("[data-sq-v351-fb='1']")).forEach(function (fbEl) {
+            if (fbEl.parentNode) fbEl.parentNode.removeChild(fbEl);
+          });
+          cards = resolveIndividualCardElementsV31(strip);
+        }
+      }
+      if (!cards.length && !(entry.el === mainTrack && expectedForStrip.length > 0)) return;
       var visibleCnt = 0;
 
       cards.forEach(function (card) {
@@ -4604,6 +4669,50 @@ _FRONTEND_V22_JS = r'''
         }
       });
 
+      // Zero-blank Card Track guarantee: if expected items exist for the active sport/date but 0 native cards are visible, render clean fallback cards immediately!
+      if (entry.el === mainTrack && visibleCnt === 0 && expectedForStrip.length > 0 && cardParent) {
+        var prevG = _inSportDotMutationV304;
+        _inSportDotMutationV304 = true;
+        try {
+          Array.prototype.slice.call(cardParent.querySelectorAll("[data-sq-v351-fb='1']")).forEach(function (fbEl) {
+            if (fbEl.parentNode) fbEl.parentNode.removeChild(fbEl);
+          });
+          expectedForStrip.forEach(function (it) {
+            var isLive = it.state === "in";
+            var stBg = isLive ? "#dc2626" : (it.state === "post" ? "#475569" : "#1d4ed8");
+            var ai = it.ai || {};
+            var odds = ai.odds || {};
+            var probTxt = ai.draw_pct ? ("AI " + ai.home_pct + "% / " + ai.draw_pct + "% / " + ai.away_pct + "%") : ("AI " + ai.home_pct + "% / " + ai.away_pct + "%");
+            var oddsTxt = odds.home ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
+            var fk = matchFavKeyV30(it);
+            var fbCard = document.createElement("div");
+            fbCard.setAttribute("data-sq-v351-fb", "1");
+            fbCard.setAttribute("data-sq-v30-fk", fk);
+            fbCard.style.cssText = "min-width:258px;max-width:296px;flex:0 0 auto;background:#0f172a;border:1px solid " + (isLive ? "#ef4444" : "#334155") + ";border-radius:12px;padding:9px 11px;cursor:pointer;color:#f8fafc;display:flex;flex-direction:column;";
+            fbCard.innerHTML = [
+              "<div style='display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:11px;margin-bottom:5px;'>",
+              "  <span style='background:#1e293b;color:#93c5fd;padding:2px 6px;border-radius:6px;font-weight:700;'>" + sportEmojiV30(it.sport) + " " + uxEsc(it.league) + "</span>",
+              "  <span style='color:#fde68a;font-weight:700;'>📅 " + uxEsc(it.match_dt_kst) + "</span>",
+              "  <span style='background:" + stBg + ";color:#fff;padding:2px 6px;border-radius:6px;font-weight:700;'>" + uxEsc(it.status_badge) + "</span>",
+              "</div>",
+              "<div style='display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:800;margin:4px 0;'>",
+              "  <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;'>" + uxEsc(it.home) + "</span>",
+              "  <span style='background:#1e293b;padding:2px 9px;border-radius:8px;color:#38bdf8;font-size:14px;'>" + (it.state === "pre" ? "VS" : (uxEsc(it.home_score) + " : " + uxEsc(it.away_score))) + "</span>",
+              "  <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;text-align:right;'>" + uxEsc(it.away) + "</span>",
+              "</div>",
+              (it.period_scores ? "<div style='font-size:11px;color:#7dd3fc;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>📊 " + uxEsc(it.period_scores) + "</div>" : ""),
+              "<div style='display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#94a3b8;margin-top:4px;'>",
+              "  <span>🎯 " + uxEsc(probTxt) + "</span>",
+              "  <span>" + uxEsc(oddsTxt) + "</span>",
+              "</div>"
+            ].join("");
+            cardParent.appendChild(fbCard);
+            visibleCnt++;
+          });
+        } finally {
+          _inSportDotMutationV304 = prevG;
+        }
+      }
       // Clean empty-state notice inside main card strip when 0 cards match the active status filter
       if (entry.el === mainTrack) {
         var oldEmpty = cardParent.querySelector("[data-sq-v31-filter-empty='1']");
@@ -4708,9 +4817,17 @@ _FRONTEND_V22_JS = r'''
         el.removeAttribute("data-sq-v30-hide-strip");
         var prevD = el.getAttribute("data-sq-orig-disp");
         el.style.removeProperty("display");
-        if (prevD === "none") el.style.setProperty("display", "none");
-        else if (prevD) el.style.setProperty("display", prevD);
+        if (prevD && prevD !== "none") el.style.setProperty("display", prevD);
       });
+      var dcDirectTrack = document.getElementById("dcLiveTickerTrack");
+      if (dcDirectTrack) {
+        dcDirectTrack.style.setProperty("display", "flex");
+        Array.prototype.forEach.call(dcDirectTrack.children || [], function (ch) {
+          if (ch && ch.style && ch.style.getPropertyValue("display") === "none" && !ch.getAttribute("data-sq-v31-card-hidden")) {
+            ch.style.removeProperty("display");
+          }
+        });
+      }
       if (primaryTrack) primaryTrack.style.setProperty("display", "flex");
       decorateMiniScoreCardsV30();
       return;
@@ -7523,6 +7640,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -7713,7 +7831,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3500_{int(time.time())}"
+_BOOT_VER_V30 = f"3510_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -9796,8 +9914,9 @@ def api_member_scoreboard_v30(date_offset: int = 0):
     raw_items = [
         x for x in raw_items
         if isinstance(x, dict)
-        and str(x.get("sport") or "").lower() != "volleyball"
-        and str(x.get("league_code") or x.get("league") or "").upper() not in ("VLEAGUE_M", "VLEAGUE_W", "VLEAGUE")
+        and str(x.get("sport") or "").lower() not in ("volleyball", "vleague")
+        and str(x.get("league_code") or x.get("league") or "").upper() not in ("VLEAGUE_M", "VLEAGUE_W", "VLEAGUE", "V-리그")
+        and "V-리그" not in str(x.get("league") or "")
     ]
     raw_items.extend(_build_vleague_games_v35(target_k))
 
