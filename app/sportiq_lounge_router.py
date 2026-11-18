@@ -122,6 +122,21 @@ _FIXED_SORT_STRIP_FN = r"""function isElementHiddenOrCollapsed(el) {
         liveTrack.__sqToolbarEl = keeper;
       }
     }
+    var primaryTrack = document.getElementById("dcLiveTickerTrack");
+    if (primaryTrack) {
+      var allBars = document.querySelectorAll(".sq-match-sort-bar");
+      var mainBar = primaryTrack.__sqToolbarEl || null;
+      for (var m = 0; m < allBars.length; m++) {
+        if (!mainBar && primaryTrack.parentNode && allBars[m].parentNode === primaryTrack.parentNode) {
+          mainBar = allBars[m];
+        }
+      }
+      for (var x = 0; x < allBars.length; x++) {
+        if (mainBar && allBars[x] !== mainBar && allBars[x].parentNode) {
+          allBars[x].parentNode.removeChild(allBars[x]);
+        }
+      }
+    }
   }
 
   function sortRenderedMatchCardStrips(forceResort) {
@@ -137,7 +152,9 @@ _FIXED_SORT_STRIP_FN = r"""function isElementHiddenOrCollapsed(el) {
       if (kids.length < 2) return;
 
       bindSmoothHorizontalControls(container);
-      mountSortToggleAboveStrip(container);
+      if (container.id === "dcLiveTickerTrack" || !document.getElementById("dcLiveTickerTrack")) {
+        mountSortToggleAboveStrip(container);
+      }
 
       var scroller = resolveActualScrollViewport(container);
       if (container.__sqToolbarEl && scroller) {
@@ -674,7 +691,7 @@ _SPORTIQ_SYNONYM_GROUPS: Tuple[Tuple[str, ...], ...] = (
     ("김도영", "kim do-young", "기아 타이거즈", "kia 타이거즈"),
     ("페이커", "이상혁", "faker", "t1", "티원"),
     # EPL & European Football Clubs
-    ("맨유", "맨체스터 유나이티드", "맨체스터유나이티드", "manchester united", "man utd", "man united", "mufc"),
+    ("맨유", "맨체스터 유나이티드", "맨체스터유나이티드", "manchester united", "man utd", "man united", "mufc", "루벤 아모림", "amorim"),
     ("맨시티", "맨체스터 시티", "맨체스터시티", "manchester city", "man city", "mcfc"),
     ("아스널", "아스날", "arsenal", "gunners"),
     ("리버풀", "liverpool", "lfc", "안필드"),
@@ -823,6 +840,113 @@ _TRUSTED_SPORT_SOURCES: Tuple[str, ...] = (
     "한스경제", "mk스포츠", "점프볼", "루키", "인벤", "디스이즈게임", "데일리e스포츠",
 )
 
+
+# Canonical Wikipedia Page Titles (KO, EN) for Sports Entities (prevents corporate/car/city/medical false hits!)
+_CANONICAL_WIKI_TITLES: Tuple[Tuple[Tuple[str, ...], str, str], ...] = (
+    (("맨유", "맨체스터 유나이티드", "맨체스터유나이티드", "manchester united", "man utd", "man united"), "맨체스터 유나이티드 FC", "Manchester United F.C."),
+    (("맨시티", "맨체스터 시티", "맨체스터시티", "manchester city", "man city"), "맨체스터 시티 FC", "Manchester City F.C."),
+    (("아스널", "아스날", "arsenal"), "아스널 FC", "Arsenal F.C."),
+    (("리버풀", "liverpool"), "리버풀 FC", "Liverpool F.C."),
+    (("토트넘", "스퍼스", "tottenham", "spurs"), "토트넘 홋스퍼 FC", "Tottenham Hotspur F.C."),
+    (("첼시", "chelsea"), "첼시 FC", "Chelsea F.C."),
+    (("뉴캐슬", "newcastle"), "뉴캐슬 유나이티드 FC", "Newcastle United F.C."),
+    (("애스턴 빌라", "아스톤 빌라", "아스톤빌라", "aston villa"), "애스턴 빌라 FC", "Aston Villa F.C."),
+    (("손흥민", "쏘니", "son heung-min", "heung-min son"), "손흥민", "Son Heung-min"),
+    (("김민재", "kim min-jae"), "김민재 (축구 선수)", "Kim Min-jae"),
+    (("이강인", "lee kang-in"), "이강인", "Lee Kang-in"),
+    (("황희찬", "hwang hee-chan"), "황희찬", "Hwang Hee-chan"),
+    (("레알", "레알 마드리드", "real madrid"), "레알 마드리드 CF", "Real Madrid CF"),
+    (("바르샤", "바르셀로나", "barcelona"), "FC 바르셀로나", "FC Barcelona"),
+    (("아틀레티코", "atletico madrid"), "아틀레티코 마드리드", "Atlético Madrid"),
+    (("바이에른", "바이에른 뮌헨", "뮌헨", "bayern"), "FC 바이에른 뮌헨", "FC Bayern Munich"),
+    (("도르트문트", "dortmund"), "보루시아 도르트문트", "Borussia Dortmund"),
+    (("레버쿠젠", "leverkusen"), "바이어 04 레버쿠젠", "Bayer 04 Leverkusen"),
+    (("인테르", "인터 밀란", "인터밀란", "inter milan"), "FC 인테르나치오날레 밀라노", "Inter Milan"),
+    (("ac밀란", "ac 밀란", "밀란", "ac milan"), "AC 밀란", "AC Milan"),
+    (("유벤투스", "유베", "juventus"), "유벤투스 FC", "Juventus FC"),
+    (("나폴리", "napoli"), "SSC 나폴리", "SSC Napoli"),
+    (("파리 생제르맹", "psg", "paris saint-germain"), "파리 생제르맹 FC", "Paris Saint-Germain F.C."),
+    (("기아", "kia", "기아 타이거즈", "kia 타이거즈", "kia tigers"), "KIA 타이거즈", "Kia Tigers"),
+    (("삼성", "삼성 라이온즈", "samsung lions"), "삼성 라이온즈", "Samsung Lions"),
+    (("엘지", "lg", "엘지 트윈스", "lg 트윈스", "lg twins"), "LG 트윈스", "LG Twins"),
+    (("두산", "두산 베어스", "doosan bears"), "두산 베어스", "Doosan Bears"),
+    (("케이티", "kt", "케이티 위즈", "kt 위즈", "kt wiz"), "KT 위즈", "KT Wiz"),
+    (("ssg", "랜더스", "ssg 랜더스", "ssg landers"), "SSG 랜더스", "SSG Landers"),
+    (("롯데", "롯데 자이언츠", "lotte giants"), "롯데 자이언츠", "Lotte Giants"),
+    (("한화", "한화 이글스", "hanwha eagles"), "한화 이글스", "Hanwha Eagles"),
+    (("엔씨", "nc", "엔씨 다이노스", "nc 다이노스", "nc dinos"), "NC 다이노스", "NC Dinos"),
+    (("키움", "키움 히어로즈", "kiwoom heroes"), "키움 히어로즈", "Kiwoom Heroes"),
+    (("오타니", "shohei ohtani", "ohtani"), "오타니 쇼헤이", "Shohei Ohtani"),
+    (("다저스", "la 다저스", "dodgers"), "로스앤젤레스 다저스", "Los Angeles Dodgers"),
+    (("양키스", "yankees"), "뉴욕 양키스", "New York Yankees"),
+    (("이정후", "jung hoo lee"), "이정후", "Jung Hoo Lee"),
+    (("김도영", "kim do-young"), "김도영 (야구 선수)", "Kim Do-young"),
+    (("류현진", "ryu hyun-jin"), "류현진", "Ryu Hyun-jin"),
+    (("보스턴", "셀틱스", "보스턴 셀틱스", "celtics"), "보스턴 셀틱스", "Boston Celtics"),
+    (("레이커스", "lakers"), "로스앤젤레스 레이커스", "Los Angeles Lakers"),
+    (("워리어스", "골든스테이트", "골스", "warriors"), "골든스테이트 워리어스", "Golden State Warriors"),
+    (("매버릭스", "댈러스", "mavericks"), "댈러스 매버릭스", "Dallas Mavericks"),
+    (("너기츠", "덴버", "nuggets"), "덴버 너기츠", "Denver Nuggets"),
+    (("요키치", "jokic"), "니콜라 요키치", "Nikola Jokic"),
+    (("커리", "stephen curry"), "스테픈 커리", "Stephen Curry"),
+    (("르브론", "lebron"), "르브론 제임스", "LeBron James"),
+    (("페이커", "faker", "t1", "티원"), "페이커", "Faker (gamer)"),
+    (("젠지", "gen.g"), "젠지", "Gen.G"),
+    (("페르스타펜", "verstappen"), "막스 페르스타펜", "Max Verstappen"),
+    (("노리스", "lando norris"), "랜도 노리스", "Lando Norris"),
+)
+
+_INTENT_ONLY_TOKENS: Set[str] = {
+    "부상", "부상자", "결장", "결장자", "명단제외", "출전불투명", "복귀", "라인업", "선발",
+    "injury", "injured", "injuries", "lineup", "out", "doubtful",
+    "이적", "오피셜", "영입", "방출", "재계약", "임대", "몸값", "transfer", "signing", "official", "contract", "rumor", "loan",
+    "배당", "드롭오즈", "오즈", "승률", "승부예측", "픽", "언오버", "핸디캡", "odds", "prediction", "preview", "betting",
+    "순위", "승점", "테이블", "성적", "랭킹", "standings", "table", "ranking",
+    "득점", "골", "하이라이트", "멀티골", "결승골", "결과", "스코어", "goal", "score", "highlights", "result",
+    "전술", "압박", "빌드업", "기대득점", "xg", "포메이션", "tactics", "formation", "일정", "중계", "뉴스", "속보",
+}
+
+_WIKI_NON_SPORT_BLOCKLIST: Tuple[str, ...] = (
+    "자동차 제조", "현대자동차그룹", "쏘렌토", "카니발", "스포티지", "모닝", "세단", "전기차", "suv",
+    "기아 (기업)", "삼성전자", "lg전자", "두산중공업", "롯데그룹", "한화그룹",
+    "연평해전", "해전", "전투", "전사자", "포피", "피부", "생식기", "수술", "질병",
+    "잉글랜드의 도시", "그레이터맨체스터주의 도시", "city and metropolitan borough",
+    "스페인의 수도", "이탈리아의 도시", "독일의 도시", "프랑스의 수도",
+)
+
+_WIKI_SPORT_REQUIRED_ANCHORS: Tuple[str, ...] = (
+    "축구", "야구", "농구", "배구", "하키", "테니스", "격투기", "골프", "포뮬러", "e스포츠", "프로게이머",
+    "구단", "클럽", "선수", "감독", "리그", "프리미어리그", "라리가", "분데스리가", "세리에", "챔피언스리그",
+    "kbo", "프로야구", "메이저리그", "월드컵", "올림픽", "포지션", "공격수", "수비수", "미드필더", "골키퍼",
+    "투수", "타자", "내야수", "외야수", "홈구장", "스타디움",
+    "football", "soccer", "baseball", "basketball", "hockey", "esports", "formula one", "racing",
+    "premier league", "la liga", "bundesliga", "serie a", "mlb", "nba", "nhl", "nfl", "ufc",
+    "professional footballer", "baseball player", "basketball player", "sports club", "football club",
+)
+
+
+def _resolve_wiki_queries(q_clean: str, stems: List[str], en_terms: List[str]) -> Tuple[str, str]:
+    q_low = q_clean.lower()
+    for aliases, ko_title, en_title in _CANONICAL_WIKI_TITLES:
+        if any(a == st or (len(a) >= 2 and a in q_low) for a in aliases for st in (stems or [q_low])):
+            return ko_title, en_title
+    entity_stems = [s for s in stems if s not in _INTENT_ONLY_TOKENS]
+    base_ko = " ".join(entity_stems) if entity_stems else q_clean
+    en_entities = [e for e in en_terms if e.lower() not in _INTENT_ONLY_TOKENS]
+    base_en = en_entities[0] if en_entities else ""
+    return base_ko, base_en
+
+
+def _is_valid_sports_wiki_card(card: Dict[str, Any]) -> bool:
+    title_l = str(card.get("title") or "").lower()
+    sum_l = str(card.get("summary") or "").lower()
+    comb = f"{title_l} {sum_l}"
+    if any(blk in comb for blk in _WIKI_NON_SPORT_BLOCKLIST):
+        # Allow only if title itself explicitly says FC / 타이거즈 / 라이온즈 / 트윈스 / 베어스 / 축구 선수 / 야구 선수
+        if not any(ok_t in title_l for ok_t in ("fc", "타이거즈", "라이온즈", "트윈스", "베어스", "위즈", "랜더스", "자이언츠", "이글스", "다이노스", "히어로즈", "셀틱스", "레이커스", "선수")):
+            return False
+    return any(anch in comb for anch in _WIKI_SPORT_REQUIRED_ANCHORS)
+
 _JOSA_SUFFIXES: Tuple[str, ...] = (
     "에서는", "으로는", "에게는", "로부터", "과의", "와의", "에서", "에게", "으로", "까지", "부터",
     "이랑", "하고", "보다", "처럼", "만큼", "은", "는", "이", "가", "을", "를", "의", "에",
@@ -934,11 +1058,20 @@ def _analyze_query_concepts(raw_query: str) -> Dict[str, Any]:
             league_hint = lg_code
             break
 
+    entity_groups = [
+        cg for cg in concept_groups
+        if not all(tok in _INTENT_ONLY_TOKENS for tok in cg)
+    ] or concept_groups
+    wiki_ko_q, wiki_en_q = _resolve_wiki_queries(q_clean, stems, en_terms)
+
     return {
         "raw_query": q_clean,
         "q_low": q_low,
         "stems": stems,
         "concept_groups": concept_groups,
+        "entity_groups": entity_groups,
+        "wiki_ko_q": wiki_ko_q,
+        "wiki_en_q": wiki_en_q,
         "expanded_terms": expanded_display[:8],
         "ko_primary_q": ko_primary_q,
         "ko_alt_q": ko_alt_q,
@@ -971,7 +1104,11 @@ def _score_text_relevance(
         if q_meta.get("needs_sport_guard") and not has_sport:
             return 0
 
-    groups: List[Set[str]] = q_meta["concept_groups"]
+    groups: List[Set[str]] = (
+        q_meta.get("entity_groups") or q_meta["concept_groups"]
+        if is_internal_sportiq
+        else q_meta["concept_groups"]
+    )
     if not groups:
         return 60
 
@@ -1000,8 +1137,13 @@ def _score_text_relevance(
     if exact_in_title:
         score += 12.0
 
-    # Trusted sports media bonus
-    if is_internal_sportiq or any(ts in src_low for ts in _TRUSTED_SPORT_SOURCES):
+    # Trusted sports media & internal intent alignment bonus
+    if is_internal_sportiq:
+        score += 12.0
+        for full_cg in q_meta["concept_groups"]:
+            if any(a in full_low for a in full_cg if len(a) >= 2):
+                score += 4.0
+    elif any(ts in src_low for ts in _TRUSTED_SPORT_SOURCES):
         score += 6.0
 
     # Recency bonus (up to +8 pts)
@@ -1662,7 +1804,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
     if mode not in ("all", "news", "wiki"):
         mode = "all"
 
-    cache_key = f"hyper2:{mode}:{q.lower()}"
+    cache_key = f"hyper21:{mode}:{q.lower()}"
     now_m = time.monotonic()
     cached_payload: Optional[Dict[str, Any]] = None
     with _HYPER_SEARCH_LOCK:
@@ -1693,12 +1835,11 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
                     futs_news.append(pool.submit(_fetch_espn_public_search, en_q, 8))
 
             if mode in ("all", "wiki"):
-                futs_know.append(pool.submit(_fetch_wikipedia_smart, q, "ko"))
-                if en_q and en_q.lower() != q.lower():
-                    futs_know.append(pool.submit(_fetch_wikipedia_smart, en_q.split()[0] if len(en_q.split()) > 2 else en_q, "en"))
-                ddg_fn = getattr(_smu, "_fetch_ddg_instant_answer", None)
-                if callable(ddg_fn):
-                    futs_know.append(pool.submit(ddg_fn, en_q or q))
+                w_ko = q_meta.get("wiki_ko_q") or q
+                w_en = q_meta.get("wiki_en_q") or ""
+                futs_know.append(pool.submit(_fetch_wikipedia_smart, w_ko, "ko"))
+                if w_en and w_en.lower() != w_ko.lower():
+                    futs_know.append(pool.submit(_fetch_wikipedia_smart, w_en, "en"))
 
             internal_ctx = _search_sportiq_deep_internal(q_meta)
 
@@ -1732,9 +1873,11 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
                 kt = (kc.get("title") or "").strip().lower()
                 if not kt or kt in seen_know_titles:
                     continue
+                if not _is_valid_sports_wiki_card(kc):
+                    continue
                 seen_know_titles.add(kt)
                 knowledge_cards.append(kc)
-                if len(knowledge_cards) >= 4:
+                if len(knowledge_cards) >= 3:
                     break
 
         summary_text = _build_hyper_briefing_summary(q, q_meta, ranked_news, knowledge_cards, internal_ctx)
@@ -1968,7 +2111,7 @@ def serve_lounge_home():
             rendered = inject_upgrade_into_html(raw_html)
             rendered = re.sub(
                 r'(/api/member/p0p1-upgrade\.js\?v=)(\d+)',
-                lambda m: m.group(1) + str(int(m.group(2)) + 200),
+                lambda m: m.group(1) + str(int(m.group(2)) + 300),
                 rendered,
             )
             return HTMLResponse(rendered, media_type="text/html; charset=utf-8")
