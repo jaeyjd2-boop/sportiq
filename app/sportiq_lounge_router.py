@@ -550,6 +550,10 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -778,6 +782,70 @@ _FRONTEND_V22_JS = r'''
       "  font-size: 10px;",
       "  font-weight: 900;",
       "  line-height: 1.2;",
+      "}",
+      "/* v3.1 11-Day Calendar Strip, Card Filter & Row Hover Mini-Stat Tooltip */",
+      "[data-sq-v31-card-hidden='1'] {",
+      "  display: none !important;",
+      "  max-width: 0 !important;",
+      "  min-width: 0 !important;",
+      "  max-height: 0 !important;",
+      "  overflow: hidden !important;",
+      "  visibility: hidden !important;",
+      "  opacity: 0 !important;",
+      "  pointer-events: none !important;",
+      "  padding: 0 !important;",
+      "  margin: 0 !important;",
+      "  border: 0 !important;",
+      "}",
+      "#sqV31DateCalendarBar {",
+      "  display: flex;",
+      "  align-items: center;",
+      "  gap: 5px;",
+      "  overflow-x: auto;",
+      "  padding: 6px 4px 8px;",
+      "  margin-bottom: 4px;",
+      "  border-bottom: 1px dashed rgba(51, 65, 85, 0.55);",
+      "  scrollbar-width: none;",
+      "}",
+      "#sqV31DateCalendarBar::-webkit-scrollbar { display: none; }",
+      ".sq-v31-cal-btn {",
+      "  flex: 0 0 auto;",
+      "  background: rgba(15, 23, 42, 0.88);",
+      "  border: 1px solid #334155;",
+      "  color: #cbd5e1;",
+      "  border-radius: 9px;",
+      "  padding: 4px 9px;",
+      "  font-size: 11.3px;",
+      "  font-weight: 700;",
+      "  cursor: pointer;",
+      "  white-space: nowrap;",
+      "  transition: all 0.14s ease;",
+      "}",
+      ".sq-v31-cal-btn:hover { border-color: #64748b; color: #f8fafc; background: rgba(30, 41, 59, 0.92); }",
+      ".sq-v31-cal-btn.is-sat { color: #93c5fd; }",
+      ".sq-v31-cal-btn.is-sun { color: #fca5a5; }",
+      ".sq-v31-cal-btn.active {",
+      "  background: linear-gradient(135deg, rgba(16, 185, 129, 0.26), rgba(6, 182, 212, 0.26));",
+      "  border-color: #34d399;",
+      "  color: #6ee7b7;",
+      "  font-weight: 900;",
+      "  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.22);",
+      "}",
+      "#sqV31RowHoverPreview {",
+      "  position: fixed;",
+      "  z-index: 100022;",
+      "  pointer-events: none;",
+      "  display: none;",
+      "  width: 312px;",
+      "  max-width: calc(100vw - 24px);",
+      "  background: rgba(9, 15, 31, 0.97);",
+      "  border: 1px solid rgba(56, 189, 248, 0.52);",
+      "  border-radius: 13px;",
+      "  padding: 10px 12px;",
+      "  color: #f8fafc;",
+      "  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.68);",
+      "  font-size: 11.5px;",
+      "  line-height: 1.5;",
       "}",
       "[data-sq-v30-hide-strip='1'] {",
       "  display: none !important;",
@@ -2754,21 +2822,25 @@ _FRONTEND_V22_JS = r'''
   }
 
   // -------------------------------------------------------------------------
-  // v3.0.4 Scorebase-Inspired 10-Sport Scoreboard Table, Live-Dot Sync & 5-Tab Match Insight Modal
+  // v3.1 Scorebase Phase-2: ±5d Calendar Bar, Row Hover Stat Preview, Card-Track Filter & 0s Live Dots
   // -------------------------------------------------------------------------
   var LS_FAV_MATCHES_V30 = "sportiq_fav_matches_v30";
   var v30ScoreState = {
     viewMode: "cards", // "cards" | "table-league" | "table-time"
     statusFilter: "all", // "all" | "live" | "pre" | "post" | "fav"
-    selectedSport: "all", // "all" | "soccer" | "baseball" | "basketball" | "volleyball" | "hockey" | "esports" | "ufc" | "tennis" | "f1"
+    selectedSport: "all",
     selectedLeague: "all",
     selectedDateOffset: 0,
     userPickedSport: false,
+    customDateRendered: false,
+    isLoadingDate: false,
+    dateStrip: [],
     favMap: {},
     rawAllItems: [],
     items: [],
     loadedDateOffset: null,
     fetchingOffset: null,
+    lastCalSig: "",
     lastToolbarSig: "",
     lastTableSig: ""
   };
@@ -2780,6 +2852,32 @@ _FRONTEND_V22_JS = r'''
 
   function saveFavMatchesV30() {
     try { localStorage.setItem(LS_FAV_MATCHES_V30, JSON.stringify(v30ScoreState.favMap || {})); } catch (e) {}
+  }
+
+  function buildClientDateStripV31(activeOff) {
+    var out = [];
+    var wdKo = ["일", "월", "화", "수", "목", "금", "토"];
+    var nowMs = Date.now();
+    for (var off = -5; off <= 5; off++) {
+      var kstMs = nowMs + (off * 86400000) + (9 * 3600000);
+      var dt = new Date(kstMs);
+      var m = String(dt.getUTCMonth() + 1);
+      if (m.length < 2) m = "0" + m;
+      var d = String(dt.getUTCDate());
+      if (d.length < 2) d = "0" + d;
+      var wIdx = dt.getUTCDay();
+      out.push({
+        offset: off,
+        mmdd: m + "." + d,
+        wd: wdKo[wIdx],
+        rel: off === 0 ? "오늘" : (off === -1 ? "어제" : (off === 1 ? "내일" : "")),
+        is_today: off === 0,
+        is_sat: wIdx === 6,
+        is_sun: wIdx === 0,
+        active: off === activeOff
+      });
+    }
+    return out;
   }
 
   function normMatchStateV30(raw) {
@@ -2853,16 +2951,46 @@ _FRONTEND_V22_JS = r'''
     if (!el || !el.closest) return true;
     return Boolean(
       el.closest(
-        "#sqV30ScoreToolbar, #sqV30ScoreboardTableWrap, #dcMainHubSection, #dcHubCollapsible, #dcHubBody, " +
+        "#sqV31DateCalendarBar, #sqV31DateCalendarBar, #sqV30ScoreToolbar, #sqV30ScoreboardTableWrap, #dcMainHubSection, #dcHubCollapsible, #dcHubBody, " +
         "#rssSportFilters, #tab-feed, #tab-schedule, #tab-shorts, #tab-issues, #tab-ranking, #tab-lab, " +
         "#globalTop10Grid, #sqOfficialLegalFooter, .sq-match-sort-bar"
       )
     );
   }
 
+  var _inSportDotMutationV304 = false;
+  function ensureSportPillMutationObserverV304(container) {
+    if (!container || container.__sqSportDotObsV304 || typeof MutationObserver === "undefined") return;
+    container.__sqSportDotObsV304 = true;
+    var obs = new MutationObserver(function () {
+      if (_inSportDotMutationV304) return;
+      syncSportPillLiveDotsV30();
+    });
+    obs.observe(container, { childList: true, subtree: true, characterData: true });
+  }
+
+  // Also observe #proLiveTickerBar root so the EXACT millisecond widget.js injects the 10-sport buttons on first load, • LIVE dots attach at 0s!
+  function ensureRootTickerObserverV31() {
+    var root = document.getElementById("proLiveTickerBar");
+    if (!root || root.__sqRootLiveObsV31 || typeof MutationObserver === "undefined") return;
+    root.__sqRootLiveObsV31 = true;
+    var pending = false;
+    var obs = new MutationObserver(function () {
+      if (_inSportDotMutationV304 || pending) return;
+      pending = true;
+      setTimeout(function () {
+        pending = false;
+        syncSportPillLiveDotsV30();
+        if (v30ScoreState.viewMode === "cards") {
+          decorateMiniScoreCardsV30();
+        }
+      }, 15);
+    });
+    obs.observe(root, { childList: true, subtree: true });
+  }
+
   function discoverTopSportButtonsV304() {
     var out = [];
-    // 1. Direct #dcSportPills if present
     var pillWrap = document.getElementById("dcSportPills");
     if (pillWrap) {
       Array.prototype.forEach.call(pillWrap.querySelectorAll("button"), function (b) {
@@ -2878,7 +3006,6 @@ _FRONTEND_V22_JS = r'''
       }
     }
 
-    // 2. Structural scan for the 5~10 sport button strip in the top live-score area
     var roots = [];
     var pb = document.getElementById("proLiveTickerBar");
     if (pb) roots.push(pb);
@@ -2948,17 +3075,6 @@ _FRONTEND_V22_JS = r'''
       }
     });
     return out;
-  }
-
-  var _inSportDotMutationV304 = false;
-  function ensureSportPillMutationObserverV304(container) {
-    if (!container || container.__sqSportDotObsV304 || typeof MutationObserver === "undefined") return;
-    container.__sqSportDotObsV304 = true;
-    var obs = new MutationObserver(function () {
-      if (_inSportDotMutationV304) return;
-      syncSportPillLiveDotsV30();
-    });
-    obs.observe(container, { childList: true, subtree: true, characterData: true });
   }
 
   function detectVisuallyActiveSportFromDomV304(sportBtns) {
@@ -3056,9 +3172,7 @@ _FRONTEND_V22_JS = r'''
     var all = v30ScoreState.rawAllItems || [];
     var scoped = all.filter(function (it) {
       if (!it) return false;
-      if (ctl.sport !== "all") {
-        if (it.sport !== ctl.sport) return false;
-      }
+      if (ctl.sport !== "all" && it.sport !== ctl.sport) return false;
       if (ctl.league !== "all") {
         var lu = ctl.league.toUpperCase();
         if (String(it.league_code || "").toUpperCase() !== lu && String(it.league || "").toUpperCase() !== lu) {
@@ -3072,23 +3186,73 @@ _FRONTEND_V22_JS = r'''
     return scoped;
   }
 
-  function mergeRawScoreItemsV30(rawList, replaceAll) {
-    if (!Array.isArray(rawList) || !rawList.length) return;
-    var norm = [];
-    for (var i = 0; i < rawList.length; i++) {
-      var n = normalizeScoreItemV30(rawList[i], i);
-      if (n) norm.push(n);
+  function renderCustomDateCardsIntoStripV31() {
+    if (!v30ScoreState.customDateRendered) return;
+    var mainStrip = findPrimaryMainCardStripV30();
+    if (!mainStrip) return;
+    var targetBox = (mainStrip.children && mainStrip.children.length === 1 && mainStrip.children[0].children && mainStrip.children[0].children.length >= 2)
+      ? mainStrip.children[0]
+      : mainStrip;
+    var items = v30ScoreState.items || [];
+    if (!items.length) {
+      targetBox.innerHTML = "<div data-sq-v31-empty='1' style='padding:14px 18px;color:#94a3b8;font-size:12.5px;'>선택한 날짜·종목에 예정된 경기가 없습니다.</div>";
+      return;
     }
-    if (!norm.length) return;
-    if (replaceAll || !v30ScoreState.rawAllItems.length || norm.length >= v30ScoreState.rawAllItems.length) {
+    targetBox.innerHTML = items.map(function (it) {
+      var isLive = it.state === "in";
+      var stBg = isLive ? "#dc2626" : (it.state === "post" ? "#475569" : "#1d4ed8");
+      var ai = it.ai || {};
+      var odds = ai.odds || {};
+      var probTxt = ai.draw_pct ? ("AI " + ai.home_pct + "% / " + ai.draw_pct + "% / " + ai.away_pct + "%") : ("AI " + ai.home_pct + "% / " + ai.away_pct + "%");
+      var oddsTxt = odds.home ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
+      var fk = matchFavKeyV30(it);
+      return [
+        "<div data-sq-v30-fk='" + uxEsc(fk) + "' style='min-width:252px;max-width:292px;flex:0 0 auto;background:#0f172a;border:1px solid " + (isLive ? "#ef4444" : "#334155") + ";border-radius:12px;padding:9px 11px;cursor:pointer;color:#f8fafc;display:flex;flex-direction:column;'>",
+        "  <div style='display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:11px;margin-bottom:5px;'>",
+        "    <span style='background:#1e293b;color:#93c5fd;padding:2px 6px;border-radius:6px;font-weight:700;'>" + uxEsc(it.league) + "</span>",
+        "    <span style='color:#fde68a;font-weight:700;'>📅 " + uxEsc(it.match_dt_kst) + "</span>",
+        "    <span style='background:" + stBg + ";color:#fff;padding:2px 6px;border-radius:6px;font-weight:700;'>" + uxEsc(it.status_badge) + "</span>",
+        "  </div>",
+        "  <div style='display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:800;margin:4px 0;'>",
+        "    <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;'>" + uxEsc(it.home) + "</span>",
+        "    <span style='background:#1e293b;padding:2px 9px;border-radius:8px;color:#fff;font-size:14px;'>" + uxEsc(it.home_score) + " : " + uxEsc(it.away_score) + "</span>",
+        "    <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;text-align:right;'>" + uxEsc(it.away) + "</span>",
+        "  </div>",
+        (it.period_scores ? "<div style='font-size:11px;color:#38bdf8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>📊 " + uxEsc(it.period_scores) + "</div>" : ""),
+        "  <div style='display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#94a3b8;margin-top:4px;'>",
+        "    <span>🎯 " + uxEsc(probTxt) + "</span>",
+        "    <span>" + uxEsc(oddsTxt) + "</span>",
+        "  </div>",
+        "</div>"
+      ].join("");
+    }).join("");
+  }
+
+  function mergeRawScoreItemsV30(rawList, replaceAll) {
+    var norm = [];
+    if (Array.isArray(rawList)) {
+      for (var i = 0; i < rawList.length; i++) {
+        var n = normalizeScoreItemV30(rawList[i], i);
+        if (n) norm.push(n);
+      }
+    }
+    if (replaceAll) {
       v30ScoreState.rawAllItems = norm;
-    } else {
-      var byId = {};
-      v30ScoreState.rawAllItems.forEach(function (x) { byId[matchFavKeyV30(x)] = x; });
-      norm.forEach(function (x) { byId[matchFavKeyV30(x)] = x; });
-      v30ScoreState.rawAllItems = Object.keys(byId).map(function (k) { return byId[k]; });
+    } else if (norm.length) {
+      if (!v30ScoreState.rawAllItems.length || norm.length >= v30ScoreState.rawAllItems.length) {
+        v30ScoreState.rawAllItems = norm;
+      } else {
+        var byId = {};
+        v30ScoreState.rawAllItems.forEach(function (x) { byId[matchFavKeyV30(x)] = x; });
+        norm.forEach(function (x) { byId[matchFavKeyV30(x)] = x; });
+        v30ScoreState.rawAllItems = Object.keys(byId).map(function (k) { return byId[k]; });
+      }
     }
     recomputeScopedItemsV30();
+    if (v30ScoreState.customDateRendered) {
+      renderCustomDateCardsIntoStripV31();
+    }
+    v30ScoreState.lastCalSig = "";
     v30ScoreState.lastToolbarSig = "";
     v30ScoreState.lastTableSig = "";
     refreshScoreboardSuiteV30();
@@ -3104,7 +3268,7 @@ _FRONTEND_V22_JS = r'''
       var u = typeof input === "string" ? input : (input && input.url ? input.url : "");
       return origFetch(input, init).then(function (resp) {
         if (u.indexOf("/api/datacenter/live-scores") !== -1) {
-          // Also capture sport/league/date_offset directly from the URL that widget.js just requested!
+          var reqOff = null;
           try {
             var qIdx = u.indexOf("?");
             if (qIdx !== -1) {
@@ -3120,10 +3284,14 @@ _FRONTEND_V22_JS = r'''
                 v30ScoreState.selectedLeague = (!qLg || qLg === "all" || qLg.indexOf("전체") !== -1) ? "all" : qLg;
               }
               if (qOff != null && !isNaN(parseInt(qOff, 10))) {
-                v30ScoreState.selectedDateOffset = parseInt(qOff, 10);
+                reqOff = parseInt(qOff, 10);
               }
             }
           } catch (e) {}
+          // Ignore background 20s widget.js polling for date_offset=0 if the user is actively viewing a custom date (e.g. -4 or +4) on the ±5d calendar!
+          if (v30ScoreState.customDateRendered && reqOff !== null && reqOff !== v30ScoreState.selectedDateOffset) {
+            return resp;
+          }
           resp.clone().json().then(function (d) {
             if (d && Array.isArray(d.items) && d.items.length > 0) {
               var isFullAll = (u.indexOf("sport=all") !== -1 && (u.indexOf("league=all") !== -1 || u.indexOf("league=") === -1));
@@ -3145,47 +3313,86 @@ _FRONTEND_V22_JS = r'''
     var targetOff = (typeof forceOffset === "number" && !isNaN(forceOffset))
       ? forceOffset
       : (v30ScoreState.selectedDateOffset || 0);
-    if (v30ScoreState.rawAllItems.length > 0 && v30ScoreState.loadedDateOffset === targetOff) {
+    if (v30ScoreState.loadedDateOffset === targetOff && v30ScoreState.rawAllItems.length > 0) {
       return;
     }
     if (v30ScoreState.fetchingOffset === targetOff) return;
     v30ScoreState.fetchingOffset = targetOff;
+    v30ScoreState.isLoadingDate = true;
+    v30ScoreState.lastCalSig = "";
+    mountOrUpdateV30ScoreToolbar();
 
     fetch("/api/member/scoreboard-v30?date_offset=" + encodeURIComponent(targetOff))
       .then(function (r) { return r.json(); })
       .then(function (d) {
         v30ScoreState.fetchingOffset = null;
-        if (d && Array.isArray(d.items) && d.items.length > 0) {
+        v30ScoreState.isLoadingDate = false;
+        if (d && d.ok) {
           v30ScoreState.loadedDateOffset = targetOff;
-          mergeRawScoreItemsV30(d.items, true);
+          if (Array.isArray(d.date_strip) && d.date_strip.length) {
+            v30ScoreState.dateStrip = d.date_strip;
+          }
+          mergeRawScoreItemsV30(d.items || [], true);
           return;
         }
-        return fetch("/api/datacenter/live-scores?sport=all&league=all&date_offset=" + encodeURIComponent(targetOff))
-          .then(function (r2) { return r2.json(); })
-          .then(function (d2) {
-            if (d2 && Array.isArray(d2.items) && d2.items.length > 0) {
-              v30ScoreState.loadedDateOffset = targetOff;
-              mergeRawScoreItemsV30(d2.items, true);
-            }
-          });
       })
       .catch(function () {
         v30ScoreState.fetchingOffset = null;
+        v30ScoreState.isLoadingDate = false;
       });
+  }
+
+  function selectDateOffsetV31(newOff) {
+    var clamped = Math.max(-5, Math.min(5, parseInt(newOff, 10) || 0));
+    v30ScoreState.selectedDateOffset = clamped;
+    v30ScoreState.loadedDateOffset = null;
+
+    // Check if native widget.js has a matching .dc-date-btn (e.g. -1, 0, 1, 2)
+    var dtBtns = discoverTopDateButtonsV304();
+    var matchedNativeBtn = null;
+    for (var i = 0; i < dtBtns.length; i++) {
+      var b = dtBtns[i];
+      var oa = b.getAttribute("data-off");
+      var ov = (oa != null && !isNaN(parseInt(oa, 10))) ? parseInt(oa, 10) : null;
+      if (ov === null) {
+        var bt = String(b.textContent || "");
+        if (bt.indexOf("어제") !== -1) ov = -1;
+        else if (bt.indexOf("오늘") !== -1) ov = 0;
+        else if (bt.indexOf("내일") !== -1) ov = 1;
+        else if (bt.indexOf("+2") !== -1) ov = 2;
+      }
+      if (ov === clamped) {
+        matchedNativeBtn = b;
+        break;
+      }
+    }
+
+    if (matchedNativeBtn) {
+      v30ScoreState.customDateRendered = false;
+      try {
+        window.__sqInternalDateClickV31 = true;
+        matchedNativeBtn.click();
+      } finally {
+        window.__sqInternalDateClickV31 = false;
+      }
+    } else {
+      v30ScoreState.customDateRendered = true;
+    }
+
+    fetchServerScoreboardBridgeV30(clamped);
   }
 
   function installTopControlCaptureSyncV304() {
     if (window.__sqTopControlCaptureV304) return;
     window.__sqTopControlCaptureV304 = true;
 
-    // Window capture listener catches clicks on ANY of the 10 sport buttons or date buttons in 0ms!
     window.addEventListener("click", function (ev) {
+      if (window.__sqInternalDateClickV31) return;
       var t = ev.target;
       if (!t || !t.closest) return;
       var btn = t.closest("button");
       if (!btn || isExcludedSectionForTopScoreBarV304(btn)) return;
 
-      // Check if it's one of the 10 sport buttons
       var sportBtns = discoverTopSportButtonsV304();
       if (sportBtns.indexOf(btn) !== -1 || btn.hasAttribute("data-sq-v304-sport")) {
         var spKey = btn.getAttribute("data-sq-v304-sport") || parseSportKeyFromBtnV304(btn);
@@ -3194,15 +3401,15 @@ _FRONTEND_V22_JS = r'''
           v30ScoreState.selectedSport = spKey;
           v30ScoreState.selectedLeague = "all";
           recomputeScopedItemsV30();
+          if (v30ScoreState.customDateRendered) renderCustomDateCardsIntoStripV31();
           v30ScoreState.lastToolbarSig = "";
           v30ScoreState.lastTableSig = "";
           refreshScoreboardSuiteV30();
-          setTimeout(refreshScoreboardSuiteV30, 50);
+          setTimeout(refreshScoreboardSuiteV30, 55);
           return;
         }
       }
 
-      // Check if it's a date button (◀ 어제 / 오늘 · 실시간 / 내일 ▶ / +2일)
       var dtBtns = discoverTopDateButtonsV304();
       if (dtBtns.indexOf(btn) !== -1) {
         var offAttr = btn.getAttribute("data-off");
@@ -3216,6 +3423,7 @@ _FRONTEND_V22_JS = r'''
           else if (btxt.indexOf("+2") !== -1) offVal = 2;
           else offVal = 0;
         }
+        v30ScoreState.customDateRendered = false;
         v30ScoreState.selectedDateOffset = offVal;
         v30ScoreState.loadedDateOffset = null;
         fetchServerScoreboardBridgeV30(offVal);
@@ -3229,6 +3437,7 @@ _FRONTEND_V22_JS = r'''
         var rawV = String(lgSel.value || "").trim();
         v30ScoreState.selectedLeague = (!rawV || rawV.toLowerCase() === "all" || rawV.indexOf("전체") !== -1) ? "all" : rawV;
         recomputeScopedItemsV30();
+        if (v30ScoreState.customDateRendered) renderCustomDateCardsIntoStripV31();
         v30ScoreState.lastToolbarSig = "";
         v30ScoreState.lastTableSig = "";
         refreshScoreboardSuiteV30();
@@ -3240,6 +3449,7 @@ _FRONTEND_V22_JS = r'''
     if (!el || !el.tagName) return true;
     var id = el.id || "";
     if (
+      id === "sqV31DateCalendarBar" ||
       id === "sqV30ScoreToolbar" ||
       id === "sqV30ScoreboardTableWrap" ||
       id === "dcTickerControls" ||
@@ -3283,10 +3493,30 @@ _FRONTEND_V22_JS = r'''
     return direct || document.getElementById("proTickerList");
   }
 
+  // Drills down through any single-child scroll viewport/flex wrapper so individual match cards are ALWAYS returned!
+  function resolveIndividualCardElementsV31(strip) {
+    if (!strip || !strip.children) return [];
+    var cur = strip;
+    var guard = 0;
+    while (cur && cur.children && cur.children.length === 1 && guard < 4) {
+      var onlyChild = cur.children[0];
+      if (onlyChild && onlyChild.children && onlyChild.children.length >= 2 && !onlyChild.getAttribute("data-sq-v31-empty")) {
+        cur = onlyChild;
+        guard++;
+      } else {
+        break;
+      }
+    }
+    var kids = Array.prototype.slice.call(cur.children || []);
+    return kids.filter(function (el) {
+      return el && el.tagName === "DIV" && !el.getAttribute("data-sq-v31-empty") && !el.getAttribute("data-sq-v31-filter-empty");
+    });
+  }
+
   function findAllScoreStripsAndHelpersToHideV30(primaryTrack) {
     var list = [];
     function addUniq(el) {
-      if (el && list.indexOf(el) === -1 && el.id !== "sqV30ScoreToolbar" && el.id !== "sqV30ScoreboardTableWrap" && el.id !== "dcTickerControls") {
+      if (el && list.indexOf(el) === -1 && el.id !== "sqV31DateCalendarBar" && el.id !== "sqV30ScoreToolbar" && el.id !== "sqV30ScoreboardTableWrap" && el.id !== "dcTickerControls") {
         if (!el.querySelector || !el.querySelector("[data-sq-v304-sport]")) {
           list.push(el);
         }
@@ -3299,7 +3529,7 @@ _FRONTEND_V22_JS = r'''
     addUniq(legacyList);
     if (legacyList && legacyList.parentElement) {
       var lp = legacyList.parentElement;
-      if (!lp.querySelector("#dcTickerControls") && !lp.querySelector("[data-sq-v304-sport]") && !lp.querySelector("#sqV30ScoreToolbar") && !lp.querySelector("#sqV30ScoreboardTableWrap") && lp.id !== "proLiveTickerBar") {
+      if (!lp.querySelector("#dcTickerControls") && !lp.querySelector("[data-sq-v304-sport]") && !lp.querySelector("#sqV30ScoreToolbar") && !lp.querySelector("#sqV31DateCalendarBar") && !lp.querySelector("#sqV30ScoreboardTableWrap") && lp.id !== "proLiveTickerBar") {
         addUniq(lp);
       }
     }
@@ -3311,8 +3541,8 @@ _FRONTEND_V22_JS = r'''
 
     roots.forEach(function (rt) {
       Array.prototype.forEach.call(rt.querySelectorAll("div"), function (d) {
-        if (!d || d === rt || d.id === "sqV30ScoreToolbar" || d.id === "sqV30ScoreboardTableWrap" || d.id === "dcTickerControls" || d.id === "dcSportPills") return;
-        if (d.contains && (d.contains(document.getElementById("dcTickerControls")) || d.contains(document.getElementById("sqV30ScoreToolbar")) || d.contains(document.getElementById("sqV30ScoreboardTableWrap")) || (d.querySelector && d.querySelector("[data-sq-v304-sport]")))) return;
+        if (!d || d === rt || d.id === "sqV31DateCalendarBar" || d.id === "sqV30ScoreToolbar" || d.id === "sqV30ScoreboardTableWrap" || d.id === "dcTickerControls" || d.id === "dcSportPills") return;
+        if (d.contains && (d.contains(document.getElementById("dcTickerControls")) || d.contains(document.getElementById("sqV30ScoreToolbar")) || d.contains(document.getElementById("sqV31DateCalendarBar")) || d.contains(document.getElementById("sqV30ScoreboardTableWrap")) || (d.querySelector && d.querySelector("[data-sq-v304-sport]")))) return;
         var txt = String(d.textContent || "");
         if ((d.classList && d.classList.contains("sq-match-sort-bar")) || (/휠·드래그|◀\s*이전|경기\s*정렬/.test(txt) && d.children && d.children.length <= 8)) {
           addUniq(d);
@@ -3398,6 +3628,7 @@ _FRONTEND_V22_JS = r'''
   }
 
   function syncSportPillLiveDotsV30() {
+    ensureRootTickerObserverV31();
     var baseAll = v30ScoreState.rawAllItems.length ? v30ScoreState.rawAllItems : (v30ScoreState.items || []);
     var liveBySport = {};
     var totalLive = 0;
@@ -3564,6 +3795,7 @@ _FRONTEND_V22_JS = r'''
       if (
         t.closest("[data-sq-card-star='1']") ||
         t.closest("[data-sq-v304-sport]") ||
+        t.closest("#sqV31DateCalendarBar") ||
         t.closest("#sqV30ScoreToolbar") ||
         t.closest("#sqV30ScoreboardTableWrap") ||
         t.closest("#dcQuickMatchModal") ||
@@ -3572,21 +3804,22 @@ _FRONTEND_V22_JS = r'''
       ) {
         return;
       }
-      var track = findPrimaryMainCardStripV30();
+      var mainStrip = findPrimaryMainCardStripV30();
       var dcDirect = document.getElementById("dcLiveTickerTrack");
       var legacyStrip = document.getElementById("proTickerList");
-      var candidates = [track, dcDirect, legacyStrip];
+      var strips = [mainStrip, dcDirect, legacyStrip];
       var card = null;
-      for (var c = 0; c < candidates.length; c++) {
-        var st = candidates[c];
-        if (st && st.contains(t)) {
-          var cur = t;
-          while (cur && cur.parentElement !== st) cur = cur.parentElement;
-          if (cur && cur.parentElement === st) {
-            card = cur;
+      for (var c = 0; c < strips.length; c++) {
+        var st = strips[c];
+        if (!st || !st.contains(t)) continue;
+        var cardList = resolveIndividualCardElementsV31(st);
+        for (var m = 0; m < cardList.length; m++) {
+          if (cardList[m] === t || cardList[m].contains(t)) {
+            card = cardList[m];
             break;
           }
         }
+        if (card) break;
       }
       if (!card) return;
       var matched = findItemForDomCardV30(card);
@@ -3594,6 +3827,7 @@ _FRONTEND_V22_JS = r'''
       ev.preventDefault();
       ev.stopPropagation();
       if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+      hideRowHoverPreviewV31();
       var oldMd = document.getElementById("dcMatchDetailModal");
       if (oldMd) oldMd.style.display = "none";
       var oldMd2 = document.getElementById("dcMatchModal");
@@ -3603,14 +3837,22 @@ _FRONTEND_V22_JS = r'''
   }
 
   function decorateMiniScoreCardsV30() {
-    var strips = [];
     var mainTrack = findPrimaryMainCardStripV30();
-    if (mainTrack) strips.push(mainTrack);
     var leg = document.getElementById("proTickerList");
-    if (leg && strips.indexOf(leg) === -1) strips.push(leg);
+    var ctl = getActiveDcControlsV30();
+    var sf = v30ScoreState.statusFilter;
 
-    strips.forEach(function (strip, sIdx) {
-      var cards = Array.prototype.slice.call(strip.children || []);
+    var strips = [];
+    if (mainTrack) strips.push({ el: mainTrack, filterActive: true });
+    if (leg && leg !== mainTrack) strips.push({ el: leg, filterActive: (sf !== "all") });
+
+    strips.forEach(function (entry) {
+      var strip = entry.el;
+      var cards = resolveIndividualCardElementsV31(strip);
+      if (!cards.length) return;
+      var cardParent = cards[0].parentElement || strip;
+      var visibleCnt = 0;
+
       cards.forEach(function (card) {
         var it = findItemForDomCardV30(card);
         if (!it) return;
@@ -3618,22 +3860,33 @@ _FRONTEND_V22_JS = r'''
         card.setAttribute("data-sq-v30-fk", fk);
         var isFav = Boolean(v30ScoreState.favMap[fk]);
 
-        if (sIdx === 0) {
-          var sf = v30ScoreState.statusFilter;
+        if (entry.filterActive) {
           var show = true;
-          if (sf === "live") show = it.state === "in";
-          else if (sf === "pre") show = it.state === "pre";
-          else if (sf === "post") show = it.state === "post";
-          else if (sf === "fav") show = isFav;
+          if (ctl.sport !== "all" && it.sport !== ctl.sport) show = false;
+          if (ctl.league !== "all") {
+            var lu = ctl.league.toUpperCase();
+            if (String(it.league_code || "").toUpperCase() !== lu && String(it.league || "").toUpperCase() !== lu) {
+              show = false;
+            }
+          }
           if (show) {
-            card.removeAttribute("data-sq-v30-card-filtered");
+            if (sf === "live") show = (it.state === "in");
+            else if (sf === "pre") show = (it.state === "pre");
+            else if (sf === "post") show = (it.state === "post");
+            else if (sf === "fav") show = isFav;
+          }
+          if (show) {
+            visibleCnt++;
+            card.removeAttribute("data-sq-v31-card-hidden");
             if (card.style.getPropertyValue("display") === "none") {
               card.style.removeProperty("display");
             }
           } else {
-            card.setAttribute("data-sq-v30-card-filtered", "1");
+            card.setAttribute("data-sq-v31-card-hidden", "1");
             card.style.setProperty("display", "none", "important");
           }
+        } else {
+          visibleCnt++;
         }
 
         var topRow = card.firstElementChild;
@@ -3662,7 +3915,94 @@ _FRONTEND_V22_JS = r'''
           if (vWrap.firstChild) botRow.appendChild(vWrap.firstChild);
         }
       });
+
+      // Clean empty-state notice inside main card strip when 0 cards match the active status filter
+      if (entry.el === mainTrack) {
+        var oldEmpty = cardParent.querySelector("[data-sq-v31-filter-empty='1']");
+        if (visibleCnt === 0 && sf !== "all") {
+          if (!oldEmpty) {
+            oldEmpty = document.createElement("div");
+            oldEmpty.setAttribute("data-sq-v31-filter-empty", "1");
+            oldEmpty.style.cssText = "padding:14px 18px;color:#94a3b8;font-size:12.5px;background:rgba(15,23,42,.75);border:1px dashed #334155;border-radius:11px;width:100%;text-align:center;";
+            cardParent.appendChild(oldEmpty);
+          }
+          oldEmpty.textContent = "현재 선택한 상태 필터에 해당하는 카드가 없습니다. '전체' 필터를 누르면 모든 카드를 다시 볼 수 있습니다.";
+        } else if (oldEmpty && oldEmpty.parentNode) {
+          oldEmpty.parentNode.removeChild(oldEmpty);
+        }
+      }
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // v3.1 Hover Mini-Stat & Value-Edge Tooltip for Scoreboard Table Rows
+  // -------------------------------------------------------------------------
+  function ensureRowHoverPreviewElV31() {
+    var tip = document.getElementById("sqV31RowHoverPreview");
+    if (!tip) {
+      tip = document.createElement("div");
+      tip.id = "sqV31RowHoverPreview";
+      document.body.appendChild(tip);
+      window.addEventListener("scroll", hideRowHoverPreviewV31, { passive: true });
+    }
+    return tip;
+  }
+
+  function hideRowHoverPreviewV31() {
+    var tip = document.getElementById("sqV31RowHoverPreview");
+    if (tip) tip.style.display = "none";
+  }
+
+  function showRowHoverPreviewV31(it, anchorTr, clientX, clientY) {
+    if (!it || !anchorTr) return;
+    var tip = ensureRowHoverPreviewElV31();
+    var ai = it.ai || {};
+    var odds = ai.odds || {};
+    var hp = Number(ai.home_pct || 45);
+    var dp = Number(ai.draw_pct || 0);
+    var ap = Number(ai.away_pct || (100 - hp - dp));
+
+    var oh = parseFloat(odds.home) || 0;
+    var od = parseFloat(odds.draw) || 0;
+    var oa = parseFloat(odds.away) || 0;
+    var invSum = (oh > 0 ? 1 / oh : 0) + (od > 0 ? 1 / od : 0) + (oa > 0 ? 1 / oa : 0);
+    var mktH = invSum > 0 && oh > 0 ? Math.round(((1 / oh) / invSum) * 1000) / 10 : hp;
+    var mktA = invSum > 0 && oa > 0 ? Math.round(((1 / oa) / invSum) * 1000) / 10 : ap;
+    var edgeH = Math.round((hp - mktH) * 10) / 10;
+    var edgeA = Math.round((ap - mktA) * 10) / 10;
+    var bestSide = Math.abs(edgeH) >= Math.abs(edgeA) ? it.home : it.away;
+    var bestEdge = Math.abs(edgeH) >= Math.abs(edgeA) ? edgeH : edgeA;
+    var verdict = evaluateAiVerdictV30(it);
+
+    var domH = Math.max(22, Math.min(78, Math.round(hp + (dp * 0.5))));
+    var domA = 100 - domH;
+
+    tip.innerHTML = [
+      "<div style='display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:5px;'>",
+      "  <span style='font-weight:800;color:#7dd3fc;font-size:11.5px;'>" + sportEmojiV30(it.sport) + " " + uxEsc(it.league_full || it.league) + "</span>",
+      "  <span style='color:#fde68a;font-size:10.5px;font-weight:700;'>" + uxEsc(it.match_dt_full_kst || it.match_dt_kst || it.status_badge) + "</span>",
+      "</div>",
+      "<div style='font-weight:900;font-size:13px;color:#f8fafc;margin-bottom:5px;'>" + uxEsc(it.home) + " <span style='color:#38bdf8;'>" + (it.state === "pre" ? "vs" : (it.home_score + " : " + it.away_score)) + "</span> " + uxEsc(it.away) + (verdict ? " " + verdict.badgeHtml : "") + "</div>",
+      "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:6px 8px;margin-bottom:6px;color:#cbd5e1;font-size:11px;'>",
+      "  <div>📊 <strong>세부 흐름:</strong> " + uxEsc(it.period_scores || (it.state === "pre" ? "킥오프 전 프리뷰 · 예상 주도권 " + domH + "% : " + domA + "%" : "실시간 스코어 집계 완료")) + "</div>",
+      (it.venue ? "  <div style='color:#94a3b8;margin-top:2px;'>🏟️ 구장: " + uxEsc(it.venue) + "</div>" : ""),
+      "  <div style='margin-top:2px;'>💎 <strong>AI·시장 격차:</strong> " + uxEsc(bestSide) + " <span style='color:" + (bestEdge >= 0 ? "#34d399" : "#fbbf24") + ";font-weight:800;'>" + (bestEdge >= 0 ? "+" : "") + bestEdge + "%p</span> (AI " + hp + "%" + (dp > 0 ? "/" + dp + "%" : "") + "/" + ap + "%)</div>",
+      "</div>",
+      "<div style='color:#6ee7b7;font-size:10.5px;font-weight:700;'>👆 클릭 시 5탭 전술·순위·라인업 상세 및 +15P 분석글 바로쓰기</div>"
+    ].join("");
+
+    tip.style.display = "block";
+    var rect = anchorTr.getBoundingClientRect();
+    var vw = window.innerWidth || 1280;
+    var vh = window.innerHeight || 800;
+    var tipW = tip.offsetWidth || 312;
+    var tipH = tip.offsetHeight || 145;
+    var left = (typeof clientX === "number" && clientX > 0) ? (clientX + 14) : (rect.left + 80);
+    if (left + tipW + 12 > vw) left = Math.max(12, vw - tipW - 14);
+    var top = rect.bottom + 6;
+    if (top + tipH + 12 > vh) top = Math.max(12, rect.top - tipH - 8);
+    tip.style.left = Math.round(left) + "px";
+    tip.style.top = Math.round(top) + "px";
   }
 
   function renderScoreboardTableV30(allItems) {
@@ -3673,6 +4013,7 @@ _FRONTEND_V22_JS = r'''
     var hideTargets = findAllScoreStripsAndHelpersToHideV30(primaryTrack);
 
     if (!isTable) {
+      hideRowHoverPreviewV31();
       wrap.removeAttribute("data-sq-open");
       wrap.style.display = "none";
       document.querySelectorAll("[data-sq-v30-hide-strip='1']").forEach(function (el) {
@@ -3701,14 +4042,14 @@ _FRONTEND_V22_JS = r'''
     var filtered = filterScoreItemsV30(allItems || []);
     var favKeysSig = Object.keys(v30ScoreState.favMap || {}).sort().join(",");
     var itemsSig = filtered.map(function (x) { return matchFavKeyV30(x) + ":" + x.state + ":" + x.home_score + "-" + x.away_score; }).join("|");
-    var nextSig = [v30ScoreState.viewMode, v30ScoreState.statusFilter, v30ScoreState.selectedSport, v30ScoreState.selectedLeague, favKeysSig, itemsSig].join("||");
+    var nextSig = [v30ScoreState.viewMode, v30ScoreState.statusFilter, v30ScoreState.selectedSport, v30ScoreState.selectedLeague, v30ScoreState.selectedDateOffset, favKeysSig, itemsSig].join("||");
     if (v30ScoreState.lastTableSig === nextSig && wrap.children.length > 0) {
       return;
     }
     v30ScoreState.lastTableSig = nextSig;
 
     if (!filtered.length) {
-      wrap.innerHTML = "<div style='padding:22px;text-align:center;color:#94a3b8;font-size:12.8px;'>선택한 조건에 해당하는 경기가 없습니다. 다른 상태·종목 필터를 선택해 보세요.</div>";
+      wrap.innerHTML = "<div style='padding:22px;text-align:center;color:#94a3b8;font-size:12.8px;'>선택한 날짜·조건에 해당하는 경기가 없습니다. 위 ±5일 날짜 바 또는 다른 상태·종목 필터를 선택해 보세요.</div>";
       return;
     }
 
@@ -3829,6 +4170,7 @@ _FRONTEND_V22_JS = r'''
     if (!wrap.__sqDelegatedV30) {
       wrap.__sqDelegatedV30 = true;
       wrap.addEventListener("click", function (ev) {
+        hideRowHoverPreviewV31();
         var t = ev.target;
         if (!t || !t.closest) return;
         var favBtn = t.closest("[data-sq-fav-key]");
@@ -3849,6 +4191,78 @@ _FRONTEND_V22_JS = r'''
           var pool = (v30ScoreState.rawAllItems && v30ScoreState.rawAllItems.length) ? v30ScoreState.rawAllItems : (v30ScoreState.items || []);
           var found = pool.find(function (x) { return x && matchFavKeyV30(x) === rowFk; });
           if (found) openMatchInsightModalByItemV30(found);
+        }
+      });
+
+      wrap.addEventListener("mouseover", function (ev) {
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var tr = t.closest(".sq-v30-match-row");
+        if (!tr) {
+          hideRowHoverPreviewV31();
+          return;
+        }
+        var rowFk = tr.getAttribute("data-sq-row-fk") || "";
+        var pool = (v30ScoreState.rawAllItems && v30ScoreState.rawAllItems.length) ? v30ScoreState.rawAllItems : (v30ScoreState.items || []);
+        var found = pool.find(function (x) { return x && matchFavKeyV30(x) === rowFk; });
+        if (found) showRowHoverPreviewV31(found, tr, ev.clientX, ev.clientY);
+      });
+
+      wrap.addEventListener("mouseleave", hideRowHoverPreviewV31);
+    }
+  }
+
+  function mountOrUpdateV31DateCalendarBar(anchorBar) {
+    if (!anchorBar || !anchorBar.parentElement) return;
+    var cal = document.getElementById("sqV31DateCalendarBar");
+    if (!cal) {
+      cal = document.createElement("div");
+      cal.id = "sqV31DateCalendarBar";
+      anchorBar.parentElement.insertBefore(cal, anchorBar);
+    }
+    var curOff = v30ScoreState.selectedDateOffset || 0;
+    var strip = (Array.isArray(v30ScoreState.dateStrip) && v30ScoreState.dateStrip.length === 11)
+      ? v30ScoreState.dateStrip
+      : buildClientDateStripV31(curOff);
+    var calSig = curOff + "|" + (v30ScoreState.isLoadingDate ? "1" : "0") + "|" + (strip[0] ? strip[0].mmdd : "");
+    if (v30ScoreState.lastCalSig === calSig && cal.children.length > 0) return;
+    v30ScoreState.lastCalSig = calSig;
+
+    var pillsHtml = strip.map(function (d) {
+      var isAct = (d.offset === curOff);
+      var cls = "sq-v31-cal-btn" + (isAct ? " active" : "") + (!isAct && d.is_sat ? " is-sat" : "") + (!isAct && d.is_sun ? " is-sun" : "");
+      var label = d.is_today
+        ? ("📅 오늘 " + uxEsc(d.mmdd) + "(" + uxEsc(d.wd) + ")")
+        : (uxEsc(d.mmdd) + "(" + uxEsc(d.wd) + ")" + (d.rel ? "·" + uxEsc(d.rel) : ""));
+      return "<button type='button' class='" + cls + "' data-v31-cal-off='" + d.offset + "'>" + label + "</button>";
+    }).join("");
+
+    cal.innerHTML = (
+      "<button type='button' class='sq-v31-cal-btn' data-v31-cal-step='-1' title='이전 날짜'" + (curOff <= -5 ? " disabled style='opacity:.4;cursor:default;'" : "") + ">◀</button>" +
+      pillsHtml +
+      "<button type='button' class='sq-v31-cal-btn' data-v31-cal-step='1' title='다음 날짜'" + (curOff >= 5 ? " disabled style='opacity:.4;cursor:default;'" : "") + ">▶</button>" +
+      (curOff !== 0 ? "<button type='button' class='sq-v31-cal-btn' data-v31-cal-off='0' style='border-color:#38bdf8;color:#7dd3fc;'>오늘로 ↺</button>" : "") +
+      (v30ScoreState.isLoadingDate ? "<span style='font-size:11px;color:#6ee7b7;font-weight:800;margin-left:4px;white-space:nowrap;'>⏳ 일정 불러오는 중...</span>" : "")
+    );
+
+    if (!cal.__sqCalDelegatedV31) {
+      cal.__sqCalDelegatedV31 = true;
+      cal.addEventListener("click", function (ev) {
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var offBtn = t.closest("[data-v31-cal-off]");
+        if (offBtn) {
+          var nextOff = parseInt(offBtn.getAttribute("data-v31-cal-off") || "0", 10);
+          selectDateOffsetV31(isNaN(nextOff) ? 0 : nextOff);
+          return;
+        }
+        var stepBtn = t.closest("[data-v31-cal-step]");
+        if (stepBtn) {
+          var delta = parseInt(stepBtn.getAttribute("data-v31-cal-step") || "0", 10);
+          var target = Math.max(-5, Math.min(5, (v30ScoreState.selectedDateOffset || 0) + delta));
+          if (target !== v30ScoreState.selectedDateOffset) {
+            selectDateOffsetV31(target);
+          }
         }
       });
     }
@@ -3879,6 +4293,8 @@ _FRONTEND_V22_JS = r'''
         track.parentElement.insertBefore(bar, track);
       }
     }
+    mountOrUpdateV31DateCalendarBar(bar);
+
     var wrap = document.getElementById("sqV30ScoreboardTableWrap");
     if (!wrap) {
       wrap = document.createElement("div");
@@ -3894,7 +4310,7 @@ _FRONTEND_V22_JS = r'''
 
     var sf = v30ScoreState.statusFilter;
     var vm = v30ScoreState.viewMode;
-    var tbSig = [cntAll, cntLive, cntPre, cntPost, cntFav, sf, vm, v30ScoreState.selectedSport, v30ScoreState.selectedLeague].join("|");
+    var tbSig = [cntAll, cntLive, cntPre, cntPost, cntFav, sf, vm, v30ScoreState.selectedSport, v30ScoreState.selectedLeague, v30ScoreState.selectedDateOffset].join("|");
     if (v30ScoreState.lastToolbarSig === tbSig && bar.children.length > 0) {
       return;
     }
@@ -3940,6 +4356,7 @@ _FRONTEND_V22_JS = r'''
   }
 
   function refreshScoreboardSuiteV30() {
+    ensureRootTickerObserverV31();
     installTopControlCaptureSyncV304();
     fetchServerScoreboardBridgeV30();
     var items = recomputeScopedItemsV30();
@@ -3950,6 +4367,7 @@ _FRONTEND_V22_JS = r'''
 
   function openMatchInsightModalByItemV30(it) {
     if (!it) return;
+    hideRowHoverPreviewV31();
     var oldMd = document.getElementById("dcMatchDetailModal");
     if (oldMd) oldMd.style.display = "none";
     var oldMd2 = document.getElementById("dcMatchModal");
@@ -4253,6 +4671,7 @@ _FRONTEND_V22_JS = r'''
     installLiveScoresFetchTapV30();
     installTopControlCaptureSyncV304();
     installGlobalCardClickCaptureV30();
+    ensureRootTickerObserverV31();
     window.__openDcScorePopup = function (idx) {
       var items = v30ScoreState.items || window.__dcLatestScoreItems || [];
       var it = items[idx];
@@ -4324,8 +4743,10 @@ _FRONTEND_V22_JS = r'''
     });
 
     // Keep dynamic UI states synchronized when tabs switch or async data arrives
-    [120, 400, 900, 1600].forEach(function (ms) {
+    [80, 220, 500, 1000, 1800].forEach(function (ms) {
       setTimeout(function () {
+        refreshScoreboardSuiteV30();
+        syncSportPillLiveDotsV30();
         enforceSingleLineMainTabBar();
         harmonizeMobileFloatingOverlaysV26();
         installDataCenterPersistenceGuardV28();
@@ -4407,7 +4828,7 @@ def _ensure_upgrade_js_dedup_patched() -> bool:
     # Prevent HYBRID_SEED_GUARD_V17_JS (L7773) from treating <div id="feedList"> inside #tab-feed as a match seed card and setting display:none!
     updated = updated.replace(
         'if (container.id === "feedList" || container.id === "dcLauncherGrid" || container.id === "globalTop10Grid") return;',
-        'if (container.id === "feedList" || container.id === "tab-feed" || container.id === "dcLauncherGrid" || container.id === "dcLaunchCards" || container.id === "dcHubBody" || container.id === "sqV30ScoreToolbar" || container.id === "sqV30ScoreboardTableWrap" || container.id === "dcHubCollapsible" || container.id === "dcMainHubSection" || container.id === "tab-datacenter" || container.id === "globalTop10Grid" || (container.querySelector && (container.querySelector("#feedList") || container.querySelector("#dcHubBody") || container.querySelector("#dcLauncherGrid"))) || (container.closest && container.closest("#tab-feed, #dcMainHubSection, #dcHubCollapsible, #dcHubBody, #dcLauncherGrid, #sqV30ScoreToolbar, #sqV30ScoreboardTableWrap, #dcLaunchCards, #tab-datacenter"))) return;',
+        'if (container.id === "feedList" || container.id === "tab-feed" || container.id === "dcLauncherGrid" || container.id === "dcLaunchCards" || container.id === "dcHubBody" || container.id === "sqV30ScoreToolbar" || container.id === "sqV30ScoreboardTableWrap" || container.id === "dcHubCollapsible" || container.id === "dcMainHubSection" || container.id === "tab-datacenter" || container.id === "globalTop10Grid" || (container.querySelector && (container.querySelector("#feedList") || container.querySelector("#dcHubBody") || container.querySelector("#dcLauncherGrid"))) || (container.closest && container.closest("#tab-feed, #dcMainHubSection, #dcHubCollapsible, #dcHubBody, #dcLauncherGrid, #sqV31DateCalendarBar, #sqV31DateCalendarBar, #sqV30ScoreToolbar, #sqV30ScoreboardTableWrap, #dcLaunchCards, #tab-datacenter"))) return;',
     )
     updated = updated.replace(
         'art.style.display = (matchTab && matchSearch) ? "" : "none";',
@@ -5912,6 +6333,8 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -6086,7 +6509,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3040_{int(time.time())}"
+_BOOT_VER_V30 = f"3100_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -7497,28 +7920,95 @@ def serve_hardened_robots_txt_v27():
     return Response(content=txt, media_type="text/plain; charset=utf-8")
 
 
+_V31_EXT_SCORE_CACHE: Dict[int, Tuple[float, List[Dict[str, Any]]]] = {}
+
+
+def _build_date_strip_v31(active_offset: int) -> List[Dict[str, Any]]:
+    now_k = datetime.now(KST)
+    wd_names = ["월", "화", "수", "목", "금", "토", "일"]
+    strip: List[Dict[str, Any]] = []
+    for off in range(-5, 6):
+        dt = now_k + timedelta(days=off)
+        w = wd_names[dt.weekday()]
+        rel = "오늘" if off == 0 else ("어제" if off == -1 else ("내일" if off == 1 else ""))
+        strip.append({
+            "offset": off,
+            "mmdd": f"{dt.month:02d}.{dt.day:02d}",
+            "wd": w,
+            "rel": rel,
+            "is_today": off == 0,
+            "is_sat": dt.weekday() == 5,
+            "is_sun": dt.weekday() == 6,
+            "active": off == active_offset,
+        })
+    return strip
+
+
 @router.get("/api/member/scoreboard-v30")
 def api_member_scoreboard_v30(date_offset: int = 0):
-    """Direct server-side bridge to sportiq_datacenter returning all 10-sport matches normalized for v3.0 scoreboard & modal."""
-    date_offset = max(-3, min(7, int(date_offset)))
+    """Direct server-side bridge to sportiq_datacenter supporting full -5..+5 KST calendar & normalized 10-sport matches."""
+    date_offset = max(-5, min(5, int(date_offset)))
+    now_k = datetime.now(KST)
+    wd_names = ["월", "화", "수", "목", "금", "토", "일"]
+    target_k = now_k + timedelta(days=date_offset)
+    target_date_kst = f"{target_k.year}.{target_k.month:02d}.{target_k.day:02d} ({wd_names[target_k.weekday()]})"
+    server_now_kst = f"{now_k.year}.{now_k.month:02d}.{now_k.day:02d} ({wd_names[now_k.weekday()]}) {now_k.hour:02d}:{now_k.minute:02d}:{now_k.second:02d} KST"
     raw_items: List[Dict[str, Any]] = []
-    target_date_kst = ""
-    server_now_kst = ""
+
     try:
         from app import sportiq_datacenter as _dc
-        collect_dict = getattr(_dc, "collect_live_scores", None)
-        collect_all = getattr(_dc, "_collect_all_matches", None)
-        if callable(collect_dict):
-            d_res = collect_dict(date_offset)
-            if isinstance(d_res, dict):
-                target_date_kst = str(d_res.get("target_date_kst") or "")
-                server_now_kst = str(d_res.get("server_now_kst") or "")
-                if isinstance(d_res.get("items"), list):
-                    raw_items = list(d_res["items"])
-        if not raw_items and callable(collect_all):
-            a_res = collect_all(date_offset)
-            if isinstance(a_res, list):
-                raw_items = list(a_res)
+        # Standard -3..+5 offsets use sportiq_datacenter's native collector directly
+        if date_offset >= -3:
+            collect_dict = getattr(_dc, "collect_live_scores", None)
+            collect_all = getattr(_dc, "_collect_all_matches", None)
+            if callable(collect_dict):
+                d_res = collect_dict(date_offset)
+                if isinstance(d_res, dict):
+                    target_date_kst = str(d_res.get("target_date_kst") or target_date_kst)
+                    server_now_kst = str(d_res.get("server_now_kst") or server_now_kst)
+                    if isinstance(d_res.get("items"), list):
+                        raw_items = list(d_res["items"])
+            if not raw_items and callable(collect_all):
+                a_res = collect_all(date_offset)
+                if isinstance(a_res, list):
+                    raw_items = list(a_res)
+        else:
+            # True KST lookup for -5 and -4 (bypassing collect_live_scores's -3 floor)
+            cached = _V31_EXT_SCORE_CACHE.get(date_offset)
+            if cached and (time.time() - cached[0]) < 300.0:
+                raw_items = list(cached[1])
+            else:
+                fetch_espn = getattr(_dc, "_fetch_espn_sb", None)
+                reg_fn = getattr(_dc, "_regional_games", None)
+                lg_reg = getattr(_dc, "LEAGUE_REGISTRY", [])
+                espn_lgs = [x for x in lg_reg if isinstance(x, dict) and x.get("espn")]
+                d1 = target_k.strftime("%Y%m%d")
+                d0 = (target_k - timedelta(days=1)).strftime("%Y%m%d")
+                pref = f"{target_k.month:02d}.{target_k.day:02d}"
+                seen_ids: Set[str] = set()
+                if callable(fetch_espn) and espn_lgs:
+                    tasks = [(lg, d0) for lg in espn_lgs] + [(lg, d1) for lg in espn_lgs]
+                    with ThreadPoolExecutor(max_workers=8) as pool:
+                        futs = [pool.submit(fetch_espn, lg, dp, False) for lg, dp in tasks]
+                        for fut in futs:
+                            try:
+                                for it in fut.result(timeout=5.0):
+                                    mid = str(it.get("id") or "")
+                                    if mid and mid not in seen_ids and str(it.get("match_dt_kst") or "").startswith(pref):
+                                        seen_ids.add(mid)
+                                        raw_items.append(it)
+                            except Exception:
+                                continue
+                if callable(reg_fn):
+                    try:
+                        for rg in reg_fn(target_k):
+                            mid = str(rg.get("id") or "")
+                            if mid not in seen_ids:
+                                seen_ids.add(mid)
+                                raw_items.append(rg)
+                    except Exception:
+                        pass
+                _V31_EXT_SCORE_CACHE[date_offset] = (time.time(), list(raw_items))
     except Exception:
         raw_items = []
 
@@ -7527,10 +8017,10 @@ def api_member_scoreboard_v30(date_offset: int = 0):
         "date_offset": date_offset,
         "target_date_kst": target_date_kst,
         "server_now_kst": server_now_kst,
+        "date_strip": _build_date_strip_v31(date_offset),
         "total": len(raw_items),
         "items": raw_items,
     }
-
 
 @router.api_route("/sitemap.xml", methods=["GET", "HEAD"])
 def serve_enriched_sitemap_xml_v27():
