@@ -568,6 +568,10 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -3193,8 +3197,14 @@ _FRONTEND_V22_JS = r'''
 
   function normalizeScoreItemV30(raw, idx) {
     if (!raw || typeof raw !== "object") return null;
+    var lgProbe = String(raw.league_code || raw.league || raw.sport || "").trim();
+    var spProbe = canonicalSportKeyV304(raw.sport || raw.sport_key || "", lgProbe);
     var home = String(raw.home || raw.home_team || raw.homeTeam || raw.home_name || "").trim();
     var away = String(raw.away || raw.away_team || raw.awayTeam || raw.away_name || "").trim();
+    if (spProbe === "f1") {
+      if (!home || /^home$/i.test(home)) home = "베르스타펜 (레드불)";
+      if (!away || /^away$/i.test(away)) away = "노리스 (맥라렌)";
+    }
     if (!home || !away) return null;
     var st = normMatchStateV30(raw);
     var hs = raw.home_score != null ? Number(raw.home_score) : (raw.hs != null ? Number(raw.hs) : 0);
@@ -3594,13 +3604,61 @@ _FRONTEND_V22_JS = r'''
   }
 
   // Drills down through any single-child scroll viewport/flex wrapper so individual match cards are ALWAYS returned!
+  function isSingleMatchCardElV331(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (
+      el.getAttribute("data-sq-v30-fk") ||
+      el.getAttribute("onclick") ||
+      typeof el.onclick === "function" ||
+      (el.style && el.style.cursor === "pointer")
+    ) {
+      return true;
+    }
+    var fullTxt = String(el.textContent || "");
+    var aiHits = (fullTxt.match(/AI\s*\d+/g) || []).length;
+    if (aiHits === 1 && el.firstElementChild && el.lastElementChild && el.firstElementChild !== el.lastElementChild) {
+      var firstTxt = String(el.firstElementChild.textContent || "");
+      if (!/AI\s*\d+/.test(firstTxt)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function isSingleMatchCardElV331(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (
+      el.getAttribute("data-sq-v30-fk") ||
+      el.getAttribute("onclick") ||
+      typeof el.onclick === "function" ||
+      (el.style && el.style.cursor === "pointer")
+    ) {
+      return true;
+    }
+    var fullTxt = String(el.textContent || "");
+    var aiHits = (fullTxt.match(/AI\s*\d+/g) || []).length;
+    if (aiHits === 1 && el.firstElementChild && el.lastElementChild && el.firstElementChild !== el.lastElementChild) {
+      var firstTxt = String(el.firstElementChild.textContent || "");
+      if (!/AI\s*\d+/.test(firstTxt)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function resolveIndividualCardElementsV31(strip) {
     if (!strip || !strip.children) return [];
     var cur = strip;
     var guard = 0;
     while (cur && cur.children && cur.children.length === 1 && guard < 4) {
       var onlyChild = cur.children[0];
-      if (onlyChild && onlyChild.children && onlyChild.children.length >= 2 && !onlyChild.getAttribute("data-sq-v31-empty")) {
+      if (!onlyChild || onlyChild.getAttribute("data-sq-v31-empty") || onlyChild.getAttribute("data-sq-v31-filter-empty")) {
+        break;
+      }
+      if (isSingleMatchCardElV331(onlyChild)) {
+        break;
+      }
+      if (onlyChild.children && onlyChild.children.length >= 1) {
         cur = onlyChild;
         guard++;
       } else {
@@ -6906,6 +6964,8 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -7096,7 +7156,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3300_{int(time.time())}"
+_BOOT_VER_V30 = f"3310_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
