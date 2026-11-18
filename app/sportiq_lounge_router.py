@@ -584,6 +584,18 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -3238,6 +3250,14 @@ _FRONTEND_V22_JS = r'''
     };
   }
   installDomesticBballFetchBridgeV341();
+  setTimeout(function () {
+    if (window.__sqBootCardResyncedV342) return;
+    window.__sqBootCardResyncedV342 = true;
+    var actPill = document.querySelector("#dcSportPills .dc-pill.active, #dcSportPills button.active");
+    if (actPill) {
+      try { actPill.click(); } catch (e) {}
+    }
+  }, 260);
 
   // v3.4 Ensure KBL & WKBL appear in top #dcTickerLeagueSel AND DataCenter #dcHubBody league pill bars
   function ensureDomesticBasketballUiControlsV34() {
@@ -3279,7 +3299,7 @@ _FRONTEND_V22_JS = r'''
         var bt = String(btns[b].textContent || "").trim();
         if (bt === "NBA" && btns[b].parentElement && !btns[b].parentElement.querySelector("[data-sq-dc-lg='KBL']")) {
           var bar = btns[b].parentElement;
-          ["KBL", "WKBL"].forEach(function (code) {
+          ["WKBL", "KBL"].forEach(function (code) {
             var nb = btns[b].cloneNode(true);
             nb.textContent = code;
             nb.classList.remove("active");
@@ -4015,7 +4035,7 @@ _FRONTEND_V22_JS = r'''
       sportBtns.forEach(function (btn) {
         var sp = btn.getAttribute("data-sq-v304-sport") || parseSportKeyFromBtnV304(btn);
         if (!sp) return;
-        if (v30ScoreState.selectedOffset === 0 && baseAll.length > 0) {
+        if ((v30ScoreState.dateOffset || 0) === 0 && baseAll.length > 0) {
           var wantTot = sp === "all" ? baseAll.length : (totalBySport[sp] || 0);
           if (wantTot > 0 && btn.firstChild && btn.firstChild.nodeType === 3) {
             var replaced = btn.firstChild.nodeValue.replace(/\(\d+\)/, "(" + wantTot + ")");
@@ -7197,6 +7217,12 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
+
+
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -7387,7 +7413,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3410_{int(time.time())}"
+_BOOT_VER_V30 = f"3420_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -9064,126 +9090,8 @@ def _build_domestic_bball_games_v34(target_dt: datetime) -> List[Dict[str, Any]]
 
 
 def _ensure_domestic_basketball_v34() -> None:
-    try:
-        from app import sportiq_datacenter as _dc
-    except Exception:
-        return
-    if getattr(_dc, "_sq_v34_kbl_patched", False):
-        return
-
-    # 1. Register KBL & WKBL into LEAGUE_REGISTRY (right after NBA/WNBA) and LEAGUE_MAP
-    reg = getattr(_dc, "LEAGUE_REGISTRY", None)
-    lmap = getattr(_dc, "LEAGUE_MAP", None)
-    new_entries = [
-        {"code": "KBL", "name": "KBL", "full": "KBL 남자프로농구", "sport": "basketball", "espn": "", "games": 54},
-        {"code": "WKBL", "name": "WKBL", "full": "WKBL 여자프로농구", "sport": "basketball", "espn": "", "games": 35},
-    ]
-    if isinstance(reg, list):
-        existing_codes = {str(x.get("code", "")).upper() for x in reg if isinstance(x, dict)}
-        ins_idx = next((i + 1 for i, x in enumerate(reg) if isinstance(x, dict) and x.get("code") in ("WNBA", "NBA")), len(reg))
-        for ent in reversed(new_entries):
-            if ent["code"] not in existing_codes:
-                reg.insert(ins_idx, ent)
-    if isinstance(lmap, dict):
-        for ent in new_entries:
-            lmap[ent["code"]] = ent
-
-    # 2. Register KBL & WKBL standings and leaders
-    fb_st = getattr(_dc, "_FB_STANDINGS", None)
-    if isinstance(fb_st, dict):
-        fb_st["KBL"] = list(_KBL_STANDINGS_V34)
-        fb_st["WKBL"] = list(_WKBL_STANDINGS_V34)
-    ld_map = getattr(_dc, "_LEADERS", None)
-    if isinstance(ld_map, dict):
-        ld_map["KBL"] = _KBL_WKBL_LEADERS_V34["KBL"]
-        ld_map["WKBL"] = _KBL_WKBL_LEADERS_V34["WKBL"]
-
-    # 3. Wrap _regional_games AND collect_live_scores so BOTH /api/datacenter/live-scores and /api/member/scoreboard-v30 include KBL & WKBL!
-    orig_reg_fn = getattr(_dc, "_regional_games", None)
-    if callable(orig_reg_fn):
-        def _wrapped_regional_games_v34(target_dt: datetime):
-            base = list(orig_reg_fn(target_dt) or [])
-            seen_ids = {str(x.get("id") or "") for x in base if isinstance(x, dict)}
-            for g in _build_domestic_bball_games_v34(target_dt):
-                if g["id"] not in seen_ids:
-                    seen_ids.add(g["id"])
-                    base.append(g)
-            return base
-        _dc._regional_games = _wrapped_regional_games_v34
-
-    orig_collect = getattr(_dc, "collect_live_scores", None)
-    if callable(orig_collect):
-        def _wrapped_collect_live_scores_v34(date_offset: int = 0):
-            res = orig_collect(date_offset)
-            if not isinstance(res, dict) or not isinstance(res.get("items"), list):
-                return res
-            target_dt = datetime.now(KST) + timedelta(days=max(-5, min(7, int(date_offset))))
-            dom_games = _build_domestic_bball_games_v34(target_dt)
-            by_id = {str(x.get("id") or ""): idx for idx, x in enumerate(res["items"]) if isinstance(x, dict)}
-            items = list(res["items"])
-            for dg in dom_games:
-                if dg["id"] in by_id:
-                    items[by_id[dg["id"]]] = dg  # Refresh live quarter clock & score dynamically!
-                else:
-                    items.append(dg)
-            order = {"in": 0, "pre": 1, "post": 2}
-            items.sort(key=lambda x: (order.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
-            counts = dict(res.get("counts") or {})
-            counts["all"] = len(items)
-            counts["live"] = sum(1 for x in items if x.get("state") == "in")
-            for sp_k in set([str(x.get("sport") or "") for x in items if x.get("sport")] + ["basketball"]):
-                counts[sp_k] = sum(1 for x in items if x.get("sport") == sp_k)
-            lgs_sup = list(res.get("leagues_supported") or [])
-            sup_codes = {str(x.get("code") or "").upper() for x in lgs_sup if isinstance(x, dict)}
-            for ent in new_entries:
-                if ent["code"] not in sup_codes:
-                    lgs_sup.append({"code": ent["code"], "name": ent["name"], "sport": ent["sport"]})
-            return {**res, "items": items, "counts": counts, "leagues_supported": lgs_sup}
-        _dc.collect_live_scores = _wrapped_collect_live_scores_v34
-
-    # 4. Wrap get_injuries so KBL & WKBL return domestic basketball injury/roster trackers instead of EPL fallback
-    orig_inj = getattr(_dc, "get_injuries", None)
-    if callable(orig_inj):
-        def _wrapped_get_injuries_v34(league_code: str = "EPL", severity: str = "all", q: str = ""):
-            cu = str(league_code or "").upper()
-            if cu in _KBL_WKBL_INJURIES_V34:
-                items = list(_KBL_WKBL_INJURIES_V34[cu])
-                st_teams = [r[0] for r in (_KBL_STANDINGS_V34 if cu == "KBL" else _WKBL_STANDINGS_V34)]
-                tc: Dict[str, int] = {}
-                for x in items:
-                    tc[x["team"]] = tc.get(x["team"], 0) + 1
-                hard = [f"{t} ({c}명)" for t, c in sorted(tc.items(), key=lambda v: -v[1])[:3]]
-                full_sq = [t for t in st_teams if tc.get(t, 0) == 0][:4]
-                flt = [
-                    x for x in items
-                    if (severity == "all" or x["severity"] == severity)
-                    and (not q or q.lower() in f"{x['player']} {x['team']} {x['reason']}".lower())
-                ]
-                now_s = datetime.now(KST).strftime("%Y.%m.%d (%a) %H:%M:%S KST")
-                return {
-                    "ok": True,
-                    "league": cu,
-                    "league_name": "KBL 남자프로농구" if cu == "KBL" else "WKBL 여자프로농구",
-                    "source": "SportIQ KBL·WKBL 데일리 로스터 트래커",
-                    "updated_at_kst": now_s,
-                    "kpis": {
-                        "total_injured": len(items),
-                        "avg_per_team": round(len(items) / max(1, len(st_teams)), 1),
-                        "top_part": "컨디션·발목 점검",
-                        "hardest_hit": hard,
-                        "full_squad": full_sq,
-                    },
-                    "items": flt,
-                }
-            return orig_inj(league_code, severity, q)
-        _dc.get_injuries = _wrapped_get_injuries_v34
-
-    # 5. Clear cached scores/standings once so KBL/WKBL appear immediately on first hit
-    dc_cache = getattr(_dc, "_CACHE", None)
-    if isinstance(dc_cache, dict):
-        dc_cache.clear()
-    _dc._sq_v34_kbl_patched = True
-
+    # v3.4.2 Zero-mutation: keep app.sportiq_datacenter 100% untouched so all 70 base games & /api/datacenter/* stay 200 OK!
+    return
 
 _ensure_domestic_basketball_v34()
 def _build_domestic_bball_standings_v341(code: str) -> Dict[str, Any]:
@@ -9322,120 +9230,8 @@ def api_member_domestic_bball_meta_v34(kind: str = "standings", league: str = "K
 
 
 def _patch_datacenter_api_routes_v341() -> None:
-    """Patches FastAPI APIRoute.dependant.call & endpoint on /api/datacenter/* across all loaded routers/apps."""
-    import gc as _gc
-    from fastapi.routing import APIRoute as _APIRoute
-
-    route_containers = []
-    try:
-        from app import sportiq_datacenter as _dc
-        if hasattr(_dc, "router"):
-            route_containers.append(_dc.router)
-    except Exception:
-        pass
-    for obj in _gc.get_objects():
-        try:
-            if obj.__class__.__name__ in ("FastAPI", "APIRouter") and hasattr(obj, "routes"):
-                route_containers.append(obj)
-        except Exception:
-            continue
-
-    for container in route_containers:
-        for rt in getattr(container, "routes", []) or []:
-            if not isinstance(rt, _APIRoute) or getattr(rt, "_sq_v341_wrapped", False):
-                continue
-            p = str(getattr(rt, "path", "") or "")
-            orig_call = getattr(rt.dependant, "call", None) or rt.endpoint
-            if not callable(orig_call):
-                continue
-
-            if p.endswith("/live-scores"):
-                def _make_ls_wrap(_fn):
-                    def _ls_wrapped(**kwargs):
-                        sport = kwargs.get("sport", "all")
-                        league = kwargs.get("league", "all")
-                        date_offset = int(kwargs.get("date_offset", 0) or 0)
-                        call_kw = dict(kwargs)
-                        if "sport" in call_kw:
-                            call_kw["sport"] = "all"
-                        if "league" in call_kw:
-                            call_kw["league"] = "all"
-                        res = _fn(**call_kw)
-                        if not isinstance(res, dict):
-                            return res
-                        target_dt = datetime.now(KST) + timedelta(days=max(-5, min(7, int(date_offset))))
-                        dom_games = _build_domestic_bball_games_v34(target_dt)
-                        all_items = list(res.get("items") or [])
-                        by_id = {str(x.get("id") or ""): i for i, x in enumerate(all_items) if isinstance(x, dict)}
-                        for dg in dom_games:
-                            if dg["id"] in by_id:
-                                all_items[by_id[dg["id"]]] = dg
-                            else:
-                                all_items.append(dg)
-                        order = {"in": 0, "pre": 1, "post": 2}
-                        all_items.sort(key=lambda x: (order.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
-                        counts = dict(res.get("counts") or {})
-                        counts["all"] = len(all_items)
-                        counts["live"] = sum(1 for x in all_items if x.get("state") == "in")
-                        for sp_k in set([str(x.get("sport") or "") for x in all_items if x.get("sport")] + ["basketball"]):
-                            counts[sp_k] = sum(1 for x in all_items if x.get("sport") == sp_k)
-                        lgs_sup = list(res.get("leagues_supported") or [])
-                        sup_codes = {str(x.get("code") or "").upper() for x in lgs_sup if isinstance(x, dict)}
-                        for ent in ({"code": "KBL", "name": "KBL", "sport": "basketball"}, {"code": "WKBL", "name": "WKBL", "sport": "basketball"}):
-                            if ent["code"] not in sup_codes:
-                                lgs_sup.append(ent)
-                        sp_l = str(sport or "all").lower()
-                        lg_u = str(league or "all").upper()
-                        flt_items = [
-                            x for x in all_items
-                            if (sp_l == "all" or str(x.get("sport") or "").lower() == sp_l)
-                            and (lg_u == "all" or str(x.get("league_code") or x.get("league") or "").upper() == lg_u)
-                        ]
-                        return {**res, "counts": counts, "leagues_supported": lgs_sup, "items": flt_items}
-                    return _ls_wrapped
-                w = _make_ls_wrap(orig_call)
-                rt.endpoint = w
-                rt.dependant.call = w
-                rt._sq_v341_wrapped = True
-
-            elif p.endswith("/standings"):
-                def _make_st_wrap(_fn):
-                    def _st_wrapped(**kwargs):
-                        lg = kwargs.get("league", "EPL")
-                        if str(lg or "").upper() in ("KBL", "WKBL"):
-                            return _build_domestic_bball_standings_v341(lg)
-                        return _fn(**kwargs)
-                    return _st_wrapped
-                w = _make_st_wrap(orig_call)
-                rt.endpoint = w
-                rt.dependant.call = w
-                rt._sq_v341_wrapped = True
-
-            elif p.endswith("/season-sim"):
-                def _make_sim_wrap(_fn):
-                    def _sim_wrapped(**kwargs):
-                        lg = kwargs.get("league", "EPL")
-                        if str(lg or "").upper() in ("KBL", "WKBL"):
-                            return _build_domestic_bball_sim_v341(lg, 5000)
-                        return _fn(**kwargs)
-                    return _sim_wrapped
-                w = _make_sim_wrap(orig_call)
-                rt.endpoint = w
-                rt.dependant.call = w
-                rt._sq_v341_wrapped = True
-
-            elif p.endswith("/injuries"):
-                def _make_inj_wrap(_fn):
-                    def _inj_wrapped(**kwargs):
-                        lg = kwargs.get("league", "EPL")
-                        if str(lg or "").upper() in ("KBL", "WKBL"):
-                            return _build_domestic_bball_injuries_v341(lg, kwargs.get("severity", "all"), kwargs.get("q", ""))
-                        return _fn(**kwargs)
-                    return _inj_wrapped
-                w = _make_inj_wrap(orig_call)
-                rt.endpoint = w
-                rt.dependant.call = w
-                rt._sq_v341_wrapped = True
+    # v3.4.2 Zero-mutation: never alter APIRoute signatures; client fetch bridge uses /api/member/domestic-bball-meta-v34 directly!
+    return
 
 _patch_datacenter_api_routes_v341()
 
