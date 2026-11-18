@@ -484,6 +484,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -499,7 +501,50 @@ _FRONTEND_V22_JS = r'''
   var LS_PIN = "sportiq_sync_pin";
   var LS_ACTOR = "sportiq_actor_uid_v22";
   var bookmarkOnlyFilter = false;
-  var reactionCache = { like_counts: {}, liked_ids: {}, bookmarked_ids: {} };
+  var reactionCache = { like_counts: {}, liked_ids: {}, bookmarked_ids: {}, bookmarked_titles: {} };
+
+  function fnv1aHexV24(str) {
+    var s = String(str || "").replace(/\s+/g, " ").trim().toLowerCase();
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0).toString(16);
+  }
+
+  function canonicalPostIdV24(p) {
+    if (!p) return "";
+    var rawId = String(p.id != null ? p.id : "").trim();
+    var title = String(p.title || "").trim();
+    var author = String(p.author || "");
+    var isVolatileAuto = Boolean(
+      p.isAutoAnalyst ||
+      author.indexOf("자동분석") !== -1 ||
+      title.indexOf("[00:00") === 0 ||
+      !rawId ||
+      /^auto[-_]/i.test(rawId) ||
+      /^\d+$/.test(rawId)
+    );
+    if (isVolatileAuto && title) {
+      return "aa_" + fnv1aHexV24(title);
+    }
+    return rawId;
+  }
+
+  function normalizeStatePostsV24() {
+    if (typeof state !== "object" || !state || !Array.isArray(state.posts)) return;
+    state.posts.forEach(function (p) {
+      if (!p) return;
+      var cid = canonicalPostIdV24(p);
+      if (cid) p.id = cid;
+      if (!Array.isArray(p.tags)) {
+        p.tags = p.tags ? String(p.tags).split(/\s+/).filter(Boolean) : ["분석"];
+      }
+      p.tags = p.tags.map(function (t) { return String(t).replace(/^#+/, ""); }).filter(Boolean);
+      if (!Array.isArray(p.comments)) p.comments = [];
+    });
+  }
   var overseasCacheV22 = [];
   var overseasCountsV22 = {};
   var overseasActiveSportV22 = "전체";
@@ -865,24 +910,73 @@ _FRONTEND_V22_JS = r'''
   // 3. Server DB Persistence for Community Post Likes & Bookmarks + Bookmark Filter Pill
   // -------------------------------------------------------------------------
   function applyReactionStateToPosts() {
+    normalizeStatePostsV24();
     if (typeof state !== "object" || !state || !Array.isArray(state.posts)) return;
+    var activeBmCount = 0;
     state.posts.forEach(function (p) {
       if (!p || !p.id) return;
-      if (reactionCache.like_counts[p.id] !== undefined) {
-        p.likes = Number(reactionCache.like_counts[p.id]);
+      var pid = String(p.id);
+      var tKey = String(p.title || "").trim();
+      if (reactionCache.like_counts[pid] !== undefined) {
+        p.likes = Number(reactionCache.like_counts[pid]);
       }
-      p.liked = Boolean(reactionCache.liked_ids[p.id]);
-      p.bookmarked = Boolean(reactionCache.bookmarked_ids[p.id]);
+      p.liked = Boolean(reactionCache.liked_ids[pid]);
+      var isBm = Boolean(reactionCache.bookmarked_ids[pid] || (tKey && reactionCache.bookmarked_titles[tKey]));
+      if (isBm) reactionCache.bookmarked_ids[pid] = true;
+      p.bookmarked = isBm;
+      if (isBm) activeBmCount++;
     });
+    reactionCache.__matchedBmCount = activeBmCount;
     updateBookmarkFilterPillCount();
+  }
+
+  function syncRenderedFeedReactionButtonsDom() {
+    var box = document.getElementById("feedList");
+    if (!box || typeof state !== "object" || !state || !Array.isArray(state.posts)) return;
+    box.querySelectorAll("article").forEach(function (art) {
+      var h3 = art.querySelector("h3");
+      var titleTxt = h3 ? String(h3.textContent || "").trim() : "";
+      var likeBtn = art.querySelector("button[onclick^='toggleLike(']");
+      var bmBtn = art.querySelector("button[onclick^='toggleBookmark(']");
+      var m = likeBtn ? (likeBtn.getAttribute("onclick") || "").match(/toggleLike\(['"]([^'"]+)['"]\)/) : null;
+      var domPid = m ? m[1] : "";
+      var postObj = state.posts.find(function (x) {
+        return x && (String(x.id) === domPid || (titleTxt && String(x.title || "").trim() === titleTxt));
+      });
+      if (!postObj) return;
+      var cid = String(postObj.id);
+      if (likeBtn && domPid !== cid) {
+        likeBtn.setAttribute("onclick", "toggleLike('" + cid + "')");
+      }
+      if (bmBtn) {
+        bmBtn.setAttribute("onclick", "toggleBookmark('" + cid + "')");
+      }
+      var effLiked = Boolean(reactionCache.liked_ids[cid] || postObj.liked);
+      var effLikes = reactionCache.like_counts[cid] !== undefined ? Number(reactionCache.like_counts[cid]) : Number(postObj.likes || 0);
+      var effBm = Boolean(reactionCache.bookmarked_ids[cid] || (titleTxt && reactionCache.bookmarked_titles[titleTxt]) || postObj.bookmarked);
+      postObj.liked = effLiked;
+      postObj.likes = effLikes;
+      postObj.bookmarked = effBm;
+      if (likeBtn) {
+        likeBtn.textContent = "♥ 좋아요 " + effLikes;
+        likeBtn.className = "rounded-lg px-2.5 py-1 " + (effLiked ? "bg-emerald-500/20 text-emerald-300 font-bold" : "bg-slate-800 text-slate-300");
+      }
+      if (bmBtn) {
+        bmBtn.textContent = "★ " + (effBm ? "저장됨" : "북마크");
+        bmBtn.className = "rounded-lg px-2.5 py-1 " + (effBm ? "bg-amber-500/20 text-amber-300 font-bold" : "bg-slate-800 text-slate-300");
+      }
+    });
   }
 
   function updateBookmarkFilterPillCount() {
     var pill = document.getElementById("sqFeedBookmarkFilterBtn");
     if (!pill) return;
-    var cnt = Object.keys(reactionCache.bookmarked_ids || {}).filter(function (k) {
+    var rawKeys = Object.keys(reactionCache.bookmarked_ids || {}).filter(function (k) {
       return Boolean(reactionCache.bookmarked_ids[k]);
-    }).length;
+    });
+    var cnt = (typeof state === "object" && state && Array.isArray(state.posts) && state.posts.length)
+      ? Math.max(Number(reactionCache.__matchedBmCount || 0), rawKeys.filter(function (k) { return !/^auto[-_]|^\d+$/.test(k); }).length)
+      : rawKeys.length;
     pill.textContent = "⭐ 내 북마크 (" + cnt + ")";
     pill.style.background = bookmarkOnlyFilter ? "rgba(245, 158, 11, 0.24)" : "rgba(15, 23, 42, 0.9)";
     pill.style.borderColor = bookmarkOnlyFilter ? "#fbbf24" : "#334155";
@@ -928,7 +1022,9 @@ _FRONTEND_V22_JS = r'''
         reactionCache.liked_ids = {};
         (d.liked_ids || []).forEach(function (id) { reactionCache.liked_ids[id] = true; });
         reactionCache.bookmarked_ids = {};
-        (d.bookmarked_ids || []).forEach(function (id) { reactionCache.bookmarked_ids[id] = true; });
+        (d.bookmarked_ids || []).forEach(function (id) { reactionCache.bookmarked_ids[String(id)] = true; });
+        reactionCache.bookmarked_titles = {};
+        (d.bookmarked_titles || []).forEach(function (t) { if (t) reactionCache.bookmarked_titles[String(t).trim()] = true; });
 
         var existingMap = {};
         (state.posts || []).forEach(function (p) { if (p && p.id) existingMap[p.id] = p; });
@@ -952,18 +1048,21 @@ _FRONTEND_V22_JS = r'''
 
   function installPersistentLikesAndBookmarks() {
     window.toggleLike = function (id) {
+      normalizeStatePostsV24();
       if (typeof state !== "object" || !state || !Array.isArray(state.posts)) return;
-      var p = state.posts.find(function (x) { return x && x.id === id; });
+      var sid = String(id);
+      var p = state.posts.find(function (x) { return x && String(x.id) === sid; });
       if (!p) return;
-      var baseLikes = Number(p.likes || 1);
+      var pid = String(p.id);
+      var baseLikes = (p.likes !== undefined && p.likes !== null && !isNaN(Number(p.likes))) ? Number(p.likes) : 0;
       var nextLiked = !p.liked;
       p.liked = nextLiked;
       p.likes = Math.max(0, baseLikes + (nextLiked ? 1 : -1));
-      reactionCache.liked_ids[id] = nextLiked;
-      reactionCache.like_counts[id] = p.likes;
+      reactionCache.liked_ids[pid] = nextLiked;
+      reactionCache.like_counts[pid] = p.likes;
       if (typeof window.renderFeed === "function") window.renderFeed();
 
-      fetch("/api/posts/" + encodeURIComponent(id) + "/like", {
+      fetch("/api/posts/" + encodeURIComponent(pid) + "/like", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -977,8 +1076,8 @@ _FRONTEND_V22_JS = r'''
           if (!d || !d.ok) return;
           p.liked = Boolean(d.liked);
           p.likes = Number(d.likes);
-          reactionCache.liked_ids[id] = p.liked;
-          reactionCache.like_counts[id] = p.likes;
+          reactionCache.liked_ids[pid] = p.liked;
+          reactionCache.like_counts[pid] = p.likes;
           if (typeof window.renderFeed === "function") window.renderFeed();
           if (typeof showToast === "function") {
             if (d.liked) {
@@ -992,15 +1091,20 @@ _FRONTEND_V22_JS = r'''
     };
 
     window.toggleBookmark = function (id) {
+      normalizeStatePostsV24();
       if (typeof state !== "object" || !state || !Array.isArray(state.posts)) return;
-      var p = state.posts.find(function (x) { return x && x.id === id; });
+      var sid = String(id);
+      var p = state.posts.find(function (x) { return x && String(x.id) === sid; });
       if (!p) return;
+      var pid = String(p.id);
+      var tKey = String(p.title || "").trim();
       p.bookmarked = !p.bookmarked;
-      reactionCache.bookmarked_ids[id] = p.bookmarked;
+      reactionCache.bookmarked_ids[pid] = p.bookmarked;
+      if (tKey) reactionCache.bookmarked_titles[tKey] = p.bookmarked;
       updateBookmarkFilterPillCount();
       if (typeof window.renderFeed === "function") window.renderFeed();
 
-      fetch("/api/posts/" + encodeURIComponent(id) + "/bookmark", {
+      fetch("/api/posts/" + encodeURIComponent(pid) + "/bookmark", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1015,7 +1119,8 @@ _FRONTEND_V22_JS = r'''
         .then(function (d) {
           if (!d || !d.ok) return;
           p.bookmarked = Boolean(d.bookmarked);
-          reactionCache.bookmarked_ids[id] = p.bookmarked;
+          reactionCache.bookmarked_ids[pid] = p.bookmarked;
+          if (tKey) reactionCache.bookmarked_titles[tKey] = p.bookmarked;
           updateBookmarkFilterPillCount();
           if (typeof window.renderFeed === "function") window.renderFeed();
           if (typeof showToast === "function") {
@@ -1047,6 +1152,7 @@ _FRONTEND_V22_JS = r'''
         box.style.setProperty("display", "block", "important");
         box.removeAttribute("data-sq-seed-archive");
         box.classList.remove("sq-seed-archive-card", "hidden");
+        syncRenderedFeedReactionButtonsDom();
         if (bookmarkOnlyFilter) {
           var visibleCnt = 0;
           box.querySelectorAll("article").forEach(function (art) {
@@ -1363,6 +1469,17 @@ _FRONTEND_V22_JS = r'''
     syncTop20MatchCountBadge();
     installUnifiedAttendanceV22();
     renderTierUpgradeSidebarCard();
+    if (typeof window.mergeAutoAnalystPosts === "function" && !window.__sqMergeAutoWrappedV24) {
+      window.__sqMergeAutoWrappedV24 = true;
+      var origMergeAuto = window.mergeAutoAnalystPosts;
+      window.mergeAutoAnalystPosts = function (data) {
+        var r = origMergeAuto(data);
+        applyReactionStateToPosts();
+        if (typeof window.renderFeed === "function") window.renderFeed();
+        syncRenderedFeedReactionButtonsDom();
+        return r;
+      };
+    }
     installPersistentLikesAndBookmarks();
     hydratePostsAndReactionsFromServer();
     mountLivePinMembersBannerInRanking();
@@ -1385,6 +1502,8 @@ _FRONTEND_V22_JS = r'''
       enforceSingleLineMainTabBar();
       syncTop20MatchCountBadge();
       renderTierUpgradeSidebarCard();
+      applyReactionStateToPosts();
+      syncRenderedFeedReactionButtonsDom();
       var fb = document.getElementById("feedList");
       if (fb) {
         fb.style.setProperty("display", "block", "important");
@@ -2902,6 +3021,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -3212,12 +3332,14 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
                 liked_ids = {r["post_id"] for r in lrows}
 
             bookmarked_ids: Set[str] = set()
+            bookmarked_titles: Set[str] = set()
             if "member_post_bookmarks" in tables and actor_keys:
                 brows = conn.execute(
-                    f"SELECT post_id FROM member_post_bookmarks WHERE actor_key IN ({placeholders})",
+                    f"SELECT post_id, title FROM member_post_bookmarks WHERE actor_key IN ({placeholders})",
                     tuple(actor_keys),
                 ).fetchall()
-                bookmarked_ids = {r["post_id"] for r in brows}
+                bookmarked_ids = {r["post_id"] for r in brows if r["post_id"]}
+                bookmarked_titles = {(r["title"] or "").strip() for r in brows if (r["title"] or "").strip()}
 
             auto_rows = []
             if "auto_analyst_posts" in tables:
@@ -3315,6 +3437,7 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
             "like_counts": like_counts,
             "liked_ids": sorted(liked_ids),
             "bookmarked_ids": sorted(bookmarked_ids),
+            "bookmarked_titles": sorted(bookmarked_titles),
         }
 
     return run_with_db_retry(_op)
@@ -4299,7 +4422,7 @@ def serve_lounge_home():
             rendered = inject_upgrade_into_html(raw_html)
             rendered = re.sub(
                 r'(/api/member/p0p1-upgrade\.js\?v=)(\d+)',
-                lambda m: m.group(1) + str(int(m.group(2)) + 500),
+                lambda m: m.group(1) + str(int(m.group(2)) + 550),
                 rendered,
             )
             return HTMLResponse(rendered, media_type="text/html; charset=utf-8")
