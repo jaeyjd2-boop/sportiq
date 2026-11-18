@@ -598,6 +598,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -3124,7 +3126,27 @@ _FRONTEND_V22_JS = r'''
   var _sqProxyDcLeagueV341 = "";
   var _sqProxyDcTimerV341 = null;
 
+  function ensureDcHubExpandedForStandingsV344() {
+    var hub = document.getElementById("dcMainHubSection") || document.querySelector(".dc-hub-wrap");
+    if (hub) {
+      hub.classList.remove("hidden");
+      hub.style.setProperty("display", "block", "important");
+    }
+    var col = document.getElementById("dcHubCollapsible");
+    if (col) {
+      col.classList.remove("hidden");
+      col.style.setProperty("display", "block", "important");
+    }
+    var hb = document.getElementById("dcHubBody");
+    if (hb) {
+      hb.setAttribute("data-sq-dc-user-open", "1");
+      hb.classList.remove("hidden");
+      hb.style.setProperty("display", "block", "important");
+    }
+  }
+
   function triggerDomesticDcStandingsV341(code, targetTab) {
+    ensureDcHubExpandedForStandingsV344();
     var cu = String(code || "KBL").toUpperCase();
     _sqProxyDcLeagueV341 = cu;
     if (_sqProxyDcTimerV341) clearTimeout(_sqProxyDcTimerV341);
@@ -3157,7 +3179,7 @@ _FRONTEND_V22_JS = r'''
           b.style.background = "#2563eb";
           b.style.color = "#ffffff";
           b.style.borderColor = "#3b82f6";
-        } else if (t === "NBA" || (t === "KBL" && cu !== "KBL") || (t === "WKBL" && cu !== "WKBL")) {
+        } else if (b.parentElement && b.parentElement.querySelector("[data-sq-dc-lg]")) {
           b.classList.remove("active");
           b.style.background = "";
           b.style.color = "";
@@ -3695,43 +3717,38 @@ _FRONTEND_V22_JS = r'''
 
   function selectDateOffsetV31(newOff) {
     var clamped = Math.max(-5, Math.min(5, parseInt(newOff, 10) || 0));
+    var wasCustom = Boolean(v30ScoreState.customDateRendered);
     v30ScoreState.selectedDateOffset = clamped;
     v30ScoreState.loadedDateOffset = null;
     v30ScoreState.rawAllItems = [];
 
-    // Check if native widget.js has a matching .dc-date-btn (e.g. -1, 0, 1, 2)
-    var dtBtns = discoverTopDateButtonsV304();
-    var matchedNativeBtn = null;
-    for (var i = 0; i < dtBtns.length; i++) {
-      var b = dtBtns[i];
-      var oa = b.getAttribute("data-off");
-      var ov = (oa != null && !isNaN(parseInt(oa, 10))) ? parseInt(oa, 10) : null;
-      if (ov === null) {
-        var bt = String(b.textContent || "");
-        if (bt.indexOf("어제") !== -1) ov = -1;
-        else if (bt.indexOf("오늘") !== -1) ov = 0;
-        else if (bt.indexOf("내일") !== -1) ov = 1;
-        else if (bt.indexOf("+2") !== -1) ov = 2;
-      }
-      if (ov === clamped) {
-        matchedNativeBtn = b;
-        break;
-      }
-    }
-
-    if (matchedNativeBtn) {
+    if (clamped === 0) {
       v30ScoreState.customDateRendered = false;
-      try {
-        window.__sqInternalDateClickV31 = true;
-        matchedNativeBtn.click();
-      } finally {
-        window.__sqInternalDateClickV31 = false;
+      var dtBtns = discoverTopDateButtonsV304();
+      for (var i = 0; i < dtBtns.length; i++) {
+        var b = dtBtns[i];
+        var oa = b.getAttribute("data-off");
+        var bt = String(b.textContent || "");
+        if (oa === "0" || bt.indexOf("오늘") !== -1) {
+          try { b.click(); } catch (e) {}
+          break;
+        }
       }
+      if (wasCustom) {
+        var actPill = document.querySelector("#dcSportPills .dc-pill.active, #dcSportPills button.active");
+        if (actPill) {
+          try { actPill.click(); } catch (e2) {}
+        }
+      }
+      fetchServerScoreboardBridgeV30(0);
     } else {
       v30ScoreState.customDateRendered = true;
+      fetchServerScoreboardBridgeV30(clamped);
     }
-
-    fetchServerScoreboardBridgeV30(clamped);
+    v30ScoreState.lastCalSig = "";
+    v30ScoreState.lastToolbarSig = "";
+    v30ScoreState.lastTableSig = "";
+    refreshScoreboardSuiteV30();
   }
 
   function installTopControlCaptureSyncV304() {
@@ -4683,7 +4700,7 @@ _FRONTEND_V22_JS = r'''
         if (jumpBtn) {
           ev.stopPropagation();
           var lgCode = jumpBtn.getAttribute("data-sq-jump-st") || "EPL";
-          if (lgCode === "KBL" || lgCode === "WKBL") { triggerDomesticDcStandingsV341(lgCode, "standings"); } else if (typeof window.__switchDcTab === "function") { window.__switchDcTab("standings", lgCode); }
+          ensureDcHubExpandedForStandingsV344(); if (lgCode === "KBL" || lgCode === "WKBL") { triggerDomesticDcStandingsV341(lgCode, "standings"); } else if (typeof window.__switchDcTab === "function") { window.__switchDcTab("standings", lgCode); }
           return;
         }
         var tr = t.closest(".sq-v30-match-row");
@@ -7328,6 +7345,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -7518,7 +7536,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3430_{int(time.time())}"
+_BOOT_VER_V30 = f"3440_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -9353,7 +9371,8 @@ def api_member_scoreboard_v30(date_offset: int = 0):
     raw_items: List[Dict[str, Any]] = []
 
     try:
-        _dc = sys.modules.get("app.sportiq_datacenter") or sys.modules.get("sportiq_datacenter")
+        import sys as _sys
+        _dc = _sys.modules.get("app.sportiq_datacenter") or _sys.modules.get("sportiq_datacenter")
         if _dc is None:
             try:
                 from app import sportiq_datacenter as _dc
