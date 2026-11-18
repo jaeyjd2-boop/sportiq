@@ -630,6 +630,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -6099,20 +6101,42 @@ _FRONTEND_V22_JS = r'''
     var s = String(rawName || "").toLowerCase().replace(/[^a-z0-9가-힣]/g, "");
     var alias = {
       "mancity": "맨체스터시티", "manchestercity": "맨체스터시티", "맨시티": "맨체스터시티", "맨체스터시티": "맨체스터시티",
-      "manutd": "맨체스터유나이티드", "manchesterunited": "맨체스터유나이티드", "맨유": "맨체스터유나이티드", "맨체스터유나이티드": "맨체스터유나이티드",
+      "manutd": "맨체스터유나이티드", "manunited": "맨체스터유나이티드", "manchesterunited": "맨체스터유나이티드", "맨유": "맨체스터유나이티드", "맨체스터유나이티드": "맨체스터유나이티드",
       "fulham": "풀럼", "풀럼": "풀럼", "arsenal": "아스널", "아스널": "아스널", "아스날": "아스널",
       "liverpool": "리버풀", "리버풀": "리버풀", "chelsea": "첼시", "첼시": "첼시",
       "tottenham": "토트넘", "tottenhamhotspur": "토트넘", "spurs": "토트넘", "토트넘": "토트넘", "토트넘홋스퍼": "토트넘",
-      "newcastle": "뉴캐슬", "newcastleunited": "뉴캐슬", "뉴캐슬": "뉴캐슬",
-      "astonvilla": "애스턴빌라", "애스턴빌라": "애스턴빌라", "brighton": "브라이턴", "브라이턴": "브라이턴",
-      "nottinghamforest": "노팅엄포레스트", "노팅엄": "노팅엄포레스트", "westham": "웨스트햄", "웨스트햄": "웨스트햄",
+      "newcastle": "뉴캐슬", "newcastleunited": "뉴캐슬", "뉴캐슬": "뉴캐슬", "뉴캐슬유나이티드": "뉴캐슬",
+      "astonvilla": "애스턴빌라", "애스턴빌라": "애스턴빌라", "아스톤빌라": "애스턴빌라",
+      "brighton": "브라이턴", "brightonhovealbion": "브라이턴", "브라이턴": "브라이턴",
+      "nottinghamforest": "노팅엄포레스트", "nottmforest": "노팅엄포레스트", "노팅엄": "노팅엄포레스트", "노팅엄포레스트": "노팅엄포레스트",
+      "westham": "웨스트햄", "westhamunited": "웨스트햄", "웨스트햄": "웨스트햄",
       "everton": "에버턴", "에버턴": "에버턴", "brentford": "브렌트퍼드", "브렌트퍼드": "브렌트퍼드",
-      "bournemouth": "본머스", "본머스": "본머스", "wolves": "울버햄프턴", "wolverhampton": "울버햄프턴", "울버햄프턴": "울버햄프턴",
-      "crystalpalace": "크리스털팰리스", "leicester": "레스터시티", "leicestercity": "레스터시티", "southampton": "사우샘프턴", "ipswich": "입스위치",
+      "bournemouth": "본머스", "afcbournemouth": "본머스", "본머스": "본머스",
+      "wolves": "울버햄프턴", "wolverhampton": "울버햄프턴", "울버햄프턴": "울버햄프턴",
+      "crystalpalace": "크리스털팰리스", "cpalace": "크리스털팰리스", "크리스털팰리스": "크리스털팰리스", "크리스탈팰리스": "크리스털팰리스",
+      "leicester": "레스터시티", "leicestercity": "레스터시티", "레스터": "레스터시티", "레스터시티": "레스터시티",
+      "southampton": "사우샘프턴", "사우샘프턴": "사우샘프턴",
+      "ipswich": "입스위치", "ipswichtown": "입스위치", "입스위치": "입스위치", "입스위치타운": "입스위치",
+      "leeds": "리즈", "leedsunited": "리즈", "리즈": "리즈", "리즈유나이티드": "리즈",
+      "sunderland": "선덜랜드", "선덜랜드": "선덜랜드", "coventry": "코번트리", "coventrycity": "코번트리", "코번트리": "코번트리",
+      "burnley": "번리", "번리": "번리", "sheffieldutd": "셰필드", "sheffieldunited": "셰필드",
       "realmadrid": "레알마드리드", "레알마드리드": "레알마드리드", "barcelona": "바르셀로나", "fcbarcelona": "바르셀로나", "바르셀로나": "바르셀로나",
-      "atleticomadrid": "아틀레티코마드리드", "bayern": "바이에른뮌헨", "bayernmunich": "바이에른뮌헨", "바이에른뮌헨": "바이에른뮌헨",
-      "dortmund": "도르트문트", "psg": "파리생제르맹", "parissaintgermain": "파리생제르맹", "inter": "인터밀란", "intermilan": "인터밀란",
-      "acmilan": "ac밀란", "juventus": "유벤투스", "napoli": "나폴리"
+      "atletico": "아틀레티코마드리드", "atleticomadrid": "아틀레티코마드리드", "아틀레티코": "아틀레티코마드리드", "아틀레티코마드리드": "아틀레티코마드리드",
+      "bayern": "바이에른뮌헨", "bayernmunich": "바이에른뮌헨", "바이에른": "바이에른뮌헨", "바이에른뮌헨": "바이에른뮌헨",
+      "dortmund": "도르트문트", "borussiadortmund": "도르트문트", "도르트문트": "도르트문트",
+      "leverkusen": "레버쿠젠", "bayerleverkusen": "레버쿠젠", "레버쿠젠": "레버쿠젠",
+      "psg": "파리생제르맹", "parissaintgermain": "파리생제르맹", "파리생제르맹": "파리생제르맹",
+      "inter": "인터밀란", "intermilan": "인터밀란", "인터밀란": "인터밀란", "인테르": "인터밀란",
+      "acmilan": "ac밀란", "milan": "ac밀란", "ac밀란": "ac밀란", "juventus": "유벤투스", "유벤투스": "유벤투스", "napoli": "나폴리", "나폴리": "나폴리",
+      "torontomapleleafs": "토론토메이플리프스", "mapleleafs": "토론토메이플리프스", "토론토메이플리프스": "토론토메이플리프스",
+      "newyorkrangers": "뉴욕레인저스", "nyrangers": "뉴욕레인저스", "rangers": "뉴욕레인저스", "뉴욕레인저스": "뉴욕레인저스",
+      "texans": "휴스턴텍산스", "houstontexans": "휴스턴텍산스", "휴스턴텍산스": "휴스턴텍산스",
+      "colts": "인디애나폴리스콜츠", "indianapoliscolts": "인디애나폴리스콜츠", "인디애나폴리스콜츠": "인디애나폴리스콜츠",
+      "perthheat": "퍼스히트", "퍼스히트": "퍼스히트", "sydneybluesox": "시드니블루삭스", "시드니블루삭스": "시드니블루삭스",
+      "lakers": "레이커스", "lalakers": "레이커스", "레이커스": "레이커스", "la레이커스": "레이커스",
+      "warriors": "워리어스", "goldenstatewarriors": "워리어스", "골든스테이트": "워리어스", "워리어스": "워리어스",
+      "celtics": "셀틱스", "bostonceltics": "셀틱스", "보스턴셀틱스": "셀틱스", "셀틱스": "셀틱스",
+      "knicks": "닉스", "newyorkknicks": "닉스", "뉴욕닉스": "닉스", "닉스": "닉스"
     };
     return alias[s] || s;
   }
@@ -6120,18 +6144,18 @@ _FRONTEND_V22_JS = r'''
   function extractCleanKellyPairV361(rawStr) {
     var tx = String(rawStr || "").replace(/\s+/g, " ").trim();
     if (!/\s+vs\s+/i.test(tx)) return null;
-    // Strip leading league badges (e.g., "EPL ", "⚽ EPL · ", "LALIGA ")
-    tx = tx.replace(/^(?:[^\w가-힣]*\s*)?(?:EPL|PL|LALIGA|LA\s*LIGA|SERIEA|SERIE\s*A|BUNDESLIGA|LIGUE1|LIGUE\s*1|UCL|UEL|UNL|MLS|J1|KLEAGUE|K리그1?|NBA|WNBA|KBL|WKBL|MLB|KBO|NPB|NHL|LCK|UFC|MMA|ATP|WTA|F1)(?:\s*[·|\-:]\s*|\s+)/i, "").trim();
-    // Strip trailing odds / value / kelly / status tokens (e.g., "@ 1.52 밸류 +3.8%p 켈리 1.26% 안정")
-    tx = tx.replace(/\s*(?:@\s*[\d.]+|배당\s*[\d.]+|밸류|켈리|안정|공격|중립|추천|홈승|원정승|무승부|\(\s*@|\|\s*|[+\-]?\d+(?:\.\d+)?%).*$/i, "").trim();
+    // Strip leading league / sport / time badges (e.g., "EPL ", "⚽ EPL · ", "NHL ", "NFL ", "ABL ")
+    tx = tx.replace(/^(?:[^\w가-힣]*\s*)?(?:EPL|PL|LALIGA|LA\s*LIGA|SERIEA|SERIE\s*A|BUNDESLIGA|LIGUE1|LIGUE\s*1|UCL|UEL|UNL|MLS|J1|KLEAGUE|K리그1?|NBA|WNBA|KBL|WKBL|MLB|KBO|NPB|ABL|NHL|NFL|LCK|UFC|MMA|ATP|WTA|F1)(?:\s*[·|\-:]\s*|\s+)/i, "").trim();
+    // Strip trailing odds / kelly / injury / lineup / formation / date-time metadata
+    tx = tx.replace(/\s*(?:@\s*[\d.]+|배당\s*[\d.]+|밸류|켈리|안정|공격|중립|추천|홈승|원정승|무승부|부상|결장|라인업|예상\s*라인업|예상\s*포메이션|포메이션|출전|의심|아웃|확정|체크|주요\s*결장|결장자|이슈|없음|정상\s*가동|\b\d-\d-\d(?:-\d)?\b|\b\d{1,2}\.\d{1,2}\b|\b\d{1,2}:\d{2}\b|\(\s*@|\(\s*결장|\(\s*부상|\(\s*\d|\|\s*|·\s*|[+\-]?\d+(?:\.\d+)?%).*$/i, "").trim();
     var parts = tx.split(/\s+vs\s+/i);
     if (parts.length < 2) return null;
-    var leftRaw = parts[0].replace(/^.*?(?:EPL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|UCL|UEL|UNL|NBA|MLB|NHL|KBL|WKBL)\s+/i, "").trim();
-    var rightRaw = parts[1].replace(/\s+(?:홈|원정|승|무|패|@|\d+\.\d+).*$/i, "").trim();
-    if (!leftRaw || !rightRaw || leftRaw.length > 32 || rightRaw.length > 32) return null;
+    var leftRaw = parts[0].replace(/^.*?(?:EPL|PL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|UCL|UEL|UNL|NBA|WNBA|MLB|KBO|NPB|ABL|NHL|NFL|KBL|WKBL)\s+/i, "").trim();
+    var rightRaw = parts[1].replace(/\s+(?:홈|원정|승|무|패|부상|결장|라인업|포메이션|결장자|출전|의심|아웃|확정|체크|@|\d-\d-\d|\d{1,2}:\d{2}|\d+\.\d+).*$/i, "").trim();
+    if (!leftRaw || !rightRaw || leftRaw.length > 34 || rightRaw.length > 34) return null;
     var k1 = canonicalKellyTeamKeyV36(leftRaw);
     var k2 = canonicalKellyTeamKeyV36(rightRaw);
-    if (!k1 || !k2) return null;
+    if (!k1 || !k2 || k1 === k2) return null;
     return {
       pairKey: [k1, k2].sort().join("::"),
       dirKey: k1 + "::" + k2,
@@ -6139,58 +6163,71 @@ _FRONTEND_V22_JS = r'''
     };
   }
 
-  function dedupLabKellyMonitorV36() {
-    var lab = document.getElementById("tab-lab") || document.body;
-    if (!lab) return;
-    var lists = lab.querySelectorAll("div, tbody, ul");
-    Array.prototype.forEach.call(lists, function (box) {
-      if (!box || !box.children || box.children.length < 2 || box.children.length > 50) return;
-      if (box.id === "dcLiveTickerTrack" || box.id === "feedList" || box.closest("#proLiveTickerBar, #sqV30ScoreboardTableWrap, #dcMainHubSection")) return;
-      var rows = [];
-      for (var i = 0; i < box.children.length; i++) {
-        var ch = box.children[i];
-        if (!ch || ch.nodeType !== 1) continue;
-        var fullTx = String(ch.textContent || "").replace(/\s+/g, " ").trim();
-        if (fullTx.indexOf("켈리") === -1 && fullTx.indexOf("밸류") === -1 && fullTx.indexOf("@") === -1 && fullTx.indexOf("배당") === -1) continue;
-        // Prefer deepest child element containing " vs " so league badges and odds spans don't pollute team names!
-        var bestVsTxt = fullTx;
-        var subEls = ch.querySelectorAll("strong, b, h4, h5, span, div, p");
-        for (var sIdx = 0; sIdx < subEls.length; sIdx++) {
-          var stx = String(subEls[sIdx].textContent || "").replace(/\s+/g, " ").trim();
-          if (/\s+vs\s+/i.test(stx) && stx.length < bestVsTxt.length && stx.length >= 6) {
-            bestVsTxt = stx;
-          }
-        }
-        var parsed = extractCleanKellyPairV361(bestVsTxt) || extractCleanKellyPairV361(fullTx);
-        if (parsed) {
-          rows.push({ el: ch, pairKey: parsed.pairKey, hasKo: parsed.hasKo });
+  function dedupMatchupChildrenInContainerV362(box, requireFinanceOrInjuryHint) {
+    if (!box || !box.children || box.children.length < 2 || box.children.length > 60) return;
+    var rows = [];
+    for (var i = 0; i < box.children.length; i++) {
+      var ch = box.children[i];
+      if (!ch || ch.nodeType !== 1) continue;
+      var fullTx = String(ch.textContent || "").replace(/\s+/g, " ").trim();
+      if (!/\s+vs\s+/i.test(fullTx)) continue;
+      if (requireFinanceOrInjuryHint) {
+        if (!/켈리|밸류|@|배당|부상|결장|라인업|포메이션|출전|의심|아웃|Injury|Lineup/i.test(fullTx)) continue;
+      }
+      var bestVsTxt = fullTx;
+      var subEls = ch.querySelectorAll("strong, b, h3, h4, h5, span, div, p");
+      for (var sIdx = 0; sIdx < subEls.length; sIdx++) {
+        var stx = String(subEls[sIdx].textContent || "").replace(/\s+/g, " ").trim();
+        if (/\s+vs\s+/i.test(stx) && stx.length < bestVsTxt.length && stx.length >= 6) {
+          bestVsTxt = stx;
         }
       }
-      if (rows.length < 2) return;
-      var byPair = {};
-      rows.forEach(function (r) {
-        if (!byPair[r.pairKey]) {
-          byPair[r.pairKey] = r;
+      var parsed = extractCleanKellyPairV361(bestVsTxt) || extractCleanKellyPairV361(fullTx);
+      if (parsed) {
+        rows.push({ el: ch, pairKey: parsed.pairKey, hasKo: parsed.hasKo });
+      }
+    }
+    if (rows.length < 2) return;
+    var byPair = {};
+    rows.forEach(function (r) {
+      if (!byPair[r.pairKey]) {
+        byPair[r.pairKey] = r;
+        if (r.el.getAttribute("data-sq-kelly-dup") === "1") {
+          r.el.removeAttribute("data-sq-kelly-dup");
+          r.el.style.removeProperty("display");
+        }
+      } else {
+        var prev = byPair[r.pairKey];
+        if (!prev.hasKo && r.hasKo) {
+          prev.el.setAttribute("data-sq-kelly-dup", "1");
+          prev.el.style.setProperty("display", "none", "important");
           if (r.el.getAttribute("data-sq-kelly-dup") === "1") {
             r.el.removeAttribute("data-sq-kelly-dup");
             r.el.style.removeProperty("display");
           }
+          byPair[r.pairKey] = r;
         } else {
-          var prev = byPair[r.pairKey];
-          if (!prev.hasKo && r.hasKo) {
-            prev.el.setAttribute("data-sq-kelly-dup", "1");
-            prev.el.style.setProperty("display", "none", "important");
-            if (r.el.getAttribute("data-sq-kelly-dup") === "1") {
-              r.el.removeAttribute("data-sq-kelly-dup");
-              r.el.style.removeProperty("display");
-            }
-            byPair[r.pairKey] = r;
-          } else {
-            r.el.setAttribute("data-sq-kelly-dup", "1");
-            r.el.style.setProperty("display", "none", "important");
-          }
+          r.el.setAttribute("data-sq-kelly-dup", "1");
+          r.el.style.setProperty("display", "none", "important");
         }
+      }
+    });
+  }
+
+  function dedupLabKellyMonitorV36() {
+    var lab = document.getElementById("tab-lab");
+    if (lab) {
+      // Inside #tab-lab: deduplicate ALL matchup boards (Kelly Value Monitor + Global Big-Match Injury/Lineup Check Board + <select> options)!
+      var labBoxes = lab.querySelectorAll("div, tbody, ul, select");
+      Array.prototype.forEach.call(labBoxes, function (box) {
+        dedupMatchupChildrenInContainerV362(box, false);
       });
+      return;
+    }
+    // Fallback if #tab-lab has a custom wrapper ID
+    Array.prototype.forEach.call(document.querySelectorAll("div, tbody, ul"), function (box) {
+      if (box.id === "dcLiveTickerTrack" || box.id === "feedList" || box.closest("#proLiveTickerBar, #sqV30ScoreboardTableWrap, #dcMainHubSection, #tab-feed, #tab-schedule")) return;
+      dedupMatchupChildrenInContainerV362(box, true);
     });
   }
 
@@ -7897,6 +7934,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -8087,7 +8125,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3610_{int(time.time())}"
+_BOOT_VER_V30 = f"3620_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
