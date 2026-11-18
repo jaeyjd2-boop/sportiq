@@ -488,6 +488,18 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -714,6 +726,101 @@ _FRONTEND_V22_JS = r'''
       "  border-color: #34d399;",
       "  color: #6ee7b7;",
       "  background: rgba(16, 185, 129, 0.12);",
+      "}",
+      "/* v2.6 Active DataCenter 7th Tab Highlight & Sibling Tab De-Highlight */",
+      "#sqDesktopMainTabStrip[data-sq-dc-mode='1'] > button:not([data-sq-dc-active='1']),",
+      "#sqDesktopMainTabStrip[data-sq-dc-mode='1'] > a:not([data-sq-dc-active='1']) {",
+      "  background: rgba(15, 23, 42, 0.86) !important;",
+      "  color: #cbd5e1 !important;",
+      "  border-color: rgba(51, 65, 85, 0.72) !important;",
+      "  box-shadow: none !important;",
+      "}",
+      "#sqDesktopMainTabStrip > button[data-sq-dc-active='1'],",
+      "#sqDesktopMainTabStrip > a[data-sq-dc-active='1'] {",
+      "  background: linear-gradient(135deg, #10b981, #06b6d4) !important;",
+      "  color: #020617 !important;",
+      "  font-weight: 900 !important;",
+      "  border-color: #34d399 !important;",
+      "  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;",
+      "}",
+      "/* v2.6 Mobile <=820px (390x844) Floating Banner / Dual Dock Separation & Footer Clearance */",
+      "@media (max-width: 820px) {",
+      "  [data-sq-header-hub-row='1'] {",
+      "    display: flex !important;",
+      "    flex-wrap: wrap !important;",
+      "    gap: 6px !important;",
+      "    max-width: 100% !important;",
+      "  }",
+      "  #rssSportFilters {",
+      "    display: flex !important;",
+      "    flex-wrap: nowrap !important;",
+      "    overflow-x: auto !important;",
+      "    -webkit-overflow-scrolling: touch;",
+      "    scrollbar-width: none;",
+      "    gap: 6px !important;",
+      "    padding-bottom: 4px !important;",
+      "  }",
+      "  #rssSportFilters::-webkit-scrollbar { display: none; }",
+      "  #rssSportFilters > .rss-filter-btn {",
+      "    flex: 0 0 auto !important;",
+      "    white-space: nowrap !important;",
+      "  }",
+      "  #sqPwaInstallBanner,",
+      "  [data-sq-pwa-banner='1'] {",
+      "    left: 10px !important;",
+      "    right: 10px !important;",
+      "    bottom: 10px !important;",
+      "    width: auto !important;",
+      "    max-width: calc(100vw - 20px) !important;",
+      "    padding: 9px 11px !important;",
+      "    gap: 8px !important;",
+      "    border-radius: 13px !important;",
+      "    box-sizing: border-box !important;",
+      "    z-index: 9990 !important;",
+      "  }",
+      "  #sqPwaInstallBanner img,",
+      "  [data-sq-pwa-banner='1'] img {",
+      "    width: 32px !important;",
+      "    height: 32px !important;",
+      "  }",
+      "  #sqBannerDismissPwa,",
+      "  [data-sq-pwa-close='1'] {",
+      "    display: inline-flex !important;",
+      "    align-items: center !important;",
+      "    justify-content: center !important;",
+      "    min-width: 28px !important;",
+      "    height: 28px !important;",
+      "    padding: 0 6px !important;",
+      "    border-radius: 8px !important;",
+      "    background: rgba(51, 65, 85, 0.82) !important;",
+      "    border: 1px solid rgba(100, 116, 139, 0.55) !important;",
+      "    color: #f8fafc !important;",
+      "    font-size: 13px !important;",
+      "    font-weight: 900 !important;",
+      "    flex-shrink: 0 !important;",
+      "    cursor: pointer !important;",
+      "  }",
+      "  [data-sq-floating-dock='1'] {",
+      "    right: 10px !important;",
+      "    gap: 6px !important;",
+      "    z-index: 9988 !important;",
+      "  }",
+      "  [data-sq-floating-dock='1'] button,",
+      "  [data-sq-floating-dock='1'] a,",
+      "  button[data-sq-floating-item],",
+      "  a[data-sq-floating-item] {",
+      "    padding: 7px 11px !important;",
+      "    font-size: 11.5px !important;",
+      "    line-height: 1.2 !important;",
+      "  }",
+      "  #sqOfficialLegalFooter {",
+      "    padding: 24px 14px 176px !important;",
+      "  }",
+      "  #sqOfficialLegalFooter .sq-footer-link-btn {",
+      "    min-height: 34px !important;",
+      "    padding: 6px 12px !important;",
+      "    font-size: 11.5px !important;",
+      "  }",
       "}"
     ].join("\n");
     document.head.appendChild(st);
@@ -758,6 +865,295 @@ _FRONTEND_V22_JS = r'''
         btn.style.setProperty("width", "auto", "important");
       }
     });
+    bindDataCenterMainTabClickV26(bar);
+  }
+
+  function bindDataCenterMainTabClickV26(bar) {
+    if (!bar) return;
+    var dcBtn = null;
+    Array.prototype.forEach.call(bar.children, function (btn) {
+      if (!dcBtn && btn && /데이터\s*센터/.test(btn.textContent || "")) {
+        dcBtn = btn;
+      }
+    });
+    if (!dcBtn) return;
+
+    if (!dcBtn.getAttribute("data-sq-dc-bound-v26")) {
+      dcBtn.setAttribute("data-sq-dc-bound-v26", "1");
+      dcBtn.setAttribute("data-tab", "datacenter");
+      dcBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (typeof ev.stopImmediatePropagation === "function") ev.stopImmediatePropagation();
+
+        var dcTabPanel = document.getElementById("tab-datacenter");
+        var dcGrid = document.getElementById("dcLauncherGrid") || document.getElementById("dcLaunchCards");
+        var dcHub = (
+          document.getElementById("dcMainHubSection") ||
+          document.querySelector(".dc-hub-wrap") ||
+          (dcGrid && dcGrid.closest ? dcGrid.closest("section, div") : null)
+        );
+        var targetEl = dcTabPanel || dcHub;
+        if (!targetEl) {
+          if (typeof window.switchTab === "function") {
+            try { window.switchTab("datacenter"); } catch (e) {}
+          }
+          return;
+        }
+
+        var hostPanel = (!dcTabPanel && dcHub && dcHub.closest) ? dcHub.closest("[id^='tab-']") : null;
+        document.querySelectorAll("[id^='tab-']").forEach(function (sec) {
+          if (sec === dcTabPanel || sec === hostPanel) {
+            sec.classList.remove("hidden");
+            sec.style.setProperty("display", "block", "important");
+          } else {
+            sec.setAttribute("data-sq-hidden-by-dc", "1");
+            sec.style.setProperty("display", "none", "important");
+          }
+        });
+
+        if (dcHub) {
+          if (!dcHub.hasAttribute("data-sq-dc-was-hidden")) {
+            var initHidden = (window.getComputedStyle(dcHub).display === "none") || dcHub.classList.contains("hidden");
+            dcHub.setAttribute("data-sq-dc-was-hidden", initHidden ? "1" : "0");
+          }
+          dcHub.classList.remove("hidden");
+          dcHub.style.setProperty("display", "block", "important");
+        }
+        var dcBody = document.getElementById("dcHubBody");
+        if (dcBody) {
+          dcBody.classList.remove("hidden");
+          dcBody.style.display = "block";
+        }
+        var dcTog = document.getElementById("dcToggleHubBtn");
+        if (dcTog && (dcTog.textContent || "").indexOf("펼치기") !== -1) {
+          dcTog.textContent = "접기 ▲";
+        }
+        if (typeof window.__switchDcTab === "function" && dcBody && (!dcBody.children.length || /로딩\s*중/.test(dcBody.textContent || ""))) {
+          try { window.__switchDcTab("standings"); } catch (e) {}
+        }
+
+        bar.setAttribute("data-sq-dc-mode", "1");
+        Array.prototype.forEach.call(bar.children, function (b) {
+          if (b === dcBtn) b.setAttribute("data-sq-dc-active", "1");
+          else b.removeAttribute("data-sq-dc-active");
+        });
+
+        var rect = targetEl.getBoundingClientRect();
+        var curY = window.pageYOffset || document.documentElement.scrollTop || 0;
+        var destY = Math.max(0, rect.top + curY - 92);
+        try {
+          window.scrollTo({ top: destY, behavior: "smooth" });
+        } catch (e) {
+          window.scrollTo(0, destY);
+        }
+      }, true);
+    }
+
+    if (!bar.getAttribute("data-sq-dc-restore-bound-v26")) {
+      bar.setAttribute("data-sq-dc-restore-bound-v26", "1");
+      bar.addEventListener("click", function (ev) {
+        var clickedBtn = ev.target && ev.target.closest ? ev.target.closest("button, a") : null;
+        if (!clickedBtn || clickedBtn.parentElement !== bar) return;
+        if (/데이터\s*센터/.test(clickedBtn.textContent || "")) return;
+
+        if (bar.getAttribute("data-sq-dc-mode") === "1") {
+          bar.removeAttribute("data-sq-dc-mode");
+          Array.prototype.forEach.call(bar.children, function (b) {
+            b.removeAttribute("data-sq-dc-active");
+          });
+          document.querySelectorAll("[data-sq-hidden-by-dc='1']").forEach(function (sec) {
+            sec.style.removeProperty("display");
+            sec.removeAttribute("data-sq-hidden-by-dc");
+          });
+          var dcTabPanel2 = document.getElementById("tab-datacenter");
+          if (dcTabPanel2) {
+            dcTabPanel2.classList.add("hidden");
+            dcTabPanel2.style.display = "none";
+          }
+          var dcHub2 = document.getElementById("dcMainHubSection") || document.querySelector(".dc-hub-wrap");
+          if (dcHub2 && dcHub2.getAttribute("data-sq-dc-was-hidden") === "1") {
+            dcHub2.style.display = "none";
+          }
+        }
+      }, true);
+    }
+  }
+
+  function saveOrigPosV26(el) {
+    if (!el || el.hasAttribute("data-sq-orig-saved")) return;
+    el.setAttribute("data-sq-orig-saved", "1");
+    el.setAttribute("data-sq-orig-bottom", el.style.bottom || "");
+    el.setAttribute("data-sq-orig-right", el.style.right || "");
+  }
+
+  function restoreOrigPosV26(el) {
+    if (!el || !el.hasAttribute("data-sq-mob-shifted")) return;
+    el.removeAttribute("data-sq-mob-shifted");
+    var ob = el.getAttribute("data-sq-orig-bottom") || "";
+    var orr = el.getAttribute("data-sq-orig-right") || "";
+    if (ob) el.style.bottom = ob;
+    else el.style.removeProperty("bottom");
+    if (orr) el.style.right = orr;
+    else el.style.removeProperty("right");
+  }
+
+  function harmonizeMobileFloatingOverlaysV26() {
+    var ptsBadge = document.getElementById("pointsBadge");
+    if (ptsBadge && ptsBadge.parentElement) {
+      ptsBadge.parentElement.setAttribute("data-sq-header-hub-row", "1");
+    }
+
+    // 1. Locate bottom-left PWA install banner & ensure clear ✕ close button
+    var banner = document.getElementById("sqPwaInstallBanner");
+    if (!banner && document.body) {
+      var candDivs = document.body.querySelectorAll("div, aside");
+      for (var bi = 0; bi < candDivs.length; bi++) {
+        var cd = candDivs[bi];
+        if ((cd.textContent || "").indexOf("홈 화면 앱으로 열기") !== -1 && window.getComputedStyle(cd).position === "fixed" && cd.offsetHeight < 180) {
+          banner = cd;
+          break;
+        }
+      }
+    }
+    if (banner) {
+      banner.setAttribute("data-sq-pwa-banner", "1");
+      var closeBtn = banner.querySelector("#sqBannerDismissPwa, [data-sq-pwa-close='1']");
+      if (!closeBtn) {
+        var bBtns = banner.querySelectorAll("button");
+        for (var k = 0; k < bBtns.length; k++) {
+          var btTxt = (bBtns[k].textContent || "").trim();
+          if (btTxt.indexOf("설치") === -1) {
+            closeBtn = bBtns[k];
+            break;
+          }
+        }
+      }
+      if (!closeBtn) {
+        closeBtn = document.createElement("button");
+        closeBtn.type = "button";
+        closeBtn.textContent = "✕";
+        banner.appendChild(closeBtn);
+      }
+      closeBtn.setAttribute("data-sq-pwa-close", "1");
+      closeBtn.setAttribute("aria-label", "앱 설치 배너 닫기");
+      closeBtn.setAttribute("title", "닫기");
+      if ((closeBtn.textContent || "").trim().indexOf("✕") === -1 && (closeBtn.textContent || "").trim().indexOf("닫기") === -1) {
+        closeBtn.textContent = "✕";
+      }
+      if (!closeBtn.getAttribute("data-sq-close-bound-v26")) {
+        closeBtn.setAttribute("data-sq-close-bound-v26", "1");
+        closeBtn.addEventListener("click", function () {
+          try { localStorage.setItem("sportiq_pwa_dismiss_until", String(Date.now() + 7 * 86400000)); } catch (e) {}
+          banner.style.setProperty("display", "none", "important");
+          setTimeout(harmonizeMobileFloatingOverlaysV26, 20);
+        });
+      }
+    }
+
+    // 2. Locate right-bottom floating dock / pills (IQ중계티비 & AI 아이큐)
+    var dockWrapper = null;
+    var tvFixedEl = null;
+    var aiFixedEl = null;
+    if (document.body) {
+      var allEls = document.body.querySelectorAll("div, aside, nav, section, button, a");
+      for (var i = 0; i < allEls.length; i++) {
+        var el = allEls[i];
+        if (el === banner || el.id === "sqLegalPolicyModal" || el.id === "sqMemberHubModal" || el.id === "sqDesktopMainTabStrip") continue;
+        if (el.classList && (el.classList.contains("sq-modal-backdrop") || el.classList.contains("inset-0") || el.classList.contains("hidden"))) continue;
+        var pos = el.style.position || window.getComputedStyle(el).position;
+        if (pos !== "fixed") continue;
+        if (el.offsetWidth > 340 || el.offsetHeight > 280) continue;
+        var txt = el.textContent || "";
+        var hasTv = txt.indexOf("IQ중계") !== -1;
+        var hasAi = txt.indexOf("AI 아이큐") !== -1;
+        if (hasTv && hasAi) {
+          dockWrapper = el;
+          el.setAttribute("data-sq-floating-dock", "1");
+          break;
+        }
+      }
+      if (!dockWrapper) {
+        for (var j = 0; j < allEls.length; j++) {
+          var el2 = allEls[j];
+          if (el2 === banner || el2.id === "sqLegalPolicyModal" || el2.id === "sqMemberHubModal" || el2.id === "sqDesktopMainTabStrip") continue;
+          if (el2.classList && (el2.classList.contains("sq-modal-backdrop") || el2.classList.contains("inset-0") || el2.classList.contains("hidden"))) continue;
+          var pos2 = el2.style.position || window.getComputedStyle(el2).position;
+          if (pos2 !== "fixed") continue;
+          if (el2.offsetWidth > 340 || el2.offsetHeight > 260) continue;
+          var txt2 = el2.textContent || "";
+          if (!tvFixedEl && txt2.indexOf("IQ중계") !== -1) {
+            tvFixedEl = el2;
+            el2.setAttribute("data-sq-floating-item", "tv");
+          } else if (!aiFixedEl && txt2.indexOf("AI 아이큐") !== -1) {
+            aiFixedEl = el2;
+            el2.setAttribute("data-sq-floating-item", "ai");
+          }
+        }
+      }
+    }
+
+    var isMobile = window.innerWidth <= 820;
+    var footer = document.getElementById("sqOfficialLegalFooter");
+    var mobNavH = 0;
+    document.querySelectorAll(".sq-mobile-bottom-nav-bar").forEach(function (mn) {
+      if (mn.id === "sqDesktopMainTabStrip") return;
+      if (window.getComputedStyle(mn).position === "fixed" && window.getComputedStyle(mn).display !== "none") {
+        mobNavH = Math.max(mobNavH, mn.offsetHeight || 56);
+      }
+    });
+
+    if (isMobile) {
+      var bannerVisible = Boolean(banner && window.getComputedStyle(banner).display !== "none" && banner.offsetHeight > 0);
+      var bannerH = bannerVisible ? (banner.offsetHeight || 54) : 0;
+      if (banner && bannerVisible) {
+        saveOrigPosV26(banner);
+        banner.style.setProperty("bottom", (10 + mobNavH) + "px", "important");
+        banner.setAttribute("data-sq-mob-shifted", "1");
+      }
+      var dockBaseBottom = (bannerVisible ? (10 + bannerH + 10) : 14) + mobNavH;
+      var totalDockH = 0;
+
+      if (dockWrapper) {
+        saveOrigPosV26(dockWrapper);
+        dockWrapper.style.setProperty("right", "10px", "important");
+        dockWrapper.style.setProperty("bottom", dockBaseBottom + "px", "important");
+        dockWrapper.setAttribute("data-sq-mob-shifted", "1");
+        totalDockH = dockWrapper.offsetHeight || 82;
+      } else {
+        var aiH = 0;
+        if (aiFixedEl) {
+          saveOrigPosV26(aiFixedEl);
+          aiFixedEl.style.setProperty("right", "10px", "important");
+          aiFixedEl.style.setProperty("bottom", dockBaseBottom + "px", "important");
+          aiFixedEl.setAttribute("data-sq-mob-shifted", "1");
+          aiH = aiFixedEl.offsetHeight || 36;
+        }
+        if (tvFixedEl) {
+          saveOrigPosV26(tvFixedEl);
+          var tvBot = dockBaseBottom + (aiFixedEl ? (aiH + 8) : 0);
+          tvFixedEl.style.setProperty("right", "10px", "important");
+          tvFixedEl.style.setProperty("bottom", tvBot + "px", "important");
+          tvFixedEl.setAttribute("data-sq-mob-shifted", "1");
+          totalDockH = (aiFixedEl ? (aiH + 8) : 0) + (tvFixedEl.offsetHeight || 36);
+        } else {
+          totalDockH = aiH;
+        }
+      }
+
+      if (footer) {
+        var safePad = Math.max(168, dockBaseBottom + totalDockH + 22);
+        footer.style.setProperty("padding-bottom", safePad + "px", "important");
+      }
+    } else {
+      if (banner) restoreOrigPosV26(banner);
+      if (dockWrapper) restoreOrigPosV26(dockWrapper);
+      if (tvFixedEl) restoreOrigPosV26(tvFixedEl);
+      if (aiFixedEl) restoreOrigPosV26(aiFixedEl);
+      if (footer) {
+        footer.style.setProperty("padding-bottom", "108px", "important");
+      }
+    }
   }
 
   function syncTop20MatchCountBadge() {
@@ -1620,11 +2016,14 @@ _FRONTEND_V22_JS = r'''
     installOverseasNewsUpgradeV22();
     installLiveHashtagSyncV25();
     mountOfficialLegalFooterV22();
+    harmonizeMobileFloatingOverlaysV26();
+    window.addEventListener("resize", harmonizeMobileFloatingOverlaysV26);
 
     // Keep dynamic UI states synchronized when tabs switch or async data arrives
     [120, 400, 900, 1600].forEach(function (ms) {
       setTimeout(function () {
         enforceSingleLineMainTabBar();
+        harmonizeMobileFloatingOverlaysV26();
         var fb = document.getElementById("feedList");
         if (fb) {
           fb.style.setProperty("display", "block", "important");
@@ -1635,6 +2034,7 @@ _FRONTEND_V22_JS = r'''
     });
     setInterval(function () {
       enforceSingleLineMainTabBar();
+      harmonizeMobileFloatingOverlaysV26();
       syncTop20MatchCountBadge();
       renderTierUpgradeSidebarCard();
       applyReactionStateToPosts();
@@ -3162,6 +3562,12 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
+
+
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -4654,7 +5060,7 @@ def serve_lounge_home():
             rendered = inject_upgrade_into_html(raw_html)
             rendered = re.sub(
                 r'(/api/member/p0p1-upgrade\.js\?v=)(\d+)',
-                lambda m: m.group(1) + str(int(m.group(2)) + 600),
+                lambda m: m.group(1) + str(int(m.group(2)) + 700),
                 rendered,
             )
             return HTMLResponse(rendered, media_type="text/html; charset=utf-8")
