@@ -486,6 +486,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -520,10 +522,13 @@ _FRONTEND_V22_JS = r'''
     var author = String(p.author || "");
     var isVolatileAuto = Boolean(
       p.isAutoAnalyst ||
+      p.isAiBriefing ||
       author.indexOf("자동분석") !== -1 ||
+      author.indexOf("AI 데이터분석팀") !== -1 ||
       title.indexOf("[00:00") === 0 ||
       !rawId ||
       /^auto[-_]/i.test(rawId) ||
+      /^ai[-_]/i.test(rawId) ||
       /^\d+$/.test(rawId)
     );
     if (isVolatileAuto && title) {
@@ -534,8 +539,12 @@ _FRONTEND_V22_JS = r'''
 
   function normalizeStatePostsV24() {
     if (typeof state !== "object" || !state || !Array.isArray(state.posts)) return;
-    state.posts.forEach(function (p) {
-      if (!p) return;
+    var seenIds = {};
+    var seenTitles = {};
+    var deduped = [];
+    for (var i = 0; i < state.posts.length; i++) {
+      var p = state.posts[i];
+      if (!p) continue;
       var cid = canonicalPostIdV24(p);
       if (cid) p.id = cid;
       if (!Array.isArray(p.tags)) {
@@ -543,7 +552,29 @@ _FRONTEND_V22_JS = r'''
       }
       p.tags = p.tags.map(function (t) { return String(t).replace(/^#+/, ""); }).filter(Boolean);
       if (!Array.isArray(p.comments)) p.comments = [];
-    });
+
+      var normT = String(p.title || "").replace(/\s+/g, " ").trim().toLowerCase();
+      var idKey = String(p.id || "");
+      if ((idKey && seenIds[idKey]) || (normT && seenTitles[normT])) {
+        var keeper = seenIds[idKey] || seenTitles[normT];
+        if (keeper && p.isAutoAnalyst && !keeper.isAutoAnalyst) {
+          keeper.isAutoAnalyst = true;
+          keeper.homeLabel = p.homeLabel;
+          keeper.awayLabel = p.awayLabel;
+          keeper.homePct = p.homePct;
+          keeper.awayPct = p.awayPct;
+          keeper.tacticalPoints = p.tacticalPoints;
+          keeper.recommendedPick = p.recommendedPick;
+        }
+        continue;
+      }
+      if (idKey) seenIds[idKey] = p;
+      if (normT) seenTitles[normT] = p;
+      deduped.push(p);
+    }
+    if (deduped.length !== state.posts.length) {
+      state.posts = deduped;
+    }
   }
   var overseasCacheV22 = [];
   var overseasCountsV22 = {};
@@ -639,6 +670,9 @@ _FRONTEND_V22_JS = r'''
       "}",
       "#feedList > article + article {",
       "  margin-top: 14px;",
+      "}",
+      "#feedList[data-sq-bm-only='1'] > article:not([data-sq-bookmarked='1']) {",
+      "  display: none !important;",
       "}",
       "/* Overseas KO Summary Card */",
       ".sq-rss-card-v22 {",
@@ -961,11 +995,29 @@ _FRONTEND_V22_JS = r'''
         likeBtn.textContent = "♥ 좋아요 " + effLikes;
         likeBtn.className = "rounded-lg px-2.5 py-1 " + (effLiked ? "bg-emerald-500/20 text-emerald-300 font-bold" : "bg-slate-800 text-slate-300");
       }
+      art.setAttribute("data-sq-bookmarked", effBm ? "1" : "0");
       if (bmBtn) {
         bmBtn.textContent = "★ " + (effBm ? "저장됨" : "북마크");
         bmBtn.className = "rounded-lg px-2.5 py-1 " + (effBm ? "bg-amber-500/20 text-amber-300 font-bold" : "bg-slate-800 text-slate-300");
       }
     });
+    // Also remove any duplicate rendered <article> cards with identical h3 title
+    var seenDomTitles = {};
+    box.querySelectorAll("article").forEach(function (art) {
+      var h3 = art.querySelector("h3");
+      var key = h3 ? String(h3.textContent || "").replace(/\s+/g, " ").trim().toLowerCase() : "";
+      if (!key) return;
+      if (seenDomTitles[key]) {
+        if (art.parentNode) art.parentNode.removeChild(art);
+      } else {
+        seenDomTitles[key] = true;
+      }
+    });
+    if (bookmarkOnlyFilter) {
+      box.setAttribute("data-sq-bm-only", "1");
+    } else {
+      box.removeAttribute("data-sq-bm-only");
+    }
   }
 
   function updateBookmarkFilterPillCount() {
@@ -1003,9 +1055,29 @@ _FRONTEND_V22_JS = r'''
     btn.style.cssText = "border:1px solid #334155;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:800;cursor:pointer;transition:all .15s;";
     btn.onclick = function () {
       bookmarkOnlyFilter = !bookmarkOnlyFilter;
+      window.__sqBookmarkOnlyFilterV25 = bookmarkOnlyFilter;
+      var fb = document.getElementById("feedList");
+      if (fb) {
+        if (bookmarkOnlyFilter) fb.setAttribute("data-sq-bm-only", "1");
+        else fb.removeAttribute("data-sq-bm-only");
+      }
       updateBookmarkFilterPillCount();
       if (typeof window.renderFeed === "function") window.renderFeed();
     };
+    filterRow.querySelectorAll("[data-sq-ftab]").forEach(function (sib) {
+      if (sib.__sqBmResetBound) return;
+      sib.__sqBmResetBound = true;
+      sib.addEventListener("click", function () {
+        if (bookmarkOnlyFilter) {
+          bookmarkOnlyFilter = false;
+          window.__sqBookmarkOnlyFilterV25 = false;
+          var fb = document.getElementById("feedList");
+          if (fb) fb.removeAttribute("data-sq-bm-only");
+          updateBookmarkFilterPillCount();
+          if (typeof window.renderFeed === "function") window.renderFeed();
+        }
+      });
+    });
     filterRow.appendChild(btn);
     updateBookmarkFilterPillCount();
   }
@@ -1463,6 +1535,68 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
+
+  function installLiveHashtagSyncV25() {
+    window.filterByTag = function (rawTag) {
+      var clean = String(rawTag || "").replace(/^#+/, "").trim();
+      if (!clean) return;
+      bookmarkOnlyFilter = false;
+      window.__sqBookmarkOnlyFilterV25 = false;
+      var fb = document.getElementById("feedList");
+      if (fb) fb.removeAttribute("data-sq-bm-only");
+      updateBookmarkFilterPillCount();
+
+      var lgSel = document.getElementById("leagueFilter");
+      if (lgSel) lgSel.value = "ALL";
+      var feedInp = document.getElementById("feedSearch");
+      if (feedInp) feedInp.value = clean;
+      var p3Inp = document.getElementById("sqP3FeedSearchInput");
+      if (p3Inp) {
+        p3Inp.value = clean;
+        p3Inp.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (typeof window.switchTab === "function") window.switchTab("feed");
+      if (typeof window.renderFeed === "function") window.renderFeed();
+      mountActiveHashtagChipV25(clean);
+      var targetEl = document.getElementById("sqP3FeedToolbar") || fb;
+      if (targetEl && targetEl.scrollIntoView) {
+        targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      if (typeof showToast === "function") {
+        showToast("🏷️ #" + clean + " 관련 실시간 분석글을 모아봅니다.");
+      }
+    };
+
+    if (typeof window.loadHashtags === "function") {
+      try { window.loadHashtags(); } catch (e) {}
+    }
+  }
+
+  function mountActiveHashtagChipV25(cleanTag) {
+    var old = document.getElementById("sqActiveTagResetChip");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    if (!cleanTag) return;
+    var toolbar = document.getElementById("sqP3FeedToolbar");
+    if (!toolbar) return;
+    var chip = document.createElement("button");
+    chip.type = "button";
+    chip.id = "sqActiveTagResetChip";
+    chip.style.cssText = "background:rgba(16,185,129,.2);border:1px solid #34d399;color:#6ee7b7;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:800;cursor:pointer;";
+    chip.textContent = "🏷️ #" + cleanTag + " 필터 해제 ✕";
+    chip.onclick = function () {
+      var feedInp = document.getElementById("feedSearch");
+      if (feedInp) feedInp.value = "";
+      var p3Inp = document.getElementById("sqP3FeedSearchInput");
+      if (p3Inp) {
+        p3Inp.value = "";
+        p3Inp.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (chip.parentNode) chip.parentNode.removeChild(chip);
+      if (typeof window.renderFeed === "function") window.renderFeed();
+    };
+    toolbar.appendChild(chip);
+  }
+
   function bootMemberUxV22() {
     injectUxV22Styles();
     enforceSingleLineMainTabBar();
@@ -1484,6 +1618,7 @@ _FRONTEND_V22_JS = r'''
     hydratePostsAndReactionsFromServer();
     mountLivePinMembersBannerInRanking();
     installOverseasNewsUpgradeV22();
+    installLiveHashtagSyncV25();
     mountOfficialLegalFooterV22();
 
     // Keep dynamic UI states synchronized when tabs switch or async data arrives
@@ -1554,6 +1689,10 @@ def _ensure_upgrade_js_dedup_patched() -> bool:
     updated = updated.replace(
         'if (container.id === "feedList" || container.id === "dcLauncherGrid" || container.id === "globalTop10Grid") return;',
         'if (container.id === "feedList" || container.id === "tab-feed" || container.id === "dcLauncherGrid" || container.id === "globalTop10Grid" || (container.querySelector && container.querySelector("#feedList")) || (container.closest && container.closest("#tab-feed"))) return;',
+    )
+    updated = updated.replace(
+        'art.style.display = (matchTab && matchSearch) ? "" : "none";',
+        'var bmKeep = !window.__sqBookmarkOnlyFilterV25 || art.getAttribute("data-sq-bookmarked") === "1"; art.style.display = (matchTab && matchSearch && bmKeep) ? "" : "none";',
     )
 
     if "__SPORTIQ_MEMBER_UX_V22__" not in updated:
@@ -3022,6 +3161,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -3385,48 +3525,6 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
                     "comments": comments_by_post.get(pid, []),
                     "isMemberServerPost": True,
                     "hasPin": bool(r["pin_hash"]),
-                }
-            )
-
-        for idx, ar in enumerate(auto_rows):
-            ad = dict(ar)
-            aid = str(ad.get("id") or ad.get("post_id") or f"ai_auto_{idx}")
-            if not aid.startswith("ai_"):
-                aid = f"ai_{aid}"
-            if aid in seen_ids:
-                continue
-            seen_ids.add(aid)
-            title = str(ad.get("title") or "").strip()
-            body = str(ad.get("body") or ad.get("content") or ad.get("summary") or "").strip()
-            if not title or not body:
-                continue
-            lg = str(ad.get("league") or ad.get("sport") or "AI 데이터").strip()[:20]
-            cts = _to_epoch_ts(ad.get("created_at")) or (now - (idx + 1) * 900)
-            mins = max(1, int((now - cts) // 60))
-            eff_likes = like_counts.get(aid, int(ad.get("likes") or 6))
-            like_counts[aid] = eff_likes
-            posts.append(
-                {
-                    "id": aid,
-                    "league": lg,
-                    "isPro": False,
-                    "isAiBriefing": True,
-                    "isAi": True,
-                    "isAiPost": True,
-                    "author": str(ad.get("author") or "🤖 SportIQ AI 데이터분석팀"),
-                    "authorBadge": "🤖 AI 공식브리핑",
-                    "trust": 95,
-                    "likes": eff_likes,
-                    "bookmarked": aid in bookmarked_ids,
-                    "liked": aid in liked_ids,
-                    "hidden": False,
-                    "time": mins,
-                    "title": title,
-                    "body": body,
-                    "tags": [lg.replace(" ", ""), "AI브리핑", "데이터분석"],
-                    "comments": comments_by_post.get(aid, []),
-                    "isMemberServerPost": False,
-                    "hasPin": False,
                 }
             )
 
@@ -4247,6 +4345,140 @@ def collect_enriched_overseas_news_v22(force: bool = False) -> List[Dict[str, An
     return interleaved
 
 
+
+
+# --- Real-Time Current-Season 24h Popular Hashtags Engine (v2.5) ---
+_OFFSEASON_STATIC_SEEDS_V25: Set[str] = {
+    "#ucl결승",
+    "#nba플레이오프",
+    "#t1월즈",
+    "#월즈결승",
+    "#한국시리즈",
+}
+
+
+def compute_live_season_hashtags_v25() -> List[Dict[str, Any]]:
+    now = time.time()
+    scores: Dict[str, int] = {}
+    display_map: Dict[str, str] = {}
+
+    def _bump(raw_tag: str, weight: int) -> None:
+        clean = re.sub(r"[^a-zA-Z0-9가-힣_]", "", (raw_tag or "").strip().lstrip("#"))
+        if len(clean) < 2 or len(clean) > 22:
+            return
+        full = f"#{clean}"
+        low = full.lower()
+        if low in _OFFSEASON_STATIC_SEEDS_V25:
+            return
+        if low not in display_map:
+            display_map[low] = full
+        scores[low] = scores.get(low, 0) + max(1, int(weight))
+
+    # A. Aggregate from community_member_posts & auto_analyst_posts & global_match_rankings in SMU DB
+    def _read_smu_sources() -> None:
+        with _smu_db_session(write=False) as conn:
+            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+
+            if "community_member_posts" in tables:
+                for r in conn.execute("SELECT league, title, tags_json, likes FROM community_member_posts LIMIT 60").fetchall():
+                    lk_w = 18 + min(30, int(r["likes"] or 1) * 2)
+                    if r["league"]:
+                        _bump(r["league"], 14)
+                    for tg in json.loads(r["tags_json"] or "[]"):
+                        _bump(str(tg), lk_w)
+
+            if "auto_analyst_posts" in tables:
+                try:
+                    for ar in conn.execute("SELECT * FROM auto_analyst_posts ORDER BY rowid DESC LIMIT 20").fetchall():
+                        ad = dict(ar)
+                        ht = str(ad.get("hashtags") or "")
+                        for tok in ht.split():
+                            _bump(tok, 22)
+                        lg = str(ad.get("league") or "")
+                        if lg:
+                            _bump(lg, 15)
+                        title = str(ad.get("title") or "")
+                        for kw in ("리버풀", "맨유", "아스널", "도르트문트", "바르셀로나", "레알마드리드", "보스턴셀틱스", "댈러스", "손흥민", "이강인", "김민재"):
+                            if kw in title.replace(" ", ""):
+                                _bump(kw, 20)
+                except Exception:
+                    pass
+
+            if "global_match_rankings" in tables:
+                for mr in conn.execute("SELECT league, matchup, votes FROM global_match_rankings ORDER BY votes DESC LIMIT 15").fetchall():
+                    v_w = max(8, int(mr["votes"] or 500) // 90)
+                    lg = str(mr["league"] or "").replace(" ", "")
+                    if lg and "APBC" not in lg.upper() and "LIDOM" not in lg.upper():
+                        _bump(lg, v_w // 2)
+                    sides = re.split(r"\s+vs\.?\s+", str(mr["matchup"] or ""), flags=re.I)
+                    for s in sides:
+                        s_clean = s.strip().replace(" ", "")
+                        if s_clean in ("맨체스터유나이티드",):
+                            _bump("맨유", v_w)
+                        elif s_clean in ("FC바르셀로나",):
+                            _bump("바르셀로나", v_w)
+                        elif s_clean in ("보루시아도르트문트",):
+                            _bump("도르트문트", v_w)
+                        elif len(s_clean) >= 2 and s_clean not in ("대만", "호주"):
+                            _bump(s_clean, v_w)
+
+    try:
+        run_with_db_retry(_read_smu_sources)
+    except Exception:
+        pass
+
+    # B. Also merge user-registered tags from Lounge DB daily_hashtags (excluding off-season static seeds!)
+    def _read_lounge_hashtags() -> None:
+        with _db_session(write=False) as conn:
+            has_dh = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='daily_hashtags'").fetchone()
+            if not has_dh:
+                return
+            for r in conn.execute("SELECT tag, count FROM daily_hashtags ORDER BY count DESC LIMIT 30").fetchall():
+                tg = str(r["tag"] or "").strip()
+                cnt = int(r["count"] or 1)
+                low = tg.lower()
+                if low in _OFFSEASON_STATIC_SEEDS_V25:
+                    continue
+                # Normalize legacy static seed counts so live post/match buzz leads
+                eff_cnt = cnt if cnt not in (128, 96, 84, 63) else max(24, cnt // 2)
+                _bump(tg, eff_cnt)
+
+    try:
+        run_with_db_retry(_read_lounge_hashtags)
+    except Exception:
+        pass
+
+    # Ensure core searchable tags matching seeded & live posts are always present
+    baseline_in_season = [
+        ("리버풀", 64),
+        ("맨유", 61),
+        ("EPL", 58),
+        ("NBA", 52),
+        ("보스턴셀틱스", 46),
+        ("아스널", 44),
+        ("손흥민", 42),
+        ("xG전술분석", 39),
+        ("챔피언스리그", 37),
+        ("KIA타이거즈", 34),
+    ]
+    for b_tag, b_w in baseline_in_season:
+        low = f"#{b_tag}".lower()
+        if scores.get(low, 0) < b_w:
+            display_map.setdefault(low, f"#{b_tag}")
+            scores[low] = max(scores.get(low, 0), b_w)
+
+    ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))[:16]
+    return [
+        {"tag": display_map[low_k], "count": int(sc), "updated_at": now}
+        for low_k, sc in ranked
+    ]
+
+
+@router.get("/api/hashtags/daily")
+def get_daily_hashtags_live_v25():
+    return {"hashtags": compute_live_season_hashtags_v25()}
+
+
 @router.get("/api/lounge/overseas-news")
 def get_enriched_overseas_news_api_v22(sport: str = "전체"):
     items = collect_enriched_overseas_news_v22(force=False)
@@ -4422,7 +4654,7 @@ def serve_lounge_home():
             rendered = inject_upgrade_into_html(raw_html)
             rendered = re.sub(
                 r'(/api/member/p0p1-upgrade\.js\?v=)(\d+)',
-                lambda m: m.group(1) + str(int(m.group(2)) + 550),
+                lambda m: m.group(1) + str(int(m.group(2)) + 600),
                 rendered,
             )
             return HTMLResponse(rendered, media_type="text/html; charset=utf-8")
