@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -17,6 +18,196 @@ from app.sqlite_guard import (
     run_with_db_retry,
 )
 from app.sportiq_member_upgrade import inject_upgrade_into_html, upgrade_router
+import app.sportiq_member_upgrade as _smu
+
+_SORT_DEDUP_APPLIED = False
+
+_FIXED_SORT_STRIP_FN = r"""function isElementHiddenOrCollapsed(el) {
+    if (!el) return true;
+    if (el.id === "proTickerList" || el.id === "dcTickerControls") return true;
+    if (el.style && el.style.display === "none") return true;
+    if (el.classList && (el.classList.contains("hidden") || el.classList.contains("sq-match-sort-bar"))) return true;
+    if (typeof window.getComputedStyle === "function") {
+      try {
+        var cs = window.getComputedStyle(el);
+        if (cs && (cs.display === "none" || cs.visibility === "hidden")) return true;
+      } catch (e) {}
+    }
+    if (typeof el.getClientRects === "function" && el.getClientRects().length === 0) return true;
+    return false;
+  }
+
+  function countDirectMatchCardChildren(el) {
+    if (!el || !el.children || el.children.length < 2 || el.children.length > 500) return 0;
+    if (
+      el.id === "proLiveTickerBar" ||
+      el.id === "proTickerList" ||
+      el.id === "dcTickerControls" ||
+      el.id === "feedList" ||
+      el.id === "dcLauncherGrid" ||
+      el.id === "globalTop10Grid"
+    ) {
+      return 0;
+    }
+    if (isElementHiddenOrCollapsed(el)) return 0;
+
+    var rawKids = Array.prototype.slice.call(el.children);
+    var cardKids = [];
+    for (var i = 0; i < rawKids.length; i++) {
+      var ch = rawKids[i];
+      if (isElementHiddenOrCollapsed(ch)) continue;
+      cardKids.push(ch);
+    }
+    if (cardKids.length < 2) return 0;
+
+    var matchLikeCount = 0;
+    for (var j = 0; j < cardKids.length; j++) {
+      var c = cardKids[j];
+      var t = c.textContent || "";
+      if (
+        (parseMatchEpochFromText(t) != null || t.indexOf("최근 시즌 기록") !== -1) &&
+        /Scheduled|예정|종료|Final|AET|LIVE|배당|스코어|vs/i.test(t)
+      ) {
+        matchLikeCount++;
+      }
+    }
+    if (matchLikeCount < 2 || matchLikeCount < Math.ceil(cardKids.length * 0.4)) return 0;
+    return matchLikeCount;
+  }
+
+  function hasDescendantMatchStrip(container) {
+    if (!container || !container.querySelectorAll) return false;
+    if (container.id !== "dcLiveTickerTrack" && container.querySelector("#dcLiveTickerTrack")) {
+      return true;
+    }
+    var subEls = container.querySelectorAll("div, section, ul");
+    for (var i = 0; i < subEls.length; i++) {
+      if (subEls[i] !== container && countDirectMatchCardChildren(subEls[i]) >= 2) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function cleanupDuplicateMatchSortBars() {
+    var tickerWrap = document.getElementById("proLiveTickerBar");
+    if (tickerWrap) {
+      var prev = tickerWrap.previousElementSibling;
+      while (prev && prev.classList && prev.classList.contains("sq-match-sort-bar")) {
+        var toDrop = prev;
+        prev = prev.previousElementSibling;
+        if (toDrop.parentNode) toDrop.parentNode.removeChild(toDrop);
+      }
+      if (tickerWrap.__sqToolbarEl) tickerWrap.__sqToolbarEl = null;
+
+      var liveTrack = document.getElementById("dcLiveTickerTrack");
+      var innerBars = tickerWrap.querySelectorAll(".sq-match-sort-bar");
+      if (liveTrack && innerBars.length > 0) {
+        var keeper = liveTrack.__sqToolbarEl || innerBars[0];
+        for (var k = 0; k < innerBars.length; k++) {
+          if (innerBars[k] !== keeper && innerBars[k].parentNode) {
+            innerBars[k].parentNode.removeChild(innerBars[k]);
+          }
+        }
+        if (keeper && keeper.nextElementSibling !== liveTrack && liveTrack.parentNode) {
+          liveTrack.parentNode.insertBefore(keeper, liveTrack);
+        }
+        liveTrack.__sqToolbarEl = keeper;
+      }
+    }
+  }
+
+  function sortRenderedMatchCardStrips(forceResort) {
+    cleanupDuplicateMatchSortBars();
+
+    document.querySelectorAll("div, section, ul").forEach(function (container) {
+      if (countDirectMatchCardChildren(container) < 2) return;
+      if (hasDescendantMatchStrip(container)) return;
+
+      var kids = Array.prototype.slice.call(container.children).filter(function (ch) {
+        return !isElementHiddenOrCollapsed(ch);
+      });
+      if (kids.length < 2) return;
+
+      bindSmoothHorizontalControls(container);
+      mountSortToggleAboveStrip(container);
+
+      var scroller = resolveActualScrollViewport(container);
+      if (container.__sqToolbarEl && scroller) {
+        updateNavButtonEdgeStates(container.__sqToolbarEl, scroller);
+      }
+
+      if (!forceResort && isStripUserInteracting(container)) return;
+
+      var firstTxt = (kids[0].textContent || "").slice(0, 48);
+      var lastTxt = (kids[kids.length - 1].textContent || "").slice(0, 48);
+      var sig = matchSortMode + "|" + kids.length + "|" + firstTxt + "|" + lastTxt;
+      if (!forceResort && container.__sqSortedSig === sig) return;
+
+      var decorated = kids.map(function (el, idx) {
+        var t = el.textContent || "";
+        var isSeedArch = el.getAttribute("data-sq-seed-archive") === "1" || t.indexOf("최근 시즌 기록") !== -1;
+        var ep = isSeedArch ? null : parseMatchEpochFromText(t);
+        var ord = isSeedArch ? { bucket: 8, key: idx } : computeMatchOrderTuple(t, ep, idx);
+        var isMy = /★\s*MY\b/.test(t) ? 0 : 1;
+        return { el: el, idx: idx, isMy: isMy, bucket: ord.bucket, key: ord.key };
+      });
+
+      var sorted = decorated.slice().sort(function (a, b) {
+        if (a.bucket !== b.bucket) return a.bucket - b.bucket;
+        if (a.key !== b.key) return a.key - b.key;
+        if (a.isMy !== b.isMy) return a.isMy - b.isMy;
+        return a.idx - b.idx;
+      });
+
+      var changed = Boolean(forceResort);
+      if (!changed) {
+        for (var i = 0; i < sorted.length; i++) {
+          if (sorted[i].el !== kids[i]) { changed = true; break; }
+        }
+      }
+      if (changed) {
+        var prevScrollLeft = scroller ? (scroller.scrollLeft || 0) : (container.scrollLeft || 0);
+        sorted.forEach(function (item) { container.appendChild(item.el); });
+        if (scroller) scroller.scrollLeft = forceResort ? 0 : prevScrollLeft;
+      }
+      var newKids = Array.prototype.slice.call(container.children).filter(function (ch) {
+        return !isElementHiddenOrCollapsed(ch);
+      });
+      container.__sqSortedSig = matchSortMode + "|" + newKids.length + "|" +
+        ((newKids[0] && newKids[0].textContent) || "").slice(0, 48) + "|" +
+        ((newKids[newKids.length - 1] && newKids[newKids.length - 1].textContent) || "").slice(0, 48);
+      if (container.__sqToolbarEl && scroller) {
+        updateNavButtonEdgeStates(container.__sqToolbarEl, scroller);
+      }
+    });
+
+    cleanupDuplicateMatchSortBars();
+  }"""
+
+
+def _ensure_upgrade_js_dedup_patched() -> bool:
+    global _SORT_DEDUP_APPLIED
+    js_raw = getattr(_smu, "UPGRADE_JS", "")
+    if not isinstance(js_raw, str) or not js_raw:
+        return False
+    if "cleanupDuplicateMatchSortBars" in js_raw:
+        _SORT_DEDUP_APPLIED = True
+        return True
+    pattern = re.compile(
+        r"function\s+sortRenderedMatchCardStrips\s*\(\s*forceResort\s*\)\s*\{.*?(?=\n\s*function\s+mountSortToggleAboveStrip\s*\()",
+        flags=re.DOTALL,
+    )
+    patched, n = pattern.subn(lambda _m: _FIXED_SORT_STRIP_FN, js_raw, count=1)
+    if n > 0:
+        _smu.UPGRADE_JS = patched
+        _SORT_DEDUP_APPLIED = True
+        return True
+    return False
+
+
+_ensure_upgrade_js_dedup_patched()
+
 
 install_sqlite_guard()
 
@@ -319,9 +510,16 @@ class ReportIn(BaseModel):
 def serve_lounge_home():
     if os.path.exists(HTML_PATH):
         try:
+            _ensure_upgrade_js_dedup_patched()
             with open(HTML_PATH, "r", encoding="utf-8") as f:
                 raw_html = f.read()
-            return HTMLResponse(inject_upgrade_into_html(raw_html), media_type="text/html; charset=utf-8")
+            rendered = inject_upgrade_into_html(raw_html)
+            rendered = re.sub(
+                r'(/api/member/p0p1-upgrade\.js\?v=)(\d+)',
+                lambda m: m.group(1) + str(int(m.group(2)) + 100),
+                rendered,
+            )
+            return HTMLResponse(rendered, media_type="text/html; charset=utf-8")
         except Exception:
             return FileResponse(HTML_PATH, media_type="text/html; charset=utf-8")
     return HTMLResponse("<h1>SportIQ Lounge</h1><p>HTML file missing.</p>", status_code=200)
@@ -341,6 +539,7 @@ def lounge_health():
         "busy_timeout_ms": DEFAULT_BUSY_TIMEOUT_MS,
         "datacenter_swr_active": _DC_SWR_INSTALLED,
         "member_upgrade_v1": True,
+        "match_sort_bar_dedup": _SORT_DEDUP_APPLIED,
     }
 
 
