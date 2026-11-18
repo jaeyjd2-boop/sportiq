@@ -596,6 +596,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -3574,13 +3576,27 @@ _FRONTEND_V22_JS = r'''
     if (replaceAll) {
       v30ScoreState.rawAllItems = norm;
     } else if (norm.length) {
-      if (!v30ScoreState.rawAllItems.length || norm.length >= v30ScoreState.rawAllItems.length) {
+      if (!v30ScoreState.rawAllItems.length) {
         v30ScoreState.rawAllItems = norm;
       } else {
         var byId = {};
-        v30ScoreState.rawAllItems.forEach(function (x) { byId[matchFavKeyV30(x)] = x; });
-        norm.forEach(function (x) { byId[matchFavKeyV30(x)] = x; });
-        v30ScoreState.rawAllItems = Object.keys(byId).map(function (k) { return byId[k]; });
+        var orderKeys = [];
+        v30ScoreState.rawAllItems.forEach(function (x) {
+          var k = matchFavKeyV30(x);
+          if (!byId[k]) orderKeys.push(k);
+          byId[k] = x;
+        });
+        norm.forEach(function (x) {
+          var k = matchFavKeyV30(x);
+          if (!byId[k]) orderKeys.push(k);
+          byId[k] = x;
+        });
+        var ordMap = { "in": 0, "pre": 1, "post": 2 };
+        v30ScoreState.rawAllItems = orderKeys.map(function (k) { return byId[k]; }).sort(function (a, b) {
+          var oa = ordMap[a.state] != null ? ordMap[a.state] : 3;
+          var ob = ordMap[b.state] != null ? ordMap[b.state] : 3;
+          return oa !== ob ? (oa - ob) : String(a.match_dt_kst || "").localeCompare(String(b.match_dt_kst || ""));
+        });
       }
     }
     recomputeScopedItemsV30();
@@ -3667,7 +3683,7 @@ _FRONTEND_V22_JS = r'''
           if (Array.isArray(d.date_strip) && d.date_strip.length) {
             v30ScoreState.dateStrip = d.date_strip;
           }
-          mergeRawScoreItemsV30(d.items || [], true);
+          mergeRawScoreItemsV30(d.items || [], Boolean(v30ScoreState.customDateRendered));
           return;
         }
       })
@@ -3681,6 +3697,7 @@ _FRONTEND_V22_JS = r'''
     var clamped = Math.max(-5, Math.min(5, parseInt(newOff, 10) || 0));
     v30ScoreState.selectedDateOffset = clamped;
     v30ScoreState.loadedDateOffset = null;
+    v30ScoreState.rawAllItems = [];
 
     // Check if native widget.js has a matching .dc-date-btn (e.g. -1, 0, 1, 2)
     var dtBtns = discoverTopDateButtonsV304();
@@ -4233,6 +4250,90 @@ _FRONTEND_V22_JS = r'''
     }, true);
   }
 
+  function buildDomesticBballCardHtmlV343(it) {
+    var isLive = it.state === "in";
+    var stBg = isLive ? "#dc2626" : (it.state === "post" ? "#475569" : "#1d4ed8");
+    var ai = it.ai || {};
+    var odds = ai.odds || {};
+    var probTxt = "AI " + (ai.home_pct || 50) + "% / 0% / " + (ai.away_pct || 50) + "%";
+    var oddsTxt = odds.home ? ("배당 " + odds.home + " / " + odds.away) : "";
+    return [
+      "<div style='display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:11px;margin-bottom:5px;'>",
+      "  <span style='background:#1e293b;color:#fdba74;padding:2px 6px;border-radius:6px;font-weight:800;'>🏀 " + uxEsc(it.league_code || it.league) + "</span>",
+      "  <span style='color:#fde68a;font-weight:700;'>" + uxEsc(it.venue || it.match_dt_kst) + "</span>",
+      "  <span data-sq-v343-badge='1' style='background:" + stBg + ";color:#fff;padding:2px 6px;border-radius:6px;font-weight:800;'>" + uxEsc(it.status_badge) + "</span>",
+      "</div>",
+      "<div style='display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:800;margin:4px 0;'>",
+      "  <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;'>" + uxEsc(it.home) + "</span>",
+      "  <span data-sq-v343-score='1' style='background:#1e293b;padding:2px 9px;border-radius:8px;color:#38bdf8;font-size:14px;'>" + uxEsc(it.home_score) + " : " + uxEsc(it.away_score) + "</span>",
+      "  <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;text-align:right;'>" + uxEsc(it.away) + "</span>",
+      "</div>",
+      "<div data-sq-v343-period='1' style='font-size:11px;color:#7dd3fc;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>📊 " + uxEsc(it.period_scores || "정규리그 매치업") + "</div>",
+      "<div style='display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#94a3b8;margin-top:4px;'>",
+      "  <span>🎯 " + uxEsc(probTxt) + "</span>",
+      "  <span>" + uxEsc(oddsTxt) + "</span>",
+      "</div>"
+    ].join("");
+  }
+
+  function syncDomesticBballCardsInTrackV343(strip) {
+    if (!strip || v30ScoreState.customDateRendered) return;
+    var domItems = (v30ScoreState.rawAllItems || []).filter(function (x) {
+      if (!x) return false;
+      var lc = String(x.league_code || x.league || "").toUpperCase();
+      return lc === "KBL" || lc === "WKBL";
+    });
+    if (!domItems.length) return;
+
+    var curCards = resolveIndividualCardElementsV31(strip);
+    var cardParent = (curCards.length && curCards[0].parentElement) ? curCards[0].parentElement : strip;
+    if (!cardParent) return;
+
+    // Hide widget.js's generic empty-message node if KBL/WKBL was selected in #dcTickerLeagueSel
+    var ctl = getActiveDcControlsV30();
+    var luAct = String(ctl.league || "all").toUpperCase();
+    if (luAct === "KBL" || luAct === "WKBL") {
+      Array.prototype.forEach.call(cardParent.children || [], function (ch) {
+        if (ch && !ch.getAttribute("data-sq-v343-dom-id") && !ch.getAttribute("data-sq-v30-fk") && !/AI\s*\d+/.test(String(ch.textContent || ""))) {
+          ch.style.display = "none";
+        }
+      });
+    }
+
+    var prevGuard = _inSportDotMutationV304;
+    _inSportDotMutationV304 = true;
+    try {
+      for (var i = domItems.length - 1; i >= 0; i--) {
+        var dg = domItems[i];
+        var fk = matchFavKeyV30(dg);
+        var existing = cardParent.querySelector("[data-sq-v343-dom-id='" + dg.id + "']") || cardParent.querySelector("[data-sq-v30-fk='" + fk.replace(/'/g, "") + "']");
+        if (!existing) {
+          var card = document.createElement("div");
+          card.setAttribute("data-sq-v343-dom-id", dg.id);
+          card.setAttribute("data-sq-v30-fk", fk);
+          card.style.cssText = "min-width:248px;max-width:288px;flex:0 0 auto;background:#0f172a;border:1px solid " + (dg.state === "in" ? "#ef4444" : "#334155") + ";border-radius:12px;padding:9px 11px;cursor:pointer;color:#f8fafc;display:flex;flex-direction:column;";
+          card.innerHTML = buildDomesticBballCardHtmlV343(dg);
+          if (dg.state === "in" && cardParent.firstChild) {
+            cardParent.insertBefore(card, cardParent.firstChild);
+          } else {
+            cardParent.appendChild(card);
+          }
+        } else if (existing.getAttribute("data-sq-v343-dom-id")) {
+          var bEl = existing.querySelector("[data-sq-v343-badge='1']");
+          if (bEl && bEl.textContent !== dg.status_badge) bEl.textContent = dg.status_badge;
+          var sEl = existing.querySelector("[data-sq-v343-score='1']");
+          var wantSc = dg.home_score + " : " + dg.away_score;
+          if (sEl && sEl.textContent !== wantSc) sEl.textContent = wantSc;
+          var pEl = existing.querySelector("[data-sq-v343-period='1']");
+          var wantPr = "📊 " + (dg.period_scores || "정규리그 매치업");
+          if (pEl && pEl.textContent !== wantPr) pEl.textContent = wantPr;
+        }
+      }
+    } finally {
+      _inSportDotMutationV304 = prevGuard;
+    }
+  }
+
   function decorateMiniScoreCardsV30() {
     var mainTrack = findPrimaryMainCardStripV30();
     var leg = document.getElementById("proTickerList");
@@ -4245,6 +4346,9 @@ _FRONTEND_V22_JS = r'''
 
     strips.forEach(function (entry) {
       var strip = entry.el;
+      if (entry.el === mainTrack) {
+        syncDomesticBballCardsInTrackV343(strip);
+      }
       var cards = resolveIndividualCardElementsV31(strip);
       if (!cards.length) return;
       var cardParent = cards[0].parentElement || strip;
@@ -7223,6 +7327,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -7413,7 +7518,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3420_{int(time.time())}"
+_BOOT_VER_V30 = f"3430_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -9248,11 +9353,17 @@ def api_member_scoreboard_v30(date_offset: int = 0):
     raw_items: List[Dict[str, Any]] = []
 
     try:
-        from app import sportiq_datacenter as _dc
+        _dc = sys.modules.get("app.sportiq_datacenter") or sys.modules.get("sportiq_datacenter")
+        if _dc is None:
+            try:
+                from app import sportiq_datacenter as _dc
+            except Exception:
+                import sportiq_datacenter as _dc  # type: ignore
         # Standard -3..+5 offsets use sportiq_datacenter's native collector directly
         if date_offset >= -3:
             collect_dict = getattr(_dc, "collect_live_scores", None)
             collect_all = getattr(_dc, "_collect_all_matches", None)
+            api_ls_fn = getattr(_dc, "api_live_scores", None)
             if callable(collect_dict):
                 d_res = collect_dict(date_offset)
                 if isinstance(d_res, dict):
@@ -9264,6 +9375,15 @@ def api_member_scoreboard_v30(date_offset: int = 0):
                 a_res = collect_all(date_offset)
                 if isinstance(a_res, list):
                     raw_items = list(a_res)
+                elif isinstance(a_res, dict) and isinstance(a_res.get("items"), list):
+                    raw_items = list(a_res["items"])
+            if not raw_items and callable(api_ls_fn):
+                try:
+                    ls_res = api_ls_fn(sport="all", league="all", date_offset=date_offset)
+                    if isinstance(ls_res, dict) and isinstance(ls_res.get("items"), list):
+                        raw_items = list(ls_res["items"])
+                except Exception:
+                    pass
         else:
             # True KST lookup for -5 and -4 (bypassing collect_live_scores's -3 floor)
             cached = _V31_EXT_SCORE_CACHE.get(date_offset)
