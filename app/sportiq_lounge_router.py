@@ -504,6 +504,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -3615,6 +3617,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -4982,6 +4985,12 @@ def inject_seo_and_og_head_v27(html_text: str) -> str:
     )
 
     extra_tags: List[str] = []
+    gsc_token = os.environ.get("GOOGLE_SITE_VERIFICATION", "5y6CyxixambA3NZ-cMgYxaAci0L-0c8ksCl9H-nPVUk").strip()
+    if gsc_token and gsc_token not in out:
+        extra_tags.append(f'  <meta name="google-site-verification" content="{gsc_token}" />')
+    naver_token = os.environ.get("NAVER_SITE_VERIFICATION", "").strip()
+    if naver_token and naver_token not in out:
+        extra_tags.append(f'  <meta name="naver-site-verification" content="{naver_token}" />')
     if 'name="robots"' not in out and "name='robots'" not in out:
         extra_tags.append('  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />')
     if 'property="og:site_name"' not in out and "property='og:site_name'" not in out:
