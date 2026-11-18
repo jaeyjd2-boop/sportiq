@@ -554,6 +554,10 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -796,6 +800,37 @@ _FRONTEND_V22_JS = r'''
       "  padding: 0 !important;",
       "  margin: 0 !important;",
       "  border: 0 !important;",
+      "}",
+      "/* v3.2 1-Click Match Fan Vote (+5P & Real-Time Vote Gauge) */",
+      ".sq-v32-vote-btn {",
+      "  background: #0f172a;",
+      "  border: 1px solid #334155;",
+      "  color: #e2e8f0;",
+      "  border-radius: 10px;",
+      "  padding: 8px 8px;",
+      "  cursor: pointer;",
+      "  display: flex;",
+      "  flex-direction: column;",
+      "  align-items: center;",
+      "  justify-content: center;",
+      "  gap: 2px;",
+      "  transition: all 0.15s ease;",
+      "}",
+      ".sq-v32-vote-btn:hover { border-color: #38bdf8; background: rgba(30, 41, 59, 0.9); transform: translateY(-1px); }",
+      ".sq-v32-vote-btn.is-picked-H {",
+      "  background: rgba(16, 185, 129, 0.2);",
+      "  border-color: #34d399;",
+      "  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.45);",
+      "}",
+      ".sq-v32-vote-btn.is-picked-D {",
+      "  background: rgba(148, 163, 184, 0.22);",
+      "  border-color: #cbd5e1;",
+      "  box-shadow: 0 0 0 1px rgba(203, 213, 225, 0.4);",
+      "}",
+      ".sq-v32-vote-btn.is-picked-A {",
+      "  background: rgba(56, 189, 248, 0.2);",
+      "  border-color: #38bdf8;",
+      "  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.45);",
       "}",
       "#sqV31DateCalendarBar {",
       "  display: flex;",
@@ -4473,8 +4508,161 @@ _FRONTEND_V22_JS = r'''
           (dp > 0 ? "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:7px;'><div style='color:#94a3b8;font-size:11px;'>무승부</div><strong style='color:#cbd5e1;font-size:14px;'>AI " + dp + "%</strong><div style='color:#64748b;font-size:10.5px;'>시장 " + mktD + "% · 배당 " + uxEsc(odds.draw || "-") + "</div></div>" : ""),
           "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:7px;'><div style='color:#94a3b8;font-size:11px;'>원정승 (" + uxEsc(it.away) + ")</div><strong style='color:#38bdf8;font-size:14px;'>AI " + ap + "%</strong><div style='color:#64748b;font-size:10.5px;'>시장 " + mktA + "% · 배당 " + uxEsc(odds.away || "-") + "</div></div>",
           "</div>",
-          "<div style='background:rgba(16,185,129,.08);border:1px solid rgba(52,211,153,.3);border-radius:9px;padding:9px 11px;color:#e2e8f0;'>💡 <strong>밸류 핵심 요약:</strong> " + edgeNote + "</div>"
+          "<div style='background:rgba(16,185,129,.08);border:1px solid rgba(52,211,153,.3);border-radius:9px;padding:9px 11px;color:#e2e8f0;margin-bottom:10px;'>💡 <strong>밸류 핵심 요약:</strong> " + edgeNote + "</div>",
+          "<div id='sqMatchFanVoteCardV32' style='background:linear-gradient(145deg,rgba(15,23,42,.96),rgba(2,6,23,.96));border:1px solid rgba(56,189,248,.38);border-radius:11px;padding:10px 12px;'>",
+          "  <div style='display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;'>",
+          "    <div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;'>",
+          "      <span style='font-weight:900;color:#f8fafc;font-size:12.3px;'>🗳️ 실시간 팬 승부투표</span>",
+          "      <span id='sqFanVoteRewardTagV32' style='background:rgba(16,185,129,.2);border:1px solid rgba(52,211,153,.5);color:#6ee7b7;border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:800;'>참여 시 +5P 즉시 적립</span>",
+          "    </div>",
+          "    <span id='sqFanVoteTotalMetaV32' style='font-size:11px;color:#94a3b8;font-weight:700;'>실시간 집계 불러오는 중...</span>",
+          "  </div>",
+          "  <div id='sqFanVoteBtnsGridV32' style='display:grid;grid-template-columns:repeat(" + (dp > 0 ? 3 : 2) + ",1fr);gap:7px;margin-bottom:8px;'></div>",
+          "  <div id='sqFanVoteGaugeWrapV32'></div>",
+          "</div>"
         ].join("");
+
+        var hasDrawVote = dp > 0;
+        function renderFanVoteStateUI(vd) {
+          var grid = document.getElementById("sqFanVoteBtnsGridV32");
+          var gWrap = document.getElementById("sqFanVoteGaugeWrapV32");
+          var rTag = document.getElementById("sqFanVoteRewardTagV32");
+          var tMeta = document.getElementById("sqFanVoteTotalMetaV32");
+          if (!grid || !gWrap) return;
+
+          var myP = String((vd && vd.my_pick) || "");
+          var fHp = vd ? Number(vd.home_pct || 0) : hp;
+          var fDp = (vd && hasDrawVote) ? Number(vd.draw_pct || 0) : (hasDrawVote ? dp : 0);
+          var fAp = vd ? Number(vd.away_pct || 0) : ap;
+          var hv = vd ? Number(vd.home_votes || 0) : 0;
+          var dv = (vd && hasDrawVote) ? Number(vd.draw_votes || 0) : 0;
+          var av = vd ? Number(vd.away_votes || 0) : 0;
+          var totV = vd ? Number(vd.total_votes || (hv + dv + av)) : 0;
+
+          if (tMeta) tMeta.textContent = "총 " + totV.toLocaleString() + "명 참여";
+          if (rTag) {
+            if (myP) {
+              var myLbl = myP === "H" ? (it.home + " 승") : (myP === "A" ? (it.away + " 승") : "무승부");
+              rTag.textContent = "✅ +5P 적립됨 · 내 픽: " + myLbl;
+              rTag.style.background = "rgba(56,189,248,.2)";
+              rTag.style.borderColor = "rgba(56,189,248,.55)";
+              rTag.style.color = "#7dd3fc";
+            } else {
+              rTag.textContent = "참여 시 +5P 즉시 적립";
+            }
+          }
+
+          var btns = [
+            "<button type='button' class='sq-v32-vote-btn" + (myP === "H" ? " is-picked-H" : "") + "' data-sq-v32-pick='H'>" +
+            "  <span style='font-size:11px;color:#cbd5e1;font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" + (myP === "H" ? "✓ " : "🏠 ") + uxEsc(it.home) + " 승</span>" +
+            "  <strong style='font-size:14px;color:#34d399;'>" + fHp + "%</strong>" +
+            "  <span style='font-size:10px;color:#64748b;'>" + hv + "표</span>" +
+            "</button>"
+          ];
+          if (hasDrawVote) {
+            btns.push(
+              "<button type='button' class='sq-v32-vote-btn" + (myP === "D" ? " is-picked-D" : "") + "' data-sq-v32-pick='D'>" +
+              "  <span style='font-size:11px;color:#cbd5e1;font-weight:800;'>" + (myP === "D" ? "✓ " : "⚖️ ") + "무승부</span>" +
+              "  <strong style='font-size:14px;color:#e2e8f0;'>" + fDp + "%</strong>" +
+              "  <span style='font-size:10px;color:#64748b;'>" + dv + "표</span>" +
+              "</button>"
+            );
+          }
+          btns.push(
+            "<button type='button' class='sq-v32-vote-btn" + (myP === "A" ? " is-picked-A" : "") + "' data-sq-v32-pick='A'>" +
+            "  <span style='font-size:11px;color:#cbd5e1;font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" + (myP === "A" ? "✓ " : "✈️ ") + uxEsc(it.away) + " 승</span>" +
+            "  <strong style='font-size:14px;color:#38bdf8;'>" + fAp + "%</strong>" +
+            "  <span style='font-size:10px;color:#64748b;'>" + av + "표</span>" +
+            "</button>"
+          );
+          grid.innerHTML = btns.join("");
+
+          var diffHome = fHp - hp;
+          var sentimentTxt = Math.abs(diffHome) <= 3
+            ? "AI 예측(" + hp + "%)과 팬 투표 여론(" + fHp + "%)이 거의 일치합니다."
+            : (diffHome > 0
+                ? (uxEsc(it.home) + " 쪽으로 팬 여론(" + fHp + "%)이 AI(" + hp + "%)보다 <strong style='color:#34d399;'>+" + diffHome + "%p</strong> 높게 쏠려 있습니다.")
+                : (uxEsc(it.away) + " 쪽으로 팬 여론(" + fAp + "%)이 AI(" + ap + "%) 대비 역배·원정 지지가 높습니다."));
+
+          gWrap.innerHTML = [
+            "<div style='display:flex;height:8px;border-radius:999px;overflow:hidden;background:#1e293b;margin-bottom:5px;'>",
+            "  <div style='width:" + fHp + "%;background:#10b981;transition:width .25s ease;'></div>",
+            (hasDrawVote ? "  <div style='width:" + fDp + "%;background:#64748b;transition:width .25s ease;'></div>" : ""),
+            "  <div style='width:" + fAp + "%;background:#38bdf8;transition:width .25s ease;'></div>",
+            "</div>",
+            "<div style='font-size:11px;color:#94a3b8;'>📊 <strong>AI vs 팬 민심:</strong> " + sentimentTxt + "</div>"
+          ].join("");
+
+          grid.querySelectorAll("[data-sq-v32-pick]").forEach(function (vb) {
+            vb.onclick = function () {
+              var chosen = vb.getAttribute("data-sq-v32-pick") || "H";
+              var curPts = 120;
+              if (typeof window.state === "object" && window.state && typeof window.state.points === "number") {
+                curPts = window.state.points;
+              } else {
+                var pbEl = document.getElementById("pointsBadge");
+                if (pbEl) {
+                  var pm = String(pbEl.textContent || "").match(/\d+/);
+                  if (pm) curPts = parseInt(pm[0], 10);
+                }
+              }
+              fetch("/api/member/match-vote", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  match_key: fk,
+                  pick: chosen,
+                  has_draw: hasDrawVote,
+                  hp: hp,
+                  dp: dp,
+                  ap: ap,
+                  nickname: getSavedNickV22(),
+                  pin: getSavedPinV22(),
+                  actor_key: getActorKeyV22(),
+                  client_points: curPts
+                })
+              })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                  if (!res || !res.ok) return;
+                  renderFanVoteStateUI(res);
+                  if (typeof res.points === "number" && res.awarded_points > 0) {
+                    if (typeof window.state === "object" && window.state) {
+                      window.state.points = res.points;
+                      if (res.role_tier) window.state.role = res.role_tier;
+                    }
+                    try { localStorage.setItem("sportiq_points", String(res.points)); } catch (e) {}
+                    var pb = document.getElementById("pointsBadge");
+                    if (pb) pb.textContent = res.points + " P";
+                    if (typeof window.updatePointsUI === "function") {
+                      try { window.updatePointsUI(); } catch (e) {}
+                    }
+                    renderTierUpgradeSidebarCard();
+                  }
+                  if (res.message && typeof showToast === "function") {
+                    showToast(res.message);
+                  }
+                })
+                .catch(function () {});
+            };
+          });
+        }
+
+        // Render immediate optimistic preview, then hydrate exact DB tally
+        renderFanVoteStateUI(null);
+        var qVoteUrl = "/api/member/match-vote?match_key=" + encodeURIComponent(fk) +
+                       "&actor_key=" + encodeURIComponent(getActorKeyV22()) +
+                       "&nickname=" + encodeURIComponent(getSavedNickV22()) +
+                       "&has_draw=" + (hasDrawVote ? "1" : "0") +
+                       "&hp=" + encodeURIComponent(hp) +
+                       "&dp=" + encodeURIComponent(dp) +
+                       "&ap=" + encodeURIComponent(ap);
+        fetch(qVoteUrl)
+          .then(function (r) { return r.json(); })
+          .then(function (vd) {
+            if (vd && vd.ok) renderFanVoteStateUI(vd);
+          })
+          .catch(function () {});
       } else if (tabKey === "stats") {
         var domH = Math.max(22, Math.min(78, Math.round(hp + (dp * 0.5))));
         var domA = 100 - domH;
@@ -6335,6 +6523,8 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -6357,7 +6547,7 @@ def _trigger_smu_pg_backup(*tables: str) -> None:
 
 
 def _register_ux_v22_pg_tables() -> None:
-    extra = ("community_post_likes", "community_post_like_totals", "member_post_bookmarks")
+    extra = ("community_post_likes", "community_post_like_totals", "member_post_bookmarks", "match_fan_votes_v32", "match_fan_vote_totals_v32")
     cur = getattr(_smu, "BACKUP_TABLES", ())
     if isinstance(cur, (tuple, list)):
         merged = tuple(dict.fromkeys(list(cur) + list(extra)))
@@ -6365,6 +6555,7 @@ def _register_ux_v22_pg_tables() -> None:
     try:
         from app.sportiq_auto_analyst import register_snapshot_table
         register_snapshot_table("community_post_like_totals", "post_id")
+        register_snapshot_table("match_fan_vote_totals_v32", "match_key")
     except Exception:
         pass
 
@@ -6398,6 +6589,21 @@ def _init_ux_v22_tables() -> None:
                     author TEXT NOT NULL DEFAULT '',
                     created_at REAL NOT NULL,
                     PRIMARY KEY (actor_key, post_id)
+                );
+                CREATE TABLE IF NOT EXISTS match_fan_votes_v32 (
+                    match_key TEXT NOT NULL,
+                    actor_key TEXT NOT NULL,
+                    pick TEXT NOT NULL,
+                    rewarded INTEGER NOT NULL DEFAULT 1,
+                    updated_at REAL NOT NULL,
+                    PRIMARY KEY (match_key, actor_key)
+                );
+                CREATE TABLE IF NOT EXISTS match_fan_vote_totals_v32 (
+                    match_key TEXT PRIMARY KEY,
+                    home_votes INTEGER NOT NULL DEFAULT 0,
+                    draw_votes INTEGER NOT NULL DEFAULT 0,
+                    away_votes INTEGER NOT NULL DEFAULT 0,
+                    updated_at REAL NOT NULL
                 );
                 """
             )
@@ -6509,7 +6715,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3100_{int(time.time())}"
+_BOOT_VER_V30 = f"3200_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -8021,6 +8227,285 @@ def api_member_scoreboard_v30(date_offset: int = 0):
         "total": len(raw_items),
         "items": raw_items,
     }
+
+class MatchFanVoteIn(BaseModel):
+    match_key: str
+    pick: str  # "H" | "D" | "A"
+    has_draw: Optional[bool] = True
+    hp: Optional[int] = 45
+    dp: Optional[int] = 25
+    ap: Optional[int] = 30
+    nickname: Optional[str] = ""
+    pin: Optional[str] = ""
+    actor_key: Optional[str] = ""
+    client_points: Optional[int] = 120
+
+
+def _seed_fan_vote_baseline_v32(match_key: str, has_draw: bool, hp: int, dp: int, ap: int) -> Tuple[int, int, int]:
+    h_val = 2166136261
+    for ch in match_key.encode("utf-8", errors="ignore"):
+        h_val ^= ch
+        h_val = (h_val * 16777619) & 0xFFFFFFFF
+    total_base = 24 + (h_val % 33)  # 24 ~ 56 initial fan votes
+    hp_c = max(8, min(88, int(hp or 45)))
+    dp_c = max(8, min(45, int(dp or 24))) if has_draw else 0
+    ap_c = max(8, 100 - hp_c - dp_c)
+    s = max(1, hp_c + dp_c + ap_c)
+    hv = max(2, int(round(total_base * (hp_c / s))))
+    dv = max(1, int(round(total_base * (dp_c / s)))) if has_draw else 0
+    av = max(2, total_base - hv - dv)
+    return hv, dv, av
+
+
+def _format_fan_vote_payload_v32(
+    match_key: str,
+    hv: int,
+    dv: int,
+    av: int,
+    has_draw: bool,
+    my_pick: str = "",
+    rewarded: bool = False,
+    awarded_points: int = 0,
+    points: Optional[int] = None,
+    role_tier: str = "",
+    switched: bool = False,
+    message: str = "",
+) -> Dict[str, Any]:
+    if not has_draw:
+        dv = 0
+    tot = max(1, hv + dv + av)
+    h_pct = int(round((hv / tot) * 100))
+    d_pct = int(round((dv / tot) * 100)) if has_draw else 0
+    a_pct = max(0, 100 - h_pct - d_pct)
+    out: Dict[str, Any] = {
+        "ok": True,
+        "match_key": match_key,
+        "has_draw": bool(has_draw),
+        "my_pick": my_pick,
+        "rewarded": bool(rewarded),
+        "switched": bool(switched),
+        "awarded_points": int(awarded_points),
+        "home_votes": int(hv),
+        "draw_votes": int(dv),
+        "away_votes": int(av),
+        "total_votes": int(hv + dv + av),
+        "home_pct": h_pct,
+        "draw_pct": d_pct,
+        "away_pct": a_pct,
+        "message": message,
+    }
+    if points is not None:
+        out["points"] = int(points)
+    if role_tier:
+        out["role_tier"] = role_tier
+    return out
+
+
+@router.get("/api/member/match-vote")
+def get_match_fan_vote_v32(
+    match_key: str,
+    actor_key: str = "",
+    nickname: str = "",
+    has_draw: int = 1,
+    hp: int = 45,
+    dp: int = 25,
+    ap: int = 30,
+):
+    mk = (match_key or "").strip()[:120]
+    if not mk:
+        raise HTTPException(status_code=400, detail="match_key required")
+    hd = bool(int(has_draw or 0))
+    _, actor_candidates = _normalize_actor_keys(actor_key, nickname)
+
+    def _op() -> Dict[str, Any]:
+        now = time.time()
+        with _smu_db_session(write=True) as conn:
+            t_row = conn.execute(
+                "SELECT home_votes, draw_votes, away_votes FROM match_fan_vote_totals_v32 WHERE match_key = ?",
+                (mk,),
+            ).fetchone()
+            if not t_row:
+                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, hp, dp, ap)
+                conn.execute(
+                    "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (mk, hv, dv, av, now),
+                )
+            else:
+                hv = int(t_row["home_votes"] or 0)
+                dv = int(t_row["draw_votes"] or 0) if hd else 0
+                av = int(t_row["away_votes"] or 0)
+
+            placeholders = ",".join("?" for _ in actor_candidates)
+            v_row = conn.execute(
+                f"SELECT pick, rewarded FROM match_fan_votes_v32 WHERE match_key = ? AND actor_key IN ({placeholders}) ORDER BY rewarded DESC, updated_at DESC LIMIT 1",
+                [mk] + actor_candidates,
+            ).fetchone()
+            my_pick = str(v_row["pick"] or "") if v_row else ""
+            rewarded = bool(v_row["rewarded"]) if v_row else False
+            return _format_fan_vote_payload_v32(mk, hv, dv, av, hd, my_pick=my_pick, rewarded=rewarded)
+
+    return run_with_db_retry(_op)
+
+
+@router.post("/api/member/match-vote")
+def submit_match_fan_vote_v32(payload: MatchFanVoteIn):
+    mk = (payload.match_key or "").strip()[:120]
+    pick = (payload.pick or "").strip().upper()
+    hd = bool(payload.has_draw)
+    if not mk or pick not in ("H", "D", "A") or (pick == "D" and not hd):
+        raise HTTPException(status_code=400, detail="유효하지 않은 승부투표 항목입니다.")
+
+    nick = (payload.nickname or "").strip()[:24]
+    pin = re.sub(r"\D", "", payload.pin or "")
+    primary_actor, actor_candidates = _normalize_actor_keys(payload.actor_key or "", nick)
+    today_kst = datetime.now(KST).strftime("%Y-%m-%d")
+    tier_fn = getattr(
+        _smu,
+        "_tier_for_points",
+        lambda p: "PRO" if p >= 350 else ("MEMBER" if p >= 150 else "GUEST"),
+    )
+    hash_fn = getattr(_smu, "_hash_pin", None)
+
+    def _op() -> Tuple[Dict[str, Any], List[str]]:
+        now = time.time()
+        touched_tables: List[str] = ["match_fan_votes_v32", "match_fan_vote_totals_v32"]
+        with _smu_db_session(write=True) as conn:
+            t_row = conn.execute(
+                "SELECT home_votes, draw_votes, away_votes FROM match_fan_vote_totals_v32 WHERE match_key = ?",
+                (mk,),
+            ).fetchone()
+            if not t_row:
+                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, int(payload.hp or 45), int(payload.dp or 25), int(payload.ap or 30))
+                conn.execute(
+                    "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (mk, hv, dv, av, now),
+                )
+            else:
+                hv = int(t_row["home_votes"] or 0)
+                dv = int(t_row["draw_votes"] or 0) if hd else 0
+                av = int(t_row["away_votes"] or 0)
+
+            placeholders = ",".join("?" for _ in actor_candidates)
+            existing = conn.execute(
+                f"SELECT actor_key, pick, rewarded FROM match_fan_votes_v32 WHERE match_key = ? AND actor_key IN ({placeholders}) ORDER BY rewarded DESC, updated_at DESC LIMIT 1",
+                [mk] + actor_candidates,
+            ).fetchone()
+
+            already_rewarded = bool(existing["rewarded"]) if existing else False
+            prev_pick = str(existing["pick"] or "") if existing else ""
+            row_actor = str(existing["actor_key"]) if existing else primary_actor
+
+            # Also check wp_point_ledger anti-farming guard
+            ledger_dup = conn.execute(
+                "SELECT id FROM wp_point_ledger WHERE nickname IN (?, ?) AND event_type IN ('match_fan_vote', 'guest_match_vote') AND ref_id = ? LIMIT 1",
+                (nick or primary_actor, primary_actor, mk),
+            ).fetchone()
+            if ledger_dup:
+                already_rewarded = True
+
+            switched = False
+            if prev_pick == pick and existing:
+                # Idempotent re-click on same pick
+                pass
+            else:
+                if prev_pick == "H":
+                    hv = max(0, hv - 1)
+                elif prev_pick == "D":
+                    dv = max(0, dv - 1)
+                elif prev_pick == "A":
+                    av = max(0, av - 1)
+
+                if pick == "H":
+                    hv += 1
+                elif pick == "D":
+                    dv += 1
+                elif pick == "A":
+                    av += 1
+
+                switched = bool(prev_pick and prev_pick != pick)
+
+            awarded = 0 if already_rewarded else 5
+            new_pts: Optional[int] = None
+            new_tier = ""
+
+            if awarded > 0:
+                has_ma = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='member_accounts'"
+                ).fetchone()
+                credited_member = False
+                if has_ma and len(nick) >= 2 and len(pin) == 4 and callable(hash_fn):
+                    pin_h = hash_fn(nick, pin)
+                    m_row = conn.execute(
+                        "SELECT nickname, pin_hash, points FROM member_accounts WHERE lower(nickname) = lower(?)",
+                        (nick,),
+                    ).fetchone()
+                    if m_row and m_row["pin_hash"] == pin_h:
+                        new_pts = int(m_row["points"] or 120) + awarded
+                        new_tier = tier_fn(new_pts)
+                        conn.execute(
+                            "UPDATE member_accounts SET points = ?, role_tier = ?, updated_at = ? WHERE nickname = ?",
+                            (new_pts, new_tier, now, m_row["nickname"]),
+                        )
+                        conn.execute(
+                            "INSERT INTO wp_point_ledger(nickname, event_type, ref_id, points_delta, kst_date, site_origin, created_at) VALUES (?, 'match_fan_vote', ?, ?, ?, 'open_lounge', ?)",
+                            (m_row["nickname"], mk, awarded, today_kst, now),
+                        )
+                        touched_tables.extend(["member_accounts", "wp_point_ledger"])
+                        credited_member = True
+
+                if not credited_member:
+                    c_pts = max(120, int(payload.client_points or 120))
+                    new_pts = c_pts + awarded
+                    new_tier = tier_fn(new_pts)
+                    conn.execute(
+                        "INSERT INTO wp_point_ledger(nickname, event_type, ref_id, points_delta, kst_date, site_origin, created_at) VALUES (?, 'guest_match_vote', ?, ?, ?, 'open_lounge_guest', ?)",
+                        (primary_actor, mk, awarded, today_kst, now),
+                    )
+                    touched_tables.append("wp_point_ledger")
+
+            conn.execute(
+                """
+                INSERT INTO match_fan_votes_v32(match_key, actor_key, pick, rewarded, updated_at)
+                VALUES (?, ?, ?, 1, ?)
+                ON CONFLICT(match_key, actor_key) DO UPDATE SET
+                    pick = excluded.pick,
+                    rewarded = 1,
+                    updated_at = excluded.updated_at
+                """,
+                (mk, row_actor, pick, now),
+            )
+            conn.execute(
+                "UPDATE match_fan_vote_totals_v32 SET home_votes = ?, draw_votes = ?, away_votes = ?, updated_at = ? WHERE match_key = ?",
+                (hv, dv, av, now, mk),
+            )
+
+            msg = (
+                f"🗳️ 승부투표 완료! +{awarded}P가 즉시 적립되었습니다."
+                if awarded > 0
+                else ("🔄 승부투표 픽이 변경되었습니다! (경기당 첫 투표 +5P 지급 완료)" if switched else "이미 이 경기에 투표하셨습니다.")
+            )
+            return (
+                _format_fan_vote_payload_v32(
+                    mk,
+                    hv,
+                    dv,
+                    av,
+                    hd,
+                    my_pick=pick,
+                    rewarded=True,
+                    awarded_points=awarded,
+                    points=new_pts,
+                    role_tier=new_tier,
+                    switched=switched,
+                    message=msg,
+                ),
+                touched_tables,
+            )
+
+    res_dict, bg_tables = run_with_db_retry(_op)
+    _trigger_smu_pg_backup(*tuple(dict.fromkeys(bg_tables)))
+    return res_dict
+
 
 @router.api_route("/sitemap.xml", methods=["GET", "HEAD"])
 def serve_enriched_sitemap_xml_v27():
