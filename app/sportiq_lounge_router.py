@@ -560,6 +560,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -802,6 +804,61 @@ _FRONTEND_V22_JS = r'''
       "  padding: 0 !important;",
       "  margin: 0 !important;",
       "  border: 0 !important;",
+      "}",
+      "/* v3.2.2 Mobile (390x844) Polish: Hide Thin Scrollbars, Compact 5-Col Mobile Scoreboard & Crisp Modal Layout */",
+      "#dcSportPills, #dcLiveTickerTrack, #sqMatchInsightTabsV30, #sqV30ScoreboardTableWrap {",
+      "  scrollbar-width: thin;",
+      "  scrollbar-color: rgba(71, 85, 105, 0.55) transparent;",
+      "}",
+      "#dcSportPills::-webkit-scrollbar, #sqMatchInsightTabsV30::-webkit-scrollbar { display: none; }",
+      "#dcQuickMatchModal { word-break: keep-all; }",
+      "#dcQuickMatchModal #sqModalFavBtnV30,",
+      "#dcQuickMatchModal #sqCloseMatchInsightV30 {",
+      "  white-space: nowrap !important;",
+      "  flex-shrink: 0 !important;",
+      "}",
+      ".sq-v32-vote-btn {",
+      "  min-width: 0 !important;",
+      "  overflow: hidden !important;",
+      "}",
+      "@media (max-width: 640px) {",
+      "  .sq-v30-sb-table {",
+      "    min-width: 495px !important;",
+      "    font-size: 11.4px !important;",
+      "  }",
+      "  .sq-v30-sb-table thead th {",
+      "    padding: 7px 5px !important;",
+      "    font-size: 10.4px !important;",
+      "  }",
+      "  .sq-v30-match-row td {",
+      "    padding: 7px 5px !important;",
+      "  }",
+      "  .sq-v30-match-row td:nth-child(3),",
+      "  .sq-v30-match-row td:nth-child(5) {",
+      "    max-width: 88px !important;",
+      "    overflow: hidden !important;",
+      "    text-overflow: ellipsis !important;",
+      "  }",
+      "  #dcQuickMatchModal {",
+      "    padding: 10px !important;",
+      "  }",
+      "  #dcQuickMatchModal > div {",
+      "    max-height: 91vh !important;",
+      "    border-radius: 16px !important;",
+      "  }",
+      "  #sqBridgeTacticalV30, #sqBridgeStandingsV30 {",
+      "    min-width: 0 !important;",
+      "    flex: 1 1 44% !important;",
+      "    white-space: nowrap !important;",
+      "    padding: 8px 8px !important;",
+      "    font-size: 11.5px !important;",
+      "  }",
+      "  #sqBridgeWritePostV30 {",
+      "    flex: 1 1 100% !important;",
+      "    order: -1 !important;",
+      "    white-space: nowrap !important;",
+      "    padding: 9px 10px !important;",
+      "  }",
       "}",
       "/* v3.2 1-Click Match Fan Vote (+5P & Real-Time Vote Gauge) */",
       ".sq-v32-vote-btn {",
@@ -4281,6 +4338,13 @@ _FRONTEND_V22_JS = r'''
       (curOff !== 0 ? "<button type='button' class='sq-v31-cal-btn' data-v31-cal-off='0' style='border-color:#38bdf8;color:#7dd3fc;'>오늘로 ↺</button>" : "") +
       (v30ScoreState.isLoadingDate ? "<span style='font-size:11px;color:#6ee7b7;font-weight:800;margin-left:4px;white-space:nowrap;'>⏳ 일정 불러오는 중...</span>" : "")
     );
+    setTimeout(function () {
+      var actPill = cal.querySelector(".sq-v31-cal-btn.active");
+      if (actPill && cal.scrollWidth > cal.clientWidth + 10) {
+        var targetLeft = actPill.offsetLeft - Math.round((cal.clientWidth - actPill.offsetWidth) / 2);
+        cal.scrollLeft = Math.max(0, targetLeft);
+      }
+    }, 20);
 
     if (!cal.__sqCalDelegatedV31) {
       cal.__sqCalDelegatedV31 = true;
@@ -4444,18 +4508,18 @@ _FRONTEND_V22_JS = r'''
     modal.innerHTML = [
       "<div style='background:#0f172a;border:1px solid #334155;border-radius:18px;max-width:620px;width:100%;max-height:88vh;display:flex;flex-direction:column;color:#f8fafc;box-shadow:0 24px 55px rgba(0,0,0,0.65);overflow:hidden;'>",
       "  <div style='padding:14px 16px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;gap:8px;'>",
-      "    <div style='display:flex;align-items:center;gap:7px;flex-wrap:wrap;'>",
+      "    <div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;flex:1 1 auto;'>",
       "      <span style='background:#2563eb;color:#fff;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:800;'>" + sportEmojiV30(it.sport) + " " + uxEsc(it.league_full || it.league) + " · " + uxEsc(it.status_badge) + "</span>",
       (verdict ? verdict.badgeHtml : ""),
       "    </div>",
-      "    <div style='display:flex;align-items:center;gap:6px;'>",
+      "    <div style='display:flex;align-items:center;gap:5px;flex-shrink:0;'>",
       "      <button type='button' id='sqModalFavBtnV30' style='background:#1e293b;border:1px solid #334155;color:" + (isFav ? "#fbbf24" : "#cbd5e1") + ";border-radius:8px;padding:4px 9px;font-size:11.5px;font-weight:800;cursor:pointer;'>" + (isFav ? "★ 관심됨" : "☆ 관심등록") + "</button>",
       "      <button type='button' id='sqCloseMatchInsightV30' style='background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:4px 10px;font-size:11.5px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:4px;'><svg data-sq-x-svg='1' viewBox='0 0 14 14' width='11' height='11' fill='none'><path d='M3 3L11 11M11 3L3 11' stroke='currentColor' stroke-width='2.2' stroke-linecap='round'/></svg><span>닫기</span></button>",
       "    </div>",
       "  </div>",
       "  <div style='padding:14px 16px;overflow-y:auto;flex:1;'>",
       "    <div style='font-size:12px;color:#fde68a;font-weight:700;margin-bottom:8px;'>📅 " + uxEsc(it.match_dt_full_kst || it.match_dt_kst || it.status_badge) + (it.venue ? " · 🏟️ " + uxEsc(it.venue) : "") + "</div>",
-      "    <div style='background:linear-gradient(135deg,#020617,#1e293b);border:1px solid #334155;border-radius:14px;padding:14px 16px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin-bottom:12px;'>",
+      "    <div style='background:linear-gradient(135deg,#020617,#1e293b);border:1px solid #334155;border-radius:14px;padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;margin-bottom:12px;'>",
       "      <div style='font-weight:900;font-size:15.5px;'>" + uxEsc(it.home) + "</div>",
       "      <div style='text-align:center;'>",
       "        <div style='font-weight:900;font-size:24px;color:#38bdf8;'>" + (it.state === "pre" ? "VS" : (uxEsc(it.home_score) + " : " + uxEsc(it.away_score))) + "</div>",
@@ -4505,7 +4569,7 @@ _FRONTEND_V22_JS = r'''
           (dp > 0 ? "<div style='width:" + dp + "%;background:#64748b;'></div>" : ""),
           "  <div style='width:" + ap + "%;background:#38bdf8;'></div>",
           "</div>",
-          "<div style='display:grid;grid-template-columns:repeat(" + (dp > 0 ? 3 : 2) + ",1fr);gap:8px;text-align:center;margin-bottom:10px;'>",
+          "<div style='display:grid;grid-template-columns:repeat(" + (dp > 0 ? 3 : 2) + ",minmax(0,1fr));gap:8px;text-align:center;margin-bottom:10px;'>",
           "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:7px;'><div style='color:#94a3b8;font-size:11px;'>홈승 (" + uxEsc(it.home) + ")</div><strong style='color:#34d399;font-size:14px;'>AI " + hp + "%</strong><div style='color:#64748b;font-size:10.5px;'>시장 " + mktH + "% · 배당 " + uxEsc(odds.home || "-") + "</div></div>",
           (dp > 0 ? "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:7px;'><div style='color:#94a3b8;font-size:11px;'>무승부</div><strong style='color:#cbd5e1;font-size:14px;'>AI " + dp + "%</strong><div style='color:#64748b;font-size:10.5px;'>시장 " + mktD + "% · 배당 " + uxEsc(odds.draw || "-") + "</div></div>" : ""),
           "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:7px;'><div style='color:#94a3b8;font-size:11px;'>원정승 (" + uxEsc(it.away) + ")</div><strong style='color:#38bdf8;font-size:14px;'>AI " + ap + "%</strong><div style='color:#64748b;font-size:10.5px;'>시장 " + mktA + "% · 배당 " + uxEsc(odds.away || "-") + "</div></div>",
@@ -4519,7 +4583,7 @@ _FRONTEND_V22_JS = r'''
           "    </div>",
           "    <span id='sqFanVoteTotalMetaV32' style='font-size:11px;color:#94a3b8;font-weight:700;'>실시간 집계 불러오는 중...</span>",
           "  </div>",
-          "  <div id='sqFanVoteBtnsGridV32' style='display:grid;grid-template-columns:repeat(" + (dp > 0 ? 3 : 2) + ",1fr);gap:7px;margin-bottom:8px;'></div>",
+          "  <div id='sqFanVoteBtnsGridV32' style='display:grid;grid-template-columns:repeat(" + (dp > 0 ? 3 : 2) + ",minmax(0,1fr));gap:7px;margin-bottom:8px;'></div>",
           "  <div id='sqFanVoteGaugeWrapV32'></div>",
           "</div>"
         ].join("");
@@ -6528,6 +6592,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -6718,7 +6783,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3210_{int(time.time())}"
+_BOOT_VER_V30 = f"3220_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
