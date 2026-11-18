@@ -478,6 +478,12 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -571,14 +577,23 @@ _FRONTEND_V22_JS = r'''
       "  width: auto !important;",
       "  min-width: max-content !important;",
       "  white-space: nowrap !important;",
-      "  padding: 7px 11px !important;",
-      "  font-size: 12.6px !important;",
+      "  padding: 6px 10px !important;",
+      "  font-size: 12.4px !important;",
       "  line-height: 1.25 !important;",
       "}",
-      "@media (min-width: 1200px) {",
-      "  .sq-main-tabbar-row { gap: 7px !important; }",
-      "  .sq-main-tabbar-row > .tab-btn,",
-      "  .sq-main-tabbar-row > button { padding: 8px 13px !important; font-size: 13.2px !important; }",
+      "@media (min-width: 1240px) {",
+      "  #sqDesktopMainTabStrip { gap: 7px !important; }",
+      "  #sqDesktopMainTabStrip > .tab-btn,",
+      "  #sqDesktopMainTabStrip > button { padding: 7px 12px !important; font-size: 13px !important; }",
+      "}",
+      "/* Guarantee #feedList is NEVER hidden by match-strip seed guards */",
+      "#feedList {",
+      "  display: block !important;",
+      "  visibility: visible !important;",
+      "  opacity: 1 !important;",
+      "}",
+      "#feedList > article + article {",
+      "  margin-top: 14px;",
       "}",
       "/* Overseas KO Summary Card */",
       ".sq-rss-card-v22 {",
@@ -630,27 +645,40 @@ _FRONTEND_V22_JS = r'''
   // -------------------------------------------------------------------------
   function enforceSingleLineMainTabBar() {
     var firstTab = document.querySelector("button.tab-btn[data-tab='feed'], button[onclick*=\"switchTab('feed')\"]");
-    if (firstTab && firstTab.parentElement) {
-      var bar = firstTab.parentElement;
-      bar.id = "sqDesktopMainTabStrip";
-      bar.classList.remove("sq-mobile-bottom-nav-bar");
-      bar.classList.add("sq-main-tabbar-row");
-      if (bar.parentElement && bar.parentElement.classList) {
-        bar.parentElement.classList.remove("sq-mobile-bottom-nav-bar");
-      }
-      bar.style.setProperty("display", "flex", "important");
-      bar.style.setProperty("grid-template-columns", "none", "important");
-      bar.style.setProperty("flex-direction", "row", "important");
-      bar.style.setProperty("flex-wrap", "nowrap", "important");
-      bar.style.setProperty("overflow-x", "auto", "important");
-      Array.prototype.forEach.call(bar.children, function (btn) {
-        if (btn && btn.style) {
-          btn.style.setProperty("flex", "0 0 auto", "important");
-          btn.style.setProperty("white-space", "nowrap", "important");
-          btn.style.setProperty("width", "auto", "important");
-        }
-      });
+    if (!firstTab || !firstTab.parentElement) return;
+    var bar = firstTab.parentElement;
+    var nav = firstTab.closest ? firstTab.closest("nav") : bar.parentElement;
+    bar.id = "sqDesktopMainTabStrip";
+    bar.classList.remove("sq-mobile-bottom-nav-bar");
+    bar.classList.add("sq-main-tabbar-row");
+    if (nav && nav.classList) {
+      nav.classList.remove("sq-mobile-bottom-nav-bar");
     }
+
+    // Move '📊 데이터센터' button (appended directly onto <nav> by sportiq_datacenter_ui.js L360) into bar!
+    if (nav) {
+      var strayBtns = nav.querySelectorAll("button, a");
+      for (var i = 0; i < strayBtns.length; i++) {
+        var sb = strayBtns[i];
+        if (sb.parentElement !== bar && /데이터\s*센터/.test(sb.textContent || "")) {
+          sb.className = "tab-btn whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold transition border border-cyan-500/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25";
+          bar.appendChild(sb);
+        }
+      }
+    }
+
+    bar.style.setProperty("display", "flex", "important");
+    bar.style.setProperty("grid-template-columns", "none", "important");
+    bar.style.setProperty("flex-direction", "row", "important");
+    bar.style.setProperty("flex-wrap", "nowrap", "important");
+    bar.style.setProperty("overflow-x", "auto", "important");
+    Array.prototype.forEach.call(bar.children, function (btn) {
+      if (btn && btn.style) {
+        btn.style.setProperty("flex", "0 0 auto", "important");
+        btn.style.setProperty("white-space", "nowrap", "important");
+        btn.style.setProperty("width", "auto", "important");
+      }
+    });
   }
 
   function syncTop20MatchCountBadge() {
@@ -1001,11 +1029,24 @@ _FRONTEND_V22_JS = r'''
       window.__sqFeedBookmarkWrapV22 = true;
       var prevRenderFeed = window.renderFeed;
       window.renderFeed = function () {
+        if (typeof state === "object" && state && Array.isArray(state.posts)) {
+          state.posts.forEach(function (p) {
+            if (!p) return;
+            if (!Array.isArray(p.tags)) {
+              p.tags = p.tags ? String(p.tags).split(/\s+/).filter(Boolean) : ["분석"];
+            }
+            p.tags = p.tags.map(function (t) { return String(t).replace(/^#+/, ""); }).filter(Boolean);
+            if (!Array.isArray(p.comments)) p.comments = [];
+          });
+        }
         applyReactionStateToPosts();
-        prevRenderFeed();
+        try { prevRenderFeed(); } catch (e) {}
         mountBookmarkFilterPill();
         var box = document.getElementById("feedList");
         if (!box) return;
+        box.style.setProperty("display", "block", "important");
+        box.removeAttribute("data-sq-seed-archive");
+        box.classList.remove("sq-seed-archive-card", "hidden");
         if (bookmarkOnlyFilter) {
           var visibleCnt = 0;
           box.querySelectorAll("article").forEach(function (art) {
@@ -1329,11 +1370,28 @@ _FRONTEND_V22_JS = r'''
     mountOfficialLegalFooterV22();
 
     // Keep dynamic UI states synchronized when tabs switch or async data arrives
+    [120, 400, 900, 1600].forEach(function (ms) {
+      setTimeout(function () {
+        enforceSingleLineMainTabBar();
+        var fb = document.getElementById("feedList");
+        if (fb) {
+          fb.style.setProperty("display", "block", "important");
+          fb.removeAttribute("data-sq-seed-archive");
+          fb.classList.remove("sq-seed-archive-card", "hidden");
+        }
+      }, ms);
+    });
     setInterval(function () {
       enforceSingleLineMainTabBar();
       syncTop20MatchCountBadge();
       renderTierUpgradeSidebarCard();
-    }, 2500);
+      var fb = document.getElementById("feedList");
+      if (fb) {
+        fb.style.setProperty("display", "block", "important");
+        fb.removeAttribute("data-sq-seed-archive");
+        fb.classList.remove("sq-seed-archive-card", "hidden");
+      }
+    }, 1000);
   }
 
   if (document.readyState === "loading") {
@@ -1372,6 +1430,12 @@ def _ensure_upgrade_js_dedup_patched() -> bool:
             _AI_SEARCH_UI_PATCHED = True
     else:
         _AI_SEARCH_UI_PATCHED = True
+
+    # Prevent HYBRID_SEED_GUARD_V17_JS (L7773) from treating <div id="feedList"> inside #tab-feed as a match seed card and setting display:none!
+    updated = updated.replace(
+        'if (container.id === "feedList" || container.id === "dcLauncherGrid" || container.id === "globalTop10Grid") return;',
+        'if (container.id === "feedList" || container.id === "tab-feed" || container.id === "dcLauncherGrid" || container.id === "globalTop10Grid" || (container.querySelector && container.querySelector("#feedList")) || (container.closest && container.closest("#tab-feed"))) return;',
+    )
 
     if "__SPORTIQ_MEMBER_UX_V22__" not in updated:
         updated = updated + "\n" + _FRONTEND_V22_JS
@@ -2835,6 +2899,9 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -3192,7 +3259,7 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
                     "time": mins,
                     "title": r["title"],
                     "body": r["body"],
-                    "tags": json.loads(r["tags_json"] or "[]"),
+                    "tags": [str(t).lstrip("#") for t in json.loads(r["tags_json"] or "[]") if str(t).strip()],
                     "comments": comments_by_post.get(pid, []),
                     "isMemberServerPost": True,
                     "hasPin": bool(r["pin_hash"]),
@@ -3234,7 +3301,7 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
                     "time": mins,
                     "title": title,
                     "body": body,
-                    "tags": [f"#{lg.replace(' ', '')}", "#AI브리핑", "#데이터분석"],
+                    "tags": [lg.replace(" ", ""), "AI브리핑", "데이터분석"],
                     "comments": comments_by_post.get(aid, []),
                     "isMemberServerPost": False,
                     "hasPin": False,
@@ -4232,7 +4299,7 @@ def serve_lounge_home():
             rendered = inject_upgrade_into_html(raw_html)
             rendered = re.sub(
                 r'(/api/member/p0p1-upgrade\.js\?v=)(\d+)',
-                lambda m: m.group(1) + str(int(m.group(2)) + 400),
+                lambda m: m.group(1) + str(int(m.group(2)) + 500),
                 rendered,
             )
             return HTMLResponse(rendered, media_type="text/html; charset=utf-8")
