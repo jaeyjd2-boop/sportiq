@@ -622,6 +622,14 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
+
+
+
+
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -6109,22 +6117,53 @@ _FRONTEND_V22_JS = r'''
     return alias[s] || s;
   }
 
+  function extractCleanKellyPairV361(rawStr) {
+    var tx = String(rawStr || "").replace(/\s+/g, " ").trim();
+    if (!/\s+vs\s+/i.test(tx)) return null;
+    // Strip leading league badges (e.g., "EPL ", "⚽ EPL · ", "LALIGA ")
+    tx = tx.replace(/^(?:[^\w가-힣]*\s*)?(?:EPL|PL|LALIGA|LA\s*LIGA|SERIEA|SERIE\s*A|BUNDESLIGA|LIGUE1|LIGUE\s*1|UCL|UEL|UNL|MLS|J1|KLEAGUE|K리그1?|NBA|WNBA|KBL|WKBL|MLB|KBO|NPB|NHL|LCK|UFC|MMA|ATP|WTA|F1)(?:\s*[·|\-:]\s*|\s+)/i, "").trim();
+    // Strip trailing odds / value / kelly / status tokens (e.g., "@ 1.52 밸류 +3.8%p 켈리 1.26% 안정")
+    tx = tx.replace(/\s*(?:@\s*[\d.]+|배당\s*[\d.]+|밸류|켈리|안정|공격|중립|추천|홈승|원정승|무승부|\(\s*@|\|\s*|[+\-]?\d+(?:\.\d+)?%).*$/i, "").trim();
+    var parts = tx.split(/\s+vs\s+/i);
+    if (parts.length < 2) return null;
+    var leftRaw = parts[0].replace(/^.*?(?:EPL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|UCL|UEL|UNL|NBA|MLB|NHL|KBL|WKBL)\s+/i, "").trim();
+    var rightRaw = parts[1].replace(/\s+(?:홈|원정|승|무|패|@|\d+\.\d+).*$/i, "").trim();
+    if (!leftRaw || !rightRaw || leftRaw.length > 32 || rightRaw.length > 32) return null;
+    var k1 = canonicalKellyTeamKeyV36(leftRaw);
+    var k2 = canonicalKellyTeamKeyV36(rightRaw);
+    if (!k1 || !k2) return null;
+    return {
+      pairKey: [k1, k2].sort().join("::"),
+      dirKey: k1 + "::" + k2,
+      hasKo: /[가-힣]/.test(leftRaw + rightRaw)
+    };
+  }
+
   function dedupLabKellyMonitorV36() {
-    var lab = document.getElementById("tab-lab");
+    var lab = document.getElementById("tab-lab") || document.body;
     if (!lab) return;
     var lists = lab.querySelectorAll("div, tbody, ul");
     Array.prototype.forEach.call(lists, function (box) {
-      if (!box || !box.children || box.children.length < 2 || box.children.length > 40) return;
+      if (!box || !box.children || box.children.length < 2 || box.children.length > 50) return;
+      if (box.id === "dcLiveTickerTrack" || box.id === "feedList" || box.closest("#proLiveTickerBar, #sqV30ScoreboardTableWrap, #dcMainHubSection")) return;
       var rows = [];
       for (var i = 0; i < box.children.length; i++) {
         var ch = box.children[i];
-        var tx = String(ch.textContent || "").replace(/\s+/g, " ").trim();
-        var m = tx.match(/([A-Za-z가-힣][A-Za-z0-9가-힣\s.'-]{1,24}?)\s+vs\s+([A-Za-z가-힣][A-Za-z0-9가-힣\s.'-]{1,24})/i);
-        if (m && (tx.indexOf("켈리") !== -1 || tx.indexOf("배당") !== -1 || tx.indexOf("밸류") !== -1 || /\b[1-9]\.[0-9]{2}\b/.test(tx) || tx.indexOf("%") !== -1)) {
-          var k1 = canonicalKellyTeamKeyV36(m[1]);
-          var k2 = canonicalKellyTeamKeyV36(m[2]);
-          var hasKo = /[가-힣]/.test(m[1] + m[2]);
-          rows.push({ el: ch, pairKey: k1 + "::" + k2, hasKo: hasKo });
+        if (!ch || ch.nodeType !== 1) continue;
+        var fullTx = String(ch.textContent || "").replace(/\s+/g, " ").trim();
+        if (fullTx.indexOf("켈리") === -1 && fullTx.indexOf("밸류") === -1 && fullTx.indexOf("@") === -1 && fullTx.indexOf("배당") === -1) continue;
+        // Prefer deepest child element containing " vs " so league badges and odds spans don't pollute team names!
+        var bestVsTxt = fullTx;
+        var subEls = ch.querySelectorAll("strong, b, h4, h5, span, div, p");
+        for (var sIdx = 0; sIdx < subEls.length; sIdx++) {
+          var stx = String(subEls[sIdx].textContent || "").replace(/\s+/g, " ").trim();
+          if (/\s+vs\s+/i.test(stx) && stx.length < bestVsTxt.length && stx.length >= 6) {
+            bestVsTxt = stx;
+          }
+        }
+        var parsed = extractCleanKellyPairV361(bestVsTxt) || extractCleanKellyPairV361(fullTx);
+        if (parsed) {
+          rows.push({ el: ch, pairKey: parsed.pairKey, hasKo: parsed.hasKo });
         }
       }
       if (rows.length < 2) return;
@@ -6132,12 +6171,22 @@ _FRONTEND_V22_JS = r'''
       rows.forEach(function (r) {
         if (!byPair[r.pairKey]) {
           byPair[r.pairKey] = r;
+          if (r.el.getAttribute("data-sq-kelly-dup") === "1") {
+            r.el.removeAttribute("data-sq-kelly-dup");
+            r.el.style.removeProperty("display");
+          }
         } else {
           var prev = byPair[r.pairKey];
           if (!prev.hasKo && r.hasKo) {
+            prev.el.setAttribute("data-sq-kelly-dup", "1");
             prev.el.style.setProperty("display", "none", "important");
+            if (r.el.getAttribute("data-sq-kelly-dup") === "1") {
+              r.el.removeAttribute("data-sq-kelly-dup");
+              r.el.style.removeProperty("display");
+            }
             byPair[r.pairKey] = r;
           } else {
+            r.el.setAttribute("data-sq-kelly-dup", "1");
             r.el.style.setProperty("display", "none", "important");
           }
         }
@@ -6308,6 +6357,10 @@ def _ensure_upgrade_js_dedup_patched() -> bool:
 
     if "__SPORTIQ_MEMBER_UX_V22__" not in updated:
         updated = updated + "\n" + _FRONTEND_V22_JS
+
+    if "var __sqSafeLS =" not in updated:
+        _ls_prelude = 'var __sqSafeLS = (function () { try { var s = window.localStorage; s.getItem("__sq_probe"); return s; } catch (e) { var m = {}; return { getItem: function (k) { return Object.prototype.hasOwnProperty.call(m, k) ? m[k] : null; }, setItem: function (k, v) { m[k] = String(v); }, removeItem: function (k) { delete m[k]; } }; } })();' + chr(10)
+        updated = _ls_prelude + re.sub(r"(?<![.\w])localStorage\.", "__sqSafeLS.", updated)
 
     if updated != js_raw:
         _smu.UPGRADE_JS = updated
@@ -7840,6 +7893,10 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
+
+
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -8030,7 +8087,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3600_{int(time.time())}"
+_BOOT_VER_V30 = f"3610_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
