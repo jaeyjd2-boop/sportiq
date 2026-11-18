@@ -582,6 +582,8 @@ _AI_SEARCH_UI_PATCHED = False
 
 
 
+
+
 _FRONTEND_V22_JS = r'''
 /* ==========================================================================
    SportIQ Member UX Polish v2.2
@@ -3104,6 +3106,139 @@ _FRONTEND_V22_JS = r'''
     obs.observe(root, { childList: true, subtree: true });
   }
 
+  // v3.4.1 Lock 3: Sync sport pill total counts + route KBL/WKBL DataCenter standings via NBA basketball renderer + live-scores fetch bridge!
+  var _sqProxyDcLeagueV341 = "";
+  var _sqProxyDcTimerV341 = null;
+
+  function triggerDomesticDcStandingsV341(code, targetTab) {
+    var cu = String(code || "KBL").toUpperCase();
+    _sqProxyDcLeagueV341 = cu;
+    if (_sqProxyDcTimerV341) clearTimeout(_sqProxyDcTimerV341);
+    _sqProxyDcTimerV341 = setTimeout(function () { _sqProxyDcLeagueV341 = ""; }, 1800);
+
+    var hubBody = document.getElementById("dcHubBody");
+    if (targetTab && typeof window.__switchDcTab === "function") {
+      try { window.__switchDcTab(targetTab, "NBA"); } catch (e) {}
+    } else if (hubBody) {
+      var btns = hubBody.querySelectorAll("button");
+      var clickedNba = false;
+      for (var i = 0; i < btns.length; i++) {
+        if (String(btns[i].textContent || "").trim() === "NBA") {
+          clickedNba = true;
+          try { btns[i].click(); } catch (e) {}
+          break;
+        }
+      }
+      if (!clickedNba && typeof window.__switchDcTab === "function") {
+        try { window.__switchDcTab("standings", "NBA"); } catch (e) {}
+      }
+    }
+    setTimeout(function () {
+      var hb = document.getElementById("dcHubBody");
+      if (!hb) return;
+      Array.prototype.forEach.call(hb.querySelectorAll("button"), function (b) {
+        var t = String(b.textContent || "").trim();
+        if (t === cu) {
+          b.classList.add("active");
+          b.style.background = "#2563eb";
+          b.style.color = "#ffffff";
+          b.style.borderColor = "#3b82f6";
+        } else if (t === "NBA" || (t === "KBL" && cu !== "KBL") || (t === "WKBL" && cu !== "WKBL")) {
+          b.classList.remove("active");
+          b.style.background = "";
+          b.style.color = "";
+          b.style.borderColor = "";
+        }
+      });
+    }, 180);
+  }
+
+  function installDomesticBballFetchBridgeV341() {
+    if (window.__sqFetchBridgeV341 || typeof window.fetch !== "function") return;
+    window.__sqFetchBridgeV341 = true;
+    var _prevFetch = window.fetch;
+    window.fetch = function (input, init) {
+      var urlStr = typeof input === "string" ? input : ((input && input.url) ? String(input.url) : "");
+      if (urlStr) {
+        // 1. Direct or proxied KBL/WKBL standings, season-sim, and injuries -> route to guaranteed domestic-bball-meta-v34!
+        var mDc = urlStr.match(/\/api\/datacenter\/(standings|season-sim|injuries)\?([^#]*)/);
+        if (mDc) {
+          var ep = mDc[1];
+          var qs = new URLSearchParams(mDc[2] || "");
+          var reqLg = String(qs.get("league") || "").toUpperCase();
+          if (_sqProxyDcLeagueV341 && (reqLg === "NBA" || reqLg === "EPL" || !reqLg)) {
+            reqLg = _sqProxyDcLeagueV341;
+          }
+          if (reqLg === "KBL" || reqLg === "WKBL") {
+            var kind = ep === "season-sim" ? "sim" : (ep === "injuries" ? "injuries" : "standings");
+            var newUrl = "/api/member/domestic-bball-meta-v34?kind=" + kind + "&league=" + reqLg + "&severity=" + encodeURIComponent(qs.get("severity") || "all") + "&q=" + encodeURIComponent(qs.get("q") || "");
+            return _prevFetch.call(window, newUrl, init);
+          }
+        }
+        // Clear proxy flag if user explicitly clicked another league (e.g. EPL, LALIGA, NBA directly)
+        if (mDc && !_sqProxyDcLeagueV341) {
+          var hb = document.getElementById("dcHubBody");
+          if (hb) {
+            Array.prototype.forEach.call(hb.querySelectorAll("button[data-sq-dc-lg]"), function (b) {
+              b.classList.remove("active");
+              b.style.background = "";
+              b.style.color = "";
+              b.style.borderColor = "";
+            });
+          }
+        }
+      }
+      if (urlStr && urlStr.indexOf("/api/datacenter/live-scores") !== -1) {
+        var qsLs = new URLSearchParams((urlStr.split("?")[1] || "").split("#")[0]);
+        var spReq = String(qsLs.get("sport") || "all").toLowerCase();
+        var lgReq = String(qsLs.get("league") || "all").toUpperCase();
+        var offReq = parseInt(qsLs.get("date_offset") || "0", 10) || 0;
+        if (spReq === "all" || spReq === "basketball") {
+          return Promise.all([
+            _prevFetch.apply(window, arguments).then(function (r) { return r.json(); }).catch(function () { return null; }),
+            _prevFetch.call(window, "/api/member/scoreboard-v30?date_offset=" + offReq).then(function (r) { return r.json(); }).catch(function () { return null; })
+          ]).then(function (pair) {
+            var dcJson = pair[0] || { ok: true, items: [], counts: {} };
+            var sbJson = pair[1] || { items: [] };
+            var domItems = (sbJson.items || []).filter(function (x) {
+              var lc = String((x && (x.league_code || x.league)) || "").toUpperCase();
+              return lc === "KBL" || lc === "WKBL";
+            });
+            var curItems = Array.isArray(dcJson.items) ? dcJson.items.slice() : [];
+            var seenMap = {};
+            curItems.forEach(function (x) { if (x && x.id) seenMap[x.id] = true; });
+            var addedCnt = 0, addedLive = 0;
+            domItems.forEach(function (dg) {
+              var dlc = String(dg.league_code || dg.league || "").toUpperCase();
+              if (!seenMap[dg.id]) {
+                addedCnt++;
+                if (dg.state === "in") addedLive++;
+                if (lgReq === "ALL" || lgReq === dlc) {
+                  curItems.push(dg);
+                }
+              }
+            });
+            var ord = { "in": 0, "pre": 1, "post": 2 };
+            curItems.sort(function (a, b) {
+              var oa = ord[a.state] != null ? ord[a.state] : 3;
+              var ob = ord[b.state] != null ? ord[b.state] : 3;
+              return oa !== ob ? (oa - ob) : String(a.match_dt_kst || "").localeCompare(String(b.match_dt_kst || ""));
+            });
+            if (addedCnt > 0 && dcJson.counts && typeof dcJson.counts === "object") {
+              dcJson.counts.basketball = Number(dcJson.counts.basketball || 0) + addedCnt;
+              dcJson.counts.all = Number(dcJson.counts.all || 0) + addedCnt;
+              dcJson.counts.live = Number(dcJson.counts.live || 0) + addedLive;
+            }
+            dcJson.items = curItems;
+            return new Response(JSON.stringify(dcJson), { status: 200, headers: { "Content-Type": "application/json" } });
+          });
+        }
+      }
+      return _prevFetch.apply(window, arguments);
+    };
+  }
+  installDomesticBballFetchBridgeV341();
+
   // v3.4 Ensure KBL & WKBL appear in top #dcTickerLeagueSel AND DataCenter #dcHubBody league pill bars
   function ensureDomesticBasketballUiControlsV34() {
     var sel = discoverTopLeagueSelectV304();
@@ -3150,13 +3285,9 @@ _FRONTEND_V22_JS = r'''
             nb.classList.remove("active");
             nb.setAttribute("data-sq-dc-lg", code);
             nb.removeAttribute("onclick");
-            nb.onclick = function () {
-              if (typeof window.__switchDcTab === "function") {
-                var activeTab = "standings";
-                if (hubBody.textContent.indexOf("5,000회") !== -1 || hubBody.textContent.indexOf("우승 확률") !== -1) activeTab = "sim";
-                else if (hubBody.textContent.indexOf("부상자") !== -1 || hubBody.textContent.indexOf("메디컬") !== -1) activeTab = "injuries";
-                window.__switchDcTab(activeTab, code);
-              }
+            nb.onclick = function (ev) {
+              if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+              triggerDomesticDcStandingsV341(code, "");
             };
             if (btns[b].nextSibling) bar.insertBefore(nb, btns[b].nextSibling);
             else bar.appendChild(nb);
@@ -3874,9 +4005,23 @@ _FRONTEND_V22_JS = r'''
     var sportBtns = discoverTopSportButtonsV304();
     _inSportDotMutationV304 = true;
     try {
+      var totalBySport = {};
+      baseAll.forEach(function (it) {
+        if (it && it.sport) {
+          var sk = String(it.sport).toLowerCase();
+          totalBySport[sk] = (totalBySport[sk] || 0) + 1;
+        }
+      });
       sportBtns.forEach(function (btn) {
         var sp = btn.getAttribute("data-sq-v304-sport") || parseSportKeyFromBtnV304(btn);
         if (!sp) return;
+        if (v30ScoreState.selectedOffset === 0 && baseAll.length > 0) {
+          var wantTot = sp === "all" ? baseAll.length : (totalBySport[sp] || 0);
+          if (wantTot > 0 && btn.firstChild && btn.firstChild.nodeType === 3) {
+            var replaced = btn.firstChild.nodeValue.replace(/\(\d+\)/, "(" + wantTot + ")");
+            if (replaced !== btn.firstChild.nodeValue) btn.firstChild.nodeValue = replaced;
+          }
+        }
         var oldDot = btn.querySelector(".sq-v30-live-dot");
         var cnt = sp === "all" ? totalLive : (liveBySport[sp] || 0);
         if (cnt > 0) {
@@ -4414,7 +4559,7 @@ _FRONTEND_V22_JS = r'''
         if (jumpBtn) {
           ev.stopPropagation();
           var lgCode = jumpBtn.getAttribute("data-sq-jump-st") || "EPL";
-          if (typeof window.__switchDcTab === "function") window.__switchDcTab("standings", lgCode);
+          if (lgCode === "KBL" || lgCode === "WKBL") { triggerDomesticDcStandingsV341(lgCode, "standings"); } else if (typeof window.__switchDcTab === "function") { window.__switchDcTab("standings", lgCode); }
           return;
         }
         var tr = t.closest(".sq-v30-match-row");
@@ -5365,7 +5510,7 @@ _FRONTEND_V22_JS = r'''
 
     document.getElementById("sqBridgeStandingsV30").onclick = function () {
       modal.style.display = "none";
-      if (typeof window.__switchDcTab === "function") window.__switchDcTab("standings", it.league_code || "EPL");
+      var _stLg = String(it.league_code || "EPL").toUpperCase(); if (_stLg === "KBL" || _stLg === "WKBL") { triggerDomesticDcStandingsV341(_stLg, "standings"); } else if (typeof window.__switchDcTab === "function") { window.__switchDcTab("standings", _stLg); }
     };
   }
 
@@ -7051,6 +7196,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
 
 
 
+
 # ============================================================================
 # SportIQ Member UX v2.2 — Likes/Bookmarks DB + Unified +20P Check-in + Overseas News KO Badges & NFL/UFC/F1
 # ============================================================================
@@ -7241,7 +7387,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3400_{int(time.time())}"
+_BOOT_VER_V30 = f"3410_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -9040,6 +9186,258 @@ def _ensure_domestic_basketball_v34() -> None:
 
 
 _ensure_domestic_basketball_v34()
+def _build_domestic_bball_standings_v341(code: str) -> Dict[str, Any]:
+    cu = "WKBL" if str(code or "").upper() == "WKBL" else "KBL"
+    fb = _WKBL_STANDINGS_V34 if cu == "WKBL" else _KBL_STANDINGS_V34
+    lg_full = "WKBL 여자프로농구" if cu == "WKBL" else "KBL 남자프로농구"
+    po_cut = 4 if cu == "WKBL" else 6
+    rows = []
+    for i, (t, gp, w, d, l, gf, ga, pts, fm) in enumerate(fb):
+        rows.append({
+            "rank": i + 1,
+            "team": t,
+            "gp": gp,
+            "w": w,
+            "d": d,
+            "l": l,
+            "gf": gf,
+            "ga": ga,
+            "gd": gf - ga,
+            "pts": pts,
+            "pts_label": f".{pts:03d}",
+            "form": list(fm[:5]),
+            "zone": "플레이오프" if (i + 1) <= po_cut else "",
+        })
+    wd_names = ["월", "화", "수", "목", "금", "토", "일"]
+    nk = datetime.now(KST)
+    now_s = f"{nk.year}.{nk.month:02d}.{nk.day:02d} ({wd_names[nk.weekday()]}) {nk.hour:02d}:{nk.minute:02d}:{nk.second:02d} KST"
+    return {
+        "ok": True,
+        "league": cu,
+        "league_name": lg_full,
+        "sport": "basketball",
+        "source": "SportIQ KBL·WKBL 공식 시즌 스냅샷",
+        "updated_at_kst": now_s,
+        "standings": rows,
+        "leaders": _KBL_WKBL_LEADERS_V34[cu],
+    }
+
+
+def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[str, Any]:
+    import math as _m
+    import random as _r
+    st = _build_domestic_bball_standings_v341(code)
+    cu = st["league"]
+    tot_g = 35 if cu == "WKBL" else 54
+    po_cut = 4 if cu == "WKBL" else 6
+    rows = st["standings"]
+    meta = []
+    for r in rows:
+        gp = max(1, r["gp"])
+        ppg = (r["w"] / gp) * 3.0
+        elo = int(round(1550 + (ppg - 1.35) * 185 + (r["gd"] / gp) * 18))
+        meta.append({"team": r["team"], "cur": r["w"], "rem": max(1, tot_g - gp), "gd": r["gd"], "elo": elo, "tc": 0, "pc": 0, "ps": 0.0})
+    avg_elo = sum(t["elo"] for t in meta) / max(1, len(meta))
+    rng = _r.Random(20261118 + sum(ord(c) for c in cu))
+    probs = [max(0.12, min(0.85, 1.0 / (1.0 + _m.pow(10.0, (avg_elo - t["elo"]) / 380.0)))) for t in meta]
+    iters = max(500, min(5000, int(iterations)))
+    for _ in range(iters):
+        sc_list = []
+        for idx, t in enumerate(meta):
+            pw = probs[idx]
+            rem = t["rem"]
+            fin = t["cur"] + max(0.0, rng.gauss(rem * pw, _m.sqrt(max(0.25, rem * pw * (1.0 - pw)))))
+            t["ps"] += fin
+            sc_list.append((fin + t["gd"] * 0.001, idx))
+        sc_list.sort(reverse=True)
+        meta[sc_list[0][1]]["tc"] += 1
+        for pos, (_, ti) in enumerate(sc_list[:po_cut]):
+            meta[ti]["pc"] += 1
+    table = [{
+        "team": t["team"],
+        "elo": t["elo"],
+        "cur_pts": t["cur"],
+        "proj_pts": round(t["ps"] / iters, 1),
+        "title_prob": round(t["tc"] * 100.0 / iters, 1),
+        "po_prob": round(t["pc"] * 100.0 / iters, 1),
+        "rel_prob": 0.0,
+    } for t in meta]
+    table.sort(key=lambda x: (-x["title_prob"], -x["proj_pts"], -x["elo"]))
+    for i, r in enumerate(table):
+        r["sim_rank"] = i + 1
+    return {
+        "ok": True,
+        "league": cu,
+        "league_name": st["league_name"],
+        "sport": "basketball",
+        "simulations": iters,
+        "po_label": "플레이오프 진출 확률",
+        "updated_at_kst": st["updated_at_kst"],
+        "table": table,
+        "fifa_ranking": [],
+        "club_ranking": [],
+    }
+
+
+def _build_domestic_bball_injuries_v341(code: str, severity: str = "all", q: str = "") -> Dict[str, Any]:
+    cu = "WKBL" if str(code or "").upper() == "WKBL" else "KBL"
+    items = list(_KBL_WKBL_INJURIES_V34[cu])
+    st_teams = [r[0] for r in (_WKBL_STANDINGS_V34 if cu == "WKBL" else _KBL_STANDINGS_V34)]
+    tc: Dict[str, int] = {}
+    for x in items:
+        tc[x["team"]] = tc.get(x["team"], 0) + 1
+    hard = [f"{t} ({c}명)" for t, c in sorted(tc.items(), key=lambda v: -v[1])[:3]]
+    full_sq = [t for t in st_teams if tc.get(t, 0) == 0][:4]
+    flt = [
+        x for x in items
+        if (severity == "all" or x["severity"] == severity)
+        and (not q or q.lower() in f"{x['player']} {x['team']} {x['reason']}".lower())
+    ]
+    st = _build_domestic_bball_standings_v341(cu)
+    return {
+        "ok": True,
+        "league": cu,
+        "league_name": st["league_name"],
+        "source": "SportIQ KBL·WKBL 데일리 로스터 트래커",
+        "updated_at_kst": st["updated_at_kst"],
+        "kpis": {
+            "total_injured": len(items),
+            "avg_per_team": round(len(items) / max(1, len(st_teams)), 1),
+            "top_part": "발목·컨디션 관리",
+            "hardest_hit": hard,
+            "full_squad": full_sq,
+        },
+        "items": flt,
+    }
+
+
+@router.get("/api/member/domestic-bball-meta-v34")
+def api_member_domestic_bball_meta_v34(kind: str = "standings", league: str = "KBL", severity: str = "all", q: str = ""):
+    k = str(kind or "standings").lower()
+    if k == "sim":
+        return _build_domestic_bball_sim_v341(league, 5000)
+    if k == "injuries":
+        return _build_domestic_bball_injuries_v341(league, severity, q)
+    return _build_domestic_bball_standings_v341(league)
+
+
+def _patch_datacenter_api_routes_v341() -> None:
+    """Patches FastAPI APIRoute.dependant.call & endpoint on /api/datacenter/* across all loaded routers/apps."""
+    import gc as _gc
+    from fastapi.routing import APIRoute as _APIRoute
+
+    route_containers = []
+    try:
+        from app import sportiq_datacenter as _dc
+        if hasattr(_dc, "router"):
+            route_containers.append(_dc.router)
+    except Exception:
+        pass
+    for obj in _gc.get_objects():
+        try:
+            if obj.__class__.__name__ in ("FastAPI", "APIRouter") and hasattr(obj, "routes"):
+                route_containers.append(obj)
+        except Exception:
+            continue
+
+    for container in route_containers:
+        for rt in getattr(container, "routes", []) or []:
+            if not isinstance(rt, _APIRoute) or getattr(rt, "_sq_v341_wrapped", False):
+                continue
+            p = str(getattr(rt, "path", "") or "")
+            orig_call = getattr(rt.dependant, "call", None) or rt.endpoint
+            if not callable(orig_call):
+                continue
+
+            if p.endswith("/live-scores"):
+                def _make_ls_wrap(_fn):
+                    def _ls_wrapped(**kwargs):
+                        sport = kwargs.get("sport", "all")
+                        league = kwargs.get("league", "all")
+                        date_offset = int(kwargs.get("date_offset", 0) or 0)
+                        call_kw = dict(kwargs)
+                        if "sport" in call_kw:
+                            call_kw["sport"] = "all"
+                        if "league" in call_kw:
+                            call_kw["league"] = "all"
+                        res = _fn(**call_kw)
+                        if not isinstance(res, dict):
+                            return res
+                        target_dt = datetime.now(KST) + timedelta(days=max(-5, min(7, int(date_offset))))
+                        dom_games = _build_domestic_bball_games_v34(target_dt)
+                        all_items = list(res.get("items") or [])
+                        by_id = {str(x.get("id") or ""): i for i, x in enumerate(all_items) if isinstance(x, dict)}
+                        for dg in dom_games:
+                            if dg["id"] in by_id:
+                                all_items[by_id[dg["id"]]] = dg
+                            else:
+                                all_items.append(dg)
+                        order = {"in": 0, "pre": 1, "post": 2}
+                        all_items.sort(key=lambda x: (order.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
+                        counts = dict(res.get("counts") or {})
+                        counts["all"] = len(all_items)
+                        counts["live"] = sum(1 for x in all_items if x.get("state") == "in")
+                        for sp_k in set([str(x.get("sport") or "") for x in all_items if x.get("sport")] + ["basketball"]):
+                            counts[sp_k] = sum(1 for x in all_items if x.get("sport") == sp_k)
+                        lgs_sup = list(res.get("leagues_supported") or [])
+                        sup_codes = {str(x.get("code") or "").upper() for x in lgs_sup if isinstance(x, dict)}
+                        for ent in ({"code": "KBL", "name": "KBL", "sport": "basketball"}, {"code": "WKBL", "name": "WKBL", "sport": "basketball"}):
+                            if ent["code"] not in sup_codes:
+                                lgs_sup.append(ent)
+                        sp_l = str(sport or "all").lower()
+                        lg_u = str(league or "all").upper()
+                        flt_items = [
+                            x for x in all_items
+                            if (sp_l == "all" or str(x.get("sport") or "").lower() == sp_l)
+                            and (lg_u == "all" or str(x.get("league_code") or x.get("league") or "").upper() == lg_u)
+                        ]
+                        return {**res, "counts": counts, "leagues_supported": lgs_sup, "items": flt_items}
+                    return _ls_wrapped
+                w = _make_ls_wrap(orig_call)
+                rt.endpoint = w
+                rt.dependant.call = w
+                rt._sq_v341_wrapped = True
+
+            elif p.endswith("/standings"):
+                def _make_st_wrap(_fn):
+                    def _st_wrapped(**kwargs):
+                        lg = kwargs.get("league", "EPL")
+                        if str(lg or "").upper() in ("KBL", "WKBL"):
+                            return _build_domestic_bball_standings_v341(lg)
+                        return _fn(**kwargs)
+                    return _st_wrapped
+                w = _make_st_wrap(orig_call)
+                rt.endpoint = w
+                rt.dependant.call = w
+                rt._sq_v341_wrapped = True
+
+            elif p.endswith("/season-sim"):
+                def _make_sim_wrap(_fn):
+                    def _sim_wrapped(**kwargs):
+                        lg = kwargs.get("league", "EPL")
+                        if str(lg or "").upper() in ("KBL", "WKBL"):
+                            return _build_domestic_bball_sim_v341(lg, 5000)
+                        return _fn(**kwargs)
+                    return _sim_wrapped
+                w = _make_sim_wrap(orig_call)
+                rt.endpoint = w
+                rt.dependant.call = w
+                rt._sq_v341_wrapped = True
+
+            elif p.endswith("/injuries"):
+                def _make_inj_wrap(_fn):
+                    def _inj_wrapped(**kwargs):
+                        lg = kwargs.get("league", "EPL")
+                        if str(lg or "").upper() in ("KBL", "WKBL"):
+                            return _build_domestic_bball_injuries_v341(lg, kwargs.get("severity", "all"), kwargs.get("q", ""))
+                        return _fn(**kwargs)
+                    return _inj_wrapped
+                w = _make_inj_wrap(orig_call)
+                rt.endpoint = w
+                rt.dependant.call = w
+                rt._sq_v341_wrapped = True
+
+_patch_datacenter_api_routes_v341()
 
 @router.get("/api/member/scoreboard-v30")
 def api_member_scoreboard_v30(date_offset: int = 0):
@@ -9113,6 +9511,17 @@ def api_member_scoreboard_v30(date_offset: int = 0):
                 _V31_EXT_SCORE_CACHE[date_offset] = (time.time(), list(raw_items))
     except Exception:
         raw_items = []
+
+    _patch_datacenter_api_routes_v341()
+    _dom_bball = _build_domestic_bball_games_v34(target_k)
+    _by_id_sb = {str(x.get("id") or ""): idx for idx, x in enumerate(raw_items) if isinstance(x, dict)}
+    for _dg in _dom_bball:
+        if _dg["id"] in _by_id_sb:
+            raw_items[_by_id_sb[_dg["id"]]] = _dg
+        else:
+            raw_items.append(_dg)
+    _ord_sb = {"in": 0, "pre": 1, "post": 2}
+    raw_items.sort(key=lambda x: (_ord_sb.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
 
     return {
         "ok": True,
