@@ -8309,7 +8309,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3750_{int(time.time())}"
+_BOOT_VER_V30 = f"3760_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -9886,11 +9886,24 @@ def _build_domestic_bball_games_v34(target_dt: datetime) -> List[Dict[str, Any]]
     yr = target_dt.year
     is_weekend = target_dt.weekday() >= 5
 
-    fixtures = _VERIFIED_DOMESTIC_BBALL_V34.get(ymd)
-    if not fixtures:
+    raw_fixtures = _VERIFIED_DOMESTIC_BBALL_V34.get(ymd)
+    if not raw_fixtures:
         d_idx = target_dt.timetuple().tm_yday
-        k1 = _KBL_ROTATION_V34[(d_idx * 2) % len(_KBL_ROTATION_V34)]
-        k2 = _KBL_ROTATION_V34[(d_idx * 2 + 3) % len(_KBL_ROTATION_V34)]
+        n_rot = len(_KBL_ROTATION_V34)
+        idx1 = (d_idx * 2) % n_rot
+        k1 = _KBL_ROTATION_V34[idx1]
+        k2 = None
+        for step in range(1, n_rot):
+            cand = _KBL_ROTATION_V34[(idx1 + 2 + step) % n_rot]
+            if cand[0] not in (k1[0], k1[1]) and cand[1] not in (k1[0], k1[1]) and cand[2] != k1[2]:
+                k2 = cand
+                break
+        if k2 is None:
+            for step in range(1, n_rot):
+                cand = _KBL_ROTATION_V34[(idx1 + step) % n_rot]
+                if cand[0] not in (k1[0], k1[1]) and cand[1] not in (k1[0], k1[1]):
+                    k2 = cand
+                    break
         wk = _WKBL_ROTATION_V34[d_idx % len(_WKBL_ROTATION_V34)]
         t1 = "14:00" if is_weekend else "19:00"
         t2 = "16:30" if is_weekend else "19:00"
@@ -9899,11 +9912,29 @@ def _build_domestic_bball_games_v34(target_dt: datetime) -> List[Dict[str, Any]]
         rng2 = 75 + ((d_idx * 11) % 15)
         if rng1 == rng2:
             rng1 += 3
-        fixtures = [
+        raw_fixtures = [
             ("KBL", k1[0], k1[1], k1[2], t1, rng1, rng2, ""),
-            ("KBL", k2[0], k2[1], k2[2], t2, rng2 + 2, rng1 - 1, ""),
-            ("WKBL", wk[0], wk[1], wk[2], tw, 64 + (d_idx % 9), 60 + ((d_idx * 3) % 9), ""),
         ]
+        if k2 is not None:
+            raw_fixtures.append(("KBL", k2[0], k2[1], k2[2], t2, rng2 + 2, rng1 - 1, ""))
+        raw_fixtures.append(("WKBL", wk[0], wk[1], wk[2], tw, 64 + (d_idx % 9), 60 + ((d_idx * 3) % 9), ""))
+
+    # Defensive same-day team & arena uniqueness guard across every league
+    fixtures = []
+    _used_lg_teams: Dict[str, Set[str]] = {}
+    _used_venues: Set[str] = set()
+    for fx in raw_fixtures:
+        lg_c, hm_c, aw_c, vn_c = fx[0], fx[1], fx[2], fx[3]
+        if hm_c == aw_c:
+            continue
+        tset = _used_lg_teams.setdefault(lg_c, set())
+        if hm_c in tset or aw_c in tset or (vn_c and vn_c in _used_venues):
+            continue
+        tset.add(hm_c)
+        tset.add(aw_c)
+        if vn_c:
+            _used_venues.add(vn_c)
+        fixtures.append(fx)
 
     out: List[Dict[str, Any]] = []
     for idx, (code, home, away, venue, hhmm, fin_h, fin_a, preset_p) in enumerate(fixtures):
@@ -10410,6 +10441,23 @@ def api_member_scoreboard_v30(date_offset: int = 0):
             raw_items[_by_id_sb[_dg["id"]]] = _dg
         else:
             raw_items.append(_dg)
+    _loc_fn_sb = globals().get("_localize_team_ko_v37")
+    if callable(_loc_fn_sb):
+        for _it_sb in raw_items:
+            if isinstance(_it_sb, dict):
+                _sp_sb = str(_it_sb.get("sport") or "")
+                _h_orig = str(_it_sb.get("home") or "")
+                _a_orig = str(_it_sb.get("away") or "")
+                if _h_orig:
+                    _h_loc = _loc_fn_sb(_h_orig, _sp_sb)
+                    if _h_loc != _h_orig:
+                        _it_sb.setdefault("home_en", _h_orig)
+                        _it_sb["home"] = _h_loc
+                if _a_orig:
+                    _a_loc = _loc_fn_sb(_a_orig, _sp_sb)
+                    if _a_loc != _a_orig:
+                        _it_sb.setdefault("away_en", _a_orig)
+                        _it_sb["away"] = _a_loc
     _ord_sb = {"in": 0, "pre": 1, "post": 2}
     raw_items.sort(key=lambda x: (_ord_sb.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
 
@@ -10791,38 +10839,129 @@ _KO_NBA_TEAMS_V37: Dict[str, str] = {
 }
 
 _KO_SOCCER_TEAMS_V37: Dict[str, str] = {
+    # EPL & English Clubs (including ESPN shortDisplayName & promoted/EFL clubs)
     "arsenal": "아스널", "chelsea": "첼시", "liverpool": "리버풀",
     "manchester city": "맨체스터 시티", "man city": "맨체스터 시티",
     "manchester united": "맨체스터 유나이티드", "man utd": "맨체스터 유나이티드", "man united": "맨체스터 유나이티드",
     "tottenham hotspur": "토트넘 홋스퍼", "tottenham": "토트넘 홋스퍼", "spurs": "토트넘 홋스퍼",
-    "newcastle united": "뉴캐슬 유나이티드", "newcastle": "뉴캐슬 유나이티드",
-    "aston villa": "애스턴 빌라", "brighton": "브라이턴", "brighton & hove albion": "브라이턴",
-    "fulham": "풀럼", "brentford": "브렌트퍼드", "nottingham forest": "노팅엄 포레스트", "nottm forest": "노팅엄 포레스트",
-    "bournemouth": "본머스", "afc bournemouth": "본머스", "west ham united": "웨스트햄 유나이티드", "west ham": "웨스트햄",
-    "everton": "에버턴", "crystal palace": "크리스털 팰리스", "wolverhampton wanderers": "울버햄프턴", "wolves": "울버햄프턴",
-    "leicester city": "레스터 시티", "ipswich town": "입스위치 타운", "southampton": "사우샘프턴",
-    "real madrid": "레알 마드리드", "barcelona": "FC 바르셀로나", "fc barcelona": "FC 바르셀로나",
-    "atletico madrid": "아틀레티코 마드리드", "atlético madrid": "아틀레티코 마드리드",
-    "bayern munich": "바이에른 뮌헨", "borussia dortmund": "보루시아 도르트문트", "bayer leverkusen": "바이어 레버쿠젠",
-    "inter milan": "인터 밀란", "internazionale": "인터 밀란", "ac milan": "AC 밀란", "juventus": "유벤투스", "napoli": "나폴리",
-    "paris saint-germain": "파리 생제르맹", "psg": "파리 생제르맹",
+    "newcastle united": "뉴캐슬 유나이티드", "newcastle utd": "뉴캐슬 유나이티드", "newcastle": "뉴캐슬 유나이티드",
+    "aston villa": "애스턴 빌라",
+    "brighton & hove albion": "브라이턴", "brighton and hove albion": "브라이턴", "brighton": "브라이턴",
+    "fulham": "풀럼", "brentford": "브렌트퍼드",
+    "nottingham forest": "노팅엄 포레스트", "nottm forest": "노팅엄 포레스트", "nott'm forest": "노팅엄 포레스트", "nottingham": "노팅엄 포레스트",
+    "afc bournemouth": "본머스", "bournemouth": "본머스",
+    "west ham united": "웨스트햄 유나이티드", "west ham": "웨스트햄 유나이티드",
+    "everton": "에버턴",
+    "crystal palace": "크리스털 팰리스", "c palace": "크리스털 팰리스", "c. palace": "크리스털 팰리스",
+    "wolverhampton wanderers": "울버햄프턴", "wolverhampton": "울버햄프턴", "wolves": "울버햄프턴",
+    "leicester city": "레스터 시티", "leicester": "레스터 시티",
+    "ipswich town": "입스위치 타운", "ipswich": "입스위치 타운",
+    "southampton": "사우샘프턴",
+    "sunderland": "선덜랜드", "afc sunderland": "선덜랜드",
+    "leeds united": "리즈 유나이티드", "leeds utd": "리즈 유나이티드", "leeds": "리즈 유나이티드",
+    "burnley": "번리",
+    "sheffield united": "셰필드 유나이티드", "sheffield utd": "셰필드 유나이티드", "sheff utd": "셰필드 유나이티드",
+    "sheffield wednesday": "셰필드 웬즈데이", "sheff wed": "셰필드 웬즈데이",
+    "coventry city": "코번트리 시티", "coventry": "코번트리 시티",
+    "hull city": "헐 시티", "hull": "헐 시티",
+    "middlesbrough": "미들즈브러",
+    "west bromwich albion": "웨스트 브로미치", "west brom": "웨스트 브로미치",
+    "norwich city": "노리치 시티", "norwich": "노리치 시티",
+    "watford": "왓퍼드", "luton town": "루턴 타운", "luton": "루턴 타운",
+    "blackburn rovers": "블랙번 로버스", "blackburn": "블랙번 로버스",
+    "stoke city": "스토크 시티", "stoke": "스토크 시티",
+    "swansea city": "스완지 시티", "swansea": "스완지 시티",
+    "bristol city": "브리스톨 시티", "millwall": "밀월",
+    "queens park rangers": "퀸즈 파크 레인저스", "qpr": "QPR",
+    "portsmouth": "포츠머스", "derby county": "더비 카운티", "derby": "더비 카운티",
+    "cardiff city": "카디프 시티", "cardiff": "카디프 시티",
+    "preston north end": "프레스턴", "preston": "프레스턴",
+    "plymouth argyle": "플리머스", "plymouth": "플리머스",
+    "oxford united": "옥스퍼드 유나이티드", "oxford utd": "옥스퍼드 유나이티드", "oxford": "옥스퍼드 유나이티드",
+    "birmingham city": "버밍엄 시티", "birmingham": "버밍엄 시티",
+    "wrexham": "렉섬", "charlton athletic": "찰턴 애슬레틱", "charlton": "찰턴 애슬레틱",
+    # LaLiga
+    "real madrid": "레알 마드리드", "fc barcelona": "FC 바르셀로나", "barcelona": "FC 바르셀로나",
+    "atletico madrid": "아틀레티코 마드리드", "atlético madrid": "아틀레티코 마드리드", "atletico": "아틀레티코 마드리드",
+    "athletic club": "아틀레틱 빌바오", "athletic bilbao": "아틀레틱 빌바오",
+    "real sociedad": "레알 소시에다드", "villarreal": "비야레알",
+    "real betis": "레알 베티스", "betis": "레알 베티스", "sevilla": "세비야", "valencia": "발렌시아",
+    "girona": "지로나", "celta vigo": "셀타 비고", "celta": "셀타 비고", "osasuna": "오사수나",
+    "rcd mallorca": "마요르카", "mallorca": "마요르카", "getafe": "헤타페",
+    "rayo vallecano": "라요 바예카노", "espanyol": "에스파뇰",
+    "deportivo alaves": "알라베스", "alaves": "알라베스", "las palmas": "라스팔마스",
+    "leganes": "레가네스", "real valladolid": "레알 바야돌리드", "valladolid": "레알 바야돌리드",
+    "elche": "엘체", "levante": "레반테", "real oviedo": "레알 오비에도",
+    # Bundesliga
+    "bayern munich": "바이에른 뮌헨", "bayern": "바이에른 뮌헨",
+    "borussia dortmund": "보루시아 도르트문트", "dortmund": "보루시아 도르트문트",
+    "bayer leverkusen": "바이어 레버쿠젠", "leverkusen": "바이어 레버쿠젠",
+    "rb leipzig": "RB 라이프치히", "leipzig": "RB 라이프치히",
+    "eintracht frankfurt": "프랑크푸르트", "frankfurt": "프랑크푸르트",
+    "vfb stuttgart": "슈투트가르트", "stuttgart": "슈투트가르트",
+    "sc freiburg": "프라이부르크", "freiburg": "프라이부르크",
+    "vfl wolfsburg": "볼프스부르크", "wolfsburg": "볼프스부르크",
+    "borussia monchengladbach": "묀헨글라트바흐", "m'gladbach": "묀헨글라트바흐", "gladbach": "묀헨글라트바흐",
+    "mainz 05": "마인츠", "mainz": "마인츠",
+    "werder bremen": "베르더 브레멘", "bremen": "베르더 브레멘",
+    "fc augsburg": "아우크스부르크", "augsburg": "아우크스부르크",
+    "tsg hoffenheim": "호펜하임", "hoffenheim": "호펜하임",
+    "union berlin": "우니온 베를린", "heidenheim": "하이덴하임",
+    "st. pauli": "장크트파울리", "st pauli": "장크트파울리",
+    "holstein kiel": "홀슈타인 킬", "bochum": "보훔", "fc koln": "FC 쾰른", "hamburger sv": "함부르크",
+    # Serie A
+    "inter milan": "인터 밀란", "internazionale": "인터 밀란", "inter": "인터 밀란",
+    "ac milan": "AC 밀란", "milan": "AC 밀란", "juventus": "유벤투스", "napoli": "나폴리",
+    "atalanta": "아탈란타", "as roma": "AS 로마", "roma": "AS 로마", "lazio": "라치오",
+    "fiorentina": "피오렌티나", "bologna": "볼로냐", "torino": "토리노", "udinese": "우디네세",
+    "genoa": "제노아", "como": "코모", "hellas verona": "엘라스 베로나", "verona": "엘라스 베로나",
+    "cagliari": "칼리아리", "parma": "파르마", "lecce": "레체", "empoli": "엠폴리",
+    "venezia": "베네치아", "monza": "몬차", "sassuolo": "사수올로", "pisa": "피사",
+    # Ligue 1 & UCL / European Clubs
+    "paris saint-germain": "파리 생제르맹", "paris sg": "파리 생제르맹", "psg": "파리 생제르맹",
+    "olympique marseille": "마르세유", "marseille": "마르세유",
+    "as monaco": "AS 모나코", "monaco": "AS 모나코", "lille": "릴 OSC",
+    "olympique lyonnais": "올랭피크 리옹", "lyon": "올랭피크 리옹",
+    "ogc nice": "OGC 니스", "nice": "OGC 니스", "rc lens": "RC 랑스", "lens": "RC 랑스",
+    "stade rennais": "스타드 렌", "rennes": "스타드 렌", "strasbourg": "스트라스부르",
+    "stade brestois": "스타드 브레스트", "brest": "스타드 브레스트",
+    "reims": "스타드 랭스", "toulouse": "툴루즈", "nantes": "FC 낭트",
+    "auxerre": "오세르", "angers": "앙제", "le havre": "르아브르", "saint-etienne": "생테티엔",
+    "psv eindhoven": "PSV 에인트호번", "psv": "PSV 에인트호번", "feyenoord": "페예노르트", "ajax": "아약스",
+    "benfica": "벤피카", "sporting cp": "스포르팅 CP", "fc porto": "FC 포르투", "porto": "FC 포르투",
+    "celtic": "셀틱", "rangers fc": "레인저스", "club brugge": "클뤼프 브뤼허",
+    "galatasaray": "갈라타사라이", "fenerbahce": "페네르바체", "salzburg": "잘츠부르크", "shakhtar donetsk": "샤흐타르",
+    # MLS & K League English fallbacks
+    "inter miami": "인터 마이애미", "la galaxy": "LA 갤럭시", "lafc": "LAFC",
+    "ulsan hd": "울산 HD", "fc seoul": "FC 서울", "jeonbuk motors": "전북 현대", "pohang steelers": "포항 스틸러스",
+    "gangwon fc": "강원 FC", "suwon fc": "수원 FC", "gimcheon sangmu": "김천 상무", "jeju united": "제주 SK",
+    "daejeon citizen": "대전 하나시티즌", "gwangju fc": "광주 FC", "daegu fc": "대구 FC", "incheon united": "인천 유나이티드",
 }
 
 _KO_HOCKEY_MLB_TEAMS_V37: Dict[str, str] = {
-    "bruins": "보스턴 브루인스", "kings": "LA 킹스", "la kings": "LA 킹스", "los angeles kings": "LA 킹스",
+    # NHL 32
+    "bruins": "보스턴 브루인스", "la kings": "LA 킹스", "los angeles kings": "LA 킹스",
     "panthers": "플로리다 팬서스", "oilers": "에드먼턴 오일러스", "maple leafs": "토론토 메이플리프스",
-    "rangers": "뉴욕 레인저스", "islanders": "뉴욕 아일랜더스", "blue jackets": "콜럼버스 블루재키츠",
-    "flyers": "필라델피아 플라이어스", "sabres": "버펄로 세이버스", "penguins": "피츠버그 펭귄스",
-    "capitals": "워싱턴 캐피털스", "blackhawks": "시카고 블랙호크스", "red wings": "디트로이트 레드윙스",
-    "avalanche": "콜로라도 애벌랜치", "golden knights": "베가스 골든나이츠", "stars": "댈러스 스타스",
-    "canucks": "밴쿠버 캐넉스", "flames": "캘거리 플레임스", "jets": "위니펙 제츠", "devils": "뉴저지 데블스",
-    "hurricanes": "캐롤라이나 허리케인스", "lightning": "탬파베이 라이트닝", "senators": "오타와 세너터스",
-    "canadiens": "몬트리올 캐네디언스", "predators": "내슈빌 프레더터스", "blues": "세인트루이스 블루스",
-    "wild": "미네소타 와일드", "kraken": "시애틀 크라켄", "sharks": "산호세 샤크스", "ducks": "애너하임 덕스",
+    "ny rangers": "뉴욕 레인저스", "rangers": "뉴욕 레인저스", "islanders": "뉴욕 아일랜더스", "ny islanders": "뉴욕 아일랜더스",
+    "blue jackets": "콜럼버스 블루재키츠", "flyers": "필라델피아 플라이어스", "sabres": "버펄로 세이버스",
+    "penguins": "피츠버그 펭귄스", "capitals": "워싱턴 캐피털스", "blackhawks": "시카고 블랙호크스",
+    "red wings": "디트로이트 레드윙스", "avalanche": "콜로라도 애벌랜치", "golden knights": "베가스 골든나이츠",
+    "stars": "댈러스 스타스", "canucks": "밴쿠버 캐넉스", "flames": "캘거리 플레임스", "jets": "위니펙 제츠",
+    "devils": "뉴저지 데블스", "hurricanes": "캐롤라이나 허리케인스", "lightning": "탬파베이 라이트닝",
+    "senators": "오타와 세너터스", "canadiens": "몬트리올 캐네디언스", "predators": "내슈빌 프레더터스",
+    "blues": "세인트루이스 블루스", "wild": "미네소타 와일드", "kraken": "시애틀 크라켄",
+    "sharks": "산호세 샤크스", "ducks": "애너하임 덕스", "utah hc": "유타 하키클럽", "mammoth": "유타 매머드",
+    # MLB 30
     "dodgers": "LA 다저스", "yankees": "뉴욕 양키스", "mets": "뉴욕 메츠", "padres": "샌디에이고 파드리스",
     "giants": "샌프란시스코 자이언츠", "phillies": "필라델피아 필리스", "braves": "애틀랜타 브레이브스",
     "astros": "휴스턴 애스트로스", "orioles": "볼티모어 오리올스", "red sox": "보스턴 레드삭스",
-    "cubs": "시카고 컵스", "brewers": "밀워키 브루어스", "rays": "탬파베이 레이스", "guardians": "클리블랜드 가디언스",
+    "cubs": "시카고 컵스", "white sox": "시카고 화이트삭스", "brewers": "밀워키 브루어스",
+    "rays": "탬파베이 레이스", "guardians": "클리블랜드 가디언스", "twins": "미네소타 트윈스",
+    "tigers": "디트로이트 타이거스", "royals": "캔자스시티 로열스", "athletics": "애슬레틱스",
+    "mariners": "시애틀 매리너스", "texas rangers": "텍사스 레인저스", "angels": "LA 에인절스",
+    "diamondbacks": "애리조나 다이아몬드백스", "d-backs": "애리조나 다이아몬드백스", "rockies": "콜로라도 로키스",
+    "cardinals": "세인트루이스 카디널스", "pirates": "피츠버그 파이리츠", "reds": "신시내티 레즈",
+    "marlins": "마이애미 말린스", "nationals": "워싱턴 내셔널스", "blue jays": "토론토 블루제이스",
 }
 
 _ESPN_LEAGUE_ENDPOINTS_V37: Dict[str, Tuple[str, str, str]] = {
@@ -10848,30 +10987,45 @@ def _localize_team_ko_v37(raw_name: str, sport: str = "") -> str:
     nm = (raw_name or "").strip()
     if not nm or re.search(r"[가-힣]", nm):
         return nm
-    low = nm.lower()
+    low = re.sub(r"\s+", " ", nm.lower().replace("’", "'")).strip()
+    low_clean = re.sub(r"\b(fc|afc|cf|sc)\b", "", low).strip()
+    low_clean = re.sub(r"\s+", " ", low_clean)
     sp = (sport or "").lower()
+
+    def _lookup_tbl(tbl: Dict[str, str], min_sub_len: int = 4) -> Optional[str]:
+        if low in tbl:
+            return tbl[low]
+        if low_clean and low_clean in tbl:
+            return tbl[low_clean]
+        no_dot = low.replace(".", "")
+        if no_dot in tbl:
+            return tbl[no_dot]
+        for k in sorted(tbl.keys(), key=len, reverse=True):
+            if len(k) >= min_sub_len and re.search(rf"(?:^|\s){re.escape(k)}(?:$|\s)", low):
+                return tbl[k]
+        return None
+
     if sp == "basketball":
-        if low in _KO_NBA_TEAMS_V37:
-            return _KO_NBA_TEAMS_V37[low]
-        for k, v in _KO_NBA_TEAMS_V37.items():
-            if len(k) >= 4 and (low.endswith(" " + k) or low == k):
-                return v
+        hit = _lookup_tbl(_KO_NBA_TEAMS_V37, 4)
+        if hit:
+            return hit
     elif sp == "soccer":
-        if low in _KO_SOCCER_TEAMS_V37:
-            return _KO_SOCCER_TEAMS_V37[low]
-        for k, v in _KO_SOCCER_TEAMS_V37.items():
-            if len(k) >= 5 and k in low:
-                return v
+        hit = _lookup_tbl(_KO_SOCCER_TEAMS_V37, 4)
+        if hit:
+            return hit
     elif sp in ("hockey", "baseball"):
-        if low in _KO_HOCKEY_MLB_TEAMS_V37:
-            return _KO_HOCKEY_MLB_TEAMS_V37[low]
-        for k, v in _KO_HOCKEY_MLB_TEAMS_V37.items():
-            if len(k) >= 5 and (low.endswith(" " + k) or low == k):
-                return v
-    # Generic fallback
+        if sp == "hockey" and low == "kings":
+            return "LA 킹스"
+        if sp == "baseball" and low == "rangers":
+            return "텍사스 레인저스"
+        hit = _lookup_tbl(_KO_HOCKEY_MLB_TEAMS_V37, 4)
+        if hit:
+            return hit
     for tbl in (_KO_NBA_TEAMS_V37, _KO_SOCCER_TEAMS_V37, _KO_HOCKEY_MLB_TEAMS_V37):
         if low in tbl:
             return tbl[low]
+        if low_clean and low_clean in tbl:
+            return tbl[low_clean]
     return nm
 
 
@@ -11710,7 +11864,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "3.7.5-py310-iso-instant",
+        "engine_version": "3.7.6-ko-teams-kbl-dedup",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
