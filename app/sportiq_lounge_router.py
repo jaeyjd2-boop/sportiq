@@ -446,7 +446,12 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
       };
     }
     if (typeof window.__foldAiModalHintsOnResultV46 === "function") {
-      try { window.__foldAiModalHintsOnResultV46(true); } catch (eFH) {}
+      try {
+        var _am = document.getElementById("sqAiIqModal") || document.getElementById("aiIqModal");
+        if (_am) _am.removeAttribute("data-sq-ai-manual-state");
+        window.__foldAiModalHintsOnResultV46(true);
+        setTimeout(function () { window.__foldAiModalHintsOnResultV46(true); }, 30);
+      } catch (eFH) {}
     }
 
     // Jump handlers for match, datacenter insight, and feed post cards
@@ -757,6 +762,21 @@ _FRONTEND_V22_JS = r'''
           }
         });
       }
+      if (typeof HTMLElement !== "undefined" && HTMLElement.prototype) {
+        var ttlDesc = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "title");
+        if (ttlDesc && ttlDesc.get && ttlDesc.set) {
+          Object.defineProperty(HTMLElement.prototype, "title", {
+            configurable: true,
+            enumerable: ttlDesc.enumerable,
+            get: ttlDesc.get,
+            set: function (val) {
+              var sv = String(val == null ? "" : val);
+              if (ttlDesc.get.call(this) === sv) return;
+              ttlDesc.set.call(this, sv);
+            }
+          });
+        }
+      }
       var idDesc = Object.getOwnPropertyDescriptor(Element.prototype, "id");
       if (idDesc && idDesc.get && idDesc.set) {
         Object.defineProperty(Element.prototype, "id", {
@@ -994,6 +1014,7 @@ _FRONTEND_V22_JS = r'''
     st.textContent = [
       "/* 1-Line Main Community Tab Bar (Overrides .sq-mobile-bottom-nav-bar 6-col grid!) */",
       "#sqDesktopMainTabStrip,",
+      "[data-sq-7tab-strip='1'],",
       "#sqDesktopMainTabStrip.sq-main-tabbar-row,",
       "#sqDesktopMainTabStrip.sq-mobile-bottom-nav-bar {",
       "  position: static !important;",
@@ -1003,27 +1024,35 @@ _FRONTEND_V22_JS = r'''
       "  flex-wrap: nowrap !important;",
       "  align-items: center !important;",
       "  justify-content: flex-start !important;",
-      "  gap: 6px !important;",
+      "  gap: 5px !important;",
+      "  width: 100% !important;",
+      "  max-width: 100% !important;",
+      "  min-width: 0 !important;",
+      "  box-sizing: border-box !important;",
       "  overflow-x: auto !important;",
+      "  overflow-y: hidden !important;",
       "  -webkit-overflow-scrolling: touch;",
       "  scrollbar-width: none !important;",
       "}",
-      "#sqDesktopMainTabStrip::-webkit-scrollbar { display: none !important; }",
+      "#sqDesktopMainTabStrip::-webkit-scrollbar, [data-sq-7tab-strip='1']::-webkit-scrollbar { display: none !important; }",
       "#sqDesktopMainTabStrip > .tab-btn,",
       "#sqDesktopMainTabStrip > button,",
-      "#sqDesktopMainTabStrip > a {",
+      "#sqDesktopMainTabStrip > a,",
+      "[data-sq-7tab-strip='1'] > button,",
+      "[data-sq-7tab-strip='1'] > a {",
       "  flex: 0 0 auto !important;",
       "  width: auto !important;",
       "  min-width: max-content !important;",
       "  white-space: nowrap !important;",
-      "  padding: 6px 10px !important;",
-      "  font-size: 12.4px !important;",
+      "  padding: 6px 9.5px !important;",
+      "  font-size: 12px !important;",
       "  line-height: 1.25 !important;",
       "}",
-      "@media (min-width: 1240px) {",
-      "  #sqDesktopMainTabStrip { gap: 7px !important; }",
+      "@media (min-width: 1280px) {",
+      "  #sqDesktopMainTabStrip, [data-sq-7tab-strip='1'] { gap: 6px !important; }",
       "  #sqDesktopMainTabStrip > .tab-btn,",
-      "  #sqDesktopMainTabStrip > button { padding: 7px 12px !important; font-size: 13px !important; }",
+      "  #sqDesktopMainTabStrip > button,",
+      "  [data-sq-7tab-strip='1'] > button { padding: 7px 11.5px !important; font-size: 12.6px !important; }",
       "}",
       "/* v3.0 Scorebase-Inspired Dual Scoreboard Table, Status/Star Filters & 5-Tab Match Insight Modal */",
       "/* v3.9 Unified Clean Scoreboard Hub — Zero Full-Bleed Overflow & Zero Duplicate Rows */",
@@ -1462,13 +1491,10 @@ _FRONTEND_V22_JS = r'''
       "  display: none !important;",
       "}",
       "#sqShortsInteractiveTabsV43 {",
-      "  display: flex;",
-      "  flex-wrap: nowrap;",
-      "  overflow-x: auto;",
-      "  -webkit-overflow-scrolling: touch;",
-      "  scrollbar-width: none;",
-      "  gap: 6px;",
-      "  padding: 8px 10px;",
+      "  display: grid !important;",
+      "  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;",
+      "  gap: 5px !important;",
+      "  padding: 6px 7px !important;",
       "  margin-top: 12px;",
       "  margin-bottom: 10px;",
       "  background: rgba(9, 15, 31, 0.94);",
@@ -1477,6 +1503,21 @@ _FRONTEND_V22_JS = r'''
       "  min-width: 0 !important;",
       "  max-width: 100% !important;",
       "  box-sizing: border-box !important;",
+      "}",
+      "#sqShortsInteractiveTabsV43 > button {",
+      "  width: 100% !important;",
+      "  min-width: 0 !important;",
+      "  padding: 6px 4px !important;",
+      "  font-size: 11.3px !important;",
+      "  justify-content: center !important;",
+      "  text-align: center !important;",
+      "  white-space: nowrap !important;",
+      "  overflow: visible !important;",
+      "  text-overflow: clip !important;",
+      "}",
+      "@media (max-width: 440px) {",
+      "  #sqShortsInteractiveTabsV43 { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none !important; }",
+      "  #sqShortsInteractiveTabsV43 > button { width: auto !important; flex: 0 0 auto !important; padding: 6px 9px !important; }",
       "}",
       "#sqShortsInteractiveTabsV43::-webkit-scrollbar { display: none; }",
       ".sq-v43-shorts-playlist {",
@@ -1827,7 +1868,8 @@ _FRONTEND_V22_JS = r'''
       "  min-width: 0 !important;",
       "  box-sizing: border-box !important;",
       "}",
-      "[data-sq-ai-hints-wrap='1'][data-sq-ai-hints-folded='1'] > [data-sq-ai-hint-row='1'] {",
+      "[data-sq-ai-hints-wrap='1'][data-sq-ai-hints-folded='1'] > [data-sq-ai-hint-row='1'],",
+      "[data-sq-ai-hint-row='1'][data-sq-ai-hint-folded='1'] {",
       "  display: none !important;",
       "}",
       "#sqLegalTabsV46 {",
@@ -2467,42 +2509,65 @@ _FRONTEND_V22_JS = r'''
   // 1. 1-Row Main Tab Bar + Dynamic Match Count ('총 20경기' -> actual count)
   // -------------------------------------------------------------------------
   function enforceSingleLineMainTabBar() {
-    var firstTab = document.querySelector("button.tab-btn[data-tab='feed'], button[onclick*=\"switchTab('feed')\"]");
-    if (!firstTab || !firstTab.parentElement) return;
-    var bar = firstTab.parentElement;
-    var nav = firstTab.closest ? firstTab.closest("nav") : bar.parentElement;
-    bar.id = "sqDesktopMainTabStrip";
-    bar.classList.remove("sq-mobile-bottom-nav-bar");
-    bar.classList.add("sq-main-tabbar-row");
-    if (nav && nav.classList) {
-      nav.classList.remove("sq-mobile-bottom-nav-bar");
-    }
-
-    // Move '📊 데이터센터' button (appended directly onto <nav> by sportiq_datacenter_ui.js L360) into bar!
-    if (nav) {
-      var strayBtns = nav.querySelectorAll("button, a");
-      for (var i = 0; i < strayBtns.length; i++) {
-        var sb = strayBtns[i];
-        if (sb.parentElement !== bar && /데이터\s*센터/.test(sb.textContent || "")) {
-          sb.className = "tab-btn whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold transition border border-cyan-500/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25";
-          bar.appendChild(sb);
-        }
-      }
-    }
-
-    bar.style.setProperty("display", "flex", "important");
-    bar.style.setProperty("grid-template-columns", "none", "important");
-    bar.style.setProperty("flex-direction", "row", "important");
-    bar.style.setProperty("flex-wrap", "nowrap", "important");
-    bar.style.setProperty("overflow-x", "auto", "important");
-    Array.prototype.forEach.call(bar.children, function (btn) {
-      if (btn && btn.style) {
-        btn.style.setProperty("flex", "0 0 auto", "important");
-        btn.style.setProperty("white-space", "nowrap", "important");
-        btn.style.setProperty("width", "auto", "important");
+    var candidateFirstTabs = [];
+    var bySel = document.querySelectorAll("button.tab-btn[data-tab='feed'], button[onclick*=\"switchTab('feed')\"], button[data-nav='feed'], button[onclick*=\"setView('feed')\"]");
+    Array.prototype.forEach.call(bySel, function (b) {
+      if (candidateFirstTabs.indexOf(b) === -1) candidateFirstTabs.push(b);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("nav button, div button"), function (b) {
+      var bt = String(b.textContent || "").trim();
+      if ((bt === "실시간 분석 피드" || bt.indexOf("실시간 분석 피드") !== -1) && candidateFirstTabs.indexOf(b) === -1) {
+        candidateFirstTabs.push(b);
       }
     });
-    bindDataCenterMainTabClickV26(bar);
+    if (!candidateFirstTabs.length) return;
+
+    candidateFirstTabs.forEach(function (firstTab, stripIdx) {
+      if (!firstTab || !firstTab.parentElement) return;
+      var bar = firstTab.parentElement;
+      var nav = firstTab.closest ? (firstTab.closest("nav") || bar.parentElement) : bar.parentElement;
+      // Prefer assigning #sqDesktopMainTabStrip to the body 7-tab bar ('실시간 분석 피드') or the first strip
+      if (stripIdx === 0 || String(firstTab.textContent || "").indexOf("실시간 분석 피드") !== -1) {
+        bar.id = "sqDesktopMainTabStrip";
+      }
+      bar.setAttribute("data-sq-7tab-strip", "1");
+      bar.classList.remove("sq-mobile-bottom-nav-bar", "flex-wrap");
+      bar.classList.add("sq-main-tabbar-row");
+      if (nav && nav.classList) {
+        nav.classList.remove("sq-mobile-bottom-nav-bar", "flex-wrap");
+      }
+
+      // Move any sibling/descendant '데이터센터' button inside `nav` (or `bar.parentElement`) directly into `bar` so it never drops to line 2!
+      var searchScope = nav || bar.parentElement;
+      if (searchScope) {
+        var strayBtns = searchScope.querySelectorAll("button, a");
+        for (var i = 0; i < strayBtns.length; i++) {
+          var sb = strayBtns[i];
+          if (sb.parentElement !== bar && !sb.closest("#dcMainHubSection") && /데이터\s*센터/.test(sb.textContent || "")) {
+            sb.className = "tab-btn whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold transition border border-cyan-500/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25";
+            bar.appendChild(sb);
+          }
+        }
+        if (searchScope !== document.body && searchScope.children && searchScope.children.length === 1) {
+          searchScope.style.setProperty("overflow-x", "hidden", "important");
+          searchScope.style.setProperty("max-width", "100%", "important");
+        }
+      }
+
+      bar.style.setProperty("display", "flex", "important");
+      bar.style.setProperty("grid-template-columns", "none", "important");
+      bar.style.setProperty("flex-direction", "row", "important");
+      bar.style.setProperty("flex-wrap", "nowrap", "important");
+      bar.style.setProperty("overflow-x", "auto", "important");
+      Array.prototype.forEach.call(bar.children, function (btn) {
+        if (btn && btn.style) {
+          btn.style.setProperty("flex", "0 0 auto", "important");
+          btn.style.setProperty("white-space", "nowrap", "important");
+          btn.style.setProperty("width", "auto", "important");
+        }
+      });
+      bindDataCenterMainTabClickV26(bar);
+    });
   }
 
   function bindDataCenterMainTabClickV26(bar) {
@@ -7831,9 +7896,9 @@ _FRONTEND_V22_JS = r'''
           quizBox.insertAdjacentElement("beforebegin", tabBar);
         }
         var tabs = [
-          { k: "quiz", lbl: "🎯 +15P 미니 예측 퀴즈" },
-          { k: "var", lbl: "⚖️ VAR 판정 밸런스 투표" },
-          { k: "comment", lbl: "⏱️ 실시간 타임스탬프 한줄평" }
+          { k: "quiz", lbl: "🎯 +15P 예측 퀴즈" },
+          { k: "var", lbl: "⚖️ VAR 밸런스 투표" },
+          { k: "comment", lbl: "⏱️ 타임스탬프 한줄평" }
         ];
         if (tabBar.getAttribute("data-sq-sig") !== _v43ShortsActiveWidget) {
           tabBar.setAttribute("data-sq-sig", _v43ShortsActiveWidget);
@@ -8605,19 +8670,102 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
+  function tagAiModalHintAndModeRowsV464(aiModal) {
+    if (!aiModal) return [];
+    var panel = aiModal.firstElementChild;
+    var modeRow = null;
+    var hintRows = [];
+
+    aiModal.querySelectorAll("div").forEach(function (d) {
+      if (d === aiModal || d === panel || d.closest("#sqAiIqResultArea") || d.id === "sqAiIqResultArea") return;
+      if (d.getAttribute("data-sq-ai-hints-wrap") === "1") return;
+      if (d.querySelector("input, h3, #sqAiIqResultArea")) return;
+      var dtx = String(d.textContent || "").replace(/\s+/g, " ").trim();
+      if (!modeRow && dtx.indexOf("통합 AI") !== -1 && dtx.indexOf("백과") !== -1 && d.querySelectorAll("button").length >= 3 && d.children.length <= 8) {
+        modeRow = d;
+        d.classList.add("sq-v46-ai-swipe-row");
+        return;
+      }
+      var isRecentOrTrendId = /^(sqAiRecent|sqAiTrend|aiRecent|aiTrend)/i.test(d.id || "");
+      var startsWithHintLabel = /^(🕒\s*)?최근\s*검색|^🔥?\s*실시간\s*추천/.test(dtx);
+      if ((isRecentOrTrendId || (startsWithHintLabel && dtx.length <= 420)) && !d.querySelector("[data-sq-ai-hint-row='1']")) {
+        // Avoid tagging a parent wrapper that contains BOTH '최근 검색' and '실시간 추천' as separate child divs
+        var childDivs = Array.prototype.filter.call(d.children || [], function (c) {
+          return c.tagName === "DIV" && /^(🕒\s*)?최근\s*검색|^🔥?\s*실시간\s*추천/.test(String(c.textContent || "").trim());
+        });
+        if (childDivs.length >= 2) return;
+        d.classList.add("sq-v46-ai-swipe-row");
+        d.setAttribute("data-sq-ai-hint-row", "1");
+        hintRows.push(d);
+        d.querySelectorAll("button").forEach(function (b) {
+          var bt = String(b.textContent || "").trim();
+          if (/네임드|토토|사설/.test(bt)) b.style.display = "none";
+        });
+      }
+    });
+
+    if (hintRows.length > 0 && !aiModal.querySelector("[data-sq-ai-hints-wrap='1']")) {
+      var firstH = hintRows[0];
+      if (firstH && firstH.parentElement) {
+        var hWrap = document.createElement("div");
+        hWrap.setAttribute("data-sq-ai-hints-wrap", "1");
+        firstH.parentElement.insertBefore(hWrap, firstH);
+        hintRows.forEach(function (hr) { hWrap.appendChild(hr); });
+      }
+    }
+
+    var allHintRows = Array.prototype.slice.call(aiModal.querySelectorAll("[data-sq-ai-hint-row='1']"));
+    if (allHintRows.length > 0 && !document.getElementById("sqAiHintsToggleBtnV46")) {
+      var hBtn = document.createElement("button");
+      hBtn.type = "button";
+      hBtn.id = "sqAiHintsToggleBtnV46";
+      hBtn.className = "sq-v44-qchip";
+      hBtn.style.cssText = "display:none;margin-left:auto;font-size:10.8px;padding:3px 9px;color:#93c5fd;border-color:rgba(56,189,248,.4);flex-shrink:0;";
+      hBtn.textContent = "🔎 추천 · 최근 검색어 ▾";
+      hBtn.onclick = function (ev) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        var curRows = aiModal.querySelectorAll("[data-sq-ai-hint-row='1']");
+        var currentlyFolded = curRows.length > 0 && curRows[0].getAttribute("data-sq-ai-hint-folded") === "1";
+        aiModal.setAttribute("data-sq-ai-manual-state", currentlyFolded ? "open" : "folded");
+        foldAiModalHintsOnResultV46(!currentlyFolded);
+      };
+      var resBox = document.getElementById("sqAiIqResultArea");
+      if (modeRow) {
+        modeRow.appendChild(hBtn);
+      } else if (resBox && resBox.parentElement) {
+        resBox.insertAdjacentElement("beforebegin", hBtn);
+      }
+    }
+    return allHintRows;
+  }
+
   function foldAiModalHintsOnResultV46(shouldFold) {
     var aiModal = findAiSearchModalContainerV372();
     if (!aiModal) return;
+    var rows = tagAiModalHintAndModeRowsV464(aiModal);
     var wrap = aiModal.querySelector("[data-sq-ai-hints-wrap='1']");
     var togBtn = document.getElementById("sqAiHintsToggleBtnV46");
-    if (!wrap || !togBtn) return;
+    if (!rows.length && !wrap) return;
     if (shouldFold) {
-      wrap.setAttribute("data-sq-ai-hints-folded", "1");
-      togBtn.style.display = "inline-flex";
-      togBtn.textContent = "🔎 추천 · 최근 검색어 ▾";
+      if (wrap) wrap.setAttribute("data-sq-ai-hints-folded", "1");
+      rows.forEach(function (r) {
+        r.setAttribute("data-sq-ai-hint-folded", "1");
+        r.style.setProperty("display", "none", "important");
+      });
+      if (togBtn) {
+        togBtn.style.setProperty("display", "inline-flex", "important");
+        togBtn.textContent = "🔎 추천 · 최근 검색어 ▾";
+      }
     } else {
-      wrap.removeAttribute("data-sq-ai-hints-folded");
-      togBtn.textContent = "🔎 추천 검색어 접기 ▴";
+      if (wrap) wrap.removeAttribute("data-sq-ai-hints-folded");
+      rows.forEach(function (r) {
+        r.removeAttribute("data-sq-ai-hint-folded");
+        r.style.removeProperty("display");
+      });
+      if (togBtn) {
+        togBtn.style.setProperty("display", "inline-flex", "important");
+        togBtn.textContent = "🔎 추천 검색어 접기 ▴";
+      }
     }
   }
   window.__foldAiModalHintsOnResultV46 = foldAiModalHintsOnResultV46;
@@ -8644,56 +8792,12 @@ _FRONTEND_V22_JS = r'''
         }
       });
 
-      // 2) Convert mode pills, recent searches, and trending rows to 1-line swipe strips + filter noisy chips + wrap for result auto-fold!
-      var hintRows = [];
-      aiModal.querySelectorAll("div").forEach(function (d) {
-        if (d.closest("#sqAiIqResultArea")) return;
-        var dtx = String(d.textContent || "").trim();
-        if (d.children && d.children.length >= 3 && d.children.length <= 5 && dtx.indexOf("통합 AI") !== -1 && dtx.indexOf("백과") !== -1 && Array.prototype.every.call(d.children, function (c) { return c.tagName === "BUTTON"; })) {
-          d.classList.add("sq-v46-ai-swipe-row");
-          if (!document.getElementById("sqAiHintsToggleBtnV46")) {
-            var hBtn = document.createElement("button");
-            hBtn.type = "button";
-            hBtn.id = "sqAiHintsToggleBtnV46";
-            hBtn.className = "sq-v44-qchip";
-            hBtn.style.cssText = "display:none;margin-left:auto;font-size:10.8px;padding:3px 9px;color:#93c5fd;border-color:rgba(56,189,248,.4);";
-            hBtn.textContent = "🔎 추천 · 최근 검색어 ▾";
-            hBtn.onclick = function () {
-              var w = aiModal.querySelector("[data-sq-ai-hints-wrap='1']");
-              var nowFolded = w && w.getAttribute("data-sq-ai-hints-folded") === "1";
-              foldAiModalHintsOnResultV46(!nowFolded);
-            };
-            d.appendChild(hBtn);
-          }
-        } else if (d !== panel && !d.querySelector("input, h3, #sqAiIqResultArea") && dtx.length <= 160 && (dtx.indexOf("최근 검색") === 0 || dtx.indexOf("🔥 실시간 추천") === 0 || dtx.indexOf("실시간 추천:") === 0) && d.querySelectorAll("button").length >= 1 && d.children.length <= 14) {
-          d.classList.add("sq-v46-ai-swipe-row");
-          d.setAttribute("data-sq-ai-hint-row", "1");
-          hintRows.push(d);
-          // Filter noisy non-sport/external betting-board keywords from trending pills
-          d.querySelectorAll("button").forEach(function (b) {
-            var bt = String(b.textContent || "").trim();
-            if (/네임드|토토|사설/.test(bt)) b.style.display = "none";
-          });
-        }
-      });
-
-      if (hintRows.length > 0 && !aiModal.querySelector("[data-sq-ai-hints-wrap='1']")) {
-        var firstH = hintRows[0];
-        if (firstH && firstH.parentElement) {
-          var hWrap = document.createElement("div");
-          hWrap.setAttribute("data-sq-ai-hints-wrap", "1");
-          firstH.parentElement.insertBefore(hWrap, firstH);
-          hintRows.forEach(function (hr) { hWrap.appendChild(hr); });
-        }
-      }
-
+      // 2) Tag mode & hint rows (`최근 검색` + `실시간 추천`) and auto-fold whenever actual search results (`#sqAiCatBar` / `.sq-ai-iq-card`) are rendered!
+      tagAiModalHintAndModeRowsV464(aiModal);
       var resArea = document.getElementById("sqAiIqResultArea");
-      if (resArea && resArea.children && resArea.children.length > 0) {
-        var hw = aiModal.querySelector("[data-sq-ai-hints-wrap='1']");
-        if (hw && !hw.hasAttribute("data-sq-ai-user-toggled")) {
-          hw.setAttribute("data-sq-ai-user-toggled", "1");
-          foldAiModalHintsOnResultV46(true);
-        }
+      var hasActualSearchResults = Boolean(resArea && resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec]"));
+      if (hasActualSearchResults && aiModal.getAttribute("data-sq-ai-manual-state") !== "open") {
+        foldAiModalHintsOnResultV46(true);
       }
     }
 
@@ -11853,7 +11957,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"4630_{int(time.time())}"
+_BOOT_VER_V30 = f"4640_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -15647,7 +15751,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.6.3-absolute-zero-flicker",
+        "engine_version": "4.6.4-complete-live-verified",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
