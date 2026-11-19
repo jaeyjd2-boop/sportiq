@@ -2514,22 +2514,62 @@ _FRONTEND_V22_JS = r'''
   // -------------------------------------------------------------------------
   // 1. 1-Row Main Tab Bar + Dynamic Match Count ('총 20경기' -> actual count)
   // -------------------------------------------------------------------------
-  function isExcludedFromMain7TabScanV467(el) {
+  function isExcludedFromMain7TabScanV468(el) {
     if (!el || !el.closest) return true;
+    // Exclude ONLY non-tab sections & modals — NEVER exclude <header> or position:fixed bars!
+    // (Mobile bottom dock uses short labels '📰피드', '🗳️일정' and #mobile-nav uses '분석 피드', so neither matches '실시간 분석 피드'!)
     if (el.closest("#mobile-nav, #proLiveTickerBar, #dcMainHubSection, #sqOfficialLegalFooter, #sqAiIqModal, #aiIqModal, #sqAiSearchModal, #sqMemberHubModal, #dcQuickMatchModal, #writeModal, #commentModal, #sqLegalPolicyModal, #sqPartnerInquiryModalV46")) {
       return true;
     }
-    var cur = el;
-    var depth = 0;
-    while (cur && cur !== document.body && depth < 5) {
-      if (cur.id !== "sqDesktopMainTabStrip" && cur.getAttribute && cur.getAttribute("data-sq-7tab-strip") !== "1") {
-        var cs = window.getComputedStyle ? window.getComputedStyle(cur) : null;
-        if (cs && cs.position === "fixed") return true;
-      }
-      cur = cur.parentElement;
-      depth++;
-    }
     return false;
+  }
+
+  function normTabTxV468(el) {
+    return String((el && el.textContent) || "").replace(/\s+/g, " ").trim();
+  }
+
+  function findTabControlUnitV468(matchFn, maxLen) {
+    if (!document.body) return null;
+    var all = document.body.querySelectorAll("button, a, [role='tab'], .tab-btn, .nav-tab, [onclick], li, div, span");
+    var bestVis = null;
+    var bestAny = null;
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (isExcludedFromMain7TabScanV468(el)) continue;
+      var tx = normTabTxV468(el);
+      if (!tx || tx.length > maxLen || !matchFn(tx)) continue;
+      // Pick innermost matching element first
+      var childHasMatch = false;
+      var chs = el.children || [];
+      for (var ci = 0; ci < chs.length; ci++) {
+        var ctx = normTabTxV468(chs[ci]);
+        if (ctx && ctx.length <= maxLen && matchFn(ctx)) {
+          childHasMatch = true;
+          break;
+        }
+      }
+      if (childHasMatch) continue;
+
+      // Climb up from inner <span>/<svg>-sibling to the actual clickable tab unit (<button>, <a>, <li>, or single-tab <div>)
+      var unit = el;
+      var guard = 0;
+      while (unit.parentElement && unit.parentElement !== document.body && guard < 4) {
+        var p = unit.parentElement;
+        if (p.tagName === "NAV" || p.tagName === "HEADER" || p.tagName === "MAIN" || p.tagName === "SECTION") break;
+        var ptx = normTabTxV468(p);
+        if (!ptx || ptx.length > maxLen + 4) break;
+        unit = p;
+        guard++;
+      }
+
+      if (!bestAny) bestAny = unit;
+      var r = unit.getBoundingClientRect ? unit.getBoundingClientRect() : null;
+      if (r && r.width > 16 && r.height >= 16 && r.height <= 74) {
+        bestVis = unit;
+        break;
+      }
+    }
+    return bestVis || bestAny;
   }
 
   function lowestCommonAncestorV467(a, b) {
@@ -2558,7 +2598,10 @@ _FRONTEND_V22_JS = r'''
         bar.classList.remove("sq-mobile-bottom-nav-bar", "flex-wrap", "grid", "grid-cols-2", "grid-cols-3", "grid-cols-6");
         bar.classList.add("sq-main-tabbar-row");
       }
-      bar.style.setProperty("position", "static", "important");
+      // Only switch position to static if it had mobile bottom-bar class or is not intentionally sticky header
+      if (bar.tagName !== "HEADER") {
+        bar.style.setProperty("position", "static", "important");
+      }
       bar.style.setProperty("display", "flex", "important");
       bar.style.setProperty("grid-template-columns", "none", "important");
       bar.style.setProperty("flex-direction", "row", "important");
@@ -2587,34 +2630,23 @@ _FRONTEND_V22_JS = r'''
   }
 
   function enforceSingleLineMainTabBar() {
-    var tab1 = null;
-    var tab6 = null;
-    var cands = document.querySelectorAll("button, a, [role='tab'], .tab-btn, .nav-tab, [onclick]");
-    for (var i = 0; i < cands.length; i++) {
-      var el = cands[i];
-      if (isExcludedFromMain7TabScanV467(el)) continue;
-      // Must be a leaf tab control (never a container holding child buttons/links!)
-      if (el.querySelector && el.querySelector("button, a")) continue;
-      var tx = String(el.textContent || "").replace(/\s+/g, " ").trim();
-      if (!tx || tx.length > 24) continue;
-      if (!tab1 && /^(📰\s*)?실시간\s*분석\s*피드$/.test(tx)) {
-        tab1 = el;
-      } else if (!tab6 && /AI\s*실험실/.test(tx)) {
-        tab6 = el;
-      }
-    }
+    var tab1 = findTabControlUnitV468(function (tx) {
+      return tx.indexOf("실시간 분석 피드") !== -1;
+    }, 28);
+    var tab2 = findTabControlUnitV468(function (tx) {
+      return tx.indexOf("경기 일정 및 승부 투표") !== -1 || tx.indexOf("9:16 AI 전술 숏츠") !== -1;
+    }, 30);
+    var tab6 = findTabControlUnitV468(function (tx) {
+      return tx.indexOf("AI 실험실") !== -1;
+    }, 28);
 
     var fallbackBtn = document.querySelector("button.tab-btn[data-tab='feed'], button[onclick*=\"switchTab('feed')\"]");
     var primaryFirstTab = tab1 || fallbackBtn;
     if (!primaryFirstTab || !primaryFirstTab.parentElement) return;
 
-    var bar = (tab1 && tab6) ? lowestCommonAncestorV467(tab1, tab6) : primaryFirstTab.parentElement;
+    var partnerTab = tab2 || tab6;
+    var bar = (tab1 && partnerTab) ? lowestCommonAncestorV467(tab1, partnerTab) : primaryFirstTab.parentElement;
     if (!bar || bar === document.body) bar = primaryFirstTab.parentElement;
-
-    // If `bar` contains a nested single flex-row holding `tab1..tab6` while `bar` itself was 1 level higher, unwrap or step into it
-    if (tab1 && tab1.parentElement && tab1.parentElement !== bar && tab6 && tab6.parentElement === tab1.parentElement) {
-      bar = tab1.parentElement;
-    }
 
     // Strip flex-wrap / grid classes on up to 3 ancestor wrappers of `bar`
     var anc = bar.parentElement;
@@ -2623,49 +2655,39 @@ _FRONTEND_V22_JS = r'''
       anc = anc.parentElement;
     }
 
-    // Scan ALL interactive/leaf elements across the document for the 7th '데이터센터' / '📊 데이터센터' tab
-    var allLeafs = document.querySelectorAll("button, a, [role='tab'], .tab-btn, .nav-tab, [onclick], div, span");
+    // Find the 7th '데이터센터' tab anywhere near the main tab bar (any tag, any emoji/badge, even with data-nav or inside fixed <header>!)
     var barRect = bar.getBoundingClientRect ? bar.getBoundingClientRect() : null;
-    for (var si = 0; si < allLeafs.length; si++) {
-      var sb = allLeafs[si];
-      if (!sb || sb === bar || sb === primaryFirstTab || sb.contains(bar)) continue;
-      if (isExcludedFromMain7TabScanV467(sb)) continue;
-      if (sb.querySelector && sb.querySelector("button, a")) continue;
-      if (sb.tagName === "DIV" || sb.tagName === "SPAN") {
-        // Only match standalone clickable div/span tabs, not inner label spans inside an already-matched button!
-        if (sb.closest("button, a")) continue;
-      }
-      var stx = String(sb.textContent || "").replace(/\s+/g, " ").trim();
-      if (!/^(📊\s*)?데이터\s*센터$/.test(stx)) continue;
+    var sb = findTabControlUnitV468(function (tx) {
+      if (!/데이터\s*센터/.test(tx)) return false;
+      if (/펼치기|접기|동기화|연동|자동업로드|실시간\s*데이터센터|탭\s*카드/.test(tx)) return false;
+      return true;
+    }, 22);
+
+    if (sb && sb !== bar && sb !== primaryFirstTab && !sb.contains(bar)) {
+      var allowMove = true;
       if (barRect && sb.getBoundingClientRect) {
         var sr = sb.getBoundingClientRect();
-        if (barRect.height > 0 && sr.height > 0 && Math.abs(sr.top - barRect.top) > 220) continue;
+        if (barRect.height > 0 && sr.height > 0 && Math.abs(sr.top - barRect.top) > 280) {
+          allowMove = false;
+        }
       }
-      // If `sb` is already a direct child of `bar`, keep it in place; otherwise move it into `bar` as the 7th child!
-      var movable = sb;
-      while (movable.parentElement && sb.parentElement !== bar && movable.parentElement !== document.body && movable.parentElement.children.length === 1 && String(movable.parentElement.textContent || "").replace(/\s+/g, " ").trim() === stx) {
-        // Stop climbing if parent is a structural row
-        if (movable.parentElement.tagName === "NAV" || movable.parentElement.tagName === "HEADER") break;
-        break;
-      }
-      if (sb.parentElement !== bar) {
+      if (allowMove && sb.parentElement !== bar) {
         var oldParent = sb.parentElement;
         if (sb.tagName === "BUTTON" || sb.tagName === "A") {
           sb.className = "tab-btn whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-bold transition border border-cyan-500/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25";
         }
         bar.appendChild(sb);
-        if (oldParent && oldParent !== bar && !oldParent.contains(bar) && String(oldParent.textContent || "").trim() === "") {
+        if (oldParent && oldParent !== bar && !oldParent.contains(bar) && normTabTxV468(oldParent) === "") {
           oldParent.setAttribute("data-sq-empty-tab-wrap", "1");
           oldParent.style.setProperty("display", "none", "important");
         }
       }
-      break;
     }
 
     apply7TabInlineLockV467(bar);
 
-    if (!bar.__sq7TabMutObsV467 && typeof MutationObserver !== "undefined") {
-      bar.__sq7TabMutObsV467 = true;
+    if (!bar.__sq7TabMutObsV468 && typeof MutationObserver !== "undefined") {
+      bar.__sq7TabMutObsV468 = true;
       var barObs = new MutationObserver(function () {
         if (bar.__sqApplying7TabLock) return;
         if (bar.classList && (bar.classList.contains("sq-mobile-bottom-nav-bar") || bar.classList.contains("flex-wrap") || bar.classList.contains("grid"))) {
@@ -2693,6 +2715,7 @@ _FRONTEND_V22_JS = r'''
     if (!dcBtn.getAttribute("data-sq-dc-bound-v26")) {
       dcBtn.setAttribute("data-sq-dc-bound-v26", "1");
       dcBtn.setAttribute("data-tab", "datacenter");
+      dcBtn.style.setProperty("cursor", "pointer", "important");
       dcBtn.addEventListener("click", function (ev) {
         ev.preventDefault();
         ev.stopPropagation();
@@ -2728,6 +2751,7 @@ _FRONTEND_V22_JS = r'''
 
         ensureDcHubExpandedForStandingsV344();
         if (dcHub) {
+          dcHub.setAttribute("data-sq-dc-open", "1");
           if (!dcHub.hasAttribute("data-sq-dc-was-hidden")) {
             var initHidden = (window.getComputedStyle(dcHub).display === "none") || dcHub.classList.contains("hidden");
             dcHub.setAttribute("data-sq-dc-was-hidden", initHidden ? "1" : "0");
@@ -2736,7 +2760,7 @@ _FRONTEND_V22_JS = r'''
           dcHub.style.setProperty("display", "block", "important");
           Array.prototype.forEach.call(dcHub.querySelectorAll("button, a"), function (b) {
             var tx = String(b.textContent || "").trim();
-            if (/^펼치기\s*▼?$/.test(tx) || tx === "표 바로 펼치기 ▼") {
+            if (/^펼치기\s*▼?$/.test(tx) || /^상세\s*표\s*펼치기/.test(tx) || tx === "표 바로 펼치기 ▼") {
               try { b.click(); } catch (e0) {}
             }
           });
@@ -2750,7 +2774,7 @@ _FRONTEND_V22_JS = r'''
           dcBody.style.setProperty("display", "block", "important");
         }
         var dcTog = document.getElementById("dcToggleHubBtn");
-        if (dcTog && (dcTog.textContent || "").indexOf("펼치기") !== -1) {
+        if (dcTog && (dcTog.textContent || "").indexOf("접기") === -1) {
           dcTog.textContent = "접기 ▲";
         }
         if (dcBody && (!dcBody.children.length || /로딩\s*중/.test(dcBody.textContent || ""))) {
@@ -2768,16 +2792,35 @@ _FRONTEND_V22_JS = r'''
           }
         }
 
+        // Highlight '데이터센터' tab and explicitly dim all sibling tabs (even if they had inline green styles!)
         bar.setAttribute("data-sq-dc-mode", "1");
         Array.prototype.forEach.call(bar.children, function (b) {
-          if (b === dcBtn) b.setAttribute("data-sq-dc-active", "1");
-          else b.removeAttribute("data-sq-dc-active");
+          if (b === dcBtn) {
+            b.setAttribute("data-sq-dc-active", "1");
+            b.style.setProperty("background", "linear-gradient(135deg, #10b981, #06b6d4)", "important");
+            b.style.setProperty("color", "#020617", "important");
+            b.style.setProperty("font-weight", "900", "important");
+            b.style.setProperty("border-color", "#34d399", "important");
+          } else {
+            b.removeAttribute("data-sq-dc-active");
+            if (!b.hasAttribute("data-sq-prev-bg")) {
+              b.setAttribute("data-sq-prev-bg", b.style.getPropertyValue("background") || "");
+              b.setAttribute("data-sq-prev-col", b.style.getPropertyValue("color") || "");
+            }
+            b.style.setProperty("background", "rgba(15, 23, 42, 0.86)", "important");
+            b.style.setProperty("color", "#cbd5e1", "important");
+          }
         });
 
-        var rect = targetEl.getBoundingClientRect();
+        var scrollAnchor = dcBody || targetEl;
+        var rect = scrollAnchor.getBoundingClientRect();
         var curY = window.pageYOffset || document.documentElement.scrollTop || 0;
-        var destY = Math.max(0, curY + rect.top - 74);
-        window.scrollTo({ top: destY, behavior: "smooth" });
+        var destY = Math.max(0, Math.round(curY + rect.top - 82));
+        try {
+          window.scrollTo({ top: destY, behavior: "smooth" });
+        } catch (eScr) {
+          window.scrollTo(0, destY);
+        }
       }, true);
     }
 
@@ -2785,8 +2828,25 @@ _FRONTEND_V22_JS = r'''
       if (!sib || sib === dcBtn || sib.getAttribute("data-sq-dc-sib-v26")) return;
       sib.setAttribute("data-sq-dc-sib-v26", "1");
       sib.addEventListener("click", function () {
-        bar.removeAttribute("data-sq-dc-mode");
-        dcBtn.removeAttribute("data-sq-dc-active");
+        if (bar.getAttribute("data-sq-dc-mode") === "1") {
+          bar.removeAttribute("data-sq-dc-mode");
+          dcBtn.removeAttribute("data-sq-dc-active");
+          dcBtn.style.removeProperty("background");
+          dcBtn.style.removeProperty("color");
+          dcBtn.style.removeProperty("font-weight");
+          dcBtn.style.removeProperty("border-color");
+          Array.prototype.forEach.call(bar.children, function (b) {
+            if (b === dcBtn) return;
+            var pb = b.getAttribute("data-sq-prev-bg") || "";
+            var pc = b.getAttribute("data-sq-prev-col") || "";
+            if (pb) b.style.setProperty("background", pb);
+            else b.style.removeProperty("background");
+            if (pc) b.style.setProperty("color", pc);
+            else b.style.removeProperty("color");
+            b.removeAttribute("data-sq-prev-bg");
+            b.removeAttribute("data-sq-prev-col");
+          });
+        }
         document.querySelectorAll("[data-sq-hidden-by-dc='1']").forEach(function (sec) {
           sec.removeAttribute("data-sq-hidden-by-dc");
           sec.style.removeProperty("display");
@@ -11941,7 +12001,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.6.7-verified-7tab-autofold",
+        "engine_version": "4.6.8-final-7tab-verified",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
@@ -12220,7 +12280,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"4670_{int(time.time())}"
+_BOOT_VER_V30 = f"4680_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -16014,7 +16074,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.6.7-verified-7tab-autofold",
+        "engine_version": "4.6.8-final-7tab-verified",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
