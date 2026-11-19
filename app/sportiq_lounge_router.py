@@ -22463,6 +22463,512 @@ def _fetch_offthefield_kr_schedule_v4622(target_k: datetime, date_offset: int) -
     return out
 
 
+_APISPORTS_LOCK_V4623 = threading.Lock()
+_APISPORTS_CACHE_V4623: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
+_APISPORTS_STATE_V4623: Dict[str, Dict[str, Any]] = {
+    "volleyball": {
+        "utc_day": "",
+        "calls_today": 0,
+        "remote_limit": 100,
+        "remote_remaining": None,
+        "last_call_mono": 0.0,
+        "circuit_until_mono": 0.0,
+        "circuit_utc_day": "",
+        "last_error": "",
+        "last_ok_kst": "",
+    },
+    "basketball": {
+        "utc_day": "",
+        "calls_today": 0,
+        "remote_limit": 100,
+        "remote_remaining": None,
+        "last_call_mono": 0.0,
+        "circuit_until_mono": 0.0,
+        "circuit_utc_day": "",
+        "last_error": "",
+        "last_ok_kst": "",
+    },
+}
+
+_APISPORTS_VB_CLUB_TOKENS_V4623: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
+    ("VLEAGUE_M", "대한항공", ("korean air", "jumbos", "kal jumbos")),
+    ("VLEAGUE_M", "현대캐피탈", ("hyundai capital", "skywalkers")),
+    ("VLEAGUE_M", "한국전력", ("kepco", "korea electric", "vixtorm")),
+    ("VLEAGUE_M", "우리카드", ("woori card", "wooricard", "wooriwon", "vibez")),
+    ("VLEAGUE_M", "삼성화재", ("samsung bluefangs", "bluefangs", "samsung fire")),
+    ("VLEAGUE_M", "OK저축은행", ("ok savings", "okman", "ok financial", "rush & cash")),
+    ("VLEAGUE_M", "KB손해보험", ("kb insurance", "kb stars", "uijeongbu kb", "pyeongtaek kb", "lig greaters")),
+    ("VLEAGUE_W", "흥국생명", ("heungkuk", "pink spiders")),
+    ("VLEAGUE_W", "GS칼텍스", ("gs caltex", "seoul kixx", "kixx")),
+    ("VLEAGUE_W", "현대건설", ("hyundai e&c", "hyundai hillstate", "hillstate", "hyundai construction")),
+    ("VLEAGUE_W", "정관장", ("jungkwanjang", "red sparks", "daejeon kgc", "kgc ginseng")),
+    ("VLEAGUE_W", "IBK기업은행", ("ibk", "altos", "industrial bank")),
+    ("VLEAGUE_W", "한국도로공사", ("korea expressway", "hi-pass", "hipass", "gimcheon")),
+    ("VLEAGUE_W", "SOOP 수퍼스", ("soop", "pepper savings", "ai peppers", "gwangju pepper")),
+)
+
+_APISPORTS_BK_CLUB_TOKENS_V4623: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
+    ("WKBL", "우리은행", ("woori bank", "woori won", "wooriwon", "asan woori")),
+    ("WKBL", "KB스타즈", ("cheongju kb", "kb stars", "kb women")),
+    ("WKBL", "삼성생명", ("samsung life", "blueminx", "blueminxx", "yongin samsung")),
+    ("WKBL", "하나은행", ("hana 1q", "hana bank", "bucheon hana", "hana oneq")),
+    ("WKBL", "신한은행", ("shinhan bank", "s-birds", "sbirds", "incheon shinhan")),
+    ("WKBL", "BNK썸", ("bnk sum", "busan bnk", "bnk women")),
+    ("KBL", "서울 SK", ("seoul sk", "sk knights")),
+    ("KBL", "서울 삼성", ("seoul samsung", "samsung thunders", "thunders")),
+    ("KBL", "창원 LG", ("changwon lg", "lg sakers", "sakers")),
+    ("KBL", "수원 KT", ("suwon kt", "kt sonicboom", "sonicboom")),
+    ("KBL", "부산 KCC", ("busan kcc", "jeonju kcc", "kcc egis", "egis")),
+    ("KBL", "울산 현대모비스", ("ulsan mobis", "hyundai mobis", "phoebus")),
+    ("KBL", "원주 DB", ("wonju db", "db promy", "promy")),
+    ("KBL", "안양 정관장", ("anyang", "anyang kgc", "anyang jungkwanjang")),
+    ("KBL", "고양 소노", ("goyang sono", "skygunners", "goyang orion", "dayone")),
+    ("KBL", "대구 한국가스공사", ("kogas", "korea gas", "daegu pegasus", "pegasus")),
+)
+
+
+def _get_apisports_key_v4623() -> str:
+    for env_nm in ("SPORTIQ_APISPORTS_KEY", "API_SPORTS_KEY", "APISPORTS_KEY"):
+        val = str(os.environ.get(env_nm) or "").strip()
+        if val:
+            return val
+    return ""
+
+
+def _get_apisports_daily_cap_v4623() -> int:
+    try:
+        raw_cap = int(os.environ.get("SPORTIQ_APISPORTS_DAILY_MAX") or "76")
+        return max(10, min(95, raw_cap))
+    except Exception:
+        return 76
+
+
+def _is_in_kst_kr_match_window_v4623(now_k: Optional[datetime] = None) -> bool:
+    nk = now_k or datetime.now(KST)
+    hm = nk.hour * 60 + nk.minute
+    return (13 * 60 + 50) <= hm <= (22 * 60 + 20)
+
+
+def _apisports_http_get_v4623(url: str, api_key: str, timeout: float = 2.8) -> Tuple[int, Dict[str, str], Optional[Dict[str, Any]]]:
+    req = urllib.request.Request(
+        url,
+        headers={
+            "x-apisports-key": api_key,
+            "Accept": "application/json",
+            "User-Agent": "SportIQ-ServerBridge/4.6.23",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            status_code = int(getattr(resp, "status", 200) or 200)
+            hdrs = {str(k).lower(): str(v) for k, v in (resp.headers.items() if resp.headers else [])}
+            raw = resp.read()
+            txt = _decode_kr_bytes_v4616(raw, hdrs.get("content-type", ""), hdrs.get("content-encoding", ""))
+            obj = json.loads(txt) if txt else None
+            return status_code, hdrs, (obj if isinstance(obj, dict) else None)
+    except urllib.error.HTTPError as he:
+        hdrs_e = {str(k).lower(): str(v) for k, v in (he.headers.items() if getattr(he, "headers", None) else [])}
+        return int(getattr(he, "code", 500) or 500), hdrs_e, None
+    except Exception:
+        return 0, {}, None
+
+
+def _resolve_apisports_kr_club_v4623(raw_name: str, sport: str, lg_name_hint: str = "") -> Tuple[str, str]:
+    nm = str(raw_name or "").strip()
+    if not nm:
+        return "", ""
+    low = nm.lower()
+    lg_low = str(lg_name_hint or "").lower()
+    is_women_hint = ("women" in low or " w" in low or low.endswith(" w") or "women" in lg_low or "wkbl" in lg_low)
+
+    if sport == "volleyball":
+        if is_women_hint:
+            ordered = [x for x in _APISPORTS_VB_CLUB_TOKENS_V4623 if x[0] == "VLEAGUE_W"] + [x for x in _APISPORTS_VB_CLUB_TOKENS_V4623 if x[0] == "VLEAGUE_M"]
+        else:
+            ordered = list(_APISPORTS_VB_CLUB_TOKENS_V4623)
+        for lg_c, ko_nm, toks in ordered:
+            if any(t in low for t in toks):
+                return lg_c, ko_nm
+        cleaned, _, _ = _clean_team_label_v4616(nm, "volleyball")
+        if cleaned in _VLEAGUE_W_TEAM_SET_V4616:
+            return "VLEAGUE_W", ("SOOP 수퍼스" if cleaned == "페퍼저축은행" else cleaned)
+        if cleaned in _VLEAGUE_M_TEAM_SET_V4616:
+            return "VLEAGUE_M", cleaned
+        return "", ""
+
+    if sport == "basketball":
+        if is_women_hint:
+            ordered_b = [x for x in _APISPORTS_BK_CLUB_TOKENS_V4623 if x[0] == "WKBL"] + [x for x in _APISPORTS_BK_CLUB_TOKENS_V4623 if x[0] == "KBL"]
+        else:
+            ordered_b = [x for x in _APISPORTS_BK_CLUB_TOKENS_V4623 if x[0] == "KBL"] + [x for x in _APISPORTS_BK_CLUB_TOKENS_V4623 if x[0] == "WKBL"]
+        for lg_c, ko_nm, toks in ordered_b:
+            if any(t in low for t in toks):
+                return lg_c, ko_nm
+        cleaned_b, _, _ = _clean_team_label_v4616(nm, "basketball")
+        if cleaned_b in ("우리은행", "KB스타즈", "삼성생명", "하나은행", "신한은행", "BNK썸"):
+            return "WKBL", cleaned_b
+        if cleaned_b in ("서울 SK", "서울 삼성", "창원 LG", "수원 KT", "부산 KCC", "울산 현대모비스", "원주 DB", "안양 정관장", "고양 소노", "대구 한국가스공사"):
+            return "KBL", cleaned_b
+        return "", ""
+    return "", ""
+
+
+def _parse_apisports_games_v4623(payload: Optional[Dict[str, Any]], sport: str, target_k: datetime, is_today: bool) -> List[Dict[str, Any]]:
+    if not isinstance(payload, dict):
+        return []
+    rows = payload.get("response")
+    if not isinstance(rows, list) or not rows:
+        return []
+
+    expected_mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
+    out: List[Dict[str, Any]] = []
+
+    for g in rows:
+        if not isinstance(g, dict):
+            continue
+        cntry = g.get("country") if isinstance(g.get("country"), dict) else {}
+        c_code = str(cntry.get("code") or "").strip().upper()
+        c_name = str(cntry.get("name") or "").strip().upper()
+        lg_obj = g.get("league") if isinstance(g.get("league"), dict) else {}
+        lg_nm = str(lg_obj.get("name") or "").strip()
+
+        teams_obj = g.get("teams") if isinstance(g.get("teams"), dict) else {}
+        hm_obj = teams_obj.get("home") if isinstance(teams_obj.get("home"), dict) else {}
+        aw_obj = teams_obj.get("away") if isinstance(teams_obj.get("away"), dict) else {}
+        h_raw = str(hm_obj.get("name") or "").strip()
+        a_raw = str(aw_obj.get("name") or "").strip()
+        if not h_raw or not a_raw:
+            continue
+
+        is_kr_country = (c_code == "KR" or "KOREA" in c_name)
+        h_lg, h_ko = _resolve_apisports_kr_club_v4623(h_raw, sport, lg_nm)
+        a_lg, a_ko = _resolve_apisports_kr_club_v4623(a_raw, sport, lg_nm)
+        if not is_kr_country and not (h_ko and a_ko):
+            continue
+        if not h_ko or not a_ko or h_ko == a_ko:
+            continue
+
+        lg_code = h_lg or a_lg
+        if sport == "volleyball":
+            if "KOVO CUP" in lg_nm.upper():
+                continue
+            if lg_code == "VLEAGUE_W" or "WOMEN" in lg_nm.upper():
+                lg_code, lg_s, lg_f = "VLEAGUE_W", "V-리그 여자부", "도드람 V-리그 여자부"
+            else:
+                lg_code, lg_s, lg_f = "VLEAGUE_M", "V-리그 남자부", "도드람 V-리그 남자부"
+        else:
+            if lg_code == "WKBL" or "WKBL" in lg_nm.upper() or "WOMEN" in lg_nm.upper():
+                lg_code, lg_s, lg_f = "WKBL", "WKBL", "WKBL 여자프로농구"
+            else:
+                lg_code, lg_s, lg_f = "KBL", "KBL", "KBL 남자프로농구"
+
+        st_obj = g.get("status") if isinstance(g.get("status"), dict) else {}
+        st_short = str(st_obj.get("short") or "").strip().upper()
+        if st_short in ("POST", "CANC", "ABD", "SUSP", "AWD", "WO"):
+            continue
+
+        dt_iso = str(g.get("date") or "").strip()
+        dt_k = _parse_espn_iso_kst_v4616(dt_iso) if dt_iso else None
+        if dt_k is None:
+            tm_s = str(g.get("time") or "19:00").strip()[:5]
+            m_tm = re.match(r"^(\d{2}):(\d{2})$", tm_s)
+            kh, km = (int(m_tm.group(1)), int(m_tm.group(2))) if m_tm else (19, 0)
+            dt_k = target_k.replace(hour=kh, minute=km, second=0, microsecond=0)
+        hhmm = f"{dt_k.hour:02d}:{dt_k.minute:02d}"
+        ev_mmdd = f"{dt_k.month:02d}.{dt_k.day:02d}"
+
+        scores_obj = g.get("scores") if isinstance(g.get("scores"), dict) else {}
+        periods_obj = g.get("periods") if isinstance(g.get("periods"), dict) else {}
+
+        p_parts: List[str] = []
+        hs_val, as_val = 0, 0
+        if sport == "volleyball":
+            hs_raw = scores_obj.get("home")
+            as_raw = scores_obj.get("away")
+            hs_val = int(hs_raw) if isinstance(hs_raw, (int, float)) else int((hs_raw or {}).get("total") or 0) if isinstance(hs_raw, dict) else 0
+            as_val = int(as_raw) if isinstance(as_raw, (int, float)) else int((as_raw or {}).get("total") or 0) if isinstance(as_raw, dict) else 0
+            for si, sk in enumerate(("first", "second", "third", "fourth", "fifth"), start=1):
+                sp_obj = periods_obj.get(sk) if isinstance(periods_obj.get(sk), dict) else {}
+                sh = sp_obj.get("home")
+                sa = sp_obj.get("away")
+                if sh is not None and sa is not None:
+                    try:
+                        shi, sai = int(sh), int(sa)
+                        if shi > 0 or sai > 0:
+                            p_parts.append(f"{si}세트 {shi}-{sai}")
+                    except Exception:
+                        pass
+        else:
+            h_sc_d = scores_obj.get("home") if isinstance(scores_obj.get("home"), dict) else {}
+            a_sc_d = scores_obj.get("away") if isinstance(scores_obj.get("away"), dict) else {}
+            hs_val = int(h_sc_d.get("total") or 0) if h_sc_d.get("total") is not None else (int(scores_obj.get("home")) if isinstance(scores_obj.get("home"), (int, float)) else 0)
+            as_val = int(a_sc_d.get("total") or 0) if a_sc_d.get("total") is not None else (int(scores_obj.get("away")) if isinstance(scores_obj.get("away"), (int, float)) else 0)
+            for qi in range(1, 5):
+                qh = h_sc_d.get(f"quarter_{qi}")
+                qa = a_sc_d.get(f"quarter_{qi}")
+                if qh is not None and qa is not None:
+                    try:
+                        qhi, qai = int(qh), int(qa)
+                        if qhi > 0 or qai > 0:
+                            p_parts.append(f"{qi}Q {qhi}-{qai}")
+                    except Exception:
+                        pass
+
+        if st_short in ("FT", "AOT", "FIN", "ENDED"):
+            state, badge = "post", "종료"
+        elif re.match(r"^S([1-5])$", st_short):
+            state, badge = "in", f"LIVE {st_short[1]}세트"
+        elif re.match(r"^Q([1-4])$", st_short):
+            state, badge = "in", f"LIVE {st_short[1]}쿼터"
+        elif st_short in ("HT", "BT"):
+            state, badge = "in", "LIVE 하프타임"
+        elif st_short in ("OT", "LIVE", "IN"):
+            state, badge = "in", "LIVE 연장" if st_short == "OT" else "LIVE 진행중"
+        else:
+            state, badge, hs_val, as_val = "pre", "예정", 0, 0
+
+        if not (is_today and state == "in") and ev_mmdd != expected_mmdd:
+            continue
+
+        venue = _KOVO_HOME_CITY_ARENA_V4619.get(h_ko, ((), ""))[1]
+        it = _build_rt_item_v4616(
+            "apisports",
+            sport, lg_s, lg_code, lg_f,
+            state, badge, dt_k, hhmm,
+            h_ko, a_ko, hs_val, as_val,
+            period_scores=" · ".join(p_parts),
+            venue=venue,
+        )
+        if it:
+            out.append(it)
+    return out
+
+
+def _fetch_single_apisports_sport_v4623(sport: str, base_host: str, target_k: datetime, date_offset: int, api_key: str) -> List[Dict[str, Any]]:
+    if abs(date_offset) > 1 or not api_key:
+        return []
+    ymd = target_k.strftime("%Y-%m-%d")
+    cache_k = f"{sport}:{ymd}"
+    now_m = time.monotonic()
+    now_utc_day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now_k = datetime.now(KST)
+    in_match_win = _is_in_kst_kr_match_window_v4623(now_k)
+
+    # Smart TTL: 5m (300s) during live KST match window for Today; 2h (7200s) off-hours Today; 3h (10800s) for +-1d
+    if date_offset == 0 and in_match_win:
+        ttl = 300.0
+    elif date_offset == 0:
+        ttl = 7200.0
+    else:
+        ttl = 10800.0
+
+    daily_cap = _get_apisports_daily_cap_v4623()
+    with _APISPORTS_LOCK_V4623:
+        st_rec = _APISPORTS_STATE_V4623[sport]
+        if st_rec["utc_day"] != now_utc_day:
+            st_rec["utc_day"] = now_utc_day
+            st_rec["calls_today"] = 0
+            st_rec["remote_remaining"] = None
+            if st_rec["circuit_utc_day"] and st_rec["circuit_utc_day"] != now_utc_day:
+                st_rec["circuit_utc_day"] = ""
+                st_rec["circuit_until_mono"] = 0.0
+
+        cached = _APISPORTS_CACHE_V4623.get(cache_k)
+        if cached and (now_m - cached[0]) < ttl:
+            return [dict(x) for x in cached[1]]
+
+        # Check Circuit Breaker & Quota Guards before touching network
+        if st_rec["circuit_utc_day"] == now_utc_day or now_m < float(st_rec["circuit_until_mono"] or 0.0):
+            return [dict(x) for x in cached[1]] if cached else []
+        if int(st_rec["calls_today"]) >= daily_cap:
+            st_rec["last_error"] = f"local_daily_cap_{daily_cap}_reached"
+            return [dict(x) for x in cached[1]] if cached else []
+        rem_hdr = st_rec.get("remote_remaining")
+        if isinstance(rem_hdr, int) and rem_hdr <= 5:
+            st_rec["circuit_utc_day"] = now_utc_day
+            st_rec["last_error"] = f"remote_remaining_low_{rem_hdr}"
+            return [dict(x) for x in cached[1]] if cached else []
+        if (now_m - float(st_rec["last_call_mono"] or 0.0)) < 6.5 and cached:
+            return [dict(x) for x in cached[1]]
+
+        st_rec["calls_today"] = int(st_rec["calls_today"]) + 1
+        st_rec["last_call_mono"] = now_m
+
+    url = f"https://{base_host}/games?date={ymd}&timezone=Asia/Seoul"
+    status_code, hdrs, js = _apisports_http_get_v4623(url, api_key, timeout=2.8)
+
+    with _APISPORTS_LOCK_V4623:
+        st_rec = _APISPORTS_STATE_V4623[sport]
+        rem_s = hdrs.get("x-ratelimit-requests-remaining")
+        lim_s = hdrs.get("x-ratelimit-requests-limit")
+        if rem_s and rem_s.isdigit():
+            st_rec["remote_remaining"] = int(rem_s)
+        if lim_s and lim_s.isdigit():
+            st_rec["remote_limit"] = int(lim_s)
+
+        if status_code == 429:
+            st_rec["circuit_until_mono"] = time.monotonic() + 900.0
+            st_rec["last_error"] = "http_429_rate_or_shared_ip"
+            cached_fb = _APISPORTS_CACHE_V4623.get(cache_k)
+            return [dict(x) for x in cached_fb[1]] if cached_fb else []
+
+        if status_code in (401, 403):
+            st_rec["circuit_until_mono"] = time.monotonic() + 21600.0
+            st_rec["last_error"] = f"http_{status_code}_auth_or_suspended"
+            return []
+
+        if not isinstance(js, dict):
+            st_rec["circuit_until_mono"] = time.monotonic() + 180.0
+            st_rec["last_error"] = f"http_{status_code}_empty_or_timeout"
+            cached_fb = _APISPORTS_CACHE_V4623.get(cache_k)
+            return [dict(x) for x in cached_fb[1]] if cached_fb else []
+
+        errs = js.get("errors")
+        if errs and ((isinstance(errs, dict) and len(errs) > 0) or (isinstance(errs, list) and len(errs) > 0)):
+            err_txt = json.dumps(errs, ensure_ascii=False)[:180]
+            err_low = err_txt.lower()
+            st_rec["last_error"] = err_txt
+            if any(k in err_low for k in ("season", "plan", "day", "suspend", "access", "token")):
+                st_rec["circuit_utc_day"] = now_utc_day
+            else:
+                st_rec["circuit_until_mono"] = time.monotonic() + 900.0
+            cached_fb = _APISPORTS_CACHE_V4623.get(cache_k)
+            return [dict(x) for x in cached_fb[1]] if cached_fb else []
+
+        parsed_items = _parse_apisports_games_v4623(js, sport, target_k, is_today=(date_offset == 0))
+        st_rec["last_error"] = ""
+        st_rec["last_ok_kst"] = now_k.strftime("%Y-%m-%d %H:%M:%S KST")
+        _APISPORTS_CACHE_V4623[cache_k] = (time.monotonic(), [dict(x) for x in parsed_items])
+        return parsed_items
+
+
+def _fetch_apisports_kr_vb_bk_safe_bridge_v4623(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
+    api_key = _get_apisports_key_v4623()
+    if not api_key or abs(date_offset) > 1:
+        return []
+    out: List[Dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_vb = pool.submit(_fetch_single_apisports_sport_v4623, "volleyball", "v1.volleyball.api-sports.io", target_k, date_offset, api_key)
+        f_bk = pool.submit(_fetch_single_apisports_sport_v4623, "basketball", "v1.basketball.api-sports.io", target_k, date_offset, api_key)
+        for fut in (f_vb, f_bk):
+            try:
+                out.extend(fut.result(timeout=3.1) or [])
+            except Exception:
+                continue
+    return out
+
+
+def _get_apisports_diag_snapshot_v4623() -> Dict[str, Any]:
+    now_m = time.monotonic()
+    now_utc_day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    key_set = bool(_get_apisports_key_v4623())
+    with _APISPORTS_LOCK_V4623:
+        sports_stat = {}
+        for sp_nm, st_rec in _APISPORTS_STATE_V4623.items():
+            calls_d = int(st_rec["calls_today"]) if st_rec["utc_day"] == now_utc_day else 0
+            c_open = bool(st_rec["circuit_utc_day"] == now_utc_day or now_m < float(st_rec["circuit_until_mono"] or 0.0))
+            sports_stat[sp_nm] = {
+                "calls_today": calls_d,
+                "remote_limit": st_rec["remote_limit"],
+                "remote_remaining": st_rec["remote_remaining"] if st_rec["utc_day"] == now_utc_day else None,
+                "circuit_open": c_open,
+                "last_error": st_rec["last_error"],
+                "last_ok_kst": st_rec["last_ok_kst"],
+            }
+    return {
+        "enabled": key_set,
+        "in_kst_match_window": _is_in_kst_kr_match_window_v4623(),
+        "live_window_ttl_sec": 300,
+        "off_window_ttl_sec": 7200,
+        "daily_cap_per_sport": _get_apisports_daily_cap_v4623(),
+        "sports": sports_stat,
+    }
+
+
+def _reconcile_domestic_with_official_cal_v4623(items: List[Dict[str, Any]], target_k: datetime) -> List[Dict[str, Any]]:
+    # Cross-validates VLEAGUE_M, VLEAGUE_W, and WKBL candidates against the 100% verified 2026-2027 official calendar
+    if not items:
+        return []
+    ymd = target_k.strftime("%Y-%m-%d")
+    in_reg_season = ("2026-10-31" <= ymd <= "2027-04-02")
+    official_rows = _OFFICIAL_KOVO_WKBL_SEASON_2627_V4622.get(ymd, []) if in_reg_season else []
+
+    official_by_pair: Dict[Tuple[str, Any], Tuple[str, str, str, str]] = {}
+    official_clubs_by_lg: Dict[str, set] = {"VLEAGUE_M": set(), "VLEAGUE_W": set(), "WKBL": set()}
+    for lg_code, hhmm, h_raw, a_raw, _, _, venue in official_rows:
+        sp_m = "volleyball" if lg_code in ("VLEAGUE_M", "VLEAGUE_W") else "basketball"
+        hc, _, _ = _clean_team_label_v4616(str(h_raw), sp_m)
+        ac, _, _ = _clean_team_label_v4616(str(a_raw), sp_m)
+        if sp_m == "volleyball":
+            if hc == "페퍼저축은행":
+                hc = "SOOP 수퍼스"
+            if ac == "페퍼저축은행":
+                ac = "SOOP 수퍼스"
+        official_by_pair[(lg_code, frozenset([hc, ac]))] = (hc, ac, str(hhmm), str(venue or ""))
+        official_clubs_by_lg.setdefault(lg_code, set()).update((hc, ac))
+
+    noisy_sources = {"gnews_xml", "daum_ssr", "thesportsdb", "livescore_mob", "spojoy", ""}
+    mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
+    wd_ko = _KO_WD_V4616[target_k.weekday()]
+
+    reconciled: List[Dict[str, Any]] = []
+    for it in items:
+        lg_c = str(it.get("league_code") or "").strip().upper()
+        if in_reg_season and lg_c in ("VLEAGUE_M", "VLEAGUE_W", "WKBL"):
+            h_cur = str(it.get("home") or "").strip()
+            a_cur = str(it.get("away") or "").strip()
+            pk = (lg_c, frozenset([h_cur, a_cur]))
+            off_spec = official_by_pair.get(pk)
+            if off_spec is not None:
+                off_h, off_a, off_hhmm, off_venue = off_spec
+                cp = dict(it)
+                if h_cur == off_a and a_cur == off_h:
+                    cp["home"], cp["away"] = off_h, off_a
+                    cp["home_score"], cp["away_score"] = int(it.get("away_score") or 0), int(it.get("home_score") or 0)
+                else:
+                    cp["home"], cp["away"] = off_h, off_a
+                cp["match_dt_kst"] = f"{mmdd} ({wd_ko}) {off_hhmm}"
+                cp["match_dt_full_kst"] = f"{target_k.year}.{mmdd} ({wd_ko}) {off_hhmm} KST"
+                if off_venue:
+                    cp["venue"] = off_venue
+                reconciled.append(cp)
+                continue
+            else:
+                src_tag = str(it.get("_src_v4616") or "").strip()
+                if src_tag in noisy_sources:
+                    continue
+                sched_clubs = official_clubs_by_lg.get(lg_c, set())
+                if h_cur in sched_clubs or a_cur in sched_clubs:
+                    continue
+        reconciled.append(it)
+
+    dom_lgs = {"VLEAGUE_M", "VLEAGUE_W", "WKBL", "KBL"}
+    dom_candidates = [x for x in reconciled if str(x.get("league_code") or "").upper() in dom_lgs]
+    if len(dom_candidates) <= 1:
+        return reconciled
+
+    def _dom_auth_rank(x: Dict[str, Any]) -> Tuple[int, Tuple[int, int, int, int, int]]:
+        lg_x = str(x.get("league_code") or "").upper()
+        pk_x = (lg_x, frozenset([str(x.get("home") or ""), str(x.get("away") or "")]))
+        in_off = 1 if pk_x in official_by_pair else 0
+        return (in_off, _item_live_priority_key_v4616(x))
+
+    dom_sorted = sorted(dom_candidates, key=_dom_auth_rank, reverse=True)
+    used_club_by_lg: Dict[str, set] = {}
+    accepted_ids: set = set()
+    for dx in dom_sorted:
+        lg_x = str(dx.get("league_code") or "").upper()
+        hx, ax = str(dx.get("home") or ""), str(dx.get("away") or "")
+        used = used_club_by_lg.setdefault(lg_x, set())
+        if hx in used or ax in used:
+            continue
+        used.update((hx, ax))
+        accepted_ids.add(id(dx))
+
+    return [x for x in reconciled if (str(x.get("league_code") or "").upper() not in dom_lgs) or (id(x) in accepted_ids)]
+
+
 def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
     from concurrent.futures import wait as _cf_wait_top_v4622
     ck = f"{date_offset}:{target_k.strftime('%Y%m%d')}"
@@ -22484,6 +22990,8 @@ def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> 
         "livescore_kr": _RT_TOP_POOL_V4622.submit(_fetch_livescore_kr_v4616, target_k, date_offset),
         "kr_portals": _RT_TOP_POOL_V4622.submit(_fetch_kr_official_portals_v4616, target_k, date_offset),
     }
+    if _get_apisports_key_v4623() and abs(date_offset) <= 1:
+        futs_top["apisports_kr"] = _RT_TOP_POOL_V4622.submit(_fetch_apisports_kr_vb_bk_safe_bridge_v4623, target_k, date_offset)
 
     done_top, _ = _cf_wait_top_v4622(list(futs_top.values()), timeout=4.2)
     off_diag: Dict[str, Any] = {}
@@ -22503,8 +23011,12 @@ def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> 
     if date_offset == 0:
         _LAST_SOURCE_DIAG_V4617.update(off_diag)
 
+    reconciled_raw = _reconcile_domestic_with_official_cal_v4623(merged_raw, target_k)
     expected_mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
-    deduped = _merge_and_filter_official_matches_v4616(merged_raw, expected_mmdd=expected_mmdd, is_today=(date_offset == 0))
+    deduped = _reconcile_domestic_with_official_cal_v4623(
+        _merge_and_filter_official_matches_v4616(reconciled_raw, expected_mmdd=expected_mmdd, is_today=(date_offset == 0)),
+        target_k,
+    )
     if date_offset == 0 and deduped:
         upgraded_vb = _enhance_kr_live_vleague_v4618(deduped, datetime.now(KST))
         _LAST_SOURCE_DIAG_V4617["vleague_live_upgraded"] = upgraded_vb
@@ -22560,7 +23072,7 @@ def _item_live_priority_key_v4616(it: Dict[str, Any]) -> Tuple[int, int, int, in
     badge_len = len(str(it.get("status_badge") or ""))
     per_len = len(str(it.get("period_scores") or ""))
     src_tag = str(it.get("_src_v4616") or "")
-    src_rank = 4 if src_tag in ("kbl_official", "livescore_pc", "naver_gw", "daum_api", "thesportsdb", "offthefield_kr") else (3 if src_tag in ("daum_ssr", "spojoy", "livescore_mob", "gnews_xml") else (2 if it.get("_espn_verified_v4615") else 1))
+    src_rank = 5 if src_tag == "apisports" else (4 if src_tag in ("kbl_official", "livescore_pc", "naver_gw", "daum_api", "thesportsdb", "offthefield_kr") else (3 if src_tag in ("daum_ssr", "spojoy", "livescore_mob", "gnews_xml") else (2 if it.get("_espn_verified_v4615") else 1)))
     return (st_rank, tot_sc, badge_len, per_len, src_rank)
 
 
@@ -22730,7 +23242,8 @@ def _install_dc_ko_team_wrapper_v381(dc_mod: Any = None) -> bool:
             if rt_extra:
                 base_list.extend(rt_extra)
             _localize_items_list_ko_v381(base_list)
-            return _merge_and_filter_official_matches_v4616(base_list, expected_mmdd=mmdd, is_today=(off_i == 0))
+            merged_m = _merge_and_filter_official_matches_v4616(base_list, expected_mmdd=mmdd, is_today=(off_i == 0))
+            return _reconcile_domestic_with_official_cal_v4623(merged_m, tk)
 
         dc_mod._collect_all_matches = _authentic_collect_all_m
 
@@ -22785,7 +23298,10 @@ def _install_dc_ko_team_wrapper_v381(dc_mod: Any = None) -> bool:
                 items.extend(rt_items)
 
             _localize_items_list_ko_v381(items)
-            clean_items = _merge_and_filter_official_matches_v4616(items, expected_mmdd=mmdd, is_today=(off_i == 0))
+            clean_items = _reconcile_domestic_with_official_cal_v4623(
+                _merge_and_filter_official_matches_v4616(items, expected_mmdd=mmdd, is_today=(off_i == 0)),
+                tk,
+            )
             res["items"] = clean_items
             res["counts"] = _recompute_sport_counts_v4615(clean_items, res.get("counts"))
             if off_i == 0:
@@ -22818,6 +23334,7 @@ _install_dc_ko_team_wrapper_v381()
 @router.get("/api/member/live-sources-diag-v4620")
 @router.get("/api/member/live-sources-diag-v4621")
 @router.get("/api/member/live-sources-diag-v4622")
+@router.get("/api/member/live-sources-diag-v4623")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -22825,7 +23342,8 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     items = _collect_realtime_all_sports_v4616(tk, off_i)
     return {
         "ok": True,
-        "version": "v4.6.22",
+        "version": "v4.6.23",
+        "apisports_bridge": _get_apisports_diag_snapshot_v4623(),
         "date_offset": off_i,
         "target_ymd": tk.strftime("%Y-%m-%d"),
         "server_kst": now_k.strftime("%Y-%m-%d %H:%M:%S KST"),
