@@ -1314,7 +1314,8 @@ _FRONTEND_V22_JS = r'''
       "  .sq-v42-mob-swipe > button { flex: 0 0 auto !important; white-space: nowrap !important; }",
       "}",
       "/* v4.3 Clean Schedule/Vote 2-Col Grid + 9:16 Tactical Shorts 3-Tab Companion & Playlist Polish */",
-      "#tab-matches, #tab-schedule, #tab-shorts, #tab-matches > *, #tab-schedule > *, #tab-shorts > * {",
+      "html, body { max-width: 100%; overflow-x: hidden; }",
+      "main, #tab-feed, #tab-news, #tab-issues, #tab-matches, #tab-schedule, #tab-shorts, #tab-feed > *, #tab-news > *, #tab-issues > *, #tab-matches > *, #tab-schedule > *, #tab-shorts > *, #rssSportFilters {",
       "  min-width: 0 !important;",
       "  max-width: 100% !important;",
       "  box-sizing: border-box !important;",
@@ -1650,6 +1651,32 @@ _FRONTEND_V22_JS = r'''
       "  #dcQuickMatchModal .sq-v32-vote-btn { padding: 5px 5px !important; gap: 1px !important; }",
       "}",
       "/* v4.6 Clean AI IQ Search Modal + 3-Tab Legal Policy Modal + Partner Inquiry Modal Polish */",
+      "#rssSportFilters {",
+      "  display: flex !important;",
+      "  flex-wrap: nowrap !important;",
+      "  overflow-x: auto !important;",
+      "  -webkit-overflow-scrolling: touch;",
+      "  scrollbar-width: none !important;",
+      "  gap: 6px !important;",
+      "  width: 100% !important;",
+      "  max-width: 100% !important;",
+      "  min-width: 0 !important;",
+      "  box-sizing: border-box !important;",
+      "}",
+      "#rssSportFilters::-webkit-scrollbar { display: none !important; }",
+      "#rssSportFilters > * { flex: 0 0 auto !important; white-space: nowrap !important; }",
+      "#sqAiIqModal button, #aiIqModal button, #sqAiSearchModal button, #sqLegalPolicyModal button, #sqPartnerInquiryModalV46 button {",
+      "  white-space: nowrap !important;",
+      "  word-break: keep-all !important;",
+      "  flex-shrink: 0 !important;",
+      "}",
+      "#sqAiIqModal h3, #aiIqModal h3, #sqAiSearchModal h3 {",
+      "  min-width: 0 !important;",
+      "  flex: 1 1 auto !important;",
+      "  word-break: keep-all !important;",
+      "  font-size: 15.2px !important;",
+      "  line-height: 1.32 !important;",
+      "}",
       "#sqAiCatBar, .sq-v46-ai-swipe-row {",
       "  display: flex !important;",
       "  flex-wrap: nowrap !important;",
@@ -8485,7 +8512,105 @@ _FRONTEND_V22_JS = r'''
     });
   }
 
+
+  function isOverlayModalVisibleV461(el) {
+    if (!el) return false;
+    if (el.classList && el.classList.contains("hidden")) return false;
+    var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+    var disp = cs ? cs.display : el.style.display;
+    var vis = cs ? cs.visibility : el.style.visibility;
+    return Boolean(disp && disp !== "none" && vis !== "hidden");
+  }
+
+  function closeSingleOverlayModalV461(el) {
+    if (!el) return;
+    if (el.id === "sqAiIqModal" || el.id === "aiIqModal" || el.id === "sqAiSearchModal" || el === findAiSearchModalContainerV372()) {
+      closeAiSearchModalCompletelyV372();
+      el.style.display = "none";
+      return;
+    }
+    var directHideIds = {
+      dcQuickMatchModal: 1,
+      sqPartnerInquiryModalV46: 1,
+      sqLegalPolicyModal: 1,
+      sqAdminRaffleModal: 1,
+      sqPwaIosModal: 1,
+      sqMemberHubModal: 1,
+      dcMatchModal: 1,
+      dcMatchDetailModal: 1
+    };
+    if (directHideIds[el.id]) {
+      el.style.display = "none";
+      return;
+    }
+    if (typeof window.closeModal === "function" && el.id) {
+      try { window.closeModal(el.id); } catch (eC) {}
+    }
+    if (el.classList) el.classList.add("hidden");
+    el.style.display = "none";
+  }
+
+  function installUniversalLifoEscapeV461() {
+    if (window.__sqLifoEscInstalledV461) return;
+    window.__sqLifoEscInstalledV461 = true;
+
+    window.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Escape" && ev.key !== "Esc" && ev.keyCode !== 27) return;
+      var candidates = [
+        document.getElementById("dcQuickMatchModal"),
+        document.getElementById("sqPartnerInquiryModalV46"),
+        document.getElementById("sqLegalPolicyModal"),
+        findAiSearchModalContainerV372(),
+        document.getElementById("sqAdminRaffleModal"),
+        document.getElementById("sqPwaIosModal"),
+        document.getElementById("sqMemberHubModal"),
+        document.getElementById("partner-inquiry-modal"),
+        document.getElementById("partnerModal"),
+        document.getElementById("commentModal"),
+        document.getElementById("post-modal"),
+        document.getElementById("writeModal"),
+        document.getElementById("write-modal"),
+        document.getElementById("news-write-modal"),
+        document.getElementById("match-report-modal"),
+        document.getElementById("dcMatchModal"),
+        document.getElementById("dcMatchDetailModal")
+      ];
+      var openList = [];
+      var seen = [];
+      for (var i = 0; i < candidates.length; i++) {
+        var m = candidates[i];
+        if (!m || seen.indexOf(m) !== -1) continue;
+        seen.push(m);
+        if (isOverlayModalVisibleV461(m)) {
+          var z = 0;
+          try { z = parseInt((window.getComputedStyle(m).zIndex || "0"), 10) || 0; } catch (eZ) {}
+          openList.push({ el: m, z: z, order: i });
+        }
+      }
+      if (!openList.length) return;
+      openList.sort(function (a, b) {
+        if (b.z !== a.z) return b.z - a.z;
+        return a.order - b.order;
+      });
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+      if (document.activeElement && typeof document.activeElement.blur === "function") {
+        try { document.activeElement.blur(); } catch (eB) {}
+      }
+      closeSingleOverlayModalV461(openList[0].el);
+    }, true);
+
+    document.addEventListener("click", function (ev) {
+      var aiM = findAiSearchModalContainerV372();
+      if (aiM && ev.target === aiM && isOverlayModalVisibleV461(aiM)) {
+        closeSingleOverlayModalV461(aiM);
+      }
+    });
+  }
+
   function organizeModalsAndMemberHubV44() {
+    installUniversalLifoEscapeV461();
     polishWriteModalV44();
     polishMemberHubAndProfilePopupsV44();
     ensureCommentModalWrappedV45();
@@ -11485,7 +11610,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"4600_{int(time.time())}"
+_BOOT_VER_V30 = f"4610_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -15279,7 +15404,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.6-complete-all-modals-and-tabs-ux",
+        "engine_version": "4.6.1-stress-verified-master",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
