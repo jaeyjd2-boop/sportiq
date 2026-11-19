@@ -3722,12 +3722,102 @@ _FRONTEND_V22_JS = r'''
     return "";
   }
 
+  var KO_TEAM_MAP_JS_V381 = {
+    "bosnia and herzegovina": "보스니아 헤르체고비나", "bosnia & herzegovina": "보스니아 헤르체고비나",
+    "bosnia-herzegovina": "보스니아 헤르체고비나", "bosnia-herz": "보스니아 헤르체고비나", "bosnia": "보스니아 헤르체고비나",
+    "romania": "루마니아", "denmark": "덴마크", "norway": "노르웨이",
+    "england": "잉글랜드", "france": "프랑스", "spain": "스페인", "germany": "독일", "italy": "이탈리아",
+    "portugal": "포르투갈", "netherlands": "네덜란드", "holland": "네덜란드", "belgium": "벨기에",
+    "croatia": "크로아티아", "switzerland": "스위스", "austria": "오스트리아", "poland": "폴란드",
+    "ukraine": "우크라이나", "serbia": "세르비아", "turkiye": "튀르키예", "türkiye": "튀르키예", "turkey": "튀르키예",
+    "hungary": "헝가리", "czechia": "체코", "czech republic": "체코", "czech rep": "체코",
+    "scotland": "스코틀랜드", "wales": "웨일스", "republic of ireland": "아일랜드", "rep of ireland": "아일랜드", "ireland": "아일랜드",
+    "northern ireland": "북아일랜드", "n. ireland": "북아일랜드", "n ireland": "북아일랜드",
+    "sweden": "스웨덴", "finland": "핀란드", "iceland": "아이슬란드", "greece": "그리스",
+    "slovakia": "슬로바키아", "slovenia": "슬로베니아", "albania": "알바니아", "georgia": "조지아",
+    "north macedonia": "북마케도니아", "n. macedonia": "북마케도니아", "montenegro": "몬테네그로", "kosovo": "코소보",
+    "bulgaria": "불가리아", "israel": "이스라엘", "armenia": "아르메니아", "azerbaijan": "아제르바이잔",
+    "kazakhstan": "카자흐스탄", "belarus": "벨라루스", "luxembourg": "룩셈부르크", "estonia": "에스토니아",
+    "latvia": "라트비아", "lithuania": "리투아니아", "cyprus": "키프로스", "faroe islands": "페로 제도",
+    "moldova": "몰도바", "malta": "몰타", "andorra": "안도라", "liechtenstein": "리히텐슈타인", "san marino": "산마리노", "gibraltar": "지브롤터",
+    "south korea": "대한민국", "korea republic": "대한민국", "korea rep": "대한민국", "japan": "일본", "australia": "호주",
+    "iran": "이란", "ir iran": "이란", "saudi arabia": "사우디아라비아", "qatar": "카타르", "iraq": "이라크",
+    "uzbekistan": "우즈베키스탄", "jordan": "요르단", "united arab emirates": "아랍에미리트", "uae": "아랍에미리트",
+    "bahrain": "바레인", "oman": "오만", "china pr": "중국", "china": "중국", "indonesia": "인도네시아",
+    "thailand": "태국", "vietnam": "베트남", "malaysia": "말레이시아", "kuwait": "쿠웨이트", "palestine": "팔레스타인",
+    "kyrgyzstan": "키르기스스탄", "north korea": "북한", "korea dpr": "북한", "new zealand": "뉴질랜드",
+    "argentina": "아르헨티나", "brazil": "브라질", "uruguay": "우루과이", "colombia": "콜롬비아", "ecuador": "에콰도르",
+    "paraguay": "파라과이", "venezuela": "베네수엘라", "chile": "칠레", "peru": "페루", "bolivia": "볼리비아",
+    "united states": "미국", "usa": "미국", "mexico": "멕시코", "canada": "캐나다", "panama": "파나마",
+    "costa rica": "코스타리카", "jamaica": "자메이카", "honduras": "온두라스",
+    "morocco": "모로코", "senegal": "세네갈", "egypt": "이집트", "nigeria": "나이지리아",
+    "ivory coast": "코트디부아르", "cote d'ivoire": "코트디부아르", "algeria": "알제리", "tunisia": "튀니지",
+    "cameroon": "카메룬", "ghana": "가나", "mali": "말리", "south africa": "남아프리카공화국",
+    "arsenal": "아스널", "chelsea": "첼시", "liverpool": "리버풀", "manchester city": "맨체스터 시티", "man city": "맨체스터 시티",
+    "manchester united": "맨체스터 유나이티드", "man utd": "맨체스터 유나이티드", "tottenham": "토트넘 홋스퍼", "tottenham hotspur": "토트넘 홋스퍼", "spurs": "토트넘 홋스퍼",
+    "newcastle": "뉴캐슬 유나이티드", "newcastle united": "뉴캐슬 유나이티드", "aston villa": "애스턴 빌라", "brighton": "브라이턴",
+    "fulham": "풀럼", "brentford": "브렌트퍼드", "nottingham forest": "노팅엄 포레스트", "nottm forest": "노팅엄 포레스트", "nott'm forest": "노팅엄 포레스트",
+    "bournemouth": "본머스", "west ham": "웨스트햄 유나이티드", "west ham united": "웨스트햄 유나이티드", "everton": "에버턴",
+    "crystal palace": "크리스털 팰리스", "c palace": "크리스털 팰리스", "c. palace": "크리스털 팰리스",
+    "wolves": "울버햄프턴", "wolverhampton": "울버햄프턴", "leicester": "레스터 시티", "leicester city": "레스터 시티",
+    "ipswich": "입스위치 타운", "ipswich town": "입스위치 타운", "southampton": "사우샘프턴",
+    "sunderland": "선덜랜드", "leeds": "리즈 유나이티드", "leeds united": "리즈 유나이티드", "burnley": "번리",
+    "coventry": "코번트리 시티", "coventry city": "코번트리 시티", "hull": "헐 시티", "hull city": "헐 시티",
+    "sheff utd": "셰필드 유나이티드", "sheffield united": "셰필드 유나이티드", "middlesbrough": "미들즈브러", "west brom": "웨스트 브로미치"
+  };
+
+  function localizeTeamKoJsV381(rawName) {
+    var s = String(rawName || "").trim();
+    if (!s || /[가-힣]/.test(s)) return s;
+    var low = s.toLowerCase().replace(/\s+/g, " ").replace(/’/g, "'").trim();
+    if (KO_TEAM_MAP_JS_V381[low]) return KO_TEAM_MAP_JS_V381[low];
+    var clean = low.replace(/\b(fc|afc|cf|sc)\b/g, "").replace(/\s+/g, " ").trim();
+    if (clean && KO_TEAM_MAP_JS_V381[clean]) return KO_TEAM_MAP_JS_V381[clean];
+    var noDot = low.replace(/\./g, "");
+    if (KO_TEAM_MAP_JS_V381[noDot]) return KO_TEAM_MAP_JS_V381[noDot];
+    return s;
+  }
+
+  function localizeScoreStripDomV381() {
+    var root = document.getElementById("proLiveTickerBar") || document.getElementById("dcLiveTickerTrack");
+    if (!root) return;
+    var prevG = _inSportDotMutationV304;
+    _inSportDotMutationV304 = true;
+    try {
+      var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+      var node;
+      while ((node = walker.nextNode())) {
+        var val = node.nodeValue;
+        if (!val || !/[A-Za-z]/.test(val)) continue;
+        var trimmed = val.trim();
+        if (!trimmed || trimmed.length > 36) continue;
+        var koDirect = localizeTeamKoJsV381(trimmed);
+        if (koDirect !== trimmed) {
+          node.nodeValue = val.replace(trimmed, koDirect);
+          continue;
+        }
+        var mScore = trimmed.match(/^([A-Za-z][A-Za-z0-9\.\-'\s&]{1,24}?)\s+(\d+\s*[-:]\s*\d+|vs|VS)\s+([A-Za-z][A-Za-z0-9\.\-'\s&]{1,24})$/);
+        if (mScore) {
+          var hK = localizeTeamKoJsV381(mScore[1]);
+          var aK = localizeTeamKoJsV381(mScore[3]);
+          if (hK !== mScore[1] || aK !== mScore[3]) {
+            node.nodeValue = val.replace(trimmed, hK + " " + mScore[2] + " " + aK);
+          }
+        }
+      }
+    } catch (e) {} finally {
+      _inSportDotMutationV304 = prevG;
+    }
+  }
+
   function normalizeScoreItemV30(raw, idx) {
     if (!raw || typeof raw !== "object") return null;
     var lgProbe = String(raw.league_code || raw.league || raw.sport || "").trim();
     var spProbe = canonicalSportKeyV304(raw.sport || raw.sport_key || "", lgProbe);
-    var home = String(raw.home || raw.home_team || raw.homeTeam || raw.home_name || "").trim();
-    var away = String(raw.away || raw.away_team || raw.awayTeam || raw.away_name || "").trim();
+    var homeRaw = String(raw.home || raw.home_team || raw.homeTeam || raw.home_name || "").trim();
+    var awayRaw = String(raw.away || raw.away_team || raw.awayTeam || raw.away_name || "").trim();
+    var home = localizeTeamKoJsV381(homeRaw);
+    var away = localizeTeamKoJsV381(awayRaw);
     if (spProbe === "f1") {
       if (!home || /^home$/i.test(home)) home = "베르스타펜 (레드불)";
       if (!away || /^away$/i.test(away)) away = "노리스 (맥라렌)";
@@ -5371,6 +5461,7 @@ _FRONTEND_V22_JS = r'''
     syncSportPillLiveDotsV30();
     mountOrUpdateV30ScoreToolbar();
     renderScoreboardTableV30(items);
+    localizeScoreStripDomV381();
   }
 
   function getSportTacticalViewV33(it, hp, ap) {
@@ -8309,7 +8400,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3800_{int(time.time())}"
+_BOOT_VER_V30 = f"3810_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -10440,6 +10531,9 @@ def api_member_scoreboard_v30(date_offset: int = 0):
         raw_items = []
 
     _patch_datacenter_api_routes_v341()
+    _w_fn = globals().get('_install_dc_ko_team_wrapper_v381')
+    if callable(_w_fn) and not globals().get('_DC_KO_WRAPPER_INSTALLED_V381'):
+        _w_fn()
     # v3.5 Replace static V-League seed items with real KST-clock-aware V-League Men's & Women's matches!
     raw_items = [
         x for x in raw_items
@@ -11129,6 +11223,49 @@ _KO_SOCCER_TEAMS_V37: Dict[str, str] = {
     "ulsan hd": "울산 HD", "fc seoul": "FC 서울", "jeonbuk motors": "전북 현대", "pohang steelers": "포항 스틸러스",
     "gangwon fc": "강원 FC", "suwon fc": "수원 FC", "gimcheon sangmu": "김천 상무", "jeju united": "제주 SK",
     "daejeon citizen": "대전 하나시티즌", "gwangju fc": "광주 FC", "daegu fc": "대구 FC", "incheon united": "인천 유나이티드",
+    # FIFA / UEFA Nations League / World Cup & Continental National Teams (including ESPN shortDisplayName)
+    "bosnia and herzegovina": "보스니아 헤르체고비나", "bosnia & herzegovina": "보스니아 헤르체고비나",
+    "bosnia-herzegovina": "보스니아 헤르체고비나", "bosnia-herz": "보스니아 헤르체고비나", "bosnia": "보스니아 헤르체고비나",
+    "romania": "루마니아", "denmark": "덴마크", "norway": "노르웨이",
+    "england": "잉글랜드", "france": "프랑스", "spain": "스페인", "germany": "독일", "italy": "이탈리아",
+    "portugal": "포르투갈", "netherlands": "네덜란드", "holland": "네덜란드", "belgium": "벨기에",
+    "croatia": "크로아티아", "switzerland": "스위스", "austria": "오스트리아", "poland": "폴란드",
+    "ukraine": "우크라이나", "serbia": "세르비아",
+    "turkiye": "튀르키예", "türkiye": "튀르키예", "turkey": "튀르키예",
+    "hungary": "헝가리", "czechia": "체코", "czech republic": "체코", "czech rep": "체코",
+    "scotland": "스코틀랜드", "wales": "웨일스",
+    "republic of ireland": "아일랜드", "rep of ireland": "아일랜드", "ireland": "아일랜드",
+    "northern ireland": "북아일랜드", "n. ireland": "북아일랜드", "n ireland": "북아일랜드",
+    "sweden": "스웨덴", "finland": "핀란드", "iceland": "아이슬란드", "greece": "그리스",
+    "slovakia": "슬로바키아", "slovenia": "슬로베니아", "albania": "알바니아", "georgia": "조지아",
+    "north macedonia": "북마케도니아", "n. macedonia": "북마케도니아", "n macedonia": "북마케도니아",
+    "montenegro": "몬테네그로", "kosovo": "코소보", "bulgaria": "불가리아", "israel": "이스라엘",
+    "armenia": "아르메니아", "azerbaijan": "아제르바이잔", "kazakhstan": "카자흐스탄", "belarus": "벨라루스",
+    "luxembourg": "룩셈부르크", "estonia": "에스토니아", "latvia": "라트비아", "lithuania": "리투아니아",
+    "cyprus": "키프로스", "faroe islands": "페로 제도", "moldova": "몰도바", "malta": "몰타",
+    "andorra": "안도라", "liechtenstein": "리히텐슈타인", "san marino": "산마리노", "gibraltar": "지브롤터",
+    # AFC / Asia & Oceania
+    "south korea": "대한민국", "korea republic": "대한민국", "korea rep": "대한민국",
+    "japan": "일본", "australia": "호주", "iran": "이란", "ir iran": "이란",
+    "saudi arabia": "사우디아라비아", "qatar": "카타르", "iraq": "이라크", "uzbekistan": "우즈베키스탄",
+    "jordan": "요르단", "united arab emirates": "아랍에미리트", "uae": "아랍에미리트",
+    "bahrain": "바레인", "oman": "오만", "china pr": "중국", "china": "중국",
+    "indonesia": "인도네시아", "thailand": "태국", "vietnam": "베트남", "malaysia": "말레이시아",
+    "kuwait": "쿠웨이트", "palestine": "팔레스타인", "kyrgyzstan": "키르기스스탄", "kyrgyz republic": "키르기스스탄",
+    "north korea": "북한", "korea dpr": "북한", "syria": "시리아", "lebanon": "레바논",
+    "india": "인도", "new zealand": "뉴질랜드",
+    # CONMEBOL / CONCACAF / CAF
+    "argentina": "아르헨티나", "brazil": "브라질", "uruguay": "우루과이", "colombia": "콜롬비아",
+    "ecuador": "에콰도르", "paraguay": "파라과이", "venezuela": "베네수엘라", "chile": "칠레",
+    "peru": "페루", "bolivia": "볼리비아",
+    "united states": "미국", "usa": "미국", "u.s.": "미국", "mexico": "멕시코", "canada": "캐나다",
+    "panama": "파나마", "costa rica": "코스타리카", "jamaica": "자메이카", "honduras": "온두라스",
+    "el salvador": "엘살바도르", "guatemala": "과테말라", "trinidad and tobago": "트리니다드 토바고",
+    "morocco": "모로코", "senegal": "세네갈", "egypt": "이집트", "nigeria": "나이지리아",
+    "ivory coast": "코트디부아르", "cote d'ivoire": "코트디부아르", "côte d'ivoire": "코트디부아르",
+    "algeria": "알제리", "tunisia": "튀니지", "cameroon": "카메룬", "ghana": "가나",
+    "mali": "말리", "south africa": "남아프리카공화국", "dr congo": "콩고민주공화국", "congo dr": "콩고민주공화국",
+    "burkina faso": "부르키나파소", "cape verde": "카보베르데",
 }
 
 _KO_HOCKEY_MLB_TEAMS_V37: Dict[str, str] = {
@@ -12057,7 +12194,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "3.8-dynamic-sitemap-rss",
+        "engine_version": "3.8.1-national-teams-ko",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
@@ -12169,6 +12306,7 @@ def _datacenter_prewarm_daemon() -> None:
     for _ in range(20):
         try:
             from app import sportiq_datacenter as _dc
+            _install_dc_ko_team_wrapper_v381(_dc)
             if install_datacenter_swr_accelerator(_dc):
                 dc_mod = _dc
                 break
@@ -12577,3 +12715,90 @@ def vote_global_match(match_id: int):
     except Exception:
         pass
     return {"ok": True, "match": voted, "matches": items}
+
+
+_DC_KO_WRAPPER_INSTALLED_V381 = False
+
+
+def _localize_items_list_ko_v381(items_list: Any) -> None:
+    if not isinstance(items_list, list):
+        return
+    for it in items_list:
+        if not isinstance(it, dict):
+            continue
+        sp = str(it.get("sport") or "")
+        h_raw = str(it.get("home") or "").strip()
+        a_raw = str(it.get("away") or "").strip()
+        if h_raw:
+            h_ko = _localize_team_ko_v37(h_raw, sp)
+            if h_ko != h_raw:
+                it.setdefault("home_en", h_raw)
+                it["home"] = h_ko
+        if a_raw:
+            a_ko = _localize_team_ko_v37(a_raw, sp)
+            if a_ko != a_raw:
+                it.setdefault("away_en", a_raw)
+                it["away"] = a_ko
+
+
+def _install_dc_ko_team_wrapper_v381(dc_mod: Any = None) -> bool:
+    global _DC_KO_WRAPPER_INSTALLED_V381
+    import sys as _sys
+    if dc_mod is None:
+        dc_mod = _sys.modules.get("app.sportiq_datacenter") or _sys.modules.get("sportiq_datacenter")
+        if dc_mod is None:
+            try:
+                from app import sportiq_datacenter as _dc_imp
+                dc_mod = _dc_imp
+            except Exception:
+                return False
+    if getattr(dc_mod, "__ko_team_wrapped_v381__", False):
+        _DC_KO_WRAPPER_INSTALLED_V381 = True
+        return True
+
+    orig_espn_sb = getattr(dc_mod, "_fetch_espn_sb", None)
+    if callable(orig_espn_sb):
+        def _ko_espn_sb(lg: Dict[str, Any], date_param: str, check_alerts: bool) -> List[Dict[str, Any]]:
+            rows = orig_espn_sb(lg, date_param, check_alerts)
+            _localize_items_list_ko_v381(rows)
+            alerts_ref = getattr(dc_mod, "_ALERTS", None)
+            if isinstance(alerts_ref, list):
+                for al in alerts_ref[:8]:
+                    if isinstance(al, dict) and isinstance(al.get("text"), str):
+                        tx = al["text"]
+                        sp_al = str(al.get("sport") or "")
+                        m_al = re.match(r"^(\S+\s+\S+\s+\[[^\]]+\]\s+)(.+?)(\s+\d+\s*:\s*\d+\s+)(.+?)(\s*\([^)]*\)\s*)$", tx)
+                        if m_al:
+                            h_al = _localize_team_ko_v37(m_al.group(2).strip(), sp_al)
+                            a_al = _localize_team_ko_v37(m_al.group(4).strip(), sp_al)
+                            al["text"] = f"{m_al.group(1)}{h_al}{m_al.group(3)}{a_al}{m_al.group(5)}"
+            return rows
+
+        dc_mod._fetch_espn_sb = _ko_espn_sb
+
+    orig_collect_ls = getattr(dc_mod, "collect_live_scores", None)
+    if callable(orig_collect_ls):
+        def _ko_collect_ls(date_offset: int = 0) -> Dict[str, Any]:
+            res = orig_collect_ls(date_offset)
+            if isinstance(res, dict) and isinstance(res.get("items"), list):
+                _localize_items_list_ko_v381(res["items"])
+            return res
+
+        dc_mod.collect_live_scores = _ko_collect_ls
+
+    dc_cache = getattr(dc_mod, "_CACHE", None)
+    if isinstance(dc_cache, dict):
+        for k_c, v_c in list(dc_cache.items()):
+            if str(k_c).startswith("live_scores_") and isinstance(v_c, tuple) and len(v_c) == 2 and isinstance(v_c[1], dict):
+                _localize_items_list_ko_v381(v_c[1].get("items"))
+    with _DC_SWR_LOCK:
+        for _off_k, (_ts_k, _lst_k) in list(_DC_SWR_CACHE.items()):
+            _localize_items_list_ko_v381(_lst_k)
+
+    dc_mod.__ko_team_wrapped_v381__ = True
+    _DC_KO_WRAPPER_INSTALLED_V381 = True
+    return True
+
+
+_install_dc_ko_team_wrapper_v381()
+
