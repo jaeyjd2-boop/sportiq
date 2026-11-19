@@ -2512,7 +2512,7 @@ _FRONTEND_V22_JS = r'''
   // -------------------------------------------------------------------------
   function enforceSingleLineMainTabBar() {
     var bodyFeedBtn = null;
-    var allBtns = document.querySelectorAll("button, a");
+    var allBtns = document.querySelectorAll("button, a, [role='tab'], [data-tab]");
     for (var bi = 0; bi < allBtns.length; bi++) {
       var cand = allBtns[bi];
       if (cand.closest("#proLiveTickerBar, #dcMainHubSection, #sqOfficialLegalFooter, #sqAiIqModal, #sqMemberHubModal")) continue;
@@ -2530,7 +2530,7 @@ _FRONTEND_V22_JS = r'''
     var bar = primaryFirstTab.parentElement;
     var climbGuard = 0;
     while (bar && bar.parentElement && bar.parentElement !== document.body && climbGuard < 3) {
-      var directOrChildTabs = bar.querySelectorAll("button, a").length;
+      var directOrChildTabs = bar.querySelectorAll("button, a, [role='tab'], [data-tab]").length;
       if (directOrChildTabs >= 4) break;
       bar = bar.parentElement;
       climbGuard++;
@@ -2555,9 +2555,10 @@ _FRONTEND_V22_JS = r'''
     for (var si = 0; si < allBtns.length; si++) {
       var sb = allBtns[si];
       if (!sb || sb === primaryFirstTab || sb.parentElement === bar || bar.contains(sb)) continue;
-      if (sb.closest("header, #proLiveTickerBar, #dcMainHubSection, #sqOfficialLegalFooter, #sqAiIqModal, #sqMemberHubModal, #dcQuickMatchModal")) continue;
+      if (sb.closest("#proLiveTickerBar, #dcMainHubSection, #sqOfficialLegalFooter, #sqAiIqModal, #sqMemberHubModal, #dcQuickMatchModal")) continue;
+      if (sb.hasAttribute("data-nav")) continue;
       var stx = String(sb.textContent || "").replace(/\s+/g, " ").trim();
-      if (stx.length <= 16 && /^(?:📊\s*|📈\s*|🏟️\s*)?데이터\s*센터$/.test(stx)) {
+      if (stx.length <= 24 && /데이터\s*센터/.test(stx) && !/펼치기|접기|동기화|연동/.test(stx)) {
         if (barRect && sb.getBoundingClientRect) {
           var sr = sb.getBoundingClientRect();
           if (barRect.height > 0 && sr.height > 0 && Math.abs(sr.top - barRect.top) > 180) continue;
@@ -5485,6 +5486,10 @@ _FRONTEND_V22_JS = r'''
     window.fetch = function (input, init) {
       var u = typeof input === "string" ? input : (input && input.url ? input.url : "");
       return origFetch(input, init).then(function (resp) {
+        if (u.indexOf("ai-iq") !== -1) {
+          setTimeout(function () { if (window.__autoFoldAiOnRenderV465) window.__autoFoldAiOnRenderV465(); }, 40);
+          setTimeout(function () { if (window.__autoFoldAiOnRenderV465) window.__autoFoldAiOnRenderV465(); }, 180);
+        }
         if (u.indexOf("/api/datacenter/live-scores") !== -1 && u.indexOf("_sq_bridge=1") === -1) {
           var reqOff = null;
           try {
@@ -8685,11 +8690,26 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
-  function hasLiveAiSearchResultsV465(resArea) {
-    if (!resArea) return false;
-    if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']")) return true;
-    var rtx = String(resArea.textContent || "");
-    return /총\s*\d+\s*건|초정밀\s*통합\s*브리핑|정확도순|실시간\s*스포츠\s*뉴스|실시간\s*매치\s*·/.test(rtx);
+  function extractAiModalResultSigV466(aiModal) {
+    if (!aiModal) return "";
+    // Exclude input/hint rows and inspect whether search result headers/cards exist anywhere inside `aiModal`
+    var fullTx = String(aiModal.textContent || "");
+    var m = fullTx.match(/총\s*\d+\s*건\s*매칭|초정밀\s*통합\s*브리핑|정확도순\s*국내[^\n]{0,30}\(\d+\s*건\)|실시간\s*매치\s*·\s*AI\s*승률/);
+    if (m) {
+      var inp = aiModal.querySelector("input");
+      var qv = inp ? String(inp.value || "").trim() : "";
+      return qv + "::" + m[0];
+    }
+    var resArea = document.getElementById("sqAiIqResultArea");
+    if (resArea && resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec]")) {
+      return "dom::" + String(resArea.textContent || "").slice(0, 48);
+    }
+    return "";
+  }
+
+  function isHintRowOrControlsInAiModalV466(el) {
+    if (!el || !el.closest) return false;
+    return Boolean(el.closest("[data-sq-ai-hints-wrap='1'], [data-sq-ai-hint-row='1'], #sqAiHintsToggleBtnV46"));
   }
 
   function tagAiModalHintAndModeRowsV464(aiModal) {
@@ -8703,6 +8723,9 @@ _FRONTEND_V22_JS = r'''
       if (d.getAttribute("data-sq-ai-hints-wrap") === "1") return;
       if (d.querySelector("input, h3, #sqAiIqResultArea")) return;
       var dtx = String(d.textContent || "").replace(/\s+/g, " ").trim();
+      // Skip containers that hold actual search results!
+      if (/총\s*\d+\s*건\s*매칭|초정밀\s*통합\s*브리핑|정확도순\s*국내/.test(dtx)) return;
+
       if (!modeRow && dtx.indexOf("통합 AI") !== -1 && dtx.indexOf("백과") !== -1 && d.querySelectorAll("button").length >= 3 && d.children.length <= 8) {
         modeRow = d;
         d.classList.add("sq-v46-ai-swipe-row");
@@ -8751,57 +8774,72 @@ _FRONTEND_V22_JS = r'''
         aiModal.setAttribute("data-sq-ai-manual-state", currentlyFolded ? "open" : "folded");
         foldAiModalHintsOnResultV46(!currentlyFolded);
       };
-      var resBox = document.getElementById("sqAiIqResultArea");
       if (modeRow) {
         modeRow.appendChild(hBtn);
-      } else if (resBox && resBox.parentElement) {
-        resBox.insertAdjacentElement("beforebegin", hBtn);
+      } else if (allHintRows[0] && allHintRows[0].parentElement) {
+        allHintRows[0].parentElement.insertAdjacentElement("beforebegin", hBtn);
       }
     }
 
-    var resAreaObs = document.getElementById("sqAiIqResultArea");
-    if (resAreaObs && !resAreaObs.__sqAiResObsV465 && typeof MutationObserver !== "undefined") {
-      resAreaObs.__sqAiResObsV465 = true;
-      var aiObs = new MutationObserver(function () {
-        if (hasLiveAiSearchResultsV465(resAreaObs)) {
+    // Observe `aiModal` itself (`childList + subtree`) so ANY search result container ID or render function triggers instant auto-fold!
+    if (!aiModal.__sqModalResultObsV466 && typeof MutationObserver !== "undefined") {
+      aiModal.__sqModalResultObsV466 = true;
+      var modalObs = new MutationObserver(function (muts) {
+        if (aiModal.__sqInFoldMutV466) return;
+        var nonHintMut = false;
+        for (var mi = 0; mi < muts.length; mi++) {
+          if (!isHintRowOrControlsInAiModalV466(muts[mi].target)) {
+            nonHintMut = true;
+            break;
+          }
+        }
+        if (!nonHintMut) return;
+        var sig = extractAiModalResultSigV466(aiModal);
+        if (sig && sig !== aiModal.getAttribute("data-sq-last-res-sig")) {
+          aiModal.setAttribute("data-sq-last-res-sig", sig);
           aiModal.removeAttribute("data-sq-ai-manual-state");
           foldAiModalHintsOnResultV46(true);
         }
       });
-      aiObs.observe(resAreaObs, { childList: true });
+      modalObs.observe(aiModal, { childList: true, subtree: true });
     }
     return allHintRows;
   }
 
   function foldAiModalHintsOnResultV46(shouldFold) {
     var aiModal = findAiSearchModalContainerV372();
-    if (!aiModal) return;
-    var rows = tagAiModalHintAndModeRowsV464(aiModal);
-    var wrap = aiModal.querySelector("[data-sq-ai-hints-wrap='1']");
-    var togBtn = document.getElementById("sqAiHintsToggleBtnV46");
-    if (!rows.length && !wrap) return;
-    if (shouldFold) {
-      if (wrap) wrap.setAttribute("data-sq-ai-hints-folded", "1");
-      rows.forEach(function (r) {
-        r.setAttribute("data-sq-ai-hint-folded", "1");
-        r.style.setProperty("display", "none", "important");
-      });
-      if (togBtn) {
-        togBtn.removeAttribute("data-sq-tog-hidden");
-        togBtn.style.setProperty("display", "inline-flex", "important");
-        togBtn.textContent = "🔎 추천 · 최근 검색어 ▾";
+    if (!aiModal || aiModal.__sqInFoldMutV466) return;
+    aiModal.__sqInFoldMutV466 = true;
+    try {
+      var rows = tagAiModalHintAndModeRowsV464(aiModal);
+      var wrap = aiModal.querySelector("[data-sq-ai-hints-wrap='1']");
+      var togBtn = document.getElementById("sqAiHintsToggleBtnV46");
+      if (!rows.length && !wrap) return;
+      if (shouldFold) {
+        if (wrap) wrap.setAttribute("data-sq-ai-hints-folded", "1");
+        rows.forEach(function (r) {
+          r.setAttribute("data-sq-ai-hint-folded", "1");
+          r.style.setProperty("display", "none", "important");
+        });
+        if (togBtn) {
+          togBtn.removeAttribute("data-sq-tog-hidden");
+          togBtn.style.setProperty("display", "inline-flex", "important");
+          togBtn.textContent = "🔎 추천 · 최근 검색어 ▾";
+        }
+      } else {
+        if (wrap) wrap.removeAttribute("data-sq-ai-hints-folded");
+        rows.forEach(function (r) {
+          r.removeAttribute("data-sq-ai-hint-folded");
+          r.style.removeProperty("display");
+        });
+        if (togBtn) {
+          togBtn.removeAttribute("data-sq-tog-hidden");
+          togBtn.style.setProperty("display", "inline-flex", "important");
+          togBtn.textContent = "🔎 추천 검색어 접기 ▴";
+        }
       }
-    } else {
-      if (wrap) wrap.removeAttribute("data-sq-ai-hints-folded");
-      rows.forEach(function (r) {
-        r.removeAttribute("data-sq-ai-hint-folded");
-        r.style.removeProperty("display");
-      });
-      if (togBtn) {
-        togBtn.removeAttribute("data-sq-tog-hidden");
-        togBtn.style.setProperty("display", "inline-flex", "important");
-        togBtn.textContent = "🔎 추천 검색어 접기 ▴";
-      }
+    } finally {
+      aiModal.__sqInFoldMutV466 = false;
     }
   }
   window.__foldAiModalHintsOnResultV46 = foldAiModalHintsOnResultV46;
@@ -8834,8 +8872,9 @@ _FRONTEND_V22_JS = r'''
       });
 
       tagAiModalHintAndModeRowsV464(aiModal);
-      var resArea = document.getElementById("sqAiIqResultArea");
-      if (hasLiveAiSearchResultsV465(resArea) && aiModal.getAttribute("data-sq-ai-manual-state") !== "open") {
+      var curSig = extractAiModalResultSigV466(aiModal);
+      if (curSig && aiModal.getAttribute("data-sq-ai-manual-state") !== "open") {
+        aiModal.setAttribute("data-sq-last-res-sig", curSig);
         foldAiModalHintsOnResultV46(true);
       }
     }
@@ -9819,7 +9858,20 @@ _FRONTEND_V22_JS = r'''
       }
       if (bestFixed) return bestFixed;
     }
-    return direct;
+    if (direct) return direct;
+    if (document.body) {
+      var fixedCands = document.body.querySelectorAll("div, section");
+      for (var fi = 0; fi < fixedCands.length; fi++) {
+        var fc = fixedCands[fi];
+        if (!fc.querySelector || !fc.querySelector("input")) continue;
+        var ftx = String(fc.textContent || "");
+        if (ftx.indexOf("AI 아이큐") !== -1 && (ftx.indexOf("통합 AI") !== -1 || ftx.indexOf("실시간 추천") !== -1)) {
+          var fcs = window.getComputedStyle ? window.getComputedStyle(fc) : null;
+          if (fcs && fcs.position === "fixed") return fc;
+        }
+      }
+    }
+    return null;
   }
 
   function closeAiSearchModalCompletelyV372() {
@@ -12001,7 +12053,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"4650_{int(time.time())}"
+_BOOT_VER_V30 = f"4660_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -15795,7 +15847,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.6.5-verified-complete",
+        "engine_version": "4.6.6-live-dom-locked",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
