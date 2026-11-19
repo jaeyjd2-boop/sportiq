@@ -1029,6 +1029,7 @@ _FRONTEND_V22_JS = r'''
       "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLaunchCards {",
       "  display: flex !important;",
       "  flex-wrap: nowrap !important;",
+      "  align-items: center !important;",
       "  overflow-x: auto !important;",
       "  -webkit-overflow-scrolling: touch;",
       "  scrollbar-width: none;",
@@ -1042,12 +1043,20 @@ _FRONTEND_V22_JS = r'''
       "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLaunchCards > * {",
       "  flex: 1 1 0% !important;",
       "  min-width: max-content !important;",
+      "  height: 36px !important;",
+      "  min-height: 36px !important;",
+      "  max-height: 36px !important;",
+      "  display: inline-flex !important;",
+      "  align-items: center !important;",
+      "  justify-content: center !important;",
       "  white-space: nowrap !important;",
       "  text-align: center !important;",
-      "  padding: 7px 10px !important;",
-      "  min-height: 0 !important;",
+      "  padding: 0 11px !important;",
       "  border-radius: 10px !important;",
+      "  box-sizing: border-box !important;",
       "}",
+      "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLauncherGrid > * > :nth-child(n+2),",
+      "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLaunchCards > * > :nth-child(n+2),",
       "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLauncherGrid > * p,",
       "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLauncherGrid > * .text-xs,",
       "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLaunchCards > * p,",
@@ -1127,6 +1136,68 @@ _FRONTEND_V22_JS = r'''
       "  }",
       "  #globalTop10Grid[data-sq-top20-expanded='1'] {",
       "    grid-template-columns: 1fr !important;",
+      "  }",
+      "}",
+      "/* v4.1 Clean Right Sidebar Rhythm + 2-Col Overseas News & Debate Grids + Cheer Strip Polish */",
+      ".sq-v41-sidebar {",
+      "  display: flex !important;",
+      "  flex-direction: column !important;",
+      "  gap: 11px !important;",
+      "}",
+      ".sq-v41-sidebar > div, .sq-v41-sidebar > section {",
+      "  margin: 0 !important;",
+      "  padding: 13px 15px !important;",
+      "  border-radius: 15px !important;",
+      "  box-sizing: border-box !important;",
+      "}",
+      "#sqSideTop5BoxV41[data-sq-side-folded='1'] > :not([data-sq-side-hdr='1']) {",
+      "  display: none !important;",
+      "}",
+      "#sqHashtagCardV41 [data-sq-ht-extra='1'] { display: none !important; }",
+      "#sqHashtagCardV41[data-sq-ht-open='1'] [data-sq-ht-extra='1'] { display: inline-flex !important; }",
+      "#sqHashtagCardV41 [data-sq-ht-form='1'] { display: none !important; }",
+      "#sqHashtagCardV41[data-sq-ht-open='1'] [data-sq-ht-form='1'] { display: flex !important; }",
+      "#rssNewsList, .sq-v41-debate-grid {",
+      "  display: grid !important;",
+      "  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;",
+      "  gap: 10px !important;",
+      "  margin-top: 10px !important;",
+      "}",
+      "#rssNewsList > .sq-rss-card-v22 {",
+      "  margin: 0 !important;",
+      "  padding: 11px 13px !important;",
+      "  border-radius: 13px !important;",
+      "  display: flex !important;",
+      "  flex-direction: column !important;",
+      "  justify-content: space-between !important;",
+      "  box-sizing: border-box !important;",
+      "}",
+      "#rssNewsList > .sq-rss-card-v22[data-sq-rss-hidden='1'] {",
+      "  display: none !important;",
+      "}",
+      ".sq-v41-issues-stack > div, .sq-v41-issues-stack > section {",
+      "  margin-top: 0 !important;",
+      "  margin-bottom: 14px !important;",
+      "  padding: 14px 16px !important;",
+      "  border-radius: 16px !important;",
+      "}",
+      "@media (max-width: 760px) {",
+      "  #rssNewsList, .sq-v41-debate-grid { grid-template-columns: 1fr !important; }",
+      "}",
+      "@media (max-width: 640px) {",
+      "  .sq-v41-cheer-strip {",
+      "    display: flex !important;",
+      "    flex-wrap: nowrap !important;",
+      "    overflow-x: auto !important;",
+      "    -webkit-overflow-scrolling: touch;",
+      "    scrollbar-width: none;",
+      "    gap: 5px !important;",
+      "    padding-bottom: 2px;",
+      "  }",
+      "  .sq-v41-cheer-strip::-webkit-scrollbar { display: none; }",
+      "  .sq-v41-cheer-strip > button, .sq-v41-cheer-strip > span {",
+      "    flex: 0 0 auto !important;",
+      "    white-space: nowrap !important;",
       "  }",
       "}",
       ".sq-v30-fbtn {",
@@ -2822,6 +2893,7 @@ _FRONTEND_V22_JS = r'''
     });
   }
 
+  var overseasShowAllV41 = false;
   function renderOverseasListV22() {
     var box = document.getElementById("rssNewsList");
     if (!box) return;
@@ -2830,32 +2902,66 @@ _FRONTEND_V22_JS = r'''
       ? overseasCacheV22
       : overseasCacheV22.filter(function (it) { return (it.sport_ko || it.sport) === sp; });
 
+    var prevMore = document.getElementById("sqRssMoreWrapV41");
     if (!list.length) {
-      box.innerHTML = "<div style='padding:18px;text-align:center;color:#94a3b8;font-size:12.5px;'>선택한 종목의 해외 실시간 속보를 불러오는 중입니다...</div>";
+      if (prevMore) prevMore.style.display = "none";
+      box.innerHTML = "<div style='grid-column:1/-1;padding:18px;text-align:center;color:#94a3b8;font-size:12.5px;'>선택한 종목의 해외 실시간 속보를 불러오는 중입니다...</div>";
       return;
     }
 
-    box.innerHTML = list.slice(0, 24).map(function (it) {
+    var sliced = list.slice(0, 24);
+    var initCap = 6;
+    box.innerHTML = sliced.map(function (it, idx) {
       var sBadge = it.sport_badge || ("⚽ " + (it.sport_ko || "해외스포츠"));
       var sColor = it.sport_color || "#38bdf8";
       var tBadge = it.topic_badge || "⚡ 현지 주요속보";
       var tColor = it.topic_color || "#7dd3fc";
       var koSum = it.ko_summary || "해외 주요 매체 실시간 스포츠 속보";
+      var hideAttr = (!overseasShowAllV41 && idx >= initCap) ? " data-sq-rss-hidden='1'" : "";
       return [
-        "<a href='" + uxEsc(it.url || it.link || "#") + "' target='_blank' rel='noopener noreferrer' class='sq-rss-card-v22'>",
-        "  <div style='display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;'>",
-        "    <div style='display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;'>",
-        "      <span style='background:rgba(15,23,42,.95);border:1px solid " + uxEsc(sColor) + ";color:" + uxEsc(sColor) + ";border-radius:999px;padding:1.5px 8px;font-size:11px;font-weight:800;'>" + uxEsc(sBadge) + "</span>",
-        "      <span style='background:rgba(30,41,59,.85);border:1px solid rgba(148,163,184,.3);color:" + uxEsc(tColor) + ";border-radius:999px;padding:1.5px 8px;font-size:11px;font-weight:800;'>" + uxEsc(tBadge) + "</span>",
-        "      <span style='font-size:11px;color:#94a3b8;font-weight:700;'>" + uxEsc(it.source || "BBC·ESPN") + "</span>",
+        "<a href='" + uxEsc(it.url || it.link || "#") + "' target='_blank' rel='noopener noreferrer' class='sq-rss-card-v22'" + hideAttr + ">",
+        "  <div>",
+        "    <div style='display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px;'>",
+        "      <div style='display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;'>",
+        "        <span style='background:rgba(15,23,42,.95);border:1px solid " + uxEsc(sColor) + ";color:" + uxEsc(sColor) + ";border-radius:999px;padding:1.5px 8px;font-size:10.8px;font-weight:800;'>" + uxEsc(sBadge) + "</span>",
+        "        <span style='background:rgba(30,41,59,.85);border:1px solid rgba(148,163,184,.3);color:" + uxEsc(tColor) + ";border-radius:999px;padding:1.5px 8px;font-size:10.8px;font-weight:800;'>" + uxEsc(tBadge) + "</span>",
+        "        <span style='font-size:10.8px;color:#94a3b8;font-weight:700;'>" + uxEsc(it.source || "BBC·ESPN") + "</span>",
+        "      </div>",
+        "      <span style='font-size:10.5px;color:#64748b;white-space:nowrap;'>" + uxEsc(it.published_kst || it.pubDate || "") + " ↗</span>",
         "    </div>",
-        "    <span style='font-size:11px;color:#64748b;'>" + uxEsc(it.published_kst || it.pubDate || "") + " ↗</span>",
+        "    <div style='background:rgba(6,182,212,.1);border-left:3px solid #22d3ee;border-radius:6px;padding:3.5px 8px;margin-bottom:5px;font-size:11.4px;font-weight:800;color:#cffafe;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>🇰🇷 " + uxEsc(koSum) + "</div>",
         "  </div>",
-        "  <div style='background:rgba(6,182,212,.1);border-left:3px solid #22d3ee;border-radius:6px;padding:4px 9px;margin-bottom:6px;font-size:11.8px;font-weight:800;color:#cffafe;'>🇰🇷 한글 요약: " + uxEsc(koSum) + "</div>",
-        "  <div style='font-size:13.2px;font-weight:700;color:#f8fafc;line-height:1.45;'>" + uxEsc(it.title || "") + "</div>",
+        "  <div style='font-size:12.8px;font-weight:700;color:#f8fafc;line-height:1.42;'>" + uxEsc(it.title || "") + "</div>",
         "</a>"
       ].join("");
     }).join("");
+
+    if (sliced.length > initCap && box.parentElement) {
+      if (!prevMore) {
+        prevMore = document.createElement("div");
+        prevMore.id = "sqRssMoreWrapV41";
+        prevMore.style.cssText = "margin-top:10px;text-align:center;";
+        box.insertAdjacentElement("afterend", prevMore);
+      }
+      prevMore.style.display = "block";
+      var btn = prevMore.querySelector("button");
+      if (!btn) {
+        btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "sq-v40-fold-btn";
+        btn.style.cssText = "padding:6px 16px;border-color:rgba(56,189,248,0.55);color:#7dd3fc;font-size:11.5px;";
+        prevMore.appendChild(btn);
+      }
+      btn.textContent = overseasShowAllV41
+        ? "▲ 최신 6건만 간략히 보기"
+        : ("📰 해외 실시간 속보 전체 펼치기 (+" + (sliced.length - initCap) + "건 더보기 ▼)");
+      btn.onclick = function () {
+        overseasShowAllV41 = !overseasShowAllV41;
+        renderOverseasListV22();
+      };
+    } else if (prevMore) {
+      prevMore.style.display = "none";
+    }
   }
 
   function installOverseasNewsUpgradeV22() {
@@ -5920,6 +6026,17 @@ _FRONTEND_V22_JS = r'''
               togBtn.style.color = openNow ? "#7dd3fc" : "#cbd5e1";
             });
           }
+          if (autoRefreshHost) {
+            autoRefreshHost.style.flexWrap = "wrap";
+            autoRefreshHost.style.justifyContent = "flex-end";
+            if (autoRefreshHost.parentElement) {
+              autoRefreshHost.parentElement.style.flexWrap = "wrap";
+              autoRefreshHost.parentElement.style.gap = "6px";
+            }
+            Array.prototype.forEach.call(autoRefreshHost.children || [], function (ch) {
+              if (ch && ch.style) ch.style.whiteSpace = "nowrap";
+            });
+          }
           var togHost = autoRefreshHost || ctrlRow;
           if (togBtn.parentElement !== togHost) {
             togHost.appendChild(togBtn);
@@ -5943,8 +6060,8 @@ _FRONTEND_V22_JS = r'''
     var dcTrack = document.getElementById("dcLiveTickerTrack");
     var track = dcTrack || findPrimaryMainCardStripV30();
     if (!track || !track.parentElement) return;
-    // Never anchor inside the full-bleed `#proLiveTickerBar` outer shell if `#proTickerList` was returned before `dcLiveTickerTrack` mounted!
-    if (!dcTrack && track.id === "proTickerList") return;
+    // Never anchor outside `#proLiveTickerBar` or on `#proTickerList` before `dcLiveTickerTrack` mounts!
+    if (!dcTrack && (track.id === "proTickerList" || !track.closest || !track.closest("#proLiveTickerBar"))) return;
 
     var parentBox = track.parentElement;
     var items = v30ScoreState.items || [];
@@ -6076,7 +6193,6 @@ _FRONTEND_V22_JS = r'''
 
   var _v40Top20ShowAll = false;
   function organizeBelowScoreboardSectionsV40() {
-    // A) DataCenter (`#dcMainHubSection`): keep `#dcHubBody` folded on initial landing until user clicks a launcher card / toggle / tab!
     var dcHub = document.getElementById("dcMainHubSection") || document.querySelector(".dc-hub-wrap");
     var dcBody = document.getElementById("dcHubBody");
     var dcTog = document.getElementById("dcToggleHubBtn");
@@ -6097,7 +6213,6 @@ _FRONTEND_V22_JS = r'''
       installDataCenterPersistenceGuardV28();
     }
 
-    // B) Global Big Match Buzz TOP 20 (`#globalTop10Grid` container):
     var topGrid = document.getElementById("globalTop10Grid");
     if (topGrid) {
       var topBox = topGrid.parentElement;
@@ -6186,7 +6301,6 @@ _FRONTEND_V22_JS = r'''
       }
     }
 
-    // C) Secondary Blocks inside `#tab-feed` (`🔥 실시간 베스트 공감 브리핑 TOP 3` & `🤖 00:00 KST 자동 분석 엔진`):
     var feedSec = document.getElementById("tab-feed") || document.getElementById("view-feed");
     if (feedSec) {
       var blocks = feedSec.querySelectorAll("div, section");
@@ -6234,6 +6348,160 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
+
+  var _v41DebateShowAll = false;
+  function organizeSidebarAndIssuesTabV41() {
+    var tierCard = document.getElementById("sqMemberTierGaugeCard");
+    var sideEl = (tierCard && tierCard.closest ? tierCard.closest("aside") : null) || document.querySelector("aside");
+    if (sideEl) {
+      sideEl.classList.add("sq-v41-sidebar");
+      Array.prototype.forEach.call(sideEl.children || [], function (card) {
+        if (!card || !card.tagName) return;
+        var cTxt = card.textContent || "";
+
+        if (!card.id && cTxt.indexOf("빅매치 TOP 5") !== -1 && card.children.length >= 2) {
+          card.id = "sqSideTop5BoxV41";
+          var sHdr = card.firstElementChild;
+          if (sHdr) {
+            sHdr.setAttribute("data-sq-side-hdr", "1");
+            sHdr.style.cssText = (sHdr.style.cssText || "") + ";display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer;";
+            card.setAttribute("data-sq-side-folded", "1");
+            var sBtn = document.createElement("button");
+            sBtn.type = "button";
+            sBtn.id = "sqSideTop5ToggleV41";
+            sBtn.className = "sq-v40-fold-btn";
+            sBtn.style.cssText = "padding:3px 8px;font-size:10.8px;";
+            sBtn.textContent = "펼치기 ▼";
+            (function (boxRef, btnRef) {
+              var togFn = function (ev) {
+                if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+                var folded = boxRef.getAttribute("data-sq-side-folded") === "1";
+                if (folded) {
+                  boxRef.removeAttribute("data-sq-side-folded");
+                  btnRef.textContent = "접기 ▲";
+                } else {
+                  boxRef.setAttribute("data-sq-side-folded", "1");
+                  btnRef.textContent = "펼치기 ▼";
+                }
+              };
+              btnRef.onclick = togFn;
+              sHdr.addEventListener("click", togFn);
+            })(card, sBtn);
+            sHdr.appendChild(sBtn);
+          }
+        }
+
+        if (!card.id && cTxt.indexOf("인기 해시태그") !== -1) {
+          card.id = "sqHashtagCardV41";
+          var tagBtns = Array.prototype.slice.call(card.querySelectorAll("button, span, a")).filter(function (el) {
+            var tx = String(el.textContent || "").trim();
+            return tx.charAt(0) === "#" && tx.length >= 2 && el.children.length <= 1;
+          });
+          tagBtns.forEach(function (tb, idx) {
+            if (idx >= 10) tb.setAttribute("data-sq-ht-extra", "1");
+            else tb.removeAttribute("data-sq-ht-extra");
+          });
+          var htInput = card.querySelector("input");
+          if (htInput && htInput.parentElement && htInput.parentElement !== card) {
+            htInput.parentElement.setAttribute("data-sq-ht-form", "1");
+          }
+          if ((tagBtns.length > 10 || htInput) && !document.getElementById("sqHashtagMoreBtnV41")) {
+            var htWrap = document.createElement("div");
+            htWrap.style.cssText = "margin-top:6px;text-align:right;";
+            var htBtn = document.createElement("button");
+            htBtn.type = "button";
+            htBtn.id = "sqHashtagMoreBtnV41";
+            htBtn.className = "sq-v40-fold-btn";
+            htBtn.style.cssText = "padding:3px 9px;font-size:10.8px;";
+            var extraCnt = Math.max(0, tagBtns.length - 10);
+            var closedLbl = extraCnt > 0 ? ("+ 태그 " + extraCnt + "개 · 직접 등록 ▼") : "+ 태그 직접 등록 ▼";
+            htBtn.textContent = closedLbl;
+            (function (cRef, bRef, lblClosed) {
+              bRef.onclick = function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                var openNow = cRef.getAttribute("data-sq-ht-open") !== "1";
+                if (openNow) {
+                  cRef.setAttribute("data-sq-ht-open", "1");
+                  bRef.textContent = "간략히 접기 ▲";
+                } else {
+                  cRef.removeAttribute("data-sq-ht-open");
+                  bRef.textContent = lblClosed;
+                }
+              };
+            })(card, htBtn, closedLbl);
+            htWrap.appendChild(htBtn);
+            card.appendChild(htWrap);
+          }
+        }
+      });
+    }
+
+    var rssBox = document.getElementById("rssNewsList");
+    var issuesSec = document.getElementById("tab-issues") || (rssBox && rssBox.closest ? rssBox.closest("section, [id^='tab-']") : null);
+    if (issuesSec) {
+      issuesSec.classList.add("sq-v41-issues-stack");
+
+      var subBlocks = issuesSec.querySelectorAll("div, section");
+      for (var si = 0; si < subBlocks.length; si++) {
+        var sb = subBlocks[si];
+        var sTxt = sb.textContent || "";
+        if (sTxt.indexOf("찬반 배틀") !== -1 && sb.children.length >= 2 && sb.children.length <= 6 && !sb.querySelector("#rssNewsList")) {
+          var listHost = null;
+          for (var ci = 0; ci < sb.children.length; ci++) {
+            if (sb.children[ci].children && sb.children[ci].children.length >= 5) {
+              var sampleTxt = sb.children[ci].children[0].textContent || "";
+              if (sampleTxt.indexOf("A.") !== -1 || sampleTxt.indexOf("투표") !== -1 || sampleTxt.indexOf("관전 브리핑") !== -1) {
+                listHost = sb.children[ci];
+                break;
+              }
+            }
+          }
+          if (listHost) {
+            listHost.classList.add("sq-v41-debate-grid");
+            var dCards = Array.prototype.slice.call(listHost.children);
+            dCards.forEach(function (dc, dIdx) {
+              dc.style.margin = "0";
+              dc.style.display = (!_v41DebateShowAll && dIdx >= 4) ? "none" : "";
+            });
+            if (dCards.length > 4) {
+              var dbMore = document.getElementById("sqDebateMoreWrapV41");
+              if (!dbMore) {
+                dbMore = document.createElement("div");
+                dbMore.id = "sqDebateMoreWrapV41";
+                dbMore.style.cssText = "margin-top:10px;text-align:center;";
+                listHost.insertAdjacentElement("afterend", dbMore);
+              }
+              var dbBtn = dbMore.querySelector("button");
+              if (!dbBtn) {
+                dbBtn = document.createElement("button");
+                dbBtn.type = "button";
+                dbBtn.className = "sq-v40-fold-btn";
+                dbBtn.style.cssText = "padding:5px 15px;border-color:rgba(249,115,22,0.55);color:#fdba74;font-size:11.4px;";
+                dbMore.appendChild(dbBtn);
+              }
+              dbBtn.textContent = _v41DebateShowAll
+                ? "▲ 주요 4개 배틀만 간략히 보기"
+                : ("🔥 찬반 배틀 전체 보기 (+" + (dCards.length - 4) + "건 더보기 ▼)");
+              dbBtn.onclick = function () {
+                _v41DebateShowAll = !_v41DebateShowAll;
+                organizeSidebarAndIssuesTabV41();
+              };
+            }
+          }
+        }
+
+        if (sTxt.indexOf("전광판 응원톡") !== -1 && sb.children.length <= 8) {
+          Array.prototype.forEach.call(sb.querySelectorAll("div"), function (rowDiv) {
+            if (rowDiv.children && rowDiv.children.length >= 5 && rowDiv.querySelectorAll("button").length >= 5 && !rowDiv.querySelector("input")) {
+              rowDiv.classList.add("sq-v41-cheer-strip");
+            }
+          });
+        }
+      }
+    }
+  }
+
   function refreshScoreboardSuiteV30() {
     ensureDomesticBasketballUiControlsV34();
     ensureRootTickerObserverV31();
@@ -6248,6 +6516,7 @@ _FRONTEND_V22_JS = r'''
     renderScoreboardTableV30(items);
     localizeScoreStripDomV381();
     try { organizeBelowScoreboardSectionsV40(); } catch (eV40) {}
+    try { organizeSidebarAndIssuesTabV41(); } catch (eV41) {}
   }
 
   function getSportTacticalViewV33(it, hp, ap) {
@@ -9186,7 +9455,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"4000_{int(time.time())}"
+_BOOT_VER_V30 = f"4100_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -12980,7 +13249,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.0-clean-datacenter-and-top20",
+        "engine_version": "4.1-clean-sidebar-and-issues",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
