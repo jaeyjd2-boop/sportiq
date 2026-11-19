@@ -7504,7 +7504,7 @@ def _deduplicate_and_rank_news(
     return final_list
 
 
-def _search_sportiq_deep_internal(q_meta: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
+def _search_sportiq_deep_internal(q_meta: Dict[str, Any], fast_cache_only: bool = False) -> Dict[str, List[Dict[str, Any]]]:
     matched_games: List[Dict[str, Any]] = []
     matched_insights: List[Dict[str, Any]] = []
     matched_posts: List[Dict[str, Any]] = []
@@ -7523,19 +7523,21 @@ def _search_sportiq_deep_internal(q_meta: Dict[str, Any]) -> Dict[str, List[Dict
 
         for off in (0, 1, -1, 2):
             try:
+                if callable(cget_fn):
+                    c_hit = cget_fn(f"live_scores_{off}", 600.0)
+                    if isinstance(c_hit, dict) and isinstance(c_hit.get("items"), list):
+                        raw_matches.extend(c_hit["items"])
+                        continue
+                if fast_cache_only:
+                    continue
                 if off == 0 and callable(collect_all):
                     res = collect_all(0)
                     if isinstance(res, list):
                         raw_matches.extend(res)
-                elif callable(cget_fn):
-                    # Check fast cache first for non-zero offsets so search never blocks!
-                    c_hit = cget_fn(f"live_scores_{off}", 600.0)
-                    if isinstance(c_hit, dict) and isinstance(c_hit.get("items"), list):
-                        raw_matches.extend(c_hit["items"])
-                    elif off in (0, 1) and callable(collect_dict):
-                        d_res = collect_dict(off)
-                        if isinstance(d_res, dict) and isinstance(d_res.get("items"), list):
-                            raw_matches.extend(d_res["items"])
+                elif off in (0, 1) and callable(collect_dict):
+                    d_res = collect_dict(off)
+                    if isinstance(d_res, dict) and isinstance(d_res.get("items"), list):
+                        raw_matches.extend(d_res["items"])
                 elif off == 0 and callable(collect_dict):
                     d_res = collect_dict(0)
                     if isinstance(d_res, dict) and isinstance(d_res.get("items"), list):
@@ -8307,7 +8309,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3730_{int(time.time())}"
+_BOOT_VER_V30 = f"3740_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -10873,6 +10875,55 @@ def _localize_team_ko_v37(raw_name: str, sport: str = "") -> str:
     return nm
 
 
+def _fetch_single_espn_json_url_v374(url: str, timeout: float = 3.4) -> Optional[Dict[str, Any]]:
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 SportIQ-DC/2.0",
+                "Accept": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if 200 <= resp.status < 300:
+                data = json.loads(resp.read().decode("utf-8", errors="replace"))
+                if isinstance(data, dict) and isinstance(data.get("events"), list):
+                    return data
+    except Exception:
+        return None
+    return None
+
+
+def _fetch_espn_json_fast_v374(path: str, ymd: str) -> Optional[Dict[str, Any]]:
+    u_web = f"https://site.web.api.espn.com/apis/site/v2/sports/{path}/scoreboard?dates={ymd}&limit=16"
+    u_api = f"https://site.api.espn.com/apis/site/v2/sports/{path}/scoreboard?dates={ymd}&limit=16"
+    from concurrent.futures import FIRST_COMPLETED, wait as _fut_wait
+    pool = ThreadPoolExecutor(max_workers=2)
+    f_web = pool.submit(_fetch_single_espn_json_url_v374, u_web, 3.4)
+    f_api = pool.submit(_fetch_single_espn_json_url_v374, u_api, 3.4)
+    try:
+        done, pending = _fut_wait([f_web, f_api], timeout=3.6, return_when=FIRST_COMPLETED)
+        for df in done:
+            try:
+                res = df.result(timeout=0.1)
+                if isinstance(res, dict) and isinstance(res.get("events"), list):
+                    return res
+            except Exception:
+                pass
+        if pending:
+            done2, _ = _fut_wait(pending, timeout=2.5)
+            for df2 in done2:
+                try:
+                    res2 = df2.result(timeout=0.1)
+                    if isinstance(res2, dict) and isinstance(res2.get("events"), list):
+                        return res2
+                except Exception:
+                    pass
+    finally:
+        pool.shutdown(wait=False)
+    return None
+
+
 def _fetch_espn_league_date_v37(lg_code: str, ymd: str) -> List[Dict[str, Any]]:
     meta = _ESPN_LEAGUE_ENDPOINTS_V37.get(lg_code)
     if not meta:
@@ -10883,16 +10934,11 @@ def _fetch_espn_league_date_v37(lg_code: str, ymd: str) -> List[Dict[str, Any]]:
     if hit and (now_t - hit[0]) < 300.0 and len(hit[1]) > 0:
         return list(hit[1])
     sport_key, lg_disp, path = meta
-    url = f"https://site.api.espn.com/apis/site/v2/sports/{path}/scoreboard?dates={ymd}"
-    raw = _http_fetch_bytes(url, timeout=6.5)
-    if not raw:
-        time.sleep(0.15)
-        raw = _http_fetch_bytes(url, timeout=5.5)
-    if not raw:
+    jd = _fetch_espn_json_fast_v374(path, ymd)
+    if not isinstance(jd, dict):
         return []
     out: List[Dict[str, Any]] = []
     try:
-        jd = json.loads(raw.decode("utf-8"))
         for ev in jd.get("events") or []:
             ev_id = str(ev.get("id") or "")
             iso_dt = str(ev.get("date") or "")
@@ -11294,7 +11340,7 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
             futs = [pool.submit(_fetch_espn_league_date_v37, lgc, dp) for lgc, dp in tasks]
             for fut in futs:
                 try:
-                    for ev_item in fut.result(timeout=8.5):
+                    for ev_item in fut.result(timeout=4.6):
                         if ev_item.get("ymd_kst") == target_ymd:
                             _add_item(ev_item)
                 except Exception:
@@ -11392,17 +11438,27 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
         ext_know_lists: List[List[Dict[str, Any]]] = []
         schedule_matches: List[Dict[str, Any]] = []
 
-        with ThreadPoolExecutor(max_workers=16) as pool:
-            futs_sched = []
-            if mode == "all":
-                for d_off in sched_intent["date_offsets"]:
-                    futs_sched.append((d_off, pool.submit(
+        # Priority Step 1: Collect exact KST schedule matches FIRST before starting RSS/Wiki burst!
+        if mode == "all":
+            with ThreadPoolExecutor(max_workers=max(1, len(sched_intent["date_offsets"]))) as sched_pool:
+                futs_sched = [
+                    (d_off, sched_pool.submit(
                         _collect_matches_for_offset_v37,
                         d_off,
                         sched_intent["league_codes"],
                         sched_intent["sport_filter"],
-                    )))
+                    ))
+                    for d_off in sched_intent["date_offsets"]
+                ]
+                for _doff, fs in futs_sched:
+                    try:
+                        res_s = fs.result(timeout=10.5)
+                        if isinstance(res_s, list):
+                            schedule_matches.extend(res_s)
+                    except Exception:
+                        continue
 
+        with ThreadPoolExecutor(max_workers=10) as pool:
             futs_news = []
             futs_know = []
             if mode in ("all", "news"):
@@ -11422,15 +11478,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
                 if w_en and w_en.lower() != w_ko.lower():
                     futs_know.append(pool.submit(_fetch_wikipedia_smart, w_en, "en"))
 
-            internal_ctx = _search_sportiq_deep_internal(q_meta)
-
-            for _doff, fs in futs_sched:
-                try:
-                    res_s = fs.result(timeout=9.5)
-                    if isinstance(res_s, list):
-                        schedule_matches.extend(res_s)
-                except Exception:
-                    continue
+            internal_ctx = _search_sportiq_deep_internal(q_meta, fast_cache_only=bool(sched_intent["is_schedule_qa"]))
 
             for fn in futs_news:
                 try:
@@ -11637,7 +11685,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "3.7.3-coldboot-guard",
+        "engine_version": "3.7.4-dualhost-priority",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
@@ -11654,18 +11702,17 @@ def _start_coldboot_schedule_prewarmer_v373() -> None:
     _ESPN_PREWARM_STARTED_V373 = True
 
     def _warm_worker() -> None:
-        time.sleep(0.8)
+        time.sleep(2.2)
         try:
             base_k = datetime.now(KST)
-            ymds = [(base_k + timedelta(days=d)).strftime("%Y%m%d") for d in (-1, 0, 1, 2)]
-            warm_tasks = [(lg, yd) for lg in ("NBA", "EPL", "UCL", "MLB", "NHL") for yd in ymds]
-            with ThreadPoolExecutor(max_workers=6) as wp:
-                wfuts = [wp.submit(_fetch_espn_league_date_v37, lg, yd) for lg, yd in warm_tasks]
-                for wf in wfuts:
+            ymds = [(base_k + timedelta(days=d)).strftime("%Y%m%d") for d in (-1, 0, 1)]
+            for lg in ("NBA", "EPL"):
+                for yd in ymds:
                     try:
-                        wf.result(timeout=8.0)
+                        _fetch_espn_league_date_v37(lg, yd)
                     except Exception:
                         pass
+                    time.sleep(0.25)
         except Exception:
             pass
 
