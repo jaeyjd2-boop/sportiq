@@ -2595,7 +2595,7 @@ _FRONTEND_V22_JS = r'''
     if (!bar || bar.__sqApplying7TabLock) return;
     bar.__sqApplying7TabLock = true;
     try {
-      if (isPrimaryStrip || !document.getElementById("sqDesktopMainTabStrip")) {
+      if (!bar.id && (isPrimaryStrip || !document.getElementById("sqDesktopMainTabStrip"))) {
         bar.id = "sqDesktopMainTabStrip";
       }
       bar.setAttribute("data-sq-7tab-strip", "1");
@@ -2798,7 +2798,7 @@ _FRONTEND_V22_JS = r'''
       });
     }
 
-    ensureDcHubExpandedForStandingsV344();
+    try { ensureDcHubExpandedForStandingsV344(); } catch (eEx1) {}
     if (dcHub) {
       dcHub.setAttribute("data-sq-dc-open", "1");
       if (!dcHub.hasAttribute("data-sq-dc-was-hidden")) {
@@ -2814,7 +2814,7 @@ _FRONTEND_V22_JS = r'''
         }
       });
     }
-    ensureDcHubExpandedForStandingsV344();
+    try { ensureDcHubExpandedForStandingsV344(); } catch (eEx2) {}
     var dcBody = document.getElementById("dcHubBody");
     if (dcBody) {
       dcBody.setAttribute("data-sq-dc-user-open", "1");
@@ -2828,7 +2828,7 @@ _FRONTEND_V22_JS = r'''
     }
     if (typeof window.__switchDcTab === "function") {
       try { window.__switchDcTab("standings"); } catch (eSw) {}
-    } else if (dcBody && (!dcBody.children.length || /로딩\s*중/.test(dcBody.textContent || "")) && dcHub) {
+    } else if (dcHub) {
       var lCards = dcHub.querySelectorAll("div, button, article");
       for (var lcI = 0; lcI < lCards.length; lcI++) {
         var lTxt = String(lCards[lcI].textContent || "");
@@ -2845,12 +2845,15 @@ _FRONTEND_V22_JS = r'''
         if (!b || !b.style) return;
         var targets = [b];
         if (b.querySelectorAll) {
-          Array.prototype.forEach.call(b.querySelectorAll("button, a"), function (ib) { targets.push(ib); });
+          Array.prototype.forEach.call(b.querySelectorAll("button, a, span"), function (ib) {
+            if (ib.tagName !== "SPAN") targets.push(ib);
+          });
         }
-        if (b === dcBtn || b.contains(dcBtn)) {
+        if (b === dcBtn || (b.contains && b.contains(dcBtn))) {
           b.setAttribute("data-sq-dc-active", "1");
           targets.forEach(function (tEl) {
-            tEl.style.setProperty("background", "linear-gradient(135deg, #10b981, #06b6d4)", "important");
+            tEl.style.setProperty("background-color", "#10b981", "important");
+            tEl.style.setProperty("background-image", "linear-gradient(135deg, #10b981, #06b6d4)", "important");
             tEl.style.setProperty("color", "#020617", "important");
             tEl.style.setProperty("font-weight", "900", "important");
             tEl.style.setProperty("border-color", "#34d399", "important");
@@ -2859,18 +2862,21 @@ _FRONTEND_V22_JS = r'''
         } else {
           b.removeAttribute("data-sq-dc-active");
           targets.forEach(function (tEl) {
-            if (!tEl.hasAttribute("data-sq-prev-bg")) {
-              tEl.setAttribute("data-sq-prev-bg", tEl.style.getPropertyValue("background") || "");
+            if (!tEl.hasAttribute("data-sq-prev-bgc")) {
+              tEl.setAttribute("data-sq-prev-bgc", tEl.style.getPropertyValue("background-color") || "");
+              tEl.setAttribute("data-sq-prev-bgi", tEl.style.getPropertyValue("background-image") || "");
               tEl.setAttribute("data-sq-prev-col", tEl.style.getPropertyValue("color") || "");
             }
-            tEl.style.setProperty("background", "rgba(15, 23, 42, 0.86)", "important");
+            tEl.style.setProperty("background-color", "rgba(15, 23, 42, 0.9)", "important");
+            tEl.style.setProperty("background-image", "none", "important");
             tEl.style.setProperty("color", "#cbd5e1", "important");
           });
         }
       });
     } else if (dcBtn && dcBtn.style) {
       dcBtn.setAttribute("data-sq-dc-active", "1");
-      dcBtn.style.setProperty("background", "linear-gradient(135deg, #10b981, #06b6d4)", "important");
+      dcBtn.style.setProperty("background-color", "#10b981", "important");
+      dcBtn.style.setProperty("background-image", "linear-gradient(135deg, #10b981, #06b6d4)", "important");
       dcBtn.style.setProperty("color", "#020617", "important");
       dcBtn.style.setProperty("font-weight", "900", "important");
     }
@@ -2899,19 +2905,25 @@ _FRONTEND_V22_JS = r'''
       }
       targets.forEach(function (tEl) {
         if (wasDc) {
+          tEl.style.removeProperty("background-color");
+          tEl.style.removeProperty("background-image");
           tEl.style.removeProperty("background");
           tEl.style.removeProperty("color");
           tEl.style.removeProperty("font-weight");
           tEl.style.removeProperty("border-color");
           tEl.style.removeProperty("outline");
         } else {
-          var pb = tEl.getAttribute("data-sq-prev-bg") || "";
-          var pc = tEl.getAttribute("data-sq-prev-col") || "";
-          if (pb) tEl.style.setProperty("background", pb);
-          else tEl.style.removeProperty("background");
-          if (pc) tEl.style.setProperty("color", pc);
+          var pbgc = tEl.getAttribute("data-sq-prev-bgc") || "";
+          var pbgi = tEl.getAttribute("data-sq-prev-bgi") || "";
+          var pcol = tEl.getAttribute("data-sq-prev-col") || "";
+          if (pbgc) tEl.style.setProperty("background-color", pbgc);
+          else tEl.style.removeProperty("background-color");
+          if (pbgi) tEl.style.setProperty("background-image", pbgi);
+          else tEl.style.removeProperty("background-image");
+          if (pcol) tEl.style.setProperty("color", pcol);
           else tEl.style.removeProperty("color");
-          tEl.removeAttribute("data-sq-prev-bg");
+          tEl.removeAttribute("data-sq-prev-bgc");
+          tEl.removeAttribute("data-sq-prev-bgi");
           tEl.removeAttribute("data-sq-prev-col");
         }
       });
@@ -2930,19 +2942,36 @@ _FRONTEND_V22_JS = r'''
     if (window.__sqGlobalDcTabDelegateV469) return;
     window.__sqGlobalDcTabDelegateV469 = true;
     window.addEventListener("click", function (ev) {
-      var t = ev.target;
+      var rawT = ev.target;
+      var t = (rawT && rawT.nodeType === 3) ? rawT.parentElement : rawT;
       if (!t || !t.closest || isExcludedFromMain7TabScanV469(t)) return;
+      if (t.closest("article, #feedList, #globalTop10Grid")) return;
+
+      // Walk up up to 4 levels to match ANY clickable tab element (<button>, <a>, <div>, <span>, <li>)
+      var cand = null;
+      var cur = t;
+      var depth = 0;
+      while (cur && cur !== document.body && depth < 4) {
+        if (cur.tagName === "NAV" || cur.tagName === "HEADER" || cur.tagName === "SECTION" || cur.tagName === "MAIN") break;
+        var tx = normTabTxV469(cur);
+        if (tx && tx.length <= 24 && /데이터\s*센터/.test(tx) && !/펼치기|접기|동기화|연동|자동업로드|SportIQ|탭\s*카드/i.test(tx)) {
+          cand = cur;
+          if (cur.tagName === "BUTTON" || cur.tagName === "A" || (cur.getAttribute && cur.getAttribute("role") === "tab")) break;
+        }
+        cur = cur.parentElement;
+        depth++;
+      }
+
       var strip = t.closest("[data-sq-7tab-strip='1'], #sqDesktopMainTabStrip");
-      var btn = t.closest("button, a, [role='tab'], .tab-btn, .nav-tab");
-      if (!btn) return;
-      var tx = normTabTxV469(btn);
-      if (tx.length <= 24 && /데이터\s*센터/.test(tx) && !/펼치기|접기|동기화|연동|자동업로드|SportIQ/i.test(tx)) {
+      if (cand) {
         ev.preventDefault();
         ev.stopPropagation();
         if (typeof ev.stopImmediatePropagation === "function") ev.stopImmediatePropagation();
-        if (!strip) enforceSingleLineMainTabBar();
-        strip = btn.closest("[data-sq-7tab-strip='1'], #sqDesktopMainTabStrip") || document.getElementById("sqDesktopMainTabStrip");
-        activateDataCenterFromMainTabV469(btn, strip);
+        if (!strip) {
+          try { enforceSingleLineMainTabBar(); } catch (eEnf) {}
+          strip = cand.closest("[data-sq-7tab-strip='1'], #sqDesktopMainTabStrip") || document.getElementById("sqDesktopMainTabStrip");
+        }
+        activateDataCenterFromMainTabV469(cand, strip);
       } else if (strip && strip.getAttribute("data-sq-dc-mode") === "1") {
         restoreSiblingMainTabFromDcModeV469(strip);
       }
@@ -9380,6 +9409,7 @@ _FRONTEND_V22_JS = r'''
     try { organizeBelowScoreboardSectionsV40(); } catch (eV40) {}
     try { organizeSidebarAndIssuesTabV41(); } catch (eV41) {}
     try { organizeRankingAndLabTabsV42(); } catch (eV42) {}
+    try { enforceSingleLineMainTabBar(); } catch (eV4610) {}
     try { organizeScheduleAndShortsTabsV43(); } catch (eV43) {}
     try { if (window.__organizeModalsAndMemberHubV44) window.__organizeModalsAndMemberHubV44(); } catch (eV44) {}
   }
@@ -10458,86 +10488,93 @@ _FRONTEND_V22_JS = r'''
     });
   }
 
+  function safeRunStepV4610(fn) {
+    try { fn(); } catch (_eStep) {}
+  }
+
   function bootMemberUxV22() {
-    injectUxV22Styles();
-    enforceSingleLineMainTabBar();
-    syncTop20MatchCountBadge();
-    installUnifiedAttendanceV22();
-    renderTierUpgradeSidebarCard();
-    if (typeof window.mergeAutoAnalystPosts === "function" && !window.__sqMergeAutoWrappedV24) {
-      window.__sqMergeAutoWrappedV24 = true;
-      var origMergeAuto = window.mergeAutoAnalystPosts;
-      window.mergeAutoAnalystPosts = function (data) {
-        var r = origMergeAuto(data);
-        applyReactionStateToPosts();
-        if (typeof window.renderFeed === "function") window.renderFeed();
-        syncRenderedFeedReactionButtonsDom();
-        return r;
-      };
-    }
-    installPersistentLikesAndBookmarks();
-    hydratePostsAndReactionsFromServer();
-    mountLivePinMembersBannerInRanking();
-    installOverseasNewsUpgradeV22();
-    installLiveHashtagSyncV25();
-    mountOfficialLegalFooterV22();
-    harmonizeMobileFloatingOverlaysV26();
-    installDataCenterPersistenceGuardV28();
-    window.addEventListener("resize", harmonizeMobileFloatingOverlaysV26);
-    polishModalsAndCloseIconsV29();
-    stabilizeHofLaunchCardV29();
-    dedupLabKellyMonitorV36();
-    installMatchInsightModalV30();
-    refreshScoreboardSuiteV30();
-    handleDeepLinkPostOnBootV29();
-    if (typeof window.submitComment === "function" && !window.__sqSubmitCommentWrappedV29) {
-      window.__sqSubmitCommentWrappedV29 = true;
-      var origSubCmt = window.submitComment;
-      window.submitComment = function () {
-        var inp = document.getElementById("commentModalInput");
-        var typed = inp ? inp.value.trim() : "";
-        var activeId = (typeof state === "object" && state && state.activePostId) ? String(state.activePostId) : "";
-        var r = origSubCmt.apply(this, arguments);
-        if (typed && activeId) {
-          var nk = getSavedNickV22() || ((typeof state === "object" && state && state.role === "PRO") ? "PRO분석가" : "오픈게스트");
-          reactionCache.extra_comments[activeId] = reactionCache.extra_comments[activeId] || [];
-          reactionCache.extra_comments[activeId].push({ user: nk, text: typed });
-          setTimeout(function () {
-            applyReactionStateToPosts();
-            syncRenderedFeedReactionButtonsDom();
-          }, 180);
-        }
-        return r;
-      };
-    }
+    safeRunStepV4610(injectUxV22Styles);
+    safeRunStepV4610(enforceSingleLineMainTabBar);
+    safeRunStepV4610(syncTop20MatchCountBadge);
+    safeRunStepV4610(installUnifiedAttendanceV22);
+    safeRunStepV4610(renderTierUpgradeSidebarCard);
+    safeRunStepV4610(function () {
+      if (typeof window.mergeAutoAnalystPosts === "function" && !window.__sqMergeAutoWrappedV24) {
+        window.__sqMergeAutoWrappedV24 = true;
+        var origMergeAuto = window.mergeAutoAnalystPosts;
+        window.mergeAutoAnalystPosts = function (data) {
+          var r = origMergeAuto(data);
+          safeRunStepV4610(applyReactionStateToPosts);
+          if (typeof window.renderFeed === "function") safeRunStepV4610(window.renderFeed);
+          safeRunStepV4610(syncRenderedFeedReactionButtonsDom);
+          return r;
+        };
+      }
+    });
+    safeRunStepV4610(installPersistentLikesAndBookmarks);
+    safeRunStepV4610(hydratePostsAndReactionsFromServer);
+    safeRunStepV4610(mountLivePinMembersBannerInRanking);
+    safeRunStepV4610(installOverseasNewsUpgradeV22);
+    safeRunStepV4610(installLiveHashtagSyncV25);
+    safeRunStepV4610(mountOfficialLegalFooterV22);
+    safeRunStepV4610(harmonizeMobileFloatingOverlaysV26);
+    safeRunStepV4610(installDataCenterPersistenceGuardV28);
+    window.addEventListener("resize", function () { safeRunStepV4610(harmonizeMobileFloatingOverlaysV26); });
+    safeRunStepV4610(polishModalsAndCloseIconsV29);
+    safeRunStepV4610(stabilizeHofLaunchCardV29);
+    safeRunStepV4610(dedupLabKellyMonitorV36);
+    safeRunStepV4610(installMatchInsightModalV30);
+    safeRunStepV4610(refreshScoreboardSuiteV30);
+    safeRunStepV4610(handleDeepLinkPostOnBootV29);
+    safeRunStepV4610(function () {
+      if (typeof window.submitComment === "function" && !window.__sqSubmitCommentWrappedV29) {
+        window.__sqSubmitCommentWrappedV29 = true;
+        var origSubCmt = window.submitComment;
+        window.submitComment = function () {
+          var inp = document.getElementById("commentModalInput");
+          var typed = inp ? inp.value.trim() : "";
+          var activeId = (typeof state === "object" && state && state.activePostId) ? String(state.activePostId) : "";
+          var r = origSubCmt.apply(this, arguments);
+          if (typed && activeId) {
+            var nk = getSavedNickV22() || ((typeof state === "object" && state && state.role === "PRO") ? "PRO분석가" : "오픈게스트");
+            reactionCache.extra_comments[activeId] = reactionCache.extra_comments[activeId] || [];
+            reactionCache.extra_comments[activeId].push({ user: nk, text: typed });
+            setTimeout(function () {
+              safeRunStepV4610(applyReactionStateToPosts);
+              safeRunStepV4610(syncRenderedFeedReactionButtonsDom);
+            }, 180);
+          }
+          return r;
+        };
+      }
+    });
     document.addEventListener("visibilitychange", function () {
       if (!document.hidden) {
-        enforceSingleLineMainTabBar();
-        harmonizeMobileFloatingOverlaysV26();
-        stabilizeHofLaunchCardV29();
-    dedupLabKellyMonitorV36();
-        polishModalsAndCloseIconsV29();
-        installMatchInsightModalV30();
-        refreshScoreboardSuiteV30();
-        applyReactionStateToPosts();
-        syncRenderedFeedReactionButtonsDom();
+        safeRunStepV4610(enforceSingleLineMainTabBar);
+        safeRunStepV4610(harmonizeMobileFloatingOverlaysV26);
+        safeRunStepV4610(stabilizeHofLaunchCardV29);
+        safeRunStepV4610(dedupLabKellyMonitorV36);
+        safeRunStepV4610(polishModalsAndCloseIconsV29);
+        safeRunStepV4610(installMatchInsightModalV30);
+        safeRunStepV4610(refreshScoreboardSuiteV30);
+        safeRunStepV4610(applyReactionStateToPosts);
+        safeRunStepV4610(syncRenderedFeedReactionButtonsDom);
       }
     });
 
-    // Keep dynamic UI states synchronized when tabs switch or async data arrives
-    [80, 220, 500, 1000, 1800].forEach(function (ms) {
+    [80, 220, 420, 750, 1150, 1850, 2800].forEach(function (ms) {
       setTimeout(function () {
-        refreshScoreboardSuiteV30();
-        syncSportPillLiveDotsV30();
-        enforceSingleLineMainTabBar();
-        harmonizeMobileFloatingOverlaysV26();
-        installDataCenterPersistenceGuardV28();
-        stabilizeHofLaunchCardV29();
-    dedupLabKellyMonitorV36();
-        polishModalsAndCloseIconsV29();
-        applyReactionStateToPosts();
-        syncRenderedFeedReactionButtonsDom();
-        handleDeepLinkPostOnBootV29();
+        safeRunStepV4610(enforceSingleLineMainTabBar);
+        safeRunStepV4610(refreshScoreboardSuiteV30);
+        safeRunStepV4610(syncSportPillLiveDotsV30);
+        safeRunStepV4610(harmonizeMobileFloatingOverlaysV26);
+        safeRunStepV4610(installDataCenterPersistenceGuardV28);
+        safeRunStepV4610(stabilizeHofLaunchCardV29);
+        safeRunStepV4610(dedupLabKellyMonitorV36);
+        safeRunStepV4610(polishModalsAndCloseIconsV29);
+        safeRunStepV4610(applyReactionStateToPosts);
+        safeRunStepV4610(syncRenderedFeedReactionButtonsDom);
+        safeRunStepV4610(handleDeepLinkPostOnBootV29);
         var fb = document.getElementById("feedList");
         if (fb) {
           fb.style.setProperty("display", "block", "important");
@@ -10548,18 +10585,18 @@ _FRONTEND_V22_JS = r'''
     });
     setInterval(function () {
       if (typeof document !== "undefined" && document.hidden) return;
-      enforceSingleLineMainTabBar();
-      stabilizeHofLaunchCardV29();
-    dedupLabKellyMonitorV36();
-      polishModalsAndCloseIconsV29();
-      installMatchInsightModalV30();
-      refreshScoreboardSuiteV30();
-      harmonizeMobileFloatingOverlaysV26();
-      installDataCenterPersistenceGuardV28();
-      syncTop20MatchCountBadge();
-      renderTierUpgradeSidebarCard();
-      applyReactionStateToPosts();
-      syncRenderedFeedReactionButtonsDom();
+      safeRunStepV4610(enforceSingleLineMainTabBar);
+      safeRunStepV4610(stabilizeHofLaunchCardV29);
+      safeRunStepV4610(dedupLabKellyMonitorV36);
+      safeRunStepV4610(polishModalsAndCloseIconsV29);
+      safeRunStepV4610(installMatchInsightModalV30);
+      safeRunStepV4610(refreshScoreboardSuiteV30);
+      safeRunStepV4610(harmonizeMobileFloatingOverlaysV26);
+      safeRunStepV4610(installDataCenterPersistenceGuardV28);
+      safeRunStepV4610(syncTop20MatchCountBadge);
+      safeRunStepV4610(renderTierUpgradeSidebarCard);
+      safeRunStepV4610(applyReactionStateToPosts);
+      safeRunStepV4610(syncRenderedFeedReactionButtonsDom);
       var fb = document.getElementById("feedList");
       if (fb) {
         if (fb.style.getPropertyValue("display") !== "block") fb.style.setProperty("display", "block", "important");
@@ -10571,9 +10608,17 @@ _FRONTEND_V22_JS = r'''
     }, 1000);
   }
 
-  installLiveScoresFetchTapV30();
-  installTopControlCaptureSyncV304();
-  installGlobalCardClickCaptureV30();
+  // Unconditional pre-boot registration: runs even before DOMContentLoaded and completely immune to any error elsewhere!
+  safeRunStepV4610(installGlobalDataCenterTabDelegateV469);
+  safeRunStepV4610(installLiveScoresFetchTapV30);
+  safeRunStepV4610(installTopControlCaptureSyncV304);
+  safeRunStepV4610(installGlobalCardClickCaptureV30);
+  [60, 200, 380, 700, 1300, 2400].forEach(function (ms) {
+    setTimeout(function () {
+      safeRunStepV4610(injectUxV22Styles);
+      safeRunStepV4610(enforceSingleLineMainTabBar);
+    }, ms);
+  });
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootMemberUxV22);
   } else {
@@ -12120,7 +12165,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.6.9-multistrip-verified",
+        "engine_version": "4.6.10-fault-isolated-verified",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
@@ -12399,7 +12444,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"4690_{int(time.time())}"
+_BOOT_VER_V30 = f"46100_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -16193,7 +16238,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.6.9-multistrip-verified",
+        "engine_version": "4.6.10-fault-isolated-verified",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
@@ -16389,6 +16434,22 @@ def serve_lounge_home(request: Request):
                 rendered,
             )
             rendered = inject_seo_and_og_head_v27(rendered)
+            if "sqInline7TabBootV4610" not in rendered and "</body>" in rendered:
+                _inline_7tab = (
+                    '<script id="sqInline7TabBootV4610">'
+                    '(function(){function f(){try{if(window.__SPORTIQ_MEMBER_UX_V22__)return;'
+                    'var bs=document.querySelectorAll("button,a");var t1=null;'
+                    'for(var i=0;i<bs.length;i++){var x=(bs[i].textContent||"").replace(/\\s+/g," ").trim();'
+                    'if(x.length<=28&&x.indexOf("실시간 분석 피드")!==-1){t1=bs[i];break;}}'
+                    'if(!t1||!t1.parentElement)return;var bar=t1.parentElement;'
+                    'for(var j=0;j<bs.length;j++){var b=bs[j];if(b.parentElement===bar||b.closest("#dcMainHubSection,#proLiveTickerBar,#mobile-nav"))continue;'
+                    'var bx=(b.textContent||"").replace(/\\s+/g," ").trim();'
+                    'if(bx.length<=22&&/데이터\\s*센터/.test(bx)&&!/펼치기|접기|동기화|SportIQ/.test(bx)){bar.appendChild(b);break;}}'
+                    'bar.style.setProperty("display","flex","important");bar.style.setProperty("flex-wrap","nowrap","important");bar.style.setProperty("overflow-x","auto","important");'
+                    '}catch(e){}}[120,450,1100].forEach(function(m){setTimeout(f,m);});})();'
+                    '</script>'
+                )
+                rendered = rendered.replace("</body>", _inline_7tab + "\n</body>", 1)
             _pq = (request.query_params.get("post") if request and hasattr(request, "query_params") else "") or ""
             if _pq:
                 rendered = apply_dynamic_post_og_v29(rendered, resolve_post_og_meta_v29(_pq))
