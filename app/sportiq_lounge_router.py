@@ -875,16 +875,68 @@ _FRONTEND_V22_JS = r'''
       "  #sqDesktopMainTabStrip > button { padding: 7px 12px !important; font-size: 13px !important; }",
       "}",
       "/* v3.0 Scorebase-Inspired Dual Scoreboard Table, Status/Star Filters & 5-Tab Match Insight Modal */",
+      "/* v3.9 Unified Clean Scoreboard Hub — Zero Full-Bleed Overflow & Zero Duplicate Rows */",
+      ".sq-match-sort-bar { display: none !important; }",
+      "#sqV31DateCalendarBar, #sqV30ScoreToolbar, #sqV30ScoreboardTableWrap {",
+      "  max-width: 1248px;",
+      "  width: 100%;",
+      "  margin-left: auto;",
+      "  margin-right: auto;",
+      "  box-sizing: border-box;",
+      "}",
       "#sqV30ScoreToolbar {",
       "  display: flex;",
       "  flex-wrap: wrap;",
       "  align-items: center;",
       "  justify-content: space-between;",
-      "  gap: 8px;",
-      "  padding: 7px 4px 9px;",
-      "  margin-bottom: 6px;",
-      "  border-bottom: 1px solid rgba(51, 65, 85, 0.55);",
+      "  gap: 6px 8px;",
+      "  padding: 6px 2px 8px;",
+      "  margin-bottom: 8px;",
+      "  border-bottom: 1px solid rgba(51, 65, 85, 0.5);",
       "}",
+      "#sqV39LeagueSlot select {",
+      "  height: 28px;",
+      "  padding: 2px 8px !important;",
+      "  font-size: 11.5px !important;",
+      "  border-radius: 8px !important;",
+      "  background: #0f172a !important;",
+      "  color: #e2e8f0 !important;",
+      "  border: 1px solid #334155 !important;",
+      "}",
+      ".sq-v39-card {",
+      "  min-width: 246px;",
+      "  max-width: 268px;",
+      "  flex: 0 0 auto;",
+      "  background: linear-gradient(165deg, rgba(15, 23, 42, 0.96), rgba(9, 14, 28, 0.98));",
+      "  border: 1px solid rgba(51, 65, 85, 0.85);",
+      "  border-radius: 13px;",
+      "  padding: 9px 12px;",
+      "  cursor: pointer;",
+      "  color: #f8fafc;",
+      "  display: flex;",
+      "  flex-direction: column;",
+      "  justify-content: space-between;",
+      "  gap: 5px;",
+      "  font-variant-numeric: tabular-nums;",
+      "  transition: border-color 0.15s ease, transform 0.15s ease;",
+      "}",
+      ".sq-v39-card:hover { border-color: #38bdf8; transform: translateY(-1px); }",
+      ".sq-v39-card.is-live {",
+      "  border-color: rgba(239, 68, 68, 0.85);",
+      "  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.16);",
+      "}",
+      "#sqV39AlertDrawer {",
+      "  display: none;",
+      "  flex-wrap: wrap;",
+      "  align-items: center;",
+      "  gap: 6px;",
+      "  padding: 7px 10px;",
+      "  margin-bottom: 8px;",
+      "  background: rgba(2, 6, 23, 0.62);",
+      "  border: 1px dashed rgba(71, 85, 105, 0.65);",
+      "  border-radius: 10px;",
+      "}",
+      "#sqV39AlertDrawer.is-open { display: flex !important; }",
       ".sq-v30-fbtn {",
       "  background: rgba(15, 23, 42, 0.9);",
       "  border: 1px solid #334155;",
@@ -1977,23 +2029,24 @@ _FRONTEND_V22_JS = r'''
     var role = pts >= 350 ? "PRO" : (pts >= 150 ? "MEMBER" : "GUEST");
     var nk = getSavedNickV22();
 
-    // Update top header role buttons clarity
+    // v3.9 Clean Top Header: display only the user's active tier badge (hiding the 2 inactive role pills to eliminate navbar clutter!)
     document.querySelectorAll("button[onclick*=\"setRole(\"]").forEach(function (btn) {
       var oc = btn.getAttribute("onclick") || "";
-      if (oc.indexOf("'MEMBER'") !== -1) {
-        btn.title = "150P 달성 시 정회원(MEMBER) 자동 승급";
-        if (pts < 150 && (btn.textContent || "").indexOf("150P") === -1) {
-          btn.textContent = "정회원 150P+";
-        } else if (pts >= 150) {
-          btn.textContent = "정회원 MEMBER";
+      var inTopHeader = Boolean(btn.closest("header, nav") || (btn.getBoundingClientRect && btn.getBoundingClientRect().top < 95));
+      if (oc.indexOf("'GUEST'") !== -1) {
+        btn.title = "현재 등급 · 출석(+20P)·분석글(+15P) 활동으로 150P 정회원 / 350P PRO 자동 승급";
+        if (inTopHeader) {
+          btn.style.display = (role === "GUEST") ? "" : "none";
+          if (role === "GUEST") btn.textContent = "🌱 오픈 게스트";
         }
+      } else if (oc.indexOf("'MEMBER'") !== -1) {
+        btn.title = "150P 달성 시 정회원(MEMBER) 자동 승급";
+        btn.textContent = pts >= 150 ? "⭐ 정회원 MEMBER" : "정회원 150P+";
+        if (inTopHeader) btn.style.display = (role === "MEMBER") ? "" : "none";
       } else if (oc.indexOf("'PRO'") !== -1) {
         btn.title = "350P 달성 시 PRO 분석가 자동 승급";
-        if (pts < 350 && (btn.textContent || "").indexOf("350P") === -1) {
-          btn.textContent = "PRO 350P+";
-        } else if (pts >= 350) {
-          btn.textContent = "PRO 분석가";
-        }
+        btn.textContent = pts >= 350 ? "👑 PRO 분석가" : "PRO 350P+";
+        if (inTopHeader) btn.style.display = (role === "PRO") ? "" : "none";
       }
     });
 
@@ -4039,45 +4092,95 @@ _FRONTEND_V22_JS = r'''
   }
 
   function renderCustomDateCardsIntoStripV31() {
-    if (!v30ScoreState.customDateRendered) return;
-    var mainStrip = document.getElementById("dcLiveTickerTrack") || findPrimaryMainCardStripV30();
+    var mainStrip = document.getElementById("dcLiveTickerTrack");
     if (!mainStrip) return;
+    var baseItems = v30ScoreState.items || [];
+    if (!baseItems.length && !v30ScoreState.customDateRendered) return;
+
     var resolved = resolveIndividualCardElementsV31(mainStrip);
-    var targetBox = (resolved.length && resolved[0].parentElement) ? resolved[0].parentElement : mainStrip;
-    if (!targetBox.hasAttribute("data-sq-orig-today-html")) {
-      targetBox.setAttribute("data-sq-orig-today-html", targetBox.innerHTML);
-    }
-    var items = filterScoreItemsV30(v30ScoreState.items || []);
-    if (!items.length) {
-      targetBox.innerHTML = "<div data-sq-v31-empty='1' style='padding:14px 18px;color:#94a3b8;font-size:12.5px;'>선택한 날짜·종목에 예정된 경기가 없습니다.</div>";
+    var targetBox = (resolved.length && resolved[0].parentElement && resolved[0].parentElement !== mainStrip.parentElement)
+      ? resolved[0].parentElement
+      : mainStrip;
+
+    var items = filterScoreItemsV30(baseItems).slice().sort(function (a, b) {
+      var rankSt = { "in": 0, "pre": 1, "post": 2 };
+      var ra = rankSt[a.state] != null ? rankSt[a.state] : 3;
+      var rb = rankSt[b.state] != null ? rankSt[b.state] : 3;
+      if (ra !== rb) return ra - rb;
+      var fa = v30ScoreState.favMap[matchFavKeyV30(a)] ? 0 : 1;
+      var fb = v30ScoreState.favMap[matchFavKeyV30(b)] ? 0 : 1;
+      if (fa !== fb) return fa - fb;
+      return String(a.match_dt_kst || "").localeCompare(String(b.match_dt_kst || ""));
+    });
+
+    var stripSig = [
+      v30ScoreState.selectedDateOffset,
+      v30ScoreState.selectedSport,
+      v30ScoreState.selectedLeague,
+      v30ScoreState.statusFilter,
+      items.length,
+      items.slice(0, 8).map(function (x) { return x.id + ":" + x.state + ":" + x.home_score + "-" + x.away_score + ":" + (v30ScoreState.favMap[matchFavKeyV30(x)] ? 1 : 0); }).join(",")
+    ].join("|");
+
+    if (v30ScoreState.lastCardStripSig === stripSig && (targetBox.querySelector(".sq-v39-card") || targetBox.querySelector("[data-sq-v31-empty='1']"))) {
       return;
     }
+    v30ScoreState.lastCardStripSig = stripSig;
+
+    if (!items.length) {
+      targetBox.innerHTML = "<div data-sq-v31-empty='1' style='padding:14px 18px;color:#94a3b8;font-size:12.5px;'>선택한 조건에 해당하는 경기가 없습니다.</div>";
+      return;
+    }
+
     var prevGuard = _inSportDotMutationV304;
     _inSportDotMutationV304 = true;
     try {
       targetBox.innerHTML = items.map(function (it) {
         var isLive = it.state === "in";
-        var stBg = isLive ? "#dc2626" : (it.state === "post" ? "#475569" : "#1d4ed8");
+        var isPre = it.state === "pre";
+        var stBg = isLive ? "#dc2626" : (isPre ? "#0369a1" : "#334155");
+        var stTxt = isLive ? ("🔴 " + (it.status_badge || "LIVE").replace(/^LIVE\s*/i, "")) : (isPre ? (it.status_badge || "예정") : "종료");
         var ai = it.ai || {};
         var odds = ai.odds || {};
-        var probTxt = ai.draw_pct ? ("AI " + ai.home_pct + "% / " + ai.draw_pct + "% / " + ai.away_pct + "%") : ("AI " + ai.home_pct + "% / " + ai.away_pct + "%");
+        var probTxt = ai.draw_pct ? ("AI " + ai.home_pct + ":" + ai.draw_pct + ":" + ai.away_pct + "%") : ("AI " + ai.home_pct + ":" + ai.away_pct + "%");
         var oddsTxt = odds.home ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
         var fk = matchFavKeyV30(it);
+        var isFav = Boolean(v30ScoreState.favMap[fk]);
+        var hsNum = Number(it.home_score);
+        var asNum = Number(it.away_score);
+        var hLead = !isPre && !isNaN(hsNum) && !isNaN(asNum) && hsNum > asNum;
+        var aLead = !isPre && !isNaN(hsNum) && !isNaN(asNum) && asNum > hsNum;
+        var hScoreCell = isPre
+          ? "<span style='color:#64748b;font-size:12px;font-weight:700;'>-</span>"
+          : "<span style='color:" + (isLive ? "#f87171" : (hLead ? "#38bdf8" : "#cbd5e1")) + ";font-size:14.5px;font-weight:900;min-width:22px;text-align:right;'>" + uxEsc(it.home_score) + "</span>";
+        var aScoreCell = isPre
+          ? "<span style='color:#64748b;font-size:12px;font-weight:700;'>-</span>"
+          : "<span style='color:" + (isLive ? "#f87171" : (aLead ? "#38bdf8" : "#cbd5e1")) + ";font-size:14.5px;font-weight:900;min-width:22px;text-align:right;'>" + uxEsc(it.away_score) + "</span>";
+        var cleanPeriod = String(it.period_scores || "").trim();
+        if (/세부\s*스코어\s*대기|최근\s*시즌\s*기록/.test(cleanPeriod)) cleanPeriod = "";
         return [
-          "<div data-sq-v30-fk='" + uxEsc(fk) + "' style='min-width:252px;max-width:292px;flex:0 0 auto;background:#0f172a;border:1px solid " + (isLive ? "#ef4444" : "#334155") + ";border-radius:12px;padding:9px 11px;cursor:pointer;color:#f8fafc;display:flex;flex-direction:column;'>",
-          "  <div style='display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:11px;margin-bottom:5px;'>",
-          "    <span style='background:#1e293b;color:#93c5fd;padding:2px 6px;border-radius:6px;font-weight:700;'>" + uxEsc(it.league) + "</span>",
-          "    <span style='color:#fde68a;font-weight:700;'>📅 " + uxEsc(it.match_dt_kst) + "</span>",
-          "    <span style='background:" + stBg + ";color:#fff;padding:2px 6px;border-radius:6px;font-weight:700;'>" + uxEsc(it.status_badge) + "</span>",
+          "<div class='sq-v39-card" + (isLive ? " is-live" : "") + "' data-sq-v30-fk='" + uxEsc(fk) + "'>",
+          "  <div style='display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:11px;'>",
+          "    <div style='display:flex;align-items:center;gap:5px;min-width:0;'>",
+          "      <button type='button' data-sq-card-star='1' style='background:transparent;border:0;padding:0 2px;cursor:pointer;font-size:13px;line-height:1;flex-shrink:0;color:" + (isFav ? "#fbbf24" : "#64748b") + ";'>" + (isFav ? "★" : "☆") + "</button>",
+          "      <span style='background:#1e293b;color:#7dd3fc;padding:2px 6px;border-radius:5px;font-weight:800;white-space:nowrap;'>" + uxEsc(it.league) + "</span>",
+          "      <span style='color:#94a3b8;font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" + uxEsc(it.match_dt_kst) + "</span>",
+          "    </div>",
+          "    <span style='background:" + stBg + ";color:#fff;padding:2px 7px;border-radius:999px;font-size:10.5px;font-weight:800;white-space:nowrap;'>" + uxEsc(stTxt) + "</span>",
           "  </div>",
-          "  <div style='display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:800;margin:4px 0;'>",
-          "    <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;'>" + uxEsc(it.home) + "</span>",
-          "    <span style='background:#1e293b;padding:2px 9px;border-radius:8px;color:#fff;font-size:14px;'>" + uxEsc(it.home_score) + " : " + uxEsc(it.away_score) + "</span>",
-          "    <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:98px;text-align:right;'>" + uxEsc(it.away) + "</span>",
+          "  <div style='display:flex;flex-direction:column;gap:3px;margin:2px 0;'>",
+          "    <div style='display:flex;align-items:center;justify-content:space-between;gap:8px;'>",
+          "      <span style='font-size:13px;font-weight:" + (hLead || isLive ? "800" : "700") + ";color:" + (hLead || isLive || isPre ? "#f8fafc" : "#cbd5e1") + ";overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" + uxEsc(it.home) + "</span>",
+          "      " + hScoreCell,
+          "    </div>",
+          "    <div style='display:flex;align-items:center;justify-content:space-between;gap:8px;'>",
+          "      <span style='font-size:13px;font-weight:" + (aLead || isLive ? "800" : "700") + ";color:" + (aLead || isLive || isPre ? "#f8fafc" : "#cbd5e1") + ";overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" + uxEsc(it.away) + "</span>",
+          "      " + aScoreCell,
+          "    </div>",
           "  </div>",
-          (it.period_scores ? "<div style='font-size:11px;color:#38bdf8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>📊 " + uxEsc(it.period_scores) + "</div>" : ""),
-          "  <div style='display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#94a3b8;margin-top:4px;'>",
-          "    <span>🎯 " + uxEsc(probTxt) + "</span>",
+          (cleanPeriod ? "<div style='font-size:10.3px;color:#38bdf8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" + uxEsc(cleanPeriod) + "</div>" : ""),
+          "  <div style='display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px;font-size:10.4px;color:#94a3b8;padding-top:4px;border-top:1px solid rgba(51,65,85,0.45);'>",
+          "    <span style='color:#6ee7b7;font-weight:700;'>" + uxEsc(probTxt) + "</span>",
           "    <span>" + uxEsc(oddsTxt) + "</span>",
           "  </div>",
           "</div>"
@@ -4203,7 +4306,7 @@ _FRONTEND_V22_JS = r'''
     var targetOff = (typeof forceOffset === "number" && !isNaN(forceOffset))
       ? forceOffset
       : (v30ScoreState.selectedDateOffset || 0);
-    if (v30ScoreState.loadedDateOffset === targetOff && v30ScoreState.rawAllItems.length > 5) {
+    if (v30ScoreState.loadedDateOffset === targetOff && v30ScoreState.rawAllItems.length > 0) {
       return;
     }
     if (v30ScoreState.fetchingOffset === targetOff) return;
@@ -5483,39 +5586,177 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
-  function mountOrUpdateV30ScoreToolbar() {
-    var track = findPrimaryMainCardStripV30();
-    if (!track || !track.parentElement) return;
-    var items = v30ScoreState.items || [];
+  function declutterScoreboardHubV39(leagueSlotEl) {
+    var rootBar = document.getElementById("proLiveTickerBar");
+    var dcTrack = document.getElementById("dcLiveTickerTrack");
+    var hubBox = (dcTrack && dcTrack.parentElement) || rootBar;
+    if (!hubBox) return;
 
-    var ctrl = document.getElementById("dcTickerControls");
-    if (!ctrl) {
-      var spBtns = discoverTopSportButtonsV304();
-      if (spBtns.length) {
-        var p = spBtns[0].parentElement;
-        while (p && p.parentElement && p.parentElement !== track.parentElement) p = p.parentElement;
-        if (p && p.parentElement === track.parentElement) ctrl = p;
+    var prevG = _inSportDotMutationV304;
+    _inSportDotMutationV304 = true;
+    try {
+      // 1) Locate top-right header area (next to `20초 자동갱신`) and hide duplicate `KST 2026... KST` badge
+      var kstSpans = [];
+      var autoRefreshHost = null;
+      Array.prototype.forEach.call(hubBox.querySelectorAll("span, div"), function (el) {
+        if (el.children && el.children.length > 0) return;
+        var tx = String(el.textContent || "").trim();
+        if (/자동갱신/.test(tx) && el.parentElement) {
+          autoRefreshHost = el.parentElement;
+        }
+        if (/KST/i.test(tx) && /202\d[\.\-\/]/.test(tx)) {
+          kstSpans.push(el);
+        }
+      });
+      if (kstSpans.length >= 2) {
+        for (var ki = 1; ki < kstSpans.length; ki++) {
+          if (/^KST\s+202\d/i.test(String(kstSpans[ki].textContent || "").trim())) {
+            kstSpans[ki].style.setProperty("display", "none", "important");
+          }
+        }
       }
+
+      // 2) Consolidate `#dcTickerControls`:
+      //    - Move `<select>` (`전체 리그`) into `#sqV39LeagueSlot` inside `#sqV30ScoreToolbar` so it shares the filter row!
+      //    - Hide legacy 4 date buttons (`어제`, `오늘·실시간`, `내일`, `+2일`)
+      //    - Move the 4 secondary alert/briefing buttons into `#sqV39AlertDrawer`, and place `🔔 알림 · 마이팀 설정 ▾` in the top-right header!
+      var ctrlRow = document.getElementById("dcTickerControls");
+      if (!ctrlRow) {
+        var cands = hubBox.querySelectorAll("div");
+        for (var ci = 0; ci < cands.length; ci++) {
+          var cd = cands[ci];
+          if (cd.id === "sqV31DateCalendarBar" || cd.id === "sqV30ScoreToolbar" || cd.id === "dcSportPills" || cd.id === "dcLiveTickerTrack") continue;
+          var ctx = cd.textContent || "";
+          if (ctx.indexOf("득점알림") !== -1 && (ctx.indexOf("배당급변") !== -1 || ctx.indexOf("마이팀") !== -1) && cd.children.length <= 14) {
+            ctrlRow = cd;
+            break;
+          }
+        }
+      }
+
+      if (leagueSlotEl) {
+        var lgSel = (ctrlRow && ctrlRow.querySelector("select")) || discoverTopLeagueSelectV304();
+        if (lgSel && lgSel.parentElement !== leagueSlotEl) {
+          leagueSlotEl.appendChild(lgSel);
+        }
+      }
+
+      if (ctrlRow) {
+        var secondaryBtns = [];
+        Array.prototype.forEach.call(ctrlRow.querySelectorAll("button"), function (b) {
+          if (b.id === "sqV39AlertToggleBtn" || b.closest("#sqV39AlertDrawer")) return;
+          var bt = String(b.textContent || "").replace(/\s+/g, " ").trim();
+          if (/^(◀\s*어제|어제|오늘\s*[·\.]?\s*실시간|내일\s*▶?|내일|\+2일)$/.test(bt)) {
+            b.style.setProperty("display", "none", "important");
+            return;
+          }
+          if (/득점알림|배당급변|마이팀\s*알림함|마이팀\s*주간브리핑/.test(bt)) {
+            secondaryBtns.push(b);
+          }
+        });
+
+        var drawer = document.getElementById("sqV39AlertDrawer");
+        if (secondaryBtns.length > 0) {
+          if (!drawer) {
+            drawer = document.createElement("div");
+            drawer.id = "sqV39AlertDrawer";
+            var spRow = document.getElementById("dcSportPills");
+            if (spRow && spRow.parentElement === hubBox) {
+              spRow.insertAdjacentElement("beforebegin", drawer);
+            } else {
+              ctrlRow.insertAdjacentElement("afterend", drawer);
+            }
+          }
+          secondaryBtns.forEach(function (sb) {
+            drawer.appendChild(sb);
+          });
+        }
+
+        if (drawer) {
+          var togBtn = document.getElementById("sqV39AlertToggleBtn");
+          if (!togBtn) {
+            togBtn = document.createElement("button");
+            togBtn.id = "sqV39AlertToggleBtn";
+            togBtn.type = "button";
+            togBtn.style.cssText = "background:rgba(15,23,42,0.92);border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:3px 10px;font-size:11.2px;font-weight:700;cursor:pointer;white-space:nowrap;";
+            togBtn.textContent = "🔔 알림 · 마이팀 설정 ▾";
+            togBtn.addEventListener("click", function () {
+              var openNow = !drawer.classList.contains("is-open");
+              drawer.classList.toggle("is-open", openNow);
+              togBtn.textContent = openNow ? "🔔 알림 · 마이팀 접기 ▴" : "🔔 알림 · 마이팀 설정 ▾";
+              togBtn.style.borderColor = openNow ? "#38bdf8" : "#334155";
+              togBtn.style.color = openNow ? "#7dd3fc" : "#cbd5e1";
+            });
+          }
+          var togHost = autoRefreshHost || ctrlRow;
+          if (togBtn.parentElement !== togHost) {
+            togHost.appendChild(togBtn);
+          }
+        }
+
+        // Hide `#dcTickerControls` completely once all visible controls have moved out, saving 42px of empty vertical height!
+        var anyVisibleLeft = Array.prototype.some.call(ctrlRow.children || [], function (ch) {
+          return ch.style.display !== "none" && ch.id !== "sqV39AlertToggleBtn";
+        });
+        if (!anyVisibleLeft) {
+          ctrlRow.style.setProperty("display", "none", "important");
+        }
+      }
+    } catch (e) {} finally {
+      _inSportDotMutationV304 = prevG;
     }
+  }
+
+  function mountOrUpdateV30ScoreToolbar() {
+    var dcTrack = document.getElementById("dcLiveTickerTrack");
+    var track = dcTrack || findPrimaryMainCardStripV30();
+    if (!track || !track.parentElement) return;
+    // Never anchor inside the full-bleed `#proLiveTickerBar` outer shell if `#proTickerList` was returned before `dcLiveTickerTrack` mounted!
+    if (!dcTrack && track.id === "proTickerList") return;
+
+    var parentBox = track.parentElement;
+    var items = v30ScoreState.items || [];
 
     var bar = document.getElementById("sqV30ScoreToolbar");
     if (!bar) {
       bar = document.createElement("div");
       bar.id = "sqV30ScoreToolbar";
-      if (ctrl && ctrl.parentElement === track.parentElement) {
-        ctrl.insertAdjacentElement("afterend", bar);
-      } else {
-        track.parentElement.insertBefore(bar, track);
-      }
     }
+    if (bar.parentElement !== parentBox || bar.nextElementSibling !== track) {
+      parentBox.insertBefore(bar, track);
+    }
+
+    var leagueSlot = document.getElementById("sqV39LeagueSlot");
+    if (!leagueSlot) {
+      leagueSlot = document.createElement("div");
+      leagueSlot.id = "sqV39LeagueSlot";
+      leagueSlot.style.cssText = "display:flex;align-items:center;flex-shrink:0;";
+      bar.appendChild(leagueSlot);
+    }
+    var tbBody = document.getElementById("sqV39ToolbarBody");
+    if (!tbBody) {
+      tbBody = document.createElement("div");
+      tbBody.id = "sqV39ToolbarBody";
+      tbBody.style.cssText = "display:flex;flex:1 1 auto;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;";
+      bar.appendChild(tbBody);
+    }
+
     mountOrUpdateV31DateCalendarBar(bar);
+    var cal = document.getElementById("sqV31DateCalendarBar");
+    if (cal && (cal.parentElement !== parentBox || cal.nextElementSibling !== bar)) {
+      parentBox.insertBefore(cal, bar);
+    }
 
     var wrap = document.getElementById("sqV30ScoreboardTableWrap");
     if (!wrap) {
       wrap = document.createElement("div");
       wrap.id = "sqV30ScoreboardTableWrap";
+    }
+    if (wrap.parentElement !== parentBox || track.nextElementSibling !== wrap) {
       track.insertAdjacentElement("afterend", wrap);
     }
+
+    declutterScoreboardHubV39(leagueSlot);
 
     var cntAll = items.length;
     var cntLive = items.filter(function (x) { return x && x.state === "in"; }).length;
@@ -5526,23 +5767,33 @@ _FRONTEND_V22_JS = r'''
     var sf = v30ScoreState.statusFilter;
     var vm = v30ScoreState.viewMode;
     var tbSig = [cntAll, cntLive, cntPre, cntPost, cntFav, sf, vm, v30ScoreState.selectedSport, v30ScoreState.selectedLeague, v30ScoreState.selectedDateOffset].join("|");
-    if (v30ScoreState.lastToolbarSig === tbSig && bar.children.length > 0) {
+    if (v30ScoreState.lastToolbarSig === tbSig && tbBody.children.length > 0) {
       return;
     }
     v30ScoreState.lastToolbarSig = tbSig;
 
-    bar.innerHTML = (
+    var navArrowsHtml = (vm === "cards")
+      ? (
+        "<span style='display:inline-flex;gap:3px;margin-left:2px;'>" +
+        "  <button type='button' class='sq-v30-fbtn' data-v39-scroll='-1' title='이전 경기 카드' style='padding:4px 8px;'>◀</button>" +
+        "  <button type='button' class='sq-v30-fbtn' data-v39-scroll='1' title='다음 경기 카드' style='padding:4px 8px;'>▶</button>" +
+        "</span>"
+      )
+      : "";
+
+    tbBody.innerHTML = (
       "<div style='display:flex;flex-wrap:wrap;gap:5px;align-items:center;'>" +
       "  <button type='button' class='sq-v30-fbtn" + (sf === "all" ? " active" : "") + "' data-v30-sf='all'>전체 (" + cntAll + ")</button>" +
       "  <button type='button' class='sq-v30-fbtn" + (sf === "live" ? " active-live" : "") + "' data-v30-sf='live'>🔴 LIVE (" + cntLive + ")</button>" +
       "  <button type='button' class='sq-v30-fbtn" + (sf === "pre" ? " active" : "") + "' data-v30-sf='pre'>⏳ 예정 (" + cntPre + ")</button>" +
       "  <button type='button' class='sq-v30-fbtn" + (sf === "post" ? " active" : "") + "' data-v30-sf='post'>✅ 종료 (" + cntPost + ")</button>" +
-      "  <button type='button' class='sq-v30-fbtn" + (sf === "fav" ? " active" : "") + "' data-v30-sf='fav'>★ 내 관심 (" + cntFav + ")</button>" +
+      "  <button type='button' class='sq-v30-fbtn" + (sf === "fav" ? " active" : "") + "' data-v30-sf='fav'>★ 관심 (" + cntFav + ")</button>" +
       "</div>" +
       "<div style='display:flex;flex-wrap:wrap;gap:5px;align-items:center;'>" +
       "  <button type='button' class='sq-v30-fbtn" + (vm === "cards" ? " active-view" : "") + "' data-v30-vm='cards'>🃏 카드 트랙</button>" +
-      "  <button type='button' class='sq-v30-fbtn" + (vm === "table-league" ? " active-view" : "") + "' data-v30-vm='table-league'>📋 스코어보드 표 (리그별)</button>" +
+      "  <button type='button' class='sq-v30-fbtn" + (vm === "table-league" ? " active-view" : "") + "' data-v30-vm='table-league'>📋 리그별 표</button>" +
       "  <button type='button' class='sq-v30-fbtn" + (vm === "table-time" ? " active-view" : "") + "' data-v30-vm='table-time'>🕒 시간순 표</button>" +
+      navArrowsHtml +
       "</div>"
     );
 
@@ -5551,11 +5802,22 @@ _FRONTEND_V22_JS = r'''
       bar.addEventListener("click", function (ev) {
         var t = ev.target;
         if (!t || !t.closest) return;
+        var scBtn = t.closest("[data-v39-scroll]");
+        if (scBtn) {
+          var dir = parseInt(scBtn.getAttribute("data-v39-scroll") || "1", 10);
+          var trEl = document.getElementById("dcLiveTickerTrack") || findPrimaryMainCardStripV30();
+          if (trEl) {
+            var stepPx = Math.max(260, Math.round((trEl.clientWidth || 780) * 0.72));
+            try { trEl.scrollBy({ left: dir * stepPx, behavior: "smooth" }); } catch (e) { trEl.scrollLeft += dir * stepPx; }
+          }
+          return;
+        }
         var sfBtn = t.closest("[data-v30-sf]");
         if (sfBtn) {
           v30ScoreState.statusFilter = sfBtn.getAttribute("data-v30-sf") || "all";
           v30ScoreState.lastToolbarSig = "";
           v30ScoreState.lastTableSig = "";
+          v30ScoreState.lastCardStripSig = "";
           refreshScoreboardSuiteV30();
           return;
         }
@@ -5564,6 +5826,7 @@ _FRONTEND_V22_JS = r'''
           v30ScoreState.viewMode = vmBtn.getAttribute("data-v30-vm") || "cards";
           v30ScoreState.lastToolbarSig = "";
           v30ScoreState.lastTableSig = "";
+          v30ScoreState.lastCardStripSig = "";
           refreshScoreboardSuiteV30();
         }
       });
@@ -5576,7 +5839,7 @@ _FRONTEND_V22_JS = r'''
     installTopControlCaptureSyncV304();
     fetchServerScoreboardBridgeV30();
     var items = recomputeScopedItemsV30();
-    if (v30ScoreState.customDateRendered && v30ScoreState.viewMode === "cards") {
+    if (v30ScoreState.viewMode === "cards") {
       renderCustomDateCardsIntoStripV31();
     }
     syncSportPillLiveDotsV30();
@@ -8521,7 +8784,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3820_{int(time.time())}"
+_BOOT_VER_V30 = f"3900_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -12315,7 +12578,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "3.8.2-floating-dock-minimize",
+        "engine_version": "3.9-clean-unified-dashboard",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
