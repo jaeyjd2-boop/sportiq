@@ -5214,7 +5214,7 @@ _FRONTEND_V22_JS = r'''
           var rawDcItems = Array.isArray(dcJson.items) ? dcJson.items.slice() : [];
           var removedVolleyCnt = 0, removedVolleyLive = 0;
           var curItems = rawDcItems.filter(function (x) {
-            if (!x) return false;
+            if (!x || isSyntheticScoreItemV4615(x)) return false;
             var isV = canonicalSportKeyV304(x.sport || "", String(x.league_code || "") + " " + String(x.league || "") + " " + String(x.league_full || "")) === "volleyball";
             if (isV && (spReq === "all" || spReq === "volleyball" || spReq === "vleague")) {
               removedVolleyCnt++;
@@ -5284,8 +5284,9 @@ _FRONTEND_V22_JS = r'''
             }
           }
           dcJson.items = curItems;
-          if (spReq === "all" && lgReq === "ALL" && (curItems.length >= 10 || !v30ScoreState.rawAllItems.length) && (!v30ScoreState.customDateRendered || offReq === v30ScoreState.selectedDateOffset)) {
-            setTimeout(function () { mergeRawScoreItemsV30(curItems, curItems.length >= 10); }, 0);
+          if (spReq === "all" && lgReq === "ALL" && (!v30ScoreState.customDateRendered || offReq === v30ScoreState.selectedDateOffset)) {
+            v30ScoreState.serverHydratedV4615 = true;
+            setTimeout(function () { mergeRawScoreItemsV30(curItems, true); }, 0);
           }
           return new Response(JSON.stringify(dcJson), { status: 200, headers: { "Content-Type": "application/json" } });
         });
@@ -5552,8 +5553,24 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
+  function isSyntheticScoreItemV4615(raw) {
+    if (!raw || typeof raw !== "object") return true;
+    var idS = String(raw.id || "").trim();
+    var lc = String(raw.league_code || "").trim().toUpperCase();
+    var ln = String(raw.league || "").trim().toUpperCase();
+    var lf = String(raw.league_full || raw.league_name || "").trim().toUpperCase();
+    var blocked = { KBO: 1, NPB: 1, LCK: 1, KBL: 1, WKBL: 1, VLEAGUE: 1, VLEAGUE_M: 1, VLEAGUE_W: 1, "V-리그": 1, "V-리그 남자부": 1, "V-리그 여자부": 1, KLEAGUE: 1, KLEAGUE1: 1, "K리그": 1, "K리그1": 1, JLEAGUE: 1, "J리그": 1 };
+    if (blocked[lc] || blocked[ln]) return true;
+    if (/NPB|KBO|V-?리그|KBL|WKBL|\bLCK\b/i.test(lf)) return true;
+    if (/^(kbo|npb|lck|kbl|wkbl|vleague|kleague|kl1|jleague|seed|sim|demo|mock|fb)[-_]/i.test(idS)) return true;
+    if (/[-_]20\d{6}([-_]\d+)?$/.test(idS)) return true;
+    var ps = String(raw.period_scores || "");
+    if (/1-3회\s*\d+:\d+,\s*4-6회/.test(ps)) return true;
+    return false;
+  }
+
   function normalizeScoreItemV30(raw, idx) {
-    if (!raw || typeof raw !== "object") return null;
+    if (!raw || typeof raw !== "object" || isSyntheticScoreItemV4615(raw)) return null;
     var lgProbe = String(raw.league_code || raw.league || raw.sport || "").trim();
     var spProbe = canonicalSportKeyV304(raw.sport || raw.sport_key || "", lgProbe);
     var homeRaw = String(raw.home || raw.home_team || raw.homeTeam || raw.home_name || "").trim();
@@ -5664,7 +5681,7 @@ _FRONTEND_V22_JS = r'''
     if (!mainStrip) return;
     lockDcLiveTickerTrackInnerHtmlV463();
     var baseItems = v30ScoreState.items || [];
-    if (!baseItems.length && !v30ScoreState.customDateRendered) return;
+    if (!baseItems.length && !v30ScoreState.customDateRendered && !v30ScoreState.serverHydratedV4615) return;
 
     var resolved = resolveIndividualCardElementsV31(mainStrip);
     var targetBox = (resolved.length && resolved[0].parentElement && resolved[0].parentElement !== mainStrip.parentElement)
@@ -5769,11 +5786,10 @@ _FRONTEND_V22_JS = r'''
         if (n) norm.push(n);
       }
     }
-    if (replaceAll && (norm.length >= 10 || v30ScoreState.customDateRendered || !v30ScoreState.fullDateItems || norm.length >= v30ScoreState.fullDateItems.length)) {
+    if (replaceAll) {
+      v30ScoreState.serverHydratedV4615 = true;
       v30ScoreState.rawAllItems = norm;
-      if (norm.length >= 10 || v30ScoreState.customDateRendered) {
-        v30ScoreState.fullDateItems = norm.slice();
-      }
+      v30ScoreState.fullDateItems = norm.slice();
     } else if (norm.length) {
       if (!v30ScoreState.rawAllItems.length) {
         v30ScoreState.rawAllItems = norm;
@@ -13371,7 +13387,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46140_{int(time.time())}"
+_BOOT_VER_V30 = f"46150_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -13697,20 +13713,41 @@ def toggle_post_like_v22(post_id: str, payload: Optional[PostReactionIn] = None)
                 target_actor = existing["actor_key"] if existing else primary_actor
                 if cmp_row and not already_rewarded:
                     post_author = (cmp_row["author"] or "").strip()
-                    if post_author and post_author.lower() != liker_nick:
+                    # v4.6.15 Anti-bot: require real liker nickname (>=2 chars, non-anon) + max 10 rewarded likes (20P)/day per author
+                    if (
+                        post_author
+                        and len(liker_nick) >= 2
+                        and not primary_actor.startswith("anon:")
+                        and post_author.lower() != liker_nick
+                    ):
                         acc = conn.execute(
                             "SELECT nickname, points FROM member_accounts WHERE lower(nickname) = lower(?)",
                             (post_author,),
                         ).fetchone()
                         if acc:
-                            new_pts = int(acc["points"] or 0) + 2
-                            tier_fn = getattr(_smu, "_tier_for_points", lambda p: "PRO" if p >= 350 else ("MEMBER" if p >= 150 else "GUEST"))
-                            conn.execute(
-                                "UPDATE member_accounts SET points = ?, role_tier = ?, updated_at = ? WHERE nickname = ?",
-                                (new_pts, tier_fn(new_pts), now, acc["nickname"]),
+                            today_kst_lk = datetime.now(KST).strftime("%Y-%m-%d")
+                            daily_lk_cnt = int(
+                                conn.execute(
+                                    "SELECT COUNT(*) AS c FROM wp_point_ledger WHERE lower(nickname) = lower(?) AND event_type = 'post_like_bonus' AND kst_date = ?",
+                                    (acc["nickname"], today_kst_lk),
+                                ).fetchone()["c"]
+                                or 0
                             )
-                            author_bonus = 2
-                    already_rewarded = 1
+                            if daily_lk_cnt < 10:
+                                new_pts = int(acc["points"] or 0) + 2
+                                tier_fn = getattr(_smu, "_tier_for_points", lambda p: "PRO" if p >= 350 else ("MEMBER" if p >= 150 else "GUEST"))
+                                conn.execute(
+                                    "UPDATE member_accounts SET points = ?, role_tier = ?, updated_at = ? WHERE nickname = ?",
+                                    (new_pts, tier_fn(new_pts), now, acc["nickname"]),
+                                )
+                                conn.execute(
+                                    "INSERT INTO wp_point_ledger(nickname, event_type, ref_id, points_delta, kst_date, site_origin, created_at) VALUES (?, 'post_like_bonus', ?, 2, ?, 'lounge', ?)",
+                                    (acc["nickname"], f"{pid}:{primary_actor}"[:64], today_kst_lk, now),
+                                )
+                                author_bonus = 2
+                                already_rewarded = 1
+                    elif post_author and post_author.lower() == liker_nick:
+                        already_rewarded = 1
 
                 conn.execute(
                     """
@@ -13849,7 +13886,7 @@ def lounge_unified_daily_checkin_v22(payload: LoungeCheckinIn):
                     (nick,),
                 ).fetchone()
                 if row is None:
-                    base_pts = max(120, min(int(payload.client_points or 120), 5000))
+                    base_pts = max(120, min(int(payload.client_points or 120), 149))
                     bonus = 20
                     new_pts = base_pts + bonus
                     new_tier = tier_fn(new_pts)
@@ -14993,6 +15030,8 @@ def _ai_probs_bball_v34(home: str, away: str, code: str) -> Dict[str, Any]:
 
 
 def _build_domestic_bball_games_v34(target_dt: datetime) -> List[Dict[str, Any]]:
+    # v4.6.15 Authentic official real-time matches only: disable clock-simulated rotation games
+    return []
     now_k = datetime.now(KST)
     wd_names = ["월", "화", "수", "목", "금", "토", "일"]
     ymd = target_dt.strftime("%Y-%m-%d")
@@ -15362,6 +15401,8 @@ def _ai_probs_vleague_v35(home: str, away: str, code: str) -> Dict[str, Any]:
 
 
 def _build_vleague_games_v35(target_dt: datetime) -> List[Dict[str, Any]]:
+    # v4.6.15 Authentic official real-time matches only: disable clock-simulated set/rally scores
+    return []
     now_k = datetime.now(KST)
     wd_names = ["월", "화", "수", "목", "금", "토", "일"]
     ymd = target_dt.strftime("%Y-%m-%d")
@@ -15575,6 +15616,8 @@ def api_member_scoreboard_v30(date_offset: int = 0):
                     if _a_loc != _a_orig:
                         _it_sb.setdefault("away_en", _a_orig)
                         _it_sb["away"] = _a_loc
+    _pref_mmdd_v4615 = f"{target_k.month:02d}.{target_k.day:02d}"
+    raw_items = _filter_official_matches_only_v4615(raw_items, expected_mmdd=_pref_mmdd_v4615)
     _ord_sb = {"in": 0, "pre": 1, "post": 2}
     raw_items.sort(key=lambda x: (_ord_sb.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
 
@@ -17254,18 +17297,23 @@ class AdminModerationDeleteInV4612(BaseModel):
     admin_key: Optional[str] = ""
 
 
-def _verify_admin_key_v4612(candidate_key: Optional[str], raise_on_error: bool = True) -> bool:
+def _verify_admin_key_v4612(candidate_key: Optional[str], raise_on_error: bool = True, ip_key: str = "admin_mod") -> bool:
     cand = (candidate_key or "").strip()
     if not cand:
         if raise_on_error:
             raise HTTPException(status_code=401, detail="관리자 마스터 키를 입력해 주세요.")
         return False
+    if raise_on_error:
+        _check_admin_lockout_v4615(ip_key)
     req_fn = getattr(_smu, "_require_admin_auth", None)
     if callable(req_fn):
         try:
             req_fn(cand)
+            _record_admin_auth_result_v4615(ip_key, True)
             return True
-        except HTTPException:
+        except HTTPException as exc:
+            if raise_on_error and exc.status_code == 403:
+                _record_admin_auth_result_v4615(ip_key, False)
             if raise_on_error:
                 raise
             return False
@@ -17307,6 +17355,30 @@ def _execute_permanent_post_delete_v4612(post_id: str, by_admin: bool = True, ra
                 if not expected or cand_hash != expected:
                     raise HTTPException(status_code=403, detail="작성 시 설정한 4자리 PIN이 일치하지 않습니다.")
 
+            reclaimed_pts = 0
+            if row and "wp_point_ledger" in tables and "member_accounts" in tables:
+                led = conn.execute(
+                    "SELECT id, points_delta FROM wp_point_ledger WHERE event_type = 'lounge_post_create' AND ref_id = ? LIMIT 1",
+                    (pid,),
+                ).fetchone()
+                if led and int(led["points_delta"] or 0) > 0:
+                    reclaim_amt = int(led["points_delta"])
+                    acc_r = conn.execute(
+                        "SELECT nickname, points FROM member_accounts WHERE lower(nickname) = lower(?)",
+                        (row["author"],),
+                    ).fetchone()
+                    if acc_r:
+                        next_p = max(0, int(acc_r["points"] or 0) - reclaim_amt)
+                        tier_fn = getattr(_smu, "_tier_for_points", lambda p: "PRO" if p >= 350 else ("MEMBER" if p >= 150 else "GUEST"))
+                        conn.execute(
+                            "UPDATE member_accounts SET points = ?, role_tier = ?, updated_at = ? WHERE nickname = ?",
+                            (next_p, tier_fn(next_p), now, acc_r["nickname"]),
+                        )
+                        reclaimed_pts = reclaim_amt
+                    conn.execute(
+                        "UPDATE wp_point_ledger SET event_type = 'lounge_post_reclaimed' WHERE id = ?",
+                        (led["id"],),
+                    )
             if "community_member_posts" in tables:
                 cur_p = conn.execute("DELETE FROM community_member_posts WHERE id = ?", (pid,))
                 deleted_post_rows = int(cur_p.rowcount or 0)
@@ -17333,7 +17405,7 @@ def _execute_permanent_post_delete_v4612(post_id: str, by_admin: bool = True, ra
                     "INSERT OR REPLACE INTO admin_deleted_tombstones(tombstone_key, target_type, target_id, deleted_at) VALUES (?, 'post', ?, ?)",
                     (f"post:{pid}", pid, now),
                 )
-        return {"deleted_post_rows": deleted_post_rows, "deleted_comments": deleted_comments}
+        return {"deleted_post_rows": deleted_post_rows, "deleted_comments": deleted_comments, "reclaimed_points": reclaimed_pts}
 
     res = run_with_db_retry(_op)
 
@@ -17350,6 +17422,8 @@ def _execute_permanent_post_delete_v4612(post_id: str, by_admin: bool = True, ra
 
     run_with_db_retry(_clean_lounge_reports)
     _trigger_smu_pg_backup(
+        "member_accounts",
+        "wp_point_ledger",
         "community_member_posts",
         "community_post_comments",
         "community_post_likes",
@@ -17364,6 +17438,7 @@ def _execute_permanent_post_delete_v4612(post_id: str, by_admin: bool = True, ra
         "by_admin": by_admin,
         "deleted_post_rows": res["deleted_post_rows"],
         "deleted_comments": res["deleted_comments"],
+        "reclaimed_points": res.get("reclaimed_points", 0),
     }
 
 
@@ -17872,7 +17947,55 @@ def create_community_post_filtered_v4613(payload: _smu.PostCreateIn):
         actor=payload.author or "익명",
         check_flood=True,
     )
-    return _smu.create_community_post(payload)
+    author_clean = (payload.author or "익명 분석가").strip()[:28]
+    today_kst = datetime.now(KST).strftime("%Y-%m-%d")
+
+    def _count_today_post_rewards() -> int:
+        with _smu_db_session(write=False) as conn:
+            r = conn.execute(
+                "SELECT COUNT(*) AS c FROM wp_point_ledger WHERE lower(nickname) = lower(?) AND event_type IN ('lounge_post_create', 'lounge_post_reclaimed') AND kst_date = ?",
+                (author_clean, today_kst),
+            ).fetchone()
+            return int(r["c"] or 0) if r else 0
+
+    prior_cnt = run_with_db_retry(_count_today_post_rewards)
+    res = _smu.create_community_post(payload)
+    if isinstance(res, dict) and res.get("ok") and res.get("updated_points") is not None:
+        pid_created = str((res.get("post") or {}).get("id") or "")
+        now_ep = time.time()
+        if prior_cnt < 3:
+            def _log_post_reward() -> None:
+                with _smu_db_session(write=True) as conn:
+                    conn.execute(
+                        "INSERT INTO wp_point_ledger(nickname, event_type, ref_id, points_delta, kst_date, site_origin, created_at) VALUES (?, 'lounge_post_create', ?, 15, ?, 'lounge', ?)",
+                        (author_clean, pid_created, today_kst, now_ep),
+                    )
+            run_with_db_retry(_log_post_reward)
+            _trigger_smu_pg_backup("wp_point_ledger")
+        else:
+            # Daily 3-post reward cap reached: revert the automatic +15P while keeping the post published!
+            def _cap_revert() -> Optional[int]:
+                with _smu_db_session(write=True) as conn:
+                    acc = conn.execute(
+                        "SELECT nickname, points FROM member_accounts WHERE lower(nickname) = lower(?)",
+                        (author_clean,),
+                    ).fetchone()
+                    if not acc:
+                        return None
+                    reverted = max(0, int(acc["points"] or 0) - 15)
+                    tier_fn = getattr(_smu, "_tier_for_points", lambda p: "PRO" if p >= 350 else ("MEMBER" if p >= 150 else "GUEST"))
+                    conn.execute(
+                        "UPDATE member_accounts SET points = ?, role_tier = ?, updated_at = ? WHERE nickname = ?",
+                        (reverted, tier_fn(reverted), now_ep, acc["nickname"]),
+                    )
+                    return reverted
+            capped_pts = run_with_db_retry(_cap_revert)
+            res["awarded_points"] = 0
+            res["daily_reward_cap_reached"] = True
+            if capped_pts is not None:
+                res["updated_points"] = capped_pts
+            _trigger_smu_pg_backup("member_accounts")
+    return res
 
 
 @router.put("/api/posts/{post_id}")
@@ -18082,6 +18205,169 @@ def wp_activity_reward_cors_v4614(payload: _smu.WPMemberRewardIn, request: Reque
     if payload.nickname:
         _validate_clean_content_v4613([payload.nickname], kind_label="WP보상닉네임", actor=payload.nickname, check_flood=False)
     return _execute_wp_cors_endpoint_v4614(request, _smu.wp_member_activity_reward, payload)
+
+
+# ============================================================================
+# v4.6.15 Anti-Abuse Security Guards (Sync Cap · Raffle Eligibility · Admin Lockout)
+# ============================================================================
+_SECURITY_GUARD_LOCK_V4615 = threading.RLock()
+_ADMIN_FAIL_BY_IP_V4615: Dict[str, List[float]] = {}
+_NEW_ACCT_BY_IP_V4615: Dict[str, List[float]] = {}
+
+
+def _client_ip_v4615(request: Optional[Request]) -> str:
+    if request is None:
+        return "local"
+    xff = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    if xff:
+        return xff[:64]
+    return (request.client.host if request.client else "local")[:64]
+
+
+def _check_admin_lockout_v4615(ip_key: str) -> None:
+    now_ep = time.time()
+    with _SECURITY_GUARD_LOCK_V4615:
+        fails = [ts for ts in _ADMIN_FAIL_BY_IP_V4615.get(ip_key, []) if (now_ep - ts) < 600.0]
+        _ADMIN_FAIL_BY_IP_V4615[ip_key] = fails
+        if len(fails) >= 5 and (now_ep - fails[-1]) < 300.0:
+            remain = max(1, int(round(300.0 - (now_ep - fails[-1]))))
+            raise HTTPException(
+                status_code=429,
+                detail=f"관리자 인증 키 오류가 5회 누적되어 보안을 위해 {remain}초간 잠금 처리되었습니다.",
+            )
+
+
+def _record_admin_auth_result_v4615(ip_key: str, success: bool) -> None:
+    now_ep = time.time()
+    with _SECURITY_GUARD_LOCK_V4615:
+        if success:
+            _ADMIN_FAIL_BY_IP_V4615.pop(ip_key, None)
+        else:
+            fails = [ts for ts in _ADMIN_FAIL_BY_IP_V4615.get(ip_key, []) if (now_ep - ts) < 600.0]
+            fails.append(now_ep)
+            _ADMIN_FAIL_BY_IP_V4615[ip_key] = fails[-10:]
+
+
+def _require_admin_with_lockout_v4615(request: Optional[Request], candidate_key: Optional[str]) -> None:
+    ip_k = _client_ip_v4615(request)
+    _check_admin_lockout_v4615(ip_k)
+    cand = (candidate_key or "").strip()
+    if not cand:
+        raise HTTPException(status_code=401, detail="관리자 마스터 키를 입력해 주세요.")
+    try:
+        _smu._require_admin_auth(cand)
+        _record_admin_auth_result_v4615(ip_k, True)
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            _record_admin_auth_result_v4615(ip_k, False)
+        raise
+
+
+@router.post("/api/member/sync")
+def sync_member_account_guarded_v4615(payload: _smu.MemberSyncIn, request: Request):
+    nick = (payload.nickname or "").strip()[:24]
+    ip_k = _client_ip_v4615(request)
+
+    def _exists_op() -> bool:
+        with _smu_db_session(write=False) as conn:
+            r = conn.execute("SELECT 1 FROM member_accounts WHERE lower(nickname) = lower(?)", (nick,)).fetchone()
+            return r is not None
+
+    already_exists = run_with_db_retry(_exists_op) if len(nick) >= 2 else False
+    if not already_exists:
+        now_ep = time.time()
+        with _SECURITY_GUARD_LOCK_V4615:
+            hist = [ts for ts in _NEW_ACCT_BY_IP_V4615.get(ip_k, []) if (now_ep - ts) < 600.0]
+            if len(hist) >= 8:
+                raise HTTPException(status_code=429, detail="단시간 다중 계정 생성이 감지되었습니다. 잠시 후 다시 시도해 주세요.")
+            hist.append(now_ep)
+            _NEW_ACCT_BY_IP_V4615[ip_k] = hist
+        # Cap initial carryover points strictly below 150P MEMBER threshold (blocks `client_points: 5000` exploit!)
+        raw_cp = int(payload.client_points if payload.client_points is not None else 120)
+        payload.client_points = max(120, min(raw_cp, 149))
+    return _smu.sync_member_account(payload)
+
+
+@router.post("/api/member/raffle/enter")
+def enter_weekly_raffle_guarded_v4615(payload: _smu.RaffleEnterIn):
+    nick = (payload.nickname or "").strip()[:24]
+    pin = re.sub(r"\D", "", payload.pin or "")
+    if len(nick) < 2 or len(pin) != 4:
+        raise HTTPException(status_code=400, detail="닉네임과 4자리 PIN 연동 후 응모할 수 있습니다.")
+
+    def _check_real_activity() -> None:
+        with _smu_db_session(write=False) as conn:
+            acc = conn.execute(
+                "SELECT nickname, last_checkin_date FROM member_accounts WHERE lower(nickname) = lower(?)",
+                (nick,),
+            ).fetchone()
+            if not acc:
+                return  # _smu.enter_weekly_raffle will raise 403
+            if (acc["last_checkin_date"] or "").strip():
+                return
+            has_led = conn.execute(
+                "SELECT 1 FROM wp_point_ledger WHERE lower(nickname) = lower(?) LIMIT 1",
+                (nick,),
+            ).fetchone()
+            if has_led:
+                return
+            has_post = conn.execute(
+                "SELECT 1 FROM community_member_posts WHERE lower(author) = lower(?) LIMIT 1",
+                (nick,),
+            ).fetchone()
+            if has_post:
+                return
+            raise HTTPException(
+                status_code=400,
+                detail="주간 럭키드로우는 최소 1회 출석체크 또는 분석 활동 이력이 있는 회원만 응모할 수 있습니다.",
+            )
+
+    run_with_db_retry(_check_real_activity)
+    return _smu.enter_weekly_raffle(payload)
+
+
+@router.post("/api/admin/setup-key")
+def setup_admin_key_guarded_v4615(payload: _smu.AdminKeySetupIn, request: Request):
+    ip_k = _client_ip_v4615(request)
+    _check_admin_lockout_v4615(ip_k)
+    try:
+        res = _smu.setup_or_rotate_admin_key(payload)
+        _record_admin_auth_result_v4615(ip_k, True)
+        return res
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            _record_admin_auth_result_v4615(ip_k, False)
+        raise
+
+
+@router.get("/api/admin/raffle/rounds")
+def admin_raffle_rounds_guarded_v4615(
+    request: Request,
+    round_key: Optional[str] = None,
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+):
+    _require_admin_with_lockout_v4615(request, x_sportiq_admin_key)
+    return _smu.admin_list_raffle_rounds(round_key=round_key, x_sportiq_admin_key=x_sportiq_admin_key)
+
+
+@router.post("/api/admin/raffle/draw")
+def admin_raffle_draw_guarded_v4615(
+    payload: _smu.AdminRaffleDrawIn,
+    request: Request,
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+):
+    _require_admin_with_lockout_v4615(request, x_sportiq_admin_key)
+    return _smu.admin_draw_raffle_winners(payload=payload, x_sportiq_admin_key=x_sportiq_admin_key)
+
+
+@router.post("/api/admin/raffle/fulfill")
+def admin_raffle_fulfill_guarded_v4615(
+    payload: _smu.AdminRaffleFulfillIn,
+    request: Request,
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+):
+    _require_admin_with_lockout_v4615(request, x_sportiq_admin_key)
+    return _smu.admin_update_raffle_fulfillment(payload=payload, x_sportiq_admin_key=x_sportiq_admin_key)
 
 router.include_router(upgrade_router)
 
@@ -18295,6 +18581,7 @@ def lounge_health(request: Request):
         "admin_moderation_v4612": True,
         "banword_spam_filter_v4613": True,
         "wp_cors_bridge_v4614": True,
+        "authentic_scores_and_anti_abuse_v4615": True,
         "member_ux_v22": True,
         "seo_og_v27": True,
     }
@@ -18537,11 +18824,26 @@ def report_post(post_id: str, payload: Optional[ReportIn] = None):
 
 @router.get("/api/rankings/global-matches")
 def get_global_matches():
+    today_mmdd = datetime.now(KST).strftime("%m.%d")
+
+    def _is_current_or_upcoming_gm(sv: str) -> bool:
+        m = re.match(r"^\s*(\d{2}\.\d{2})", str(sv or ""))
+        if not m:
+            return True
+        mmdd = m.group(1)
+        # Handle Dec -> Jan year rollover gracefully
+        if today_mmdd.startswith("12.") and mmdd.startswith("01."):
+            return True
+        return mmdd >= today_mmdd
+
     def _op() -> list[dict]:
         with _db_session(write=False) as conn:
-            rows = conn.execute(
+            all_rows = conn.execute(
                 "SELECT id, match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC"
             ).fetchall()
+            rows = [r for r in all_rows if _is_current_or_upcoming_gm(r["schedule_venue"])]
+            if not rows:
+                rows = all_rows[:5]
             return [
                 {
                     "rank": i + 1,
@@ -18624,6 +18926,86 @@ def _localize_items_list_ko_v381(items_list: Any) -> None:
                 it["away"] = a_ko
 
 
+
+_SYNTHETIC_LEAGUE_CODES_V4615: Set[str] = {
+    "KBO", "NPB", "LCK", "KBL", "WKBL",
+    "VLEAGUE", "VLEAGUE_M", "VLEAGUE_W", "V-리그", "V-리그 남자부", "V-리그 여자부",
+    "KLEAGUE", "KLEAGUE1", "K리그", "K리그1", "JLEAGUE", "J리그", "CBA",
+}
+_SYNTHETIC_ID_RE_V4615 = re.compile(
+    r"(?:^(?:kbo|npb|lck|kbl|wkbl|vleague|kleague|kl1|jleague|cba|seed|sim|demo|mock|fb)[-_])|(?:[-_]20\d{6}(?:[-_]\d+)?$)",
+    re.IGNORECASE,
+)
+
+
+def _is_authentic_official_match_v4615(item: Any, expected_mmdd: Optional[str] = None) -> bool:
+    if not isinstance(item, dict):
+        return False
+    mid = str(item.get("id") or "").strip()
+    lg_code = str(item.get("league_code") or "").strip().upper()
+    lg_name = str(item.get("league") or "").strip().upper()
+    lg_full = str(item.get("league_full") or "").strip().upper()
+
+    if lg_code in _SYNTHETIC_LEAGUE_CODES_V4615 or lg_name in _SYNTHETIC_LEAGUE_CODES_V4615:
+        return False
+    if any(tok in lg_full for tok in ("일본 프로야구 NPB", "KBO 프로야구", "V-리그", "KBL", "WKBL", "LCK")):
+        return False
+    if mid and _SYNTHETIC_ID_RE_V4615.search(mid):
+        return False
+
+    p_scores = str(item.get("period_scores") or "")
+    if re.search(r"1-3회\s*\d+:\d+,\s*4-6회", p_scores) or ("세트" in p_scores and "진행중" in p_scores):
+        return False
+
+    st = str(item.get("state") or "").strip().lower()
+    dt_kst = str(item.get("match_dt_kst") or "").strip()
+    if expected_mmdd and st != "in":
+        if dt_kst and re.match(r"^\d{2}\.\d{2}", dt_kst) and not dt_kst.startswith(expected_mmdd):
+            return False
+    return True
+
+
+def _filter_official_matches_only_v4615(items: Any, expected_mmdd: Optional[str] = None) -> List[Dict[str, Any]]:
+    if not isinstance(items, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    seen_ids: Set[str] = set()
+    for it in items:
+        if not _is_authentic_official_match_v4615(it, expected_mmdd=expected_mmdd):
+            continue
+        mid = str(it.get("id") or "").strip()
+        if mid:
+            if mid in seen_ids:
+                continue
+            seen_ids.add(mid)
+        out.append(it)
+    return out
+
+
+def _recompute_sport_counts_v4615(items: List[Dict[str, Any]], prev_counts: Any = None) -> Dict[str, int]:
+    base_keys = ["soccer", "baseball", "basketball", "volleyball", "hockey", "esports", "ufc", "tennis", "f1"]
+    counts: Dict[str, int] = {}
+    if isinstance(prev_counts, dict):
+        for k in prev_counts:
+            counts[str(k)] = 0
+    for k in base_keys:
+        counts[k] = 0
+    for it in items:
+        sp = str(it.get("sport") or "").strip().lower()
+        if sp in ("mma",):
+            sp = "ufc"
+        elif sp in ("football",):
+            sp = "soccer"
+        counts[sp] = counts.get(sp, 0) + 1
+    counts["all"] = len(items)
+    counts["live"] = sum(1 for x in items if str(x.get("state") or "").lower() == "in")
+    if "vleague" in counts:
+        counts["vleague"] = counts.get("volleyball", 0)
+    if "lck" in counts:
+        counts["lck"] = counts.get("esports", 0)
+    return counts
+
+
 def _install_dc_ko_team_wrapper_v381(dc_mod: Any = None) -> bool:
     global _DC_KO_WRAPPER_INSTALLED_V381
     import sys as _sys
@@ -18639,13 +19021,25 @@ def _install_dc_ko_team_wrapper_v381(dc_mod: Any = None) -> bool:
         _DC_KO_WRAPPER_INSTALLED_V381 = True
         return True
 
+    # v4.6.15 Disable synthetic regional seed generators (`NPB`, `KBO`, `LCK`, etc.) on dc_mod
+    if hasattr(dc_mod, "_regional_games"):
+        dc_mod._regional_games = lambda *a, **kw: []
+
     orig_espn_sb = getattr(dc_mod, "_fetch_espn_sb", None)
     if callable(orig_espn_sb):
         def _ko_espn_sb(lg: Dict[str, Any], date_param: str, check_alerts: bool) -> List[Dict[str, Any]]:
             rows = orig_espn_sb(lg, date_param, check_alerts)
+            if isinstance(rows, list):
+                for _r_it in rows:
+                    if isinstance(_r_it, dict):
+                        _r_it["_espn_verified_v4615"] = True
             _localize_items_list_ko_v381(rows)
             alerts_ref = getattr(dc_mod, "_ALERTS", None)
             if isinstance(alerts_ref, list):
+                alerts_ref[:] = [
+                    al for al in alerts_ref
+                    if not re.search(r"\[(?:NPB|KBO|LCK|KBL|WKBL|V-?리그)\]", str((al or {}).get("text") or ""), re.I)
+                ]
                 for al in alerts_ref[:8]:
                     if isinstance(al, dict) and isinstance(al.get("text"), str):
                         tx = al["text"]
@@ -18659,24 +19053,90 @@ def _install_dc_ko_team_wrapper_v381(dc_mod: Any = None) -> bool:
 
         dc_mod._fetch_espn_sb = _ko_espn_sb
 
+    orig_collect_all_m = getattr(dc_mod, "_collect_all_matches", None)
+    if callable(orig_collect_all_m):
+        def _authentic_collect_all_m(date_offset: int = 0):
+            try:
+                off_i = int(date_offset)
+            except Exception:
+                off_i = 0
+            tk = datetime.now(KST) + timedelta(days=off_i)
+            mmdd = f"{tk.month:02d}.{tk.day:02d}"
+            raw_res = orig_collect_all_m(off_i)
+            if isinstance(raw_res, list):
+                _localize_items_list_ko_v381(raw_res)
+                return _filter_official_matches_only_v4615(raw_res, expected_mmdd=mmdd)
+            return raw_res
+
+        dc_mod._collect_all_matches = _authentic_collect_all_m
+
+    _today_espn_supp_cache: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
+
     orig_collect_ls = getattr(dc_mod, "collect_live_scores", None)
     if callable(orig_collect_ls):
         def _ko_collect_ls(date_offset: int = 0) -> Dict[str, Any]:
-            res = orig_collect_ls(date_offset)
-            if isinstance(res, dict) and isinstance(res.get("items"), list):
-                _localize_items_list_ko_v381(res["items"])
+            try:
+                off_i = int(date_offset)
+            except Exception:
+                off_i = 0
+            tk = datetime.now(KST) + timedelta(days=off_i)
+            mmdd = f"{tk.month:02d}.{tk.day:02d}"
+            res = orig_collect_ls(off_i)
+            if not isinstance(res, dict):
+                return res
+            items = list(res.get("items") or [])
+
+            # Supplement `date_offset == 0` with explicit ESPN `d0` + `d1` dates so KST morning NBA/NHL games on `mmdd` are never missed!
+            if off_i == 0 and callable(getattr(dc_mod, "_fetch_espn_sb", None)):
+                ck_supp = tk.strftime("%Y%m%d")
+                cached_s = _today_espn_supp_cache.get(ck_supp)
+                now_m = time.monotonic()
+                if cached_s and (now_m - cached_s[0]) < 50.0:
+                    supp_items = cached_s[1]
+                else:
+                    supp_items = []
+                    espn_lgs = [x for x in getattr(dc_mod, "LEAGUE_REGISTRY", []) if isinstance(x, dict) and x.get("espn")]
+                    if espn_lgs:
+                        d1 = tk.strftime("%Y%m%d")
+                        d0 = (tk - timedelta(days=1)).strftime("%Y%m%d")
+                        tasks = [(lg, d0) for lg in espn_lgs] + [(lg, d1) for lg in espn_lgs]
+                        fetch_fn = getattr(dc_mod, "_fetch_espn_sb")
+                        with ThreadPoolExecutor(max_workers=8) as pool:
+                            futs = [pool.submit(fetch_fn, lg, dp, False) for lg, dp in tasks]
+                            for fut in futs:
+                                try:
+                                    supp_items.extend(fut.result(timeout=5.0) or [])
+                                except Exception:
+                                    continue
+                    _today_espn_supp_cache[ck_supp] = (now_m, supp_items)
+                seen_ids = {str(x.get("id") or "") for x in items if isinstance(x, dict) and x.get("id")}
+                for sit in supp_items:
+                    sid = str((sit or {}).get("id") or "")
+                    if sid and sid not in seen_ids:
+                        seen_ids.add(sid)
+                        items.append(sit)
+
+            _localize_items_list_ko_v381(items)
+            clean_items = _filter_official_matches_only_v4615(items, expected_mmdd=mmdd)
+            ord_st = {"in": 0, "pre": 1, "post": 2}
+            clean_items.sort(key=lambda x: (ord_st.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
+            res["items"] = clean_items
+            res["counts"] = _recompute_sport_counts_v4615(clean_items, res.get("counts"))
+            if isinstance(res.get("score_alerts"), list):
+                res["score_alerts"] = [
+                    al for al in res["score_alerts"]
+                    if not re.search(r"\[(?:NPB|KBO|LCK|KBL|WKBL|V-?리그)\]", str((al or {}).get("text") or ""), re.I)
+                ]
             return res
 
         dc_mod.collect_live_scores = _ko_collect_ls
 
     dc_cache = getattr(dc_mod, "_CACHE", None)
     if isinstance(dc_cache, dict):
-        for k_c, v_c in list(dc_cache.items()):
-            if str(k_c).startswith("live_scores_") and isinstance(v_c, tuple) and len(v_c) == 2 and isinstance(v_c[1], dict):
-                _localize_items_list_ko_v381(v_c[1].get("items"))
+        for k_c in [k for k in list(dc_cache.keys()) if str(k).startswith("live_scores_")]:
+            dc_cache.pop(k_c, None)
     with _DC_SWR_LOCK:
-        for _off_k, (_ts_k, _lst_k) in list(_DC_SWR_CACHE.items()):
-            _localize_items_list_ko_v381(_lst_k)
+        _DC_SWR_CACHE.clear()
 
     dc_mod.__ko_team_wrapped_v381__ = True
     _DC_KO_WRAPPER_INSTALLED_V381 = True
