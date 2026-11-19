@@ -1348,7 +1348,7 @@ _FRONTEND_V22_JS = r'''
       "  }",
       "}",
       "/* v4.4 Clean Write Modal + 3-Tab Attendance/Profile/Shop Member Hub Polish */",
-      "#writeModal .sq-modal-panel, #writeModal > div, #write-modal > div, #news-write-modal > div, #sqMemberHubModal .sq-modal-panel, #profileModal > div {",
+      "#commentModal > div, #post-modal > div, #match-report-modal > div, #writeModal .sq-modal-panel, #writeModal > div, #write-modal > div, #news-write-modal > div, #sqMemberHubModal .sq-modal-panel, #profileModal > div {",
       "  max-width: 540px !important;",
       "  width: 100% !important;",
       "  max-height: 88vh !important;",
@@ -1557,6 +1557,64 @@ _FRONTEND_V22_JS = r'''
       "    box-sizing: border-box !important;",
       "  }",
       "}",
+      "/* v4.5 Clean Comment/Post Detail Modal & Match Insight Popup Polish */",
+      "#sqMatchInsightTabsV30 {",
+      "  display: flex !important;",
+      "  flex-wrap: nowrap !important;",
+      "  overflow-x: auto !important;",
+      "  -webkit-overflow-scrolling: touch;",
+      "  scrollbar-width: none !important;",
+      "  gap: 5px !important;",
+      "  padding-bottom: 2px !important;",
+      "  margin-bottom: 10px !important;",
+      "}",
+      "#sqMatchInsightTabsV30::-webkit-scrollbar { display: none !important; }",
+      "#dcQuickMatchModal .sq-v30-insight-tab {",
+      "  flex: 0 0 auto !important;",
+      "  padding: 5.5px 9.5px !important;",
+      "  font-size: 11.4px !important;",
+      "}",
+      ".sq-v45-post-clamp {",
+      "  display: -webkit-box;",
+      "  -webkit-line-clamp: 4;",
+      "  -webkit-box-orient: vertical;",
+      "  overflow: hidden;",
+      "}",
+      ".sq-v45-act-pill {",
+      "  background: rgba(15, 23, 42, 0.92);",
+      "  border: 1px solid #334155;",
+      "  color: #cbd5e1;",
+      "  border-radius: 999px;",
+      "  padding: 3px 9px;",
+      "  font-size: 11px;",
+      "  font-weight: 800;",
+      "  cursor: pointer;",
+      "  display: inline-flex;",
+      "  align-items: center;",
+      "  gap: 4px;",
+      "  white-space: nowrap;",
+      "}",
+      ".sq-v45-act-pill.is-liked { border-color: rgba(244, 63, 94, 0.55); color: #fda4af; background: rgba(244, 63, 94, 0.15); }",
+      ".sq-v45-act-pill.is-bm { border-color: rgba(250, 204, 21, 0.55); color: #fde047; background: rgba(250, 204, 21, 0.14); }",
+      "#commentModalTitle, #modal-post-header h3 {",
+      "  font-size: 15px !important;",
+      "  line-height: 1.38 !important;",
+      "  display: -webkit-box;",
+      "  -webkit-line-clamp: 2;",
+      "  -webkit-box-orient: vertical;",
+      "  overflow: hidden;",
+      "  word-break: keep-all;",
+      "}",
+      "#commentModalList, #modal-comments-list {",
+      "  max-height: 185px !important;",
+      "  overflow-y: auto !important;",
+      "  padding-right: 4px !important;",
+      "}",
+      "@media (max-width: 640px) {",
+      "  #dcQuickMatchModal { padding: 10px !important; }",
+      "  #dcQuickMatchModal > div > div:first-child { padding: 10px 12px !important; }",
+      "  #dcQuickMatchModal .sq-v32-vote-btn { padding: 5px 5px !important; gap: 1px !important; }",
+      "}",
       ".sq-v30-fbtn {",
       "  background: rgba(15, 23, 42, 0.9);",
       "  border: 1px solid #334155;",
@@ -1663,11 +1721,13 @@ _FRONTEND_V22_JS = r'''
       "    padding: 8px 8px !important;",
       "    font-size: 11.5px !important;",
       "  }",
-      "  #sqBridgeWritePostV30 {",
-      "    flex: 1 1 100% !important;",
-      "    order: -1 !important;",
+      "  #sqBridgeWritePostV30, #sqBridgeTacticalV30, #sqBridgeStandingsV30 {",
+      "    flex: 1 1 auto !important;",
+      "    min-width: 0 !important;",
+      "    order: 0 !important;",
       "    white-space: nowrap !important;",
-      "    padding: 9px 10px !important;",
+      "    padding: 8px 8px !important;",
+      "    font-size: 11.3px !important;",
       "  }",
       "}",
       "/* v3.2 1-Click Match Fan Vote (+5P & Real-Time Vote Gauge) */",
@@ -3753,25 +3813,111 @@ _FRONTEND_V22_JS = r'''
     var listEl = document.getElementById("commentModalList") || cm.querySelector("[id*='comment'][id*='List'], .space-y-2, .overflow-y-auto");
     if (!listEl || !listEl.parentElement) return;
 
+    // Localize title if needed
+    var tEl = document.getElementById("commentModalTitle");
+    if (tEl && postObj.title) {
+      tEl.textContent = translateInlineVsAndClubPrefixV42(String(postObj.title));
+    }
+
     var box = document.getElementById("sqModalPostBodyBoxV29");
     if (!box) {
       box = document.createElement("div");
       box.id = "sqModalPostBodyBoxV29";
-      box.style.cssText = "background:rgba(2,6,23,.72);border:1px solid rgba(51,65,85,.85);border-radius:12px;padding:12px 14px;margin-bottom:12px;max-height:210px;overflow-y:auto;font-size:12.8px;line-height:1.62;color:#cbd5e1;";
       listEl.parentElement.insertBefore(box, listEl);
     }
-    var bodyTxt = String(postObj.body || postObj.summary || postObj.content || "").trim();
-    var metaLine = uxEsc(postObj.league || "SPORTIQ") + " · " + uxEsc(postObj.author || "SportIQ 분석") + " · ♥ " + Number(postObj.likes || 0);
+    // Zero nested scrollbar: clean card with 4-line clamp + expand toggle
+    box.style.cssText = "background:rgba(2,6,23,.82);border:1px solid rgba(51,65,85,.85);border-radius:13px;padding:11px 13px;margin-bottom:10px;font-size:12.5px;line-height:1.58;color:#cbd5e1;";
+
+    var rawBody = String(postObj.body || postObj.summary || postObj.content || "").trim();
+    var bodyTxt = translateInlineVsAndClubPrefixV42(rawBody);
+    var isLongBody = bodyTxt.length > 155 || bodyTxt.split("\n").length > 4;
+    var pidStr = String(postObj.id || "");
+    var rCache = (typeof reactionCache === "object" && reactionCache) ? reactionCache : { liked_ids: {}, bookmarked_ids: {}, like_counts: {} };
+    var isLiked = Boolean(postObj.liked || (rCache.liked_ids && rCache.liked_ids[pidStr]));
+    var isBm = Boolean(postObj.bookmarked || (rCache.bookmarked_ids && rCache.bookmarked_ids[pidStr]));
+    var likeCnt = (rCache.like_counts && rCache.like_counts[pidStr] != null) ? Number(rCache.like_counts[pidStr]) : Number(postObj.likes || 0);
+    var cmtCnt = Array.isArray(postObj.comments) ? postObj.comments.length : 0;
+    var metaLine = uxEsc(postObj.league || "SPORTIQ") + " · " + uxEsc(postObj.author || "SportIQ 분석");
+
     box.innerHTML = (
-      "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;'>" +
-      "  <span style='font-size:11.5px;font-weight:800;color:#34d399;'>" + metaLine + "</span>" +
-      "  <button type='button' id='sqModalCopyDeepLinkBtnV29' style='background:rgba(14,165,233,.16);border:1px solid rgba(56,189,248,.45);color:#7dd3fc;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;'>🔗 이 분석글 링크 복사</button>" +
+      "<div style='display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap;'>" +
+      "  <span style='font-size:11.3px;font-weight:800;color:#34d399;'>" + metaLine + "</span>" +
+      "  <div style='display:flex;align-items:center;gap:5px;flex-wrap:nowrap;'>" +
+      "    <button type='button' id='sqModalLikeBtnV45' class='sq-v45-act-pill" + (isLiked ? " is-liked" : "") + "'>♥ 추천 <span id='sqModalLikeCntV45'>" + likeCnt + "</span></button>" +
+      "    <button type='button' id='sqModalBmBtnV45' class='sq-v45-act-pill" + (isBm ? " is-bm" : "") + "'>" + (isBm ? "★ 저장됨" : "☆ 북마크") + "</button>" +
+      "    <button type='button' id='sqModalCopyDeepLinkBtnV29' class='sq-v45-act-pill' style='border-color:rgba(56,189,248,.45);color:#7dd3fc;'>🔗 공유</button>" +
+      "  </div>" +
       "</div>" +
-      (bodyTxt ? "<div style='white-space:pre-line;color:#e2e8f0;'>" + uxEsc(bodyTxt) + "</div>" : "")
+      (bodyTxt ? ("<div id='sqModalPostBodyTextV45' class='" + (isLongBody ? "sq-v45-post-clamp" : "") + "' style='white-space:pre-line;color:#e2e8f0;word-break:keep-all;'>" + uxEsc(bodyTxt) + "</div>") : "") +
+      (isLongBody ? "<div style='margin-top:5px;display:flex;justify-content:flex-end;'><button type='button' id='sqModalBodyExpandBtnV45' class='sq-v44-qchip' style='font-size:10.6px;padding:2px 9px;color:#93c5fd;'>본문 전체 보기 ▾</button></div>" : "") +
+      "<div style='margin-top:8px;padding-top:6px;border-top:1px solid rgba(30,41,59,.9);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#94a3b8;'>" +
+      "  <strong style='color:#cbd5e1;'>💬 커뮤니티 의견 (" + cmtCnt + ")</strong>" +
+      "  <span>매너 댓글 · 전술 토론 환영</span>" +
+      "</div>"
     );
+
     var cpBtn = document.getElementById("sqModalCopyDeepLinkBtnV29");
-    if (cpBtn) {
-      cpBtn.onclick = function () { window.shareSportiqPostV29(String(postObj.id)); };
+    if (cpBtn) cpBtn.onclick = function () { window.shareSportiqPostV29(pidStr); };
+
+    var expBtn = document.getElementById("sqModalBodyExpandBtnV45");
+    var bodyDiv = document.getElementById("sqModalPostBodyTextV45");
+    if (expBtn && bodyDiv) {
+      expBtn.onclick = function () {
+        var clamped = bodyDiv.classList.contains("sq-v45-post-clamp");
+        if (clamped) {
+          bodyDiv.classList.remove("sq-v45-post-clamp");
+          expBtn.textContent = "본문 접기 ▴";
+        } else {
+          bodyDiv.classList.add("sq-v45-post-clamp");
+          expBtn.textContent = "본문 전체 보기 ▾";
+        }
+      };
+    }
+
+    var lkBtn = document.getElementById("sqModalLikeBtnV45");
+    if (lkBtn && pidStr) {
+      lkBtn.onclick = function () {
+        if (typeof window.toggleLike === "function") {
+          window.toggleLike(pidStr);
+          setTimeout(function () { injectPostPreviewIntoCommentModalV29(postObj); }, 180);
+        }
+      };
+    }
+    var bmBtn = document.getElementById("sqModalBmBtnV45");
+    if (bmBtn && pidStr) {
+      bmBtn.onclick = function () {
+        if (typeof window.toggleBookmark === "function") {
+          window.toggleBookmark(pidStr);
+          setTimeout(function () { injectPostPreviewIntoCommentModalV29(postObj); }, 180);
+        }
+      };
+    }
+
+    // Mount 1-line Quick Comment Chips right above #commentModalInput / #modal-comment-input
+    var cmtInp = document.getElementById("commentModalInput") || document.getElementById("modal-comment-input");
+    if (cmtInp && cmtInp.parentElement && !document.getElementById("sqCommentQuickChipsV45")) {
+      var qRow = document.createElement("div");
+      qRow.id = "sqCommentQuickChipsV45";
+      qRow.className = "sq-v44-chip-strip";
+      qRow.style.cssText = "margin:6px 0 7px;padding-bottom:2px;";
+      var presets = [
+        "👍 데이터 근거 공감합니다!",
+        "🔥 핵심 픽 참고할게요",
+        "📊 배당 흐름이 변수네요",
+        "⚡ 후반 로테이션 주목!"
+      ];
+      qRow.innerHTML = presets.map(function (pr) {
+        return "<button type='button' class='sq-v44-qchip' data-sq-cmt-q='" + uxEsc(pr) + "'>" + uxEsc(pr) + "</button>";
+      }).join("");
+      cmtInp.parentElement.insertAdjacentElement("beforebegin", qRow);
+      qRow.querySelectorAll("[data-sq-cmt-q]").forEach(function (qb) {
+        qb.onclick = function () {
+          var targetInp = document.getElementById("commentModalInput") || document.getElementById("modal-comment-input");
+          if (!targetInp) return;
+          targetInp.value = qb.getAttribute("data-sq-cmt-q") || "";
+          targetInp.focus();
+        };
+      });
     }
   }
 
@@ -7944,9 +8090,30 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
+  function ensureCommentModalWrappedV45() {
+    if (typeof window.openCommentModal === "function" && !window.__sqOpenCmtWrappedV45) {
+      window.__sqOpenCmtWrappedV45 = true;
+      var origOpenCmt = window.openCommentModal;
+      window.openCommentModal = function (pid) {
+        var r = origOpenCmt.apply(this, arguments);
+        setTimeout(function () {
+          var stObj = (typeof state === "object" && state) ? state : (window.state || null);
+          var targetId = String(pid || (stObj && stObj.activePostId) || "");
+          var pFound = (stObj && Array.isArray(stObj.posts))
+            ? stObj.posts.find(function (x) { return x && String(x.id) === targetId; })
+            : null;
+          if (pFound) injectPostPreviewIntoCommentModalV29(pFound);
+          polishModalsAndCloseIconsV29();
+        }, 15);
+        return r;
+      };
+    }
+  }
+
   function organizeModalsAndMemberHubV44() {
     polishWriteModalV44();
     polishMemberHubAndProfilePopupsV44();
+    ensureCommentModalWrappedV45();
   }
   window.__organizeModalsAndMemberHubV44 = organizeModalsAndMemberHubV44;
 
@@ -8294,6 +8461,10 @@ _FRONTEND_V22_JS = r'''
   function openMatchInsightModalByItemV30(it) {
     if (!it) return;
     hideRowHoverPreviewV31();
+    it = Object.assign({}, it);
+    if (it.home) it.home = localizeTeamKoJsV381(it.home);
+    if (it.away) it.away = localizeTeamKoJsV381(it.away);
+    if (it.venue) it.venue = translateInlineVsAndClubPrefixV42(String(it.venue));
     var oldMd = document.getElementById("dcMatchDetailModal");
     if (oldMd) oldMd.style.display = "none";
     var oldMd2 = document.getElementById("dcMatchModal");
@@ -8335,7 +8506,7 @@ _FRONTEND_V22_JS = r'''
       "<div style='background:#0f172a;border:1px solid #334155;border-radius:18px;max-width:620px;width:100%;max-height:88vh;display:flex;flex-direction:column;color:#f8fafc;box-shadow:0 24px 55px rgba(0,0,0,0.65);overflow:hidden;'>",
       "  <div style='padding:14px 16px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;gap:8px;'>",
       "    <div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;flex:1 1 auto;'>",
-      "      <span style='background:#2563eb;color:#fff;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:800;'>" + sportEmojiV30(it.sport) + " " + uxEsc(it.league_full || it.league) + " · " + uxEsc(it.status_badge) + "</span>",
+      "      <span style='background:#2563eb;color:#fff;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:800;'>" + sportEmojiV30(it.sport) + " " + uxEsc((window.innerWidth <= 640 ? (it.league || it.league_code) : (it.league_full || it.league))) + " · " + uxEsc(it.status_badge) + "</span>",
       (verdict ? verdict.badgeHtml : ""),
       "    </div>",
       "    <div style='display:flex;align-items:center;gap:5px;flex-shrink:0;'>",
@@ -8343,29 +8514,29 @@ _FRONTEND_V22_JS = r'''
       "      <button type='button' id='sqCloseMatchInsightV30' style='background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:4px 10px;font-size:11.5px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:4px;'><svg data-sq-x-svg='1' viewBox='0 0 14 14' width='11' height='11' fill='none'><path d='M3 3L11 11M11 3L3 11' stroke='currentColor' stroke-width='2.2' stroke-linecap='round'/></svg><span>닫기</span></button>",
       "    </div>",
       "  </div>",
-      "  <div style='padding:14px 16px;overflow-y:auto;flex:1;'>",
-      "    <div style='font-size:12px;color:#fde68a;font-weight:700;margin-bottom:8px;'>📅 " + uxEsc(it.match_dt_full_kst || it.match_dt_kst || it.status_badge) + (it.venue ? " · 🏟️ " + uxEsc(it.venue) : "") + "</div>",
-      "    <div style='background:linear-gradient(135deg,#020617,#1e293b);border:1px solid #334155;border-radius:14px;padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;margin-bottom:12px;'>",
-      "      <div style='font-weight:900;font-size:15.5px;'>" + uxEsc(it.home) + "</div>",
-      "      <div style='text-align:center;'>",
-      "        <div style='font-weight:900;font-size:24px;color:#38bdf8;'>" + (it.state === "pre" ? "VS" : (uxEsc(it.home_score) + " : " + uxEsc(it.away_score))) + "</div>",
-      (it.period_scores ? "<div style='font-size:11px;color:#93c5fd;margin-top:2px;'>" + uxEsc(it.period_scores) + "</div>" : ""),
+      "  <div style='padding:12px 15px;overflow-y:auto;flex:1;'>",
+      "    <div style='font-size:11.5px;color:#fde68a;font-weight:700;margin-bottom:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>📅 " + uxEsc(it.match_dt_full_kst || it.match_dt_kst || it.status_badge) + (it.venue ? " · 🏟️ " + uxEsc(it.venue) : "") + "</div>",
+      "    <div style='background:linear-gradient(135deg,#020617,#1e293b);border:1px solid #334155;border-radius:13px;padding:11px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px;margin-bottom:10px;'>",
+      "      <div style='font-weight:900;font-size:14.5px;line-height:1.28;word-break:keep-all;'>" + uxEsc(it.home) + "</div>",
+      "      <div style='text-align:center;padding:0 4px;'>",
+      "        <div style='font-weight:900;font-size:21px;color:#38bdf8;font-variant-numeric:tabular-nums;'>" + (it.state === "pre" ? "VS" : (uxEsc(it.home_score) + " : " + uxEsc(it.away_score))) + "</div>",
+      (it.period_scores ? "<div style='font-size:10.5px;color:#93c5fd;margin-top:1px;'>" + uxEsc(it.period_scores) + "</div>" : ""),
       "      </div>",
-      "      <div style='font-weight:900;font-size:15.5px;text-align:right;'>" + uxEsc(it.away) + "</div>",
+      "      <div style='font-weight:900;font-size:14.5px;line-height:1.28;text-align:right;word-break:keep-all;'>" + uxEsc(it.away) + "</div>",
       "    </div>",
-      "    <div id='sqMatchInsightTabsV30' style='display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px;'>",
-      "      <button type='button' class='sq-v30-insight-tab active' data-mitab='summary'>📊 요약 · 확률격차</button>",
+      "    <div id='sqMatchInsightTabsV30'>",
+      "      <button type='button' class='sq-v30-insight-tab active' data-mitab='summary'>📊 요약 · 팬투표</button>",
       "      <button type='button' class='sq-v30-insight-tab' data-mitab='stats'>📈 스탯 · 흐름</button>",
-      "      <button type='button' class='sq-v30-insight-tab' data-mitab='h2h'>⚔️ 전력 · 순위 · 부상</button>",
+      "      <button type='button' class='sq-v30-insight-tab' data-mitab='h2h'>⚔️ 순위 · 부상</button>",
       "      <button type='button' class='sq-v30-insight-tab' data-mitab='lineup'>" + tacMeta.tabLabel + "</button>",
-      "      <button type='button' class='sq-v30-insight-tab' data-mitab='talk'>💬 이 경기 한줄톡</button>",
+      "      <button type='button' class='sq-v30-insight-tab' data-mitab='talk'>💬 한줄톡</button>",
       "    </div>",
-      "    <div id='sqMatchInsightBodyV30' style='background:#020617;border:1px solid #1e293b;border-radius:12px;padding:13px;min-height:150px;font-size:12.5px;line-height:1.6;'></div>",
+      "    <div id='sqMatchInsightBodyV30' style='background:#020617;border:1px solid #1e293b;border-radius:12px;padding:11px 12px;min-height:132px;font-size:12.2px;line-height:1.55;'></div>",
       "  </div>",
-      "  <div style='padding:12px 16px;border-top:1px solid #1e293b;background:#090f1f;display:flex;flex-wrap:wrap;gap:7px;'>",
-      "    <button type='button' id='sqBridgeTacticalV30' style='flex:1;min-width:150px;background:rgba(56,189,248,.16);border:1px solid rgba(56,189,248,.5);color:#7dd3fc;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:800;cursor:pointer;'>🧪 전술판으로 매치업 불러오기</button>",
-      "    <button type='button' id='sqBridgeWritePostV30' style='flex:1;min-width:165px;background:linear-gradient(135deg,#10b981,#059669);border:0;color:#020617;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:900;cursor:pointer;'>✍️ 이 경기로 분석글 쓰기 (+15P)</button>",
-      "    <button type='button' id='sqBridgeStandingsV30' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:10px;padding:8px 11px;font-size:12px;font-weight:800;cursor:pointer;'>🔢 순위표</button>",
+      "  <div style='padding:10px 15px;border-top:1px solid #1e293b;background:#090f1f;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;'>",
+      "    <button type='button' id='sqBridgeWritePostV30' style='flex:1.25;min-width:0;height:36px;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#10b981,#34d399);border:1px solid transparent;color:#022c22;border-radius:10px;padding:0 10px;font-size:11.6px;font-weight:900;cursor:pointer;white-space:nowrap;box-sizing:border-box;'>✍️ 분석글 쓰기 (+15P)</button>",
+      "    <button type='button' id='sqBridgeTacticalV30' style='flex:1;min-width:0;height:36px;display:inline-flex;align-items:center;justify-content:center;background:rgba(56,189,248,.16);border:1px solid rgba(56,189,248,.5);color:#7dd3fc;border-radius:10px;padding:0 9px;font-size:11.6px;font-weight:800;cursor:pointer;white-space:nowrap;box-sizing:border-box;'>🧪 전술판</button>",
+      "    <button type='button' id='sqBridgeStandingsV30' style='flex:0 0 auto;height:36px;display:inline-flex;align-items:center;justify-content:center;background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:10px;padding:0 10px;font-size:11.6px;font-weight:800;cursor:pointer;white-space:nowrap;box-sizing:border-box;'>🔢 순위표</button>",
       "  </div>",
       "</div>"
     ].join("");
@@ -8389,18 +8560,21 @@ _FRONTEND_V22_JS = r'''
           ? (uxEsc(it.home) + " 측 AI 확률(" + hp + "%)이 배당 내재확률(" + mktH + "%) 대비 <strong style='color:" + (edgeH >= 0 ? "#34d399" : "#fbbf24") + ";'>" + (edgeH >= 0 ? "+" : "") + edgeH + "%p</strong> 차이를 보입니다.")
           : (uxEsc(it.away) + " 측 AI 확률(" + ap + "%)이 배당 내재확률(" + mktA + "%) 대비 <strong style='color:" + (edgeA >= 0 ? "#34d399" : "#fbbf24") + ";'>" + (edgeA >= 0 ? "+" : "") + edgeA + "%p</strong> 차이를 보입니다.");
         box.innerHTML = [
-          "<div style='font-weight:800;color:#6ee7b7;margin-bottom:8px;'>🤖 SportIQ 앙상블 확률 vs 시장 배당 내재확률 비교</div>",
-          "<div style='display:flex;height:10px;border-radius:999px;overflow:hidden;background:#1e293b;margin-bottom:6px;'>",
+          "<div style='display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:5px;'>" +
+          "  <span style='font-weight:800;color:#6ee7b7;font-size:11.8px;'>🤖 AI 승률 vs 시장 배당 비교</span>" +
+          "  <span style='font-size:10.8px;color:#cbd5e1;'>배당 " + uxEsc(odds.home || "-") + (dp > 0 ? " / " + uxEsc(odds.draw || "-") : "") + " / " + uxEsc(odds.away || "-") + "</span>" +
+          "</div>",
+          "<div style='display:flex;height:7px;border-radius:999px;overflow:hidden;background:#1e293b;margin-bottom:6px;'>",
           "  <div style='width:" + hp + "%;background:#10b981;'></div>",
           (dp > 0 ? "<div style='width:" + dp + "%;background:#64748b;'></div>" : ""),
           "  <div style='width:" + ap + "%;background:#38bdf8;'></div>",
           "</div>",
-          "<div style='display:grid;grid-template-columns:repeat(" + (dp > 0 ? 3 : 2) + ",minmax(0,1fr));gap:8px;text-align:center;margin-bottom:10px;'>",
-          "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:7px;'><div style='color:#94a3b8;font-size:11px;'>홈승 (" + uxEsc(it.home) + ")</div><strong style='color:#34d399;font-size:14px;'>AI " + hp + "%</strong><div style='color:#64748b;font-size:10.5px;'>시장 " + mktH + "% · 배당 " + uxEsc(odds.home || "-") + "</div></div>",
-          (dp > 0 ? "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:7px;'><div style='color:#94a3b8;font-size:11px;'>무승부</div><strong style='color:#cbd5e1;font-size:14px;'>AI " + dp + "%</strong><div style='color:#64748b;font-size:10.5px;'>시장 " + mktD + "% · 배당 " + uxEsc(odds.draw || "-") + "</div></div>" : ""),
-          "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:7px;'><div style='color:#94a3b8;font-size:11px;'>원정승 (" + uxEsc(it.away) + ")</div><strong style='color:#38bdf8;font-size:14px;'>AI " + ap + "%</strong><div style='color:#64748b;font-size:10.5px;'>시장 " + mktA + "% · 배당 " + uxEsc(odds.away || "-") + "</div></div>",
+          "<div style='display:grid;grid-template-columns:repeat(" + (dp > 0 ? 3 : 2) + ",minmax(0,1fr));gap:6px;text-align:center;margin-bottom:7px;'>",
+          "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:6px 5px;min-width:0;'><div style='color:#94a3b8;font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>🏠 " + uxEsc(it.home) + "</div><strong style='color:#34d399;font-size:13.5px;'>AI " + hp + "%</strong><div style='color:#64748b;font-size:10px;'>시장 " + mktH + "%</div></div>",
+          (dp > 0 ? "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:6px 5px;min-width:0;'><div style='color:#94a3b8;font-size:10.5px;'>⚖️ 무승부</div><strong style='color:#cbd5e1;font-size:13.5px;'>AI " + dp + "%</strong><div style='color:#64748b;font-size:10px;'>시장 " + mktD + "%</div></div>" : ""),
+          "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:6px 5px;min-width:0;'><div style='color:#94a3b8;font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>✈️ " + uxEsc(it.away) + "</div><strong style='color:#38bdf8;font-size:13.5px;'>AI " + ap + "%</strong><div style='color:#64748b;font-size:10px;'>시장 " + mktA + "%</div></div>",
           "</div>",
-          "<div style='background:rgba(16,185,129,.08);border:1px solid rgba(52,211,153,.3);border-radius:9px;padding:9px 11px;color:#e2e8f0;margin-bottom:10px;'>💡 <strong>밸류 핵심 요약:</strong> " + edgeNote + "</div>",
+          "<div style='background:rgba(16,185,129,.08);border:1px solid rgba(52,211,153,.28);border-radius:9px;padding:7px 10px;font-size:11.4px;color:#e2e8f0;margin-bottom:8px;word-break:keep-all;'>💡 " + edgeNote + "</div>",
           "<div id='sqMatchFanVoteCardV32' style='background:linear-gradient(145deg,rgba(15,23,42,.96),rgba(2,6,23,.96));border:1px solid rgba(56,189,248,.38);border-radius:11px;padding:10px 12px;'>",
           "  <div style='display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;'>",
           "    <div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;'>",
@@ -8435,7 +8609,7 @@ _FRONTEND_V22_JS = r'''
           if (rTag) {
             if (myP) {
               var myLbl = myP === "H" ? (it.home + " 승") : (myP === "A" ? (it.away + " 승") : "무승부");
-              var liveP = ((typeof state === "object" && state && state.points != null) ? state.points : ((vd && vd.points != null) ? vd.points : null)); rTag.textContent = "✅ +5P 적립됨" + (liveP != null ? " (보유 " + liveP + "P)" : "") + " · 내 픽: " + myLbl;
+              var liveP = ((typeof state === "object" && state && state.points != null) ? state.points : ((vd && vd.points != null) ? vd.points : null)); rTag.textContent = "✅ +5P 완료" + (liveP != null ? " (" + liveP + "P)" : "");
               rTag.style.background = "rgba(56,189,248,.2)";
               rTag.style.borderColor = "rgba(56,189,248,.55)";
               rTag.style.color = "#7dd3fc";
@@ -8584,10 +8758,22 @@ _FRONTEND_V22_JS = r'''
           var injData = arr[1] || {};
           var rows = stData.standings || [];
           function matchTeamRow(name) {
-            var n = String(name || "").toLowerCase();
+            var nRaw = String(name || "").trim();
+            var nLow = nRaw.toLowerCase();
+            var nKo = localizeTeamKoJsV381(nRaw).toLowerCase();
+            var nCanon = canonicalKellyTeamKeyV36(nRaw);
             return rows.find(function (r) {
-              var rt = String(r.team || "").toLowerCase();
-              return rt === n || rt.indexOf(n) !== -1 || n.indexOf(rt) !== -1;
+              var rtRaw = String((r && r.team) || "").trim();
+              if (!rtRaw) return false;
+              var rtLow = rtRaw.toLowerCase();
+              var rtKo = localizeTeamKoJsV381(rtRaw).toLowerCase();
+              var rtCanon = canonicalKellyTeamKeyV36(rtRaw);
+              return (
+                rtLow === nLow || rtKo === nKo ||
+                (nCanon && rtCanon && nCanon === rtCanon) ||
+                (rtKo.length >= 2 && (rtKo.indexOf(nKo) !== -1 || nKo.indexOf(rtKo) !== -1)) ||
+                (rtLow.length >= 3 && (rtLow.indexOf(nLow) !== -1 || nLow.indexOf(rtLow) !== -1))
+              );
             });
           }
           var hRow = matchTeamRow(it.home);
@@ -8611,15 +8797,15 @@ _FRONTEND_V22_JS = r'''
             if (ptsRaw) recParts.push("승점 " + uxEsc(ptsRaw));
             else if (pctRaw) recParts.push("승률 " + uxEsc(pctRaw));
             var recStr = recParts.length ? " (" + recParts.join(" · ") + ")" : "";
-            return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;'><span><strong style='color:#fde68a;'>#" + uxEsc(rObj.rank) + "</strong> <strong>" + uxEsc(rObj.team) + "</strong>" + recStr + "</span><span style='font-size:11px;color:#34d399;font-weight:800;'>최근폼 " + uxEsc(fm) + "</span></div>";
+            return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;'><span><strong style='color:#fde68a;'>#" + uxEsc(rObj.rank) + "</strong> <strong>" + uxEsc(localizeTeamKoJsV381(rObj.team)) + "</strong>" + recStr + "</span><span style='font-size:11px;color:#34d399;font-weight:800;'>최근폼 " + uxEsc(fm) + "</span></div>";
           }
           var teamInjs = (injData.items || []).filter(function (x) {
-            var tm = String(x.team || "");
-            return tm.indexOf(it.home) !== -1 || it.home.indexOf(tm) !== -1 || tm.indexOf(it.away) !== -1 || it.away.indexOf(tm) !== -1;
+            var tmKo = localizeTeamKoJsV381(String(x.team || ""));
+            return tmKo.indexOf(it.home) !== -1 || it.home.indexOf(tmKo) !== -1 || tmKo.indexOf(it.away) !== -1 || it.away.indexOf(tmKo) !== -1;
           }).slice(0, 5);
           var injHtml = teamInjs.length
             ? teamInjs.map(function (x) {
-                return "<div style='font-size:11.5px;padding:4px 0;border-bottom:1px solid #1e293b;'>🏥 <strong>[" + uxEsc(x.team) + "] " + uxEsc(x.player) + "</strong> · " + uxEsc(x.reason) + " <span style='color:#fbbf24;'>(" + uxEsc(x.severity) + ")</span></div>";
+                return "<div style='font-size:11.5px;padding:4px 0;border-bottom:1px solid #1e293b;'>🏥 <strong>[" + uxEsc(localizeTeamKoJsV381(x.team)) + "] " + uxEsc(x.player) + "</strong> · " + uxEsc(x.reason) + " <span style='color:#fbbf24;'>(" + uxEsc(x.severity) + ")</span></div>";
               }).join("")
             : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>";
           box.innerHTML = (
@@ -8701,6 +8887,8 @@ _FRONTEND_V22_JS = r'''
       if (typeof window.switchTab === "function") window.switchTab("lab");
       setTimeout(function () {
         var labSec = document.getElementById("tab-lab") || document.body;
+        var tacSubBtn = document.querySelector("#sqLabSubNavV42 [data-sq-lab-tab='tactics']");
+        if (tacSubBtn) { try { tacSubBtn.click(); } catch (eSub) {} }
         if (tacMeta.labPresetKw) {
           var pBtns = labSec.querySelectorAll("button");
           for (var i = 0; i < pBtns.length; i++) {
@@ -8735,10 +8923,13 @@ _FRONTEND_V22_JS = r'''
       var bEl = document.getElementById("postContent");
       var lEl = document.getElementById("postLeague");
       var gEl = document.getElementById("postTags");
-      if (lEl && it.league_code) {
+      try { polishWriteModalV44(); } catch (ePW) {}
+      if (lEl) {
+        var mappedLg = mapLeagueCodeForWriteV44(it.league_code || it.league || it.sport || "EPL");
         Array.prototype.forEach.call(lEl.options || [], function (opt) {
-          if (opt.value.toUpperCase() === String(it.league_code).toUpperCase()) lEl.value = opt.value;
+          if (String(opt.value || "").toUpperCase() === mappedLg) lEl.value = opt.value;
         });
+        try { syncWriteTagChipsV44(); } catch (eTG) {}
       }
       if (tEl) tEl.value = "[매치 프리뷰] " + it.home + " vs " + it.away + " 전력·배당 핵심 분석";
       if (bEl) {
@@ -8879,7 +9070,7 @@ _FRONTEND_V22_JS = r'''
     installGlobalCardClickCaptureV30();
     ensureRootTickerObserverV31();
     window.__openDcScorePopup = function (idx) {
-      var items = v30ScoreState.items || window.__dcLatestScoreItems || [];
+      var items = (v30ScoreState.items && v30ScoreState.items.length) ? v30ScoreState.items : (window.__dcLatestScoreItems || []);
       var it = items[idx];
       if (it) openMatchInsightModalByItemV30(it);
     };
@@ -10918,7 +11109,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"4400_{int(time.time())}"
+_BOOT_VER_V30 = f"4500_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -14712,7 +14903,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.4-clean-modals-and-member-hub",
+        "engine_version": "4.5-clean-comment-and-insight-modals",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
