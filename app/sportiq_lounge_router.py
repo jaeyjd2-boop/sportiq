@@ -5048,6 +5048,216 @@ _FRONTEND_V22_JS = r'''
   // v3.4.1 Lock 3: Sync sport pill total counts + route KBL/WKBL DataCenter standings via NBA basketball renderer + live-scores fetch bridge!
   var _sqProxyDcLeagueV341 = "";
   var _sqProxyDcTimerV341 = null;
+  var _sqActiveDomDcLeagueV4625 = "";
+  var _sqInternalNbaTriggerV4625 = false;
+  var _inDcHubDomSyncV4625 = false;
+
+  function isDomesticDcLeagueCodeV4625(cd) {
+    var u = String(cd || "").toUpperCase();
+    return u === "KBL" || u === "WKBL" || u === "VLEAGUE_M" || u === "VLEAGUE_W";
+  }
+
+  function isNbaLeaguePillBtnV4625(btn) {
+    if (!btn || btn.getAttribute("data-sq-dc-lg")) return false;
+    var oc = String(btn.getAttribute("onclick") || "");
+    var tx = String(btn.textContent || "").trim();
+    if (/\(\s*['"]NBA['"]\s*\)/i.test(oc)) return true;
+    return /\bNBA\b/i.test(tx) && !/WNBA/i.test(tx);
+  }
+
+  function isLegacyMixedVleaguePillBtnV4625(btn) {
+    if (!btn || btn.getAttribute("data-sq-dc-lg")) return false;
+    var oc = String(btn.getAttribute("onclick") || "");
+    var tx = String(btn.textContent || "").trim();
+    if (/\(\s*['"]VLEAGUE['"]\s*\)/i.test(oc)) return true;
+    return /^(?:🏐\s*)?(?:V-?리그|VLEAGUE)$/i.test(tx);
+  }
+
+  function installDcHubGlobalsBridgeV4625() {
+    var specs = [
+      ["__setDcStLeague", "standings"],
+      ["__setDcSimLeague", "season-sim"],
+      ["__setDcInjLeague", "injuries"]
+    ];
+    specs.forEach(function (sp) {
+      var fnName = sp[0];
+      var tabKind = sp[1];
+      var fn = window[fnName];
+      if (typeof fn === "function" && !fn.__sqWrappedV4625) {
+        var wrapped = function (cd) {
+          var up = String(cd || "").toUpperCase();
+          if (up === "VLEAGUE") {
+            triggerDomesticDcStandingsV341("VLEAGUE_M", tabKind);
+            return;
+          }
+          if (isDomesticDcLeagueCodeV4625(up)) {
+            triggerDomesticDcStandingsV341(up, tabKind);
+            return;
+          }
+          if (!_sqInternalNbaTriggerV4625) {
+            _sqActiveDomDcLeagueV4625 = "";
+            _sqProxyDcLeagueV341 = "";
+          }
+          var r = fn.apply(this, arguments);
+          syncDcHubDomesticPillsAndHighlightV4625();
+          return r;
+        };
+        wrapped.__sqWrappedV4625 = true;
+        window[fnName] = wrapped;
+      }
+    });
+    if (typeof window.__switchDcTab === "function" && !window.__switchDcTab.__sqWrappedV4625) {
+      var origSw = window.__switchDcTab;
+      var wrappedSw = function (tab, optionalLeague) {
+        var optUp = String(optionalLeague || "").toUpperCase();
+        if (optUp === "VLEAGUE") {
+          triggerDomesticDcStandingsV341("VLEAGUE_M", tab || "standings");
+          return;
+        }
+        if (isDomesticDcLeagueCodeV4625(optUp)) {
+          triggerDomesticDcStandingsV341(optUp, tab || "standings");
+          return;
+        }
+        if (optUp && !_sqInternalNbaTriggerV4625) {
+          _sqActiveDomDcLeagueV4625 = "";
+          _sqProxyDcLeagueV341 = "";
+        }
+        var r = origSw.apply(this, arguments);
+        syncDcHubDomesticPillsAndHighlightV4625();
+        return r;
+      };
+      wrappedSw.__sqWrappedV4625 = true;
+      window.__switchDcTab = wrappedSw;
+    }
+  }
+
+  function ensureDcHubBodyObserverV4625(hubBody) {
+    if (!hubBody || hubBody.__sqDcDomObsV4625 || typeof MutationObserver === "undefined") return;
+    hubBody.__sqDcDomObsV4625 = true;
+    var obs = new MutationObserver(function () {
+      if (_inDcHubDomSyncV4625) return;
+      syncDcHubDomesticPillsAndHighlightV4625();
+    });
+    obs.observe(hubBody, { childList: true, subtree: true });
+  }
+
+  function syncDcHubDomesticPillsAndHighlightV4625() {
+    if (_inDcHubDomSyncV4625) return;
+    _inDcHubDomSyncV4625 = true;
+    try {
+      installDcHubGlobalsBridgeV4625();
+      var hubBody = document.getElementById("dcHubBody");
+      if (!hubBody) return;
+      ensureDcHubBodyObserverV4625(hubBody);
+      var allBtns = hubBody.querySelectorAll("button");
+      var nbaBtn = null;
+      for (var i = 0; i < allBtns.length; i++) {
+        if (isNbaLeaguePillBtnV4625(allBtns[i])) {
+          nbaBtn = allBtns[i];
+          break;
+        }
+      }
+      if (!nbaBtn || !nbaBtn.parentElement) return;
+      var bar = nbaBtn.parentElement;
+      var ocStr = String(nbaBtn.getAttribute("onclick") || "");
+      var tabHint = ocStr.indexOf("__setDcSimLeague") !== -1
+        ? "season-sim"
+        : (ocStr.indexOf("__setDcInjLeague") !== -1 ? "injuries" : "standings");
+
+      Array.prototype.forEach.call(bar.querySelectorAll("button"), function (b) {
+        if (isLegacyMixedVleaguePillBtnV4625(b)) {
+          b.style.display = "none";
+          b.classList.remove("active");
+          b.setAttribute("data-sq-hidden-legacy-vl", "1");
+        }
+      });
+
+      if (!bar.querySelector("[data-sq-dc-lg='VLEAGUE_M']")) {
+        var anchor = nbaBtn;
+        [
+          ["KBL", "🏀 KBL"],
+          ["WKBL", "🏀 WKBL"],
+          ["VLEAGUE_M", "🏐 V-리그 남자부"],
+          ["VLEAGUE_W", "🏐 V-리그 여자부"]
+        ].forEach(function (pair) {
+          var code = pair[0];
+          var lbl = pair[1];
+          var existing = bar.querySelector("[data-sq-dc-lg='" + code + "']");
+          if (existing) {
+            anchor = existing;
+            return;
+          }
+          var nb = nbaBtn.cloneNode(true);
+          nb.textContent = lbl;
+          nb.classList.remove("active");
+          nb.style.background = "";
+          nb.style.color = "";
+          nb.style.borderColor = "";
+          nb.setAttribute("data-sq-dc-lg", code);
+          nb.removeAttribute("onclick");
+          nb.onclick = function (ev) {
+            if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+            triggerDomesticDcStandingsV341(code, tabHint);
+          };
+          if (anchor.nextSibling) bar.insertBefore(nb, anchor.nextSibling);
+          else bar.appendChild(nb);
+          anchor = nb;
+        });
+      } else {
+        Array.prototype.forEach.call(bar.querySelectorAll("button[data-sq-dc-lg]"), function (nb) {
+          var code = nb.getAttribute("data-sq-dc-lg") || "";
+          nb.onclick = function (ev) {
+            if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+            triggerDomesticDcStandingsV341(code, tabHint);
+          };
+        });
+      }
+
+      Array.prototype.forEach.call(bar.querySelectorAll("button"), function (b) {
+        if (b.getAttribute("data-sq-dc-lg") || b.getAttribute("data-sq-hidden-legacy-vl")) return;
+        if (!b.getAttribute("data-sq-nondom-bound")) {
+          b.setAttribute("data-sq-nondom-bound", "1");
+          b.addEventListener("click", function () {
+            if (_sqInternalNbaTriggerV4625) return;
+            _sqActiveDomDcLeagueV4625 = "";
+            _sqProxyDcLeagueV341 = "";
+            Array.prototype.forEach.call(bar.querySelectorAll("button[data-sq-dc-lg]"), function (db) {
+              db.classList.remove("active");
+              db.style.background = "";
+              db.style.color = "";
+              db.style.borderColor = "";
+            });
+          }, true);
+        }
+      });
+
+      if (isDomesticDcLeagueCodeV4625(_sqActiveDomDcLeagueV4625)) {
+        Array.prototype.forEach.call(bar.querySelectorAll("button"), function (b) {
+          var dcLg = String(b.getAttribute("data-sq-dc-lg") || "").toUpperCase();
+          if (dcLg === _sqActiveDomDcLeagueV4625) {
+            b.classList.add("active");
+            b.style.background = "#2563eb";
+            b.style.color = "#ffffff";
+            b.style.borderColor = "#3b82f6";
+          } else {
+            b.classList.remove("active");
+            b.style.background = "";
+            b.style.color = "";
+            b.style.borderColor = "";
+          }
+        });
+      } else {
+        Array.prototype.forEach.call(bar.querySelectorAll("button[data-sq-dc-lg]"), function (b) {
+          b.classList.remove("active");
+          b.style.background = "";
+          b.style.color = "";
+          b.style.borderColor = "";
+        });
+      }
+    } finally {
+      _inDcHubDomSyncV4625 = false;
+    }
+  }
 
   function ensureDcHubExpandedForStandingsV344() {
     var hub = document.getElementById("dcMainHubSection") || document.querySelector(".dc-hub-wrap");
@@ -5066,6 +5276,7 @@ _FRONTEND_V22_JS = r'''
       hb.setAttribute("data-sq-dc-user-open", "1");
       hb.classList.remove("hidden");
       hb.style.setProperty("display", "block", "important");
+      ensureDcHubBodyObserverV4625(hb);
     }
     var tg = document.getElementById("dcToggleHubBtn");
     if (tg) tg.textContent = "접기 ▲";
@@ -5074,8 +5285,17 @@ _FRONTEND_V22_JS = r'''
   function jumpToLeagueStandingsV345(rawCode) {
     var code = String(rawCode || "EPL").toUpperCase();
     ensureDcHubExpandedForStandingsV344();
+    installDcHubGlobalsBridgeV4625();
 
-    // 1. If DataCenter has a folded toggle button (`펼치기 ▼`), click it!
+    if (code === "KBL" || code === "WKBL" || code === "VLEAGUE_M" || code === "VLEAGUE_W" || code === "VLEAGUE") {
+      var domTarget = code === "VLEAGUE" ? "VLEAGUE_M" : code;
+      _sqActiveDomDcLeagueV4625 = domTarget;
+      _sqProxyDcLeagueV341 = domTarget;
+    } else {
+      _sqActiveDomDcLeagueV4625 = "";
+      _sqProxyDcLeagueV341 = "";
+    }
+
     var dcSec = document.getElementById("dcMainHubSection") || document.querySelector(".dc-hub-wrap") || document.body;
     Array.prototype.forEach.call(dcSec.querySelectorAll("button, a"), function (b) {
       var tx = String(b.textContent || "").trim();
@@ -5084,16 +5304,15 @@ _FRONTEND_V22_JS = r'''
       }
     });
 
-    // 2. Ensure `🔢 리그 순위` tab is active inside DataCenter so league buttons (`EPL`, `NBA`, ...) are mounted!
     var hb = document.getElementById("dcHubBody");
     var hasNbaBtn = false;
     if (hb) {
       Array.prototype.forEach.call(hb.querySelectorAll("button"), function (b) {
-        if (String(b.textContent || "").trim() === "NBA") hasNbaBtn = true;
+        if (isNbaLeaguePillBtnV4625(b)) hasNbaBtn = true;
       });
     }
     if (!hasNbaBtn) {
-      var launchRoot = document.getElementById("dcLauncherGrid") || dcSec;
+      var launchRoot = document.getElementById("dcLaunchCards") || document.getElementById("dcLauncherGrid") || dcSec;
       var cards = launchRoot.querySelectorAll("div, button, article");
       for (var i = 0; i < cards.length; i++) {
         var ct = String(cards[i].textContent || "");
@@ -5104,20 +5323,16 @@ _FRONTEND_V22_JS = r'''
       }
     }
 
-    // 3. After standings bar mounts, ensure KBL/WKBL buttons exist, click target league, and scroll smoothly!
     setTimeout(function () {
       ensureDcHubExpandedForStandingsV344();
       ensureDomesticBasketballUiControlsV34();
       var hubBody = document.getElementById("dcHubBody");
-      if (code === "KBL" || code === "WKBL") {
-        triggerDomesticDcStandingsV341(code, "");
+      if (code === "KBL" || code === "WKBL" || code === "VLEAGUE_M" || code === "VLEAGUE_W" || code === "VLEAGUE") {
+        triggerDomesticDcStandingsV341(code === "VLEAGUE" ? "VLEAGUE_M" : code, "standings");
       } else if (hubBody) {
         var aliasCandidates = [code];
         var fallbackSwitchCode = code;
-        if (code === "VLEAGUE_M" || code === "VLEAGUE_W" || code === "VLEAGUE") {
-          aliasCandidates = ["V-리그", "VLEAGUE"];
-          fallbackSwitchCode = "VLEAGUE";
-        } else if (code === "WTA" || code === "ATP" || code === "TENNIS") {
+        if (code === "WTA" || code === "ATP" || code === "TENNIS") {
           aliasCandidates = [code, "ATP 랭킹", "ATP", "테니스"];
           fallbackSwitchCode = "ATP";
         } else if (code === "UFC" || code === "MMA") {
@@ -5138,6 +5353,7 @@ _FRONTEND_V22_JS = r'''
         for (var aIdx = 0; aIdx < aliasCandidates.length && !clicked; aIdx++) {
           var cand = aliasCandidates[aIdx];
           for (var j = 0; j < btns.length; j++) {
+            if (btns[j].getAttribute("data-sq-dc-lg") || btns[j].getAttribute("data-sq-hidden-legacy-vl")) continue;
             var bt = String(btns[j].textContent || "").trim();
             if (bt.toUpperCase() === cand.toUpperCase() || bt.toUpperCase().indexOf(cand.toUpperCase()) !== -1) {
               clicked = true;
@@ -5157,51 +5373,51 @@ _FRONTEND_V22_JS = r'''
       if (scrollTarget && scrollTarget.scrollIntoView) {
         try { scrollTarget.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e5) {}
       }
-    }, 110);
+    }, 60);
   }
 
   function triggerDomesticDcStandingsV341(code, targetTab) {
     ensureDcHubExpandedForStandingsV344();
+    installDcHubGlobalsBridgeV4625();
     var cu = String(code || "KBL").toUpperCase();
+    if (cu === "VLEAGUE") cu = "VLEAGUE_M";
+    _sqActiveDomDcLeagueV4625 = cu;
     _sqProxyDcLeagueV341 = cu;
     if (_sqProxyDcTimerV341) clearTimeout(_sqProxyDcTimerV341);
-    _sqProxyDcTimerV341 = setTimeout(function () { _sqProxyDcLeagueV341 = ""; }, 1800);
+    _sqProxyDcTimerV341 = setTimeout(function () { _sqProxyDcLeagueV341 = ""; }, 2500);
 
-    var hubBody = document.getElementById("dcHubBody");
-    if (targetTab && typeof window.__switchDcTab === "function") {
-      try { window.__switchDcTab(targetTab, "NBA"); } catch (e) {}
-    } else if (hubBody) {
-      var btns = hubBody.querySelectorAll("button");
-      var clickedNba = false;
-      for (var i = 0; i < btns.length; i++) {
-        if (String(btns[i].textContent || "").trim() === "NBA") {
-          clickedNba = true;
-          try { btns[i].click(); } catch (e) {}
-          break;
+    var effTab = targetTab || "standings";
+    _sqInternalNbaTriggerV4625 = true;
+    try {
+      if (effTab === "season-sim" && typeof window.__setDcSimLeague === "function" && document.querySelector("#dcLaunchCards .dc-launch-card.active[data-tab='season-sim']")) {
+        window.__setDcSimLeague("NBA");
+      } else if (effTab === "injuries" && typeof window.__setDcInjLeague === "function" && document.querySelector("#dcLaunchCards .dc-launch-card.active[data-tab='injuries']")) {
+        window.__setDcInjLeague("NBA");
+      } else if (effTab === "standings" && typeof window.__setDcStLeague === "function" && document.querySelector("#dcLaunchCards .dc-launch-card.active[data-tab='standings']")) {
+        window.__setDcStLeague("NBA");
+      } else if (typeof window.__switchDcTab === "function") {
+        window.__switchDcTab(effTab, "NBA");
+      } else {
+        var hubBody = document.getElementById("dcHubBody");
+        if (hubBody) {
+          var btns = hubBody.querySelectorAll("button");
+          for (var i = 0; i < btns.length; i++) {
+            if (isNbaLeaguePillBtnV4625(btns[i])) {
+              try { btns[i].click(); } catch (e) {}
+              break;
+            }
+          }
         }
       }
-      if (!clickedNba && typeof window.__switchDcTab === "function") {
-        try { window.__switchDcTab("standings", "NBA"); } catch (e) {}
-      }
+    } catch (eTrig) {
+    } finally {
+      _sqInternalNbaTriggerV4625 = false;
     }
-    setTimeout(function () {
-      var hb = document.getElementById("dcHubBody");
-      if (!hb) return;
-      Array.prototype.forEach.call(hb.querySelectorAll("button"), function (b) {
-        var t = String(b.textContent || "").trim();
-        if (t === cu) {
-          b.classList.add("active");
-          b.style.background = "#2563eb";
-          b.style.color = "#ffffff";
-          b.style.borderColor = "#3b82f6";
-        } else if (b.parentElement && b.parentElement.querySelector("[data-sq-dc-lg]")) {
-          b.classList.remove("active");
-          b.style.background = "";
-          b.style.color = "";
-          b.style.borderColor = "";
-        }
-      });
-    }, 180);
+
+    syncDcHubDomesticPillsAndHighlightV4625();
+    setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 80);
+    setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 220);
+    setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 480);
   }
 
   function installDomesticBballFetchBridgeV341() {
@@ -5217,24 +5433,26 @@ _FRONTEND_V22_JS = r'''
           var ep = mDc[1];
           var qs = new URLSearchParams(mDc[2] || "");
           var reqLg = String(qs.get("league") || "").toUpperCase();
-          if (_sqProxyDcLeagueV341 && (reqLg === "NBA" || reqLg === "EPL" || !reqLg)) {
-            reqLg = _sqProxyDcLeagueV341;
+          var activeDom = _sqProxyDcLeagueV341 || _sqActiveDomDcLeagueV4625;
+          if (activeDom && (reqLg === "NBA" || reqLg === "EPL" || !reqLg)) {
+            reqLg = activeDom;
           }
-          if (reqLg === "KBL" || reqLg === "WKBL") {
+          if (reqLg === "KBL" || reqLg === "WKBL" || reqLg === "VLEAGUE_M" || reqLg === "VLEAGUE_W" || reqLg === "VLEAGUE") {
+            var normDomLg = reqLg === "VLEAGUE" ? "VLEAGUE_M" : reqLg;
+            _sqActiveDomDcLeagueV4625 = normDomLg;
             var kind = ep === "season-sim" ? "sim" : (ep === "injuries" ? "injuries" : "standings");
-            var newUrl = "/api/member/domestic-bball-meta-v34?kind=" + kind + "&league=" + reqLg + "&severity=" + encodeURIComponent(qs.get("severity") || "all") + "&q=" + encodeURIComponent(qs.get("q") || "");
-            return _prevFetch.call(window, newUrl, init);
+            var newUrl = "/api/member/domestic-bball-meta-v34?kind=" + kind + "&league=" + normDomLg + "&severity=" + encodeURIComponent(qs.get("severity") || "all") + "&q=" + encodeURIComponent(qs.get("q") || "");
+            return _prevFetch.call(window, newUrl, init).then(function (resp) {
+              setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 0);
+              setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 60);
+              return resp;
+            });
           }
-        }
-        // Clear proxy flag if user explicitly clicked another league (e.g. EPL, LALIGA, NBA directly)
-        if (mDc && !_sqProxyDcLeagueV341) {
-          var hb = document.getElementById("dcHubBody");
-          if (hb) {
-            Array.prototype.forEach.call(hb.querySelectorAll("button[data-sq-dc-lg]"), function (b) {
-              b.classList.remove("active");
-              b.style.background = "";
-              b.style.color = "";
-              b.style.borderColor = "";
+          if (!_sqProxyDcLeagueV341 && !_sqActiveDomDcLeagueV4625) {
+            return _prevFetch.apply(window, arguments).then(function (resp) {
+              setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 0);
+              setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 60);
+              return resp;
             });
           }
         }
@@ -5393,30 +5611,22 @@ _FRONTEND_V22_JS = r'''
       sel.setAttribute("data-sq-v34-kbl", "1");
     }
 
-    // Also add KBL & WKBL league buttons inside #dcHubBody next to the NBA button whenever DataCenter renders!
-    var hubBody = document.getElementById("dcHubBody");
-    if (hubBody) {
-      var btns = hubBody.querySelectorAll("button");
-      for (var b = 0; b < btns.length; b++) {
-        var bt = String(btns[b].textContent || "").trim();
-        if (bt === "NBA" && btns[b].parentElement && !btns[b].parentElement.querySelector("[data-sq-dc-lg='KBL']")) {
-          var bar = btns[b].parentElement;
-          ["WKBL", "KBL"].forEach(function (code) {
-            var nb = btns[b].cloneNode(true);
-            nb.textContent = code;
-            nb.classList.remove("active");
-            nb.setAttribute("data-sq-dc-lg", code);
-            nb.removeAttribute("onclick");
-            nb.onclick = function (ev) {
-              if (ev) { ev.preventDefault(); ev.stopPropagation(); }
-              triggerDomesticDcStandingsV341(code, "");
-            };
-            if (btns[b].nextSibling) bar.insertBefore(nb, btns[b].nextSibling);
-            else bar.appendChild(nb);
-          });
-          break;
+    // v4.6.25: Mount KBL / WKBL / V-리그 남·여 pills and lock active highlight across async #dcHubBody re-renders
+    syncDcHubDomesticPillsAndHighlightV4625();
+    if (!window.__sqDcHubBootWatchV4625 && typeof MutationObserver !== "undefined" && document.body) {
+      window.__sqDcHubBootWatchV4625 = true;
+      var bootObs = new MutationObserver(function () {
+        var hbNow = document.getElementById("dcHubBody");
+        if (hbNow) {
+          syncDcHubDomesticPillsAndHighlightV4625();
+          if (hbNow.__sqDcDomObsV4625) {
+            try { bootObs.disconnect(); } catch (e) {}
+          }
         }
-      }
+      });
+      bootObs.observe(document.body, { childList: true, subtree: true });
+      setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 150);
+      setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 600);
     }
   }
 
@@ -10299,7 +10509,7 @@ _FRONTEND_V22_JS = r'''
       "    <div id='sqMatchInsightTabsV30'>",
       "      <button type='button' class='sq-v30-insight-tab active' data-mitab='summary'>📊 요약 · 팬투표</button>",
       "      <button type='button' class='sq-v30-insight-tab' data-mitab='stats'>📈 스탯 · 흐름</button>",
-      "      <button type='button' class='sq-v30-insight-tab' data-mitab='h2h'>⚔️ 순위 · 부상</button>",
+      "      <button type='button' class='sq-v30-insight-tab' data-mitab='h2h'>⚔️ 순위 · 맞대결</button>",
       "      <button type='button' class='sq-v30-insight-tab' data-mitab='lineup'>" + tacMeta.tabLabel + "</button>",
       "      <button type='button' class='sq-v30-insight-tab' data-mitab='talk'>💬 한줄톡</button>",
       "    </div>",
@@ -10520,11 +10730,26 @@ _FRONTEND_V22_JS = r'''
           "</div>"
         ].join("");
       } else if (tabKey === "h2h") {
-        box.innerHTML = "<div style='color:#94a3b8;'>⚔️ 양 팀 실시간 리그 순위·최근 폼 및 결장자 명단을 조회 중입니다...</div>";
-        var lgc = encodeURIComponent(it.league_code || "EPL");
+        box.innerHTML = "<div style='color:#94a3b8;'>⚔️ 양 팀 실시간 리그 순위·맞대결 전적 및 로스터 이슈를 조회 중입니다...</div>";
+        var rawLgCode = String(it.league_code || "").toUpperCase();
+        if (!rawLgCode || rawLgCode === "VLEAGUE") {
+          if (String(it.sport || "").toLowerCase() === "volleyball") {
+            rawLgCode = /여자|흥국|GS|도로공사|현대건설|IBK|정관장|SOOP|페퍼/.test(String(it.league || "") + " " + String(it.home || "")) ? "VLEAGUE_W" : "VLEAGUE_M";
+          } else {
+            rawLgCode = "EPL";
+          }
+        }
+        var isDomKrLg = (rawLgCode === "VLEAGUE_M" || rawLgCode === "VLEAGUE_W" || rawLgCode === "WKBL" || rawLgCode === "KBL");
+        var lgc = encodeURIComponent(rawLgCode);
+        var stFetchUrl = isDomKrLg
+          ? ("/api/member/domestic-bball-meta-v34?kind=standings&league=" + lgc + "&home=" + encodeURIComponent(it.home || "") + "&away=" + encodeURIComponent(it.away || ""))
+          : ("/api/datacenter/standings?league=" + lgc);
+        var injFetchUrl = isDomKrLg
+          ? ("/api/member/domestic-bball-meta-v34?kind=injuries&league=" + lgc)
+          : ("/api/datacenter/injuries?league=" + lgc);
         Promise.all([
-          fetch("/api/datacenter/standings?league=" + lgc).then(function (r) { return r.json(); }).catch(function () { return {}; }),
-          fetch("/api/datacenter/injuries?league=" + lgc).then(function (r) { return r.json(); }).catch(function () { return {}; })
+          fetch(stFetchUrl).then(function (r) { return r.json(); }).catch(function () { return {}; }),
+          fetch(injFetchUrl).then(function (r) { return r.json(); }).catch(function () { return {}; })
         ]).then(function (arr) {
           var stData = arr[0] || {};
           var injData = arr[1] || {};
@@ -10532,13 +10757,13 @@ _FRONTEND_V22_JS = r'''
           function matchTeamRow(name) {
             var nRaw = String(name || "").trim();
             var nLow = nRaw.toLowerCase();
-            var nKo = localizeTeamKoJsV381(nRaw).toLowerCase();
+            var nKo = localizeTeamKoJsV381(nRaw).toLowerCase().replace(/\s+/g, "");
             var nCanon = canonicalKellyTeamKeyV36(nRaw);
             return rows.find(function (r) {
               var rtRaw = String((r && r.team) || "").trim();
               if (!rtRaw) return false;
               var rtLow = rtRaw.toLowerCase();
-              var rtKo = localizeTeamKoJsV381(rtRaw).toLowerCase();
+              var rtKo = localizeTeamKoJsV381(rtRaw).toLowerCase().replace(/\s+/g, "");
               var rtCanon = canonicalKellyTeamKeyV36(rtRaw);
               return (
                 rtLow === nLow || rtKo === nKo ||
@@ -10550,30 +10775,67 @@ _FRONTEND_V22_JS = r'''
           }
           var hRow = matchTeamRow(it.home);
           var aRow = matchTeamRow(it.away);
+          var isBballOrBase = (it.sport === "basketball" || it.sport === "baseball" || rawLgCode === "KBL" || rawLgCode === "WKBL" || rawLgCode === "NBA" || rawLgCode === "WNBA");
           function fmtStanding(tName, rObj) {
-            if (!rObj) return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;'><strong>" + uxEsc(tName) + "</strong>: 국제대회·토너먼트 매치업</div>";
+            if (!rObj) return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;'><strong>" + uxEsc(tName) + "</strong>: 컵·국가대표·인터리그 매치업</div>";
             var fm = Array.isArray(rObj.form) ? rObj.form.join("·") : String(rObj.form || "-");
             var hasDrawStat = (it.sport === "soccer") || (Number(rObj.d || 0) > 0);
             var recParts = [];
+            if (rObj.gp !== undefined && rObj.gp !== null && Number(rObj.gp) > 0) {
+              recParts.push(uxEsc(rObj.gp) + "경기");
+            }
             if (rObj.w !== undefined && rObj.w !== null && String(rObj.w) !== "") {
               recParts.push(uxEsc(rObj.w) + "승" + (hasDrawStat ? " " + uxEsc(rObj.d || 0) + "무" : "") + " " + uxEsc(rObj.l != null ? rObj.l : 0) + "패");
             } else if (rObj.record) {
               recParts.push(uxEsc(rObj.record));
             }
-            var ptsRaw = (rObj.pts !== undefined && rObj.pts !== null && String(rObj.pts).trim() !== "")
-              ? String(rObj.pts).trim()
-              : ((rObj.points !== undefined && rObj.points !== null && String(rObj.points).trim() !== "") ? String(rObj.points).trim() : "");
-            var pctRaw = (rObj.pct !== undefined && rObj.pct !== null && String(rObj.pct).trim() !== "")
-              ? String(rObj.pct).trim()
-              : ((rObj.win_pct !== undefined && rObj.win_pct !== null && String(rObj.win_pct).trim() !== "") ? String(rObj.win_pct).trim() : "");
-            if (ptsRaw) recParts.push("승점 " + uxEsc(ptsRaw));
-            else if (pctRaw) recParts.push("승률 " + uxEsc(pctRaw));
+            if (isBballOrBase) {
+              var pctLbl = String(rObj.pts_label || rObj.win_pct || rObj.pct || "").trim();
+              if (!pctLbl && rObj.pts != null && Number(rObj.pts) > 1) {
+                pctLbl = "." + String(Math.round(Number(rObj.pts))).padStart(3, "0");
+              }
+              if (pctLbl) recParts.push("승률 " + uxEsc(pctLbl));
+              if (rObj.streak_ko) recParts.push(uxEsc(rObj.streak_ko));
+            } else {
+              var ptsRaw = (rObj.pts !== undefined && rObj.pts !== null && String(rObj.pts).trim() !== "")
+                ? String(rObj.pts).trim()
+                : String(rObj.pts_label || rObj.points || "").trim();
+              if (ptsRaw) recParts.push("승점 " + uxEsc(ptsRaw));
+              if (rObj.set_ratio) recParts.push("세트득실 " + uxEsc(rObj.set_ratio));
+            }
             var recStr = recParts.length ? " (" + recParts.join(" · ") + ")" : "";
             return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;'><span><strong style='color:#fde68a;'>#" + uxEsc(rObj.rank) + "</strong> <strong>" + uxEsc(localizeTeamKoJsV381(rObj.team)) + "</strong>" + recStr + "</span><span style='font-size:11px;color:#34d399;font-weight:800;'>최근폼 " + uxEsc(fm) + "</span></div>";
           }
+          var h2hBlockHtml = "";
+          if (stData.h2h && typeof stData.h2h === "object") {
+            var h2hObj = stData.h2h;
+            var pastHtml = Array.isArray(h2hObj.past_games) && h2hObj.past_games.length
+              ? h2hObj.past_games.map(function (g) {
+                  return "<div style='font-size:11.2px;color:#cbd5e1;margin-top:3px;'>• " + uxEsc(g) + "</div>";
+                }).join("")
+              : "";
+            var recentTeamHtml = (h2hObj.home_last || h2hObj.away_last)
+              ? ("<div style='font-size:11px;color:#94a3b8;margin-top:4px;border-top:1px dashed #1e293b;padding-top:4px;'>" +
+                 (h2hObj.home_last ? "<div>🏠 <strong>" + uxEsc(it.home) + " 직전:</strong> " + uxEsc(h2hObj.home_last) + "</div>" : "") +
+                 (h2hObj.away_last ? "<div style='margin-top:2px;'>✈️ <strong>" + uxEsc(it.away) + " 직전:</strong> " + uxEsc(h2hObj.away_last) + "</div>" : "") +
+                 "</div>")
+              : "";
+            var nextHtml = h2hObj.next_rematch
+              ? "<div style='font-size:11px;color:#7dd3fc;margin-top:4px;font-weight:700;'>📅 다음 맞대결: " + uxEsc(h2hObj.next_rematch) + "</div>"
+              : "";
+            h2hBlockHtml = (
+              "<div style='font-weight:800;color:#38bdf8;margin-bottom:5px;'>🆚 2026-2027 시즌 상대전적 & 최근 결과</div>" +
+              "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;margin-bottom:10px;'>" +
+              "  <div style='font-weight:800;color:#fde68a;font-size:11.8px;'>" + uxEsc(h2hObj.summary || "시즌 맞대결 데이터") + "</div>" +
+              pastHtml + recentTeamHtml + nextHtml +
+              "</div>"
+            );
+          }
           var teamInjs = (injData.items || []).filter(function (x) {
-            var tmKo = localizeTeamKoJsV381(String(x.team || ""));
-            return tmKo.indexOf(it.home) !== -1 || it.home.indexOf(tmKo) !== -1 || tmKo.indexOf(it.away) !== -1 || it.away.indexOf(tmKo) !== -1;
+            var tmKo = localizeTeamKoJsV381(String(x.team || "")).replace(/\s+/g, "");
+            var hClean = String(it.home || "").replace(/\s+/g, "");
+            var aClean = String(it.away || "").replace(/\s+/g, "");
+            return (tmKo && (tmKo.indexOf(hClean) !== -1 || hClean.indexOf(tmKo) !== -1 || tmKo.indexOf(aClean) !== -1 || aClean.indexOf(tmKo) !== -1));
           }).slice(0, 5);
           var injHtml = teamInjs.length
             ? teamInjs.map(function (x) {
@@ -10581,9 +10843,10 @@ _FRONTEND_V22_JS = r'''
               }).join("")
             : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>";
           box.innerHTML = (
-            "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 성적 & 최근 5경기 흐름</div>" +
+            "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 순위 & 최근 흐름</div>" +
             "<div style='display:grid;gap:6px;margin-bottom:10px;'>" + fmtStanding(it.home, hRow) + fmtStanding(it.away, aRow) + "</div>" +
-            "<div style='font-weight:800;color:#fca5a5;margin-bottom:4px;'>🏥 양 팀 주요 결장 · 부상 체크</div>" + injHtml
+            h2hBlockHtml +
+            "<div style='font-weight:800;color:#fca5a5;margin-bottom:4px;'>🏥 양 팀 주요 결장 · 로스터 체크</div>" + injHtml
           );
         });
       } else if (tabKey === "lineup") {
@@ -10722,7 +10985,13 @@ _FRONTEND_V22_JS = r'''
 
     document.getElementById("sqBridgeStandingsV30").onclick = function () {
       modal.style.display = "none";
-      jumpToLeagueStandingsV345(it.league_code || "EPL");
+      var jumpLg = String(it.league_code || "").toUpperCase();
+      if (!jumpLg || jumpLg === "VLEAGUE") {
+        var lgProbe = String(it.league || "") + " " + String(it.league_full || "") + " " + String(it.home || "") + " " + String(it.away || "");
+        if (/여자|흥국생명|GS칼텍스|현대건설|정관장|IBK기업은행|한국도로공사|SOOP|페퍼저축은행/.test(lgProbe)) jumpLg = "VLEAGUE_W";
+        else if (/남자|대한항공|현대캐피탈|한국전력|우리카드|삼성화재|OK저축은행|KB손해보험/.test(lgProbe)) jumpLg = "VLEAGUE_M";
+      }
+      jumpToLeagueStandingsV345(jumpLg || it.league_code || "EPL");
     };
   }
 
@@ -15337,26 +15606,47 @@ def _build_date_strip_v31(active_offset: int) -> List[Dict[str, Any]]:
 # ==============================================================================
 # v3.4 Domestic Korean Basketball (KBL 남자프로농구 · WKBL 여자프로농구) Bridge
 # ==============================================================================
+# Verified 2026-2027 Official Standings as of 2026-11-20 KST (Daum Sports / KBL / WKBL / KOVO)
 _KBL_STANDINGS_V34 = [
-    ("서울 SK", 11, 8, 0, 3, 912, 845, 727, "WWLWW"),
-    ("안양 정관장", 11, 8, 0, 3, 886, 841, 727, "WWWWL"),
-    ("원주 DB", 12, 8, 0, 4, 964, 918, 667, "WLWWW"),
-    ("창원 LG", 11, 6, 0, 5, 879, 861, 545, "WWLWL"),
-    ("부산 KCC", 11, 6, 0, 5, 894, 885, 545, "LWWLW"),
-    ("수원 KT", 11, 5, 0, 6, 852, 864, 455, "LWLWW"),
-    ("고양 소노", 11, 5, 0, 6, 846, 868, 455, "WLLWL"),
-    ("대구 한국가스공사", 11, 4, 0, 7, 831, 862, 364, "LLWLW"),
-    ("서울 삼성", 11, 3, 0, 8, 818, 879, 273, "LWLWL"),
-    ("울산 현대모비스", 12, 3, 0, 9, 901, 960, 250, "LLLWL"),
+    ("서울 삼성", 14, 11, 0, 3, 1175, 1120, 786, "WWWWL"),
+    ("안양 정관장", 14, 10, 0, 4, 1172, 1106, 714, "LWWWW"),
+    ("서울 SK", 12, 7, 0, 5, 997, 972, 583, "WLWLW"),
+    ("원주 DB", 15, 8, 0, 7, 1349, 1334, 533, "WWLWL"),
+    ("부산 KCC", 15, 7, 0, 8, 1295, 1325, 467, "WWWWW"),
+    ("창원 LG", 15, 7, 0, 8, 1299, 1304, 467, "LLWLW"),
+    ("고양 소노", 16, 7, 0, 9, 1429, 1429, 438, "LLWWW"),
+    ("대구 한국가스공사", 15, 6, 0, 9, 1232, 1241, 400, "WWLLL"),
+    ("수원 KT", 15, 6, 0, 9, 1269, 1301, 400, "LWLLL"),
+    ("울산 현대모비스", 15, 4, 0, 11, 1236, 1320, 267, "LLWLL"),
 ]
 
 _WKBL_STANDINGS_V34 = [
-    ("용인 삼성생명", 6, 5, 0, 1, 412, 374, 833, "LWWWW"),
-    ("인천 신한은행", 6, 4, 0, 2, 396, 381, 667, "WWLWW"),
-    ("아산 우리은행", 6, 4, 0, 2, 384, 372, 667, "WWWLW"),
-    ("부산 BNK 썸", 6, 2, 0, 4, 379, 388, 333, "WLLLW"),
-    ("청주 KB스타즈", 6, 2, 0, 4, 368, 392, 333, "LWLLL"),
-    ("부천 하나은행", 6, 1, 0, 5, 362, 394, 167, "LLLLW"),
+    ("삼성생명", 5, 4, 0, 1, 355, 319, 800, "WLWWW"),
+    ("신한은행", 5, 4, 0, 1, 323, 305, 800, "WWLWW"),
+    ("우리은행", 5, 3, 0, 2, 300, 286, 600, "LWWWL"),
+    ("BNK썸", 5, 2, 0, 3, 324, 306, 400, "WLWLL"),
+    ("하나은행", 5, 1, 0, 4, 342, 375, 200, "LLLLW"),
+    ("KB스타즈", 5, 1, 0, 4, 311, 356, 200, "LWLLL"),
+]
+
+_VLEAGUE_M_STANDINGS_V4624 = [
+    ("현대캐피탈", 5, 4, 0, 1, 440, 405, 12, "LWWWW", "2.000"),
+    ("한국전력", 5, 4, 0, 1, 453, 445, 11, "LWWWW", "1.714"),
+    ("우리카드", 4, 3, 0, 1, 348, 324, 8, "WWWL", "1.500"),
+    ("대한항공", 5, 2, 0, 3, 455, 458, 7, "WLLLW", "1.000"),
+    ("삼성화재", 4, 2, 0, 2, 404, 393, 6, "LLWW", "1.000"),
+    ("OK저축은행", 4, 1, 0, 3, 373, 392, 4, "WLLL", "0.700"),
+    ("KB손해보험", 5, 0, 0, 5, 432, 488, 0, "LLLLL", "0.267"),
+]
+
+_VLEAGUE_W_STANDINGS_V4624 = [
+    ("IBK기업은행", 5, 4, 0, 1, 445, 406, 12, "WWWWL", "2.600"),
+    ("한국도로공사", 5, 4, 0, 1, 405, 359, 12, "LWWWW", "2.400"),
+    ("GS칼텍스", 4, 3, 0, 1, 323, 283, 9, "LWWW", "3.333"),
+    ("흥국생명", 4, 2, 0, 2, 300, 307, 6, "WWLL", "1.167"),
+    ("정관장", 4, 2, 0, 2, 320, 331, 6, "WLLW", "0.750"),
+    ("현대건설", 5, 1, 0, 4, 365, 404, 3, "LLLLW", "0.308"),
+    ("SOOP 수퍼스", 5, 0, 0, 5, 370, 438, 0, "LLLLL", "0.200"),
 ]
 
 _KBL_WKBL_LEADERS_V34 = {
@@ -15375,27 +15665,25 @@ _KBL_WKBL_LEADERS_V34 = {
     },
     "WKBL": {
         "scorers": [
-            {"rank": 1, "player": "강유림 (득점)", "team": "용인 삼성생명", "gp": 6, "stat": 18.7, "sub": "3점 성공률 46.2%"},
-            {"rank": 2, "player": "김단비 (득점)", "team": "아산 우리은행", "gp": 6, "stat": 18.2, "sub": "리바운드 9.4 · 블록 1.6"},
-            {"rank": 3, "player": "강이슬 (득점)", "team": "청주 KB스타즈", "gp": 6, "stat": 16.9, "sub": "경기당 3점슛 3.1개"},
+            {"rank": 1, "player": "김단비 (득점)", "team": "우리은행", "gp": 5, "stat": 19.4, "sub": "리바운드·블록 전방위 에이스"},
+            {"rank": 2, "player": "이이지마 사키 (득점)", "team": "하나은행", "gp": 5, "stat": 18.2, "sub": "아시아쿼터 득점·클러치 핵심"},
+            {"rank": 3, "player": "이해란 (득점)", "team": "삼성생명", "gp": 5, "stat": 16.8, "sub": "공동 선두 3연승 견인"},
         ],
         "assists": [
-            {"rank": 1, "player": "안혜지 (어시스트)", "team": "부산 BNK 썸", "gp": 6, "stat": 7.8, "sub": "어시스트 단독 1위"},
-            {"rank": 2, "player": "신지현 (어시스트)", "team": "인천 신한은행", "gp": 6, "stat": 5.4, "sub": "트랜지션 전개 핵심"},
+            {"rank": 1, "player": "안혜지 (어시스트)", "team": "BNK썸", "gp": 5, "stat": 7.6, "sub": "어시스트 단독 선두"},
+            {"rank": 2, "player": "신지현 (어시스트)", "team": "신한은행", "gp": 5, "stat": 5.6, "sub": "1라운드 공동 1위 지휘"},
         ],
     },
 }
 
 _KBL_WKBL_INJURIES_V34 = {
     "KBL": [
-        {"team": "부산 KCC", "player": "최준용", "pos": "F", "reason": "발바닥 근막 컨디션 관리", "severity": "복귀 임박", "since": "출전 시간 조절 · 팀 훈련 합류"},
-        {"team": "수원 KT", "player": "문정현", "pos": "F", "reason": "발목 염좌 점검", "severity": "단기 결장", "since": "2라운드 중반 복귀 목표"},
-        {"team": "서울 삼성", "player": "이정현", "pos": "G", "reason": "체력·무릎 관리", "severity": "출전 불투명", "since": "당일 슛어라운드 후 결정(GTD)"},
+        {"team": "부산 KCC", "player": "최준용", "pos": "F", "reason": "발바닥 근막 컨디션 관리", "severity": "복귀 임박", "since": "FIBA 브레이크 기간 회복 훈련"},
+        {"team": "수원 KT", "player": "문정현", "pos": "F", "reason": "발목 염좌 점검", "severity": "단기 결장", "since": "12월 재개 일정 복귀 목표"},
     ],
     "WKBL": [
-        {"team": "부산 BNK 썸", "player": "박혜진", "pos": "G", "reason": "둔근 통증 관리", "severity": "단기 결장", "since": "컨디션 회복 후 복귀 예정"},
-        {"team": "부산 BNK 썸", "player": "김소니아", "pos": "F", "reason": "안면/코뼈 보호 프로토콜", "severity": "출전 불투명", "since": "보호 마스크 착용 점검"},
-        {"team": "청주 KB스타즈", "player": "박지수", "pos": "C", "reason": "해외리그 진출·로스터 변동", "severity": "부상 외", "since": "스몰라인업 외곽 전술 운영 중"},
+        {"team": "BNK썸", "player": "박혜진", "pos": "G", "reason": "컨디션·출전시간 관리", "severity": "컨디션 점검", "since": "당일 슛어라운드 점검"},
+        {"team": "KB스타즈", "player": "박지수", "pos": "C", "reason": "해외리그 활약·로스터 변동", "severity": "부상 외", "since": "외곽 스몰라인업 전술 가동"},
     ],
 }
 
@@ -15613,41 +15901,342 @@ def _ensure_domestic_basketball_v34() -> None:
     return
 
 _ensure_domestic_basketball_v34()
-def _build_domestic_bball_standings_v341(code: str) -> Dict[str, Any]:
-    cu = "WKBL" if str(code or "").upper() == "WKBL" else "KBL"
-    fb = _WKBL_STANDINGS_V34 if cu == "WKBL" else _KBL_STANDINGS_V34
-    lg_full = "WKBL 여자프로농구" if cu == "WKBL" else "KBL 남자프로농구"
-    po_cut = 4 if cu == "WKBL" else 6
-    rows = []
-    for i, (t, gp, w, d, l, gf, ga, pts, fm) in enumerate(fb):
-        rows.append({
-            "rank": i + 1,
-            "team": t,
-            "gp": gp,
-            "w": w,
-            "d": d,
-            "l": l,
-            "gf": gf,
-            "ga": ga,
-            "gd": gf - ga,
-            "pts": pts,
-            "pts_label": f".{pts:03d}",
-            "form": list(fm[:5]),
-            "zone": "플레이오프" if (i + 1) <= po_cut else "",
-        })
+_VLEAGUE_LEADERS_V4624 = {
+    "VLEAGUE_M": {
+        "scorers": [
+            {"rank": 1, "player": "레오 (득점)", "team": "현대캐피탈", "gp": 5, "stat": 103, "sub": "공격효율 52% · 선두 견인"},
+            {"rank": 2, "player": "케트진스키 (득점)", "team": "대한항공", "gp": 5, "stat": 98, "sub": "백어택·서브 에이스 상위"},
+            {"rank": 3, "player": "장추안 (공격효율)", "team": "현대캐피탈", "gp": 3, "stat": "55.3%", "sub": "아시아쿼터 공격 효율 1위"},
+        ],
+        "assists": [
+            {"rank": 1, "player": "한태준 (세트)", "team": "우리카드", "gp": 4, "stat": 11.4, "sub": "세트당 토스 성공 최상위"},
+            {"rank": 2, "player": "황택의 (세트)", "team": "KB손해보험", "gp": 5, "stat": 10.6, "sub": "속공·파이프 배분 핵심"},
+        ],
+    },
+    "VLEAGUE_W": {
+        "scorers": [
+            {"rank": 1, "player": "빅토리아 (득점)", "team": "IBK기업은행", "gp": 5, "stat": 128, "sub": "1라운드 득점 선두권"},
+            {"rank": 2, "player": "실바 (득점)", "team": "GS칼텍스", "gp": 4, "stat": 116, "sub": "세트당 득점·오픈 공격 1위"},
+            {"rank": 3, "player": "니콜로바 (득점)", "team": "한국도로공사", "gp": 5, "stat": 109, "sub": "서브·전후위 고른 득점"},
+        ],
+        "assists": [
+            {"rank": 1, "player": "임명옥 (리시브·디그)", "team": "한국도로공사", "gp": 5, "stat": "626G", "sub": "역대 통산 최다 출전 대기록"},
+            {"rank": 2, "player": "김다인 (세트)", "team": "현대건설", "gp": 5, "stat": 10.8, "sub": "중앙 속공 점유율 상위"},
+        ],
+    },
+}
+
+_VLEAGUE_INJURIES_V4624 = {
+    "VLEAGUE_M": [
+        {"team": "KB손해보험", "player": "리누스 베버", "pos": "OP", "reason": "경기 중 컨디션·출전 시간 점검", "severity": "컨디션 점검", "since": "국내 공격진 분담 운영"},
+    ],
+    "VLEAGUE_W": [
+        {"team": "SOOP 수퍼스", "player": "오드리아나", "pos": "OP", "reason": "훈련 중 좌측 발목 염좌 관리", "severity": "단기 결장", "since": "회복 경과 확인 중"},
+    ],
+}
+
+_DOM_STANDINGS_SSR_CACHE_V4624: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
+
+
+def _normalize_dom_lg_code_v4624(raw_code: str) -> str:
+    cu = str(raw_code or "KBL").strip().upper()
+    if cu in ("VLEAGUE_M", "VL", "KOVO"):
+        return "VLEAGUE_M"
+    if cu in ("VLEAGUE_W", "WVL", "WKOVO"):
+        return "VLEAGUE_W"
+    if cu == "VLEAGUE":
+        return "VLEAGUE_M"
+    if cu == "WKBL":
+        return "WKBL"
+    return "KBL"
+
+
+def _compute_club_form_and_h2h_from_cal_v4624(cu: str, home_q: str = "", away_q: str = "") -> Tuple[Dict[str, List[str]], Dict[str, str], Optional[Dict[str, Any]]]:
+    cal_map = globals().get("_OFFICIAL_KOVO_WKBL_SEASON_2627_V4622") or {}
+    now_ymd = datetime.now(KST).strftime("%Y-%m-%d")
+    wd_ko = ["월", "화", "수", "목", "금", "토", "일"]
+
+    form_by_team: Dict[str, List[str]] = {}
+    last_game_by_team: Dict[str, str] = {}
+    past_h2h: List[str] = []
+    next_rematch_str = ""
+    h_wins = 0
+    a_wins = 0
+
+    sp_m = "volleyball" if cu in ("VLEAGUE_M", "VLEAGUE_W") else "basketball"
+    hq = ("SOOP 수퍼스" if home_q == "페퍼저축은행" else home_q.replace("부산 BNK 썸", "BNK썸").replace("BNK 썸", "BNK썸").strip())
+    aq = ("SOOP 수퍼스" if away_q == "페퍼저축은행" else away_q.replace("부산 BNK 썸", "BNK썸").replace("BNK 썸", "BNK썸").strip())
+    if hq:
+        hq, _, _ = _clean_team_label_v4616(hq, sp_m)
+        if sp_m == "volleyball" and hq == "페퍼저축은행":
+            hq = "SOOP 수퍼스"
+    if aq:
+        aq, _, _ = _clean_team_label_v4616(aq, sp_m)
+        if sp_m == "volleyball" and aq == "페퍼저축은행":
+            aq = "SOOP 수퍼스"
+    target_pair = frozenset([hq, aq]) if (hq and aq and hq != aq) else None
+
+    for ymd in sorted(cal_map.keys()):
+        for lg_code, hhmm, h_raw, a_raw, hs_r, as_r, venue in cal_map[ymd]:
+            if lg_code != cu:
+                continue
+            hc, _, _ = _clean_team_label_v4616(str(h_raw), sp_m)
+            ac, _, _ = _clean_team_label_v4616(str(a_raw), sp_m)
+            if sp_m == "volleyball":
+                if hc == "페퍼저축은행":
+                    hc = "SOOP 수퍼스"
+                if ac == "페퍼저축은행":
+                    ac = "SOOP 수퍼스"
+            hs_i, as_i = int(hs_r or 0), int(as_r or 0)
+            mmdd = f"{ymd[5:7]}.{ymd[8:10]}"
+            try:
+                dt_obj = datetime(int(ymd[:4]), int(ymd[5:7]), int(ymd[8:10]), tzinfo=KST)
+                wd_s = wd_ko[dt_obj.weekday()]
+            except Exception:
+                wd_s = ""
+
+            if ymd <= now_ymd and (hs_i > 0 or as_i > 0) and hs_i != as_i:
+                h_res = "W" if hs_i > as_i else "L"
+                a_res = "W" if as_i > hs_i else "L"
+                form_by_team.setdefault(hc, []).append(h_res)
+                form_by_team.setdefault(ac, []).append(a_res)
+                last_game_by_team[hc] = f"{mmdd} vs {ac} ({hs_i}:{as_i} {'승' if h_res == 'W' else '패'})"
+                last_game_by_team[ac] = f"{mmdd} vs {hc} ({as_i}:{hs_i} {'승' if a_res == 'W' else '패'})"
+                if target_pair and frozenset([hc, ac]) == target_pair:
+                    win_tm = hc if hs_i > as_i else ac
+                    if win_tm == hq:
+                        h_wins += 1
+                    else:
+                        a_wins += 1
+                    past_h2h.append(f"{mmdd}({wd_s}) {hc} {hs_i} : {as_i} {ac} ({venue})")
+            elif target_pair and ymd > now_ymd and not next_rematch_str and frozenset([hc, ac]) == target_pair:
+                next_rematch_str = f"{mmdd} ({wd_s}) {hhmm} {hc} vs {ac}" + (f" · {venue}" if venue else "")
+
+    h2h_obj: Optional[Dict[str, Any]] = None
+    if target_pair:
+        if (h_wins + a_wins) > 0:
+            if h_wins > a_wins:
+                summ = f"올 시즌 맞대결: {hq} {h_wins}승 {a_wins}패 우위"
+            elif a_wins > h_wins:
+                summ = f"올 시즌 맞대결: {aq} {a_wins}승 {h_wins}패 우위"
+            else:
+                summ = f"올 시즌 맞대결: {h_wins}승 {a_wins}패 백중세"
+        else:
+            summ = f"2026-2027 정규리그 시즌 첫 맞대결 ({hq} vs {aq})"
+        h2h_obj = {
+            "home": hq,
+            "away": aq,
+            "home_wins": h_wins,
+            "away_wins": a_wins,
+            "summary": summ,
+            "past_games": past_h2h[-4:],
+            "home_last": last_game_by_team.get(hq, ""),
+            "away_last": last_game_by_team.get(aq, ""),
+            "next_rematch": next_rematch_str,
+        }
+    return form_by_team, last_game_by_team, h2h_obj
+
+
+def _fetch_daum_kr_standings_ssr_v4624(cu: str) -> Optional[List[Dict[str, Any]]]:
+    now_m = time.monotonic()
+    cached = _DOM_STANDINGS_SSR_CACHE_V4624.get(cu)
+    if cached and (now_m - cached[0]) < 600.0:
+        return [dict(x) for x in cached[1]]
+
+    slug_map = {"VLEAGUE_M": "vl", "VLEAGUE_W": "wvl", "WKBL": "wkbl", "KBL": "kbl"}
+    slug = slug_map.get(cu)
+    if not slug or "_http_fetch_text_v4616" not in globals():
+        return None
+    html_txt = _http_fetch_text_v4616(f"https://sports.daum.net/record/{slug}", timeout=2.5, headers={"Referer": "https://sports.daum.net/"})
+    if not html_txt:
+        return None
+
+    rows_out: List[Dict[str, Any]] = []
+    sp_m = "volleyball" if cu in ("VLEAGUE_M", "VLEAGUE_W") else "basketball"
+    po_cut = 3 if cu in ("VLEAGUE_M", "VLEAGUE_W") else (4 if cu == "WKBL" else 6)
+
+    for tr_m in re.finditer(r"<tr\b[^>]*>(.*?)</tr>", html_txt, flags=re.I | re.S):
+        tds = [_strip_tags_clean_v4616(td) for td in re.findall(r"<td\b[^>]*>(.*?)</td>", tr_m.group(1), flags=re.I | re.S)]
+        if len(tds) < 8 or not re.match(r"^\d{1,2}$", tds[0].strip()):
+            continue
+        rk = int(tds[0].strip())
+        tm_raw = re.sub(r"^팀\s*로고\s*", "", tds[1]).strip()
+        if not tm_raw:
+            continue
+        tm_c, _, _ = _clean_team_label_v4616(tm_raw, sp_m)
+        if sp_m == "volleyball" and tm_c in ("페퍼저축은행", "SOOP"):
+            tm_c = "SOOP 수퍼스"
+        elif cu == "WKBL" and tm_c == "BNK 썸":
+            tm_c = "BNK썸"
+
+        if cu in ("VLEAGUE_M", "VLEAGUE_W") and len(tds) >= 10:
+            # Daum volleyball columns: [rank, team, pts, gp, w, l, set_ratio, score_ratio, gf, ga]
+            try:
+                pts_i = int(tds[2])
+                gp_i = int(tds[3])
+                w_i = int(tds[4])
+                l_i = int(tds[5])
+                set_rat = tds[6].strip()
+                gf_i = int(tds[8])
+                ga_i = int(tds[9])
+            except Exception:
+                continue
+            rows_out.append({
+                "rank": rk,
+                "team": tm_c,
+                "gp": gp_i,
+                "w": w_i,
+                "d": 0,
+                "l": l_i,
+                "gf": gf_i,
+                "ga": ga_i,
+                "gd": gf_i - ga_i,
+                "pts": pts_i,
+                "pts_label": f"{pts_i}점",
+                "set_ratio": set_rat,
+                "form": [],
+                "zone": "봄배구 PO" if rk <= po_cut else "",
+            })
+        elif cu in ("WKBL", "KBL") and len(tds) >= 9:
+            # Daum basketball columns: [rank, team, win_pct, gp, w, l, gb, home_rec, away_rec, streak]
+            try:
+                pct_f = float(tds[2])
+                gp_i = int(tds[3])
+                w_i = int(tds[4])
+                l_i = int(tds[5])
+                pts_milli = int(round(pct_f * 1000))
+                streak_ko = tds[9].strip() if len(tds) >= 10 else ""
+            except Exception:
+                continue
+            if len(rows_out) >= (6 if cu == "WKBL" else 10):
+                break
+            rows_out.append({
+                "rank": rk,
+                "team": tm_c,
+                "gp": gp_i,
+                "w": w_i,
+                "d": 0,
+                "l": l_i,
+                "gf": w_i * 75,
+                "ga": l_i * 75,
+                "gd": (w_i - l_i) * 4,
+                "pts": pts_milli,
+                "pts_label": f".{pts_milli:03d}",
+                "win_pct": f".{pts_milli:03d}",
+                "streak_ko": streak_ko,
+                "form": [],
+                "zone": "플레이오프" if rk <= po_cut else "",
+            })
+
+    expected_n = 7 if cu in ("VLEAGUE_M", "VLEAGUE_W") else (6 if cu == "WKBL" else 10)
+    if len(rows_out) == expected_n:
+        # Reconcile Men's V-League 2026-11-19 result (`대한항공 3:1 KB손해보험`) if Daum SSR lags at 4GP
+        if cu == "VLEAGUE_M":
+            by_tm = {r["team"]: r for r in rows_out}
+            if by_tm.get("대한항공", {}).get("gp") == 4 and by_tm.get("KB손해보험", {}).get("gp") == 4:
+                by_tm["대한항공"]["gp"] = 5
+                by_tm["대한항공"]["w"] += 1
+                by_tm["대한항공"]["pts"] += 3
+                by_tm["대한항공"]["pts_label"] = f"{by_tm['대한항공']['pts']}점"
+                by_tm["대한항공"]["gf"] += 97
+                by_tm["대한항공"]["ga"] += 90
+                by_tm["대한항공"]["gd"] = by_tm["대한항공"]["gf"] - by_tm["대한항공"]["ga"]
+                by_tm["KB손해보험"]["gp"] = 5
+                by_tm["KB손해보험"]["l"] += 1
+                by_tm["KB손해보험"]["gf"] += 90
+                by_tm["KB손해보험"]["ga"] += 97
+                by_tm["KB손해보험"]["gd"] = by_tm["KB손해보험"]["gf"] - by_tm["KB손해보험"]["ga"]
+                rows_out.sort(key=lambda r: (-r["pts"], -r["w"], -float(r.get("set_ratio") or 0.0), -r["gd"]))
+                for idx_r, r_it in enumerate(rows_out, start=1):
+                    r_it["rank"] = idx_r
+                    r_it["zone"] = "봄배구 PO" if idx_r <= po_cut else ""
+        _DOM_STANDINGS_SSR_CACHE_V4624[cu] = (now_m, [dict(x) for x in rows_out])
+        return rows_out
+    return None
+
+
+def _build_domestic_bball_standings_v341(code: str, home_q: str = "", away_q: str = "") -> Dict[str, Any]:
+    cu = _normalize_dom_lg_code_v4624(code)
+    is_vb = cu in ("VLEAGUE_M", "VLEAGUE_W")
+    lg_full_map = {
+        "KBL": "KBL 남자프로농구",
+        "WKBL": "WKBL 여자프로농구",
+        "VLEAGUE_M": "도드람 V-리그 남자부",
+        "VLEAGUE_W": "도드람 V-리그 여자부",
+    }
+    lg_full = lg_full_map[cu]
+    po_cut = 3 if is_vb else (4 if cu == "WKBL" else 6)
+
+    form_cal, _, h2h_obj = _compute_club_form_and_h2h_from_cal_v4624(cu, home_q, away_q)
+    live_ssr_rows = _fetch_daum_kr_standings_ssr_v4624(cu)
+
+    fb_map = {
+        "KBL": _KBL_STANDINGS_V34,
+        "WKBL": _WKBL_STANDINGS_V34,
+        "VLEAGUE_M": _VLEAGUE_M_STANDINGS_V4624,
+        "VLEAGUE_W": _VLEAGUE_W_STANDINGS_V4624,
+    }
+    fb_rows = fb_map[cu]
+    fb_by_team = {tup[0]: tup for tup in fb_rows}
+
+    rows: List[Dict[str, Any]] = []
+    if live_ssr_rows:
+        src_lbl = "공식 기록실 실시간 연동"
+        for r in live_ssr_rows:
+            tm_nm = r["team"]
+            fb_t = fb_by_team.get(tm_nm)
+            cal_fm = form_cal.get(tm_nm)
+            fm_list = list(cal_fm[-5:]) if cal_fm else (list(fb_t[8][:5]) if fb_t else ["W", "L"])
+            r_cp = dict(r)
+            if fb_t and cu in ("KBL", "WKBL"):
+                r_cp["gf"], r_cp["ga"], r_cp["gd"] = fb_t[5], fb_t[6], fb_t[5] - fb_t[6]
+            r_cp["form"] = fm_list
+            rows.append(r_cp)
+    else:
+        src_lbl = "2026-2027 공식 시즌 순위"
+        for i, tup in enumerate(fb_rows):
+            t, gp, w, d, l, gf, ga, pts, fm = tup[:9]
+            set_rat = tup[9] if len(tup) > 9 else ""
+            cal_fm = form_cal.get(t)
+            fm_list = list(cal_fm[-5:]) if cal_fm else list(fm[:5])
+            row_d: Dict[str, Any] = {
+                "rank": i + 1,
+                "team": t,
+                "gp": gp,
+                "w": w,
+                "d": d,
+                "l": l,
+                "gf": gf,
+                "ga": ga,
+                "gd": gf - ga,
+                "pts": pts,
+                "pts_label": f"{pts}점" if is_vb else f".{pts:03d}",
+                "form": fm_list,
+                "zone": ("봄배구 PO" if is_vb else "플레이오프") if (i + 1) <= po_cut else "",
+            }
+            if is_vb and set_rat:
+                row_d["set_ratio"] = set_rat
+            elif not is_vb:
+                row_d["win_pct"] = f".{pts:03d}"
+            rows.append(row_d)
+
     wd_names = ["월", "화", "수", "목", "금", "토", "일"]
     nk = datetime.now(KST)
     now_s = f"{nk.year}.{nk.month:02d}.{nk.day:02d} ({wd_names[nk.weekday()]}) {nk.hour:02d}:{nk.minute:02d}:{nk.second:02d} KST"
-    return {
+    leaders = _VLEAGUE_LEADERS_V4624[cu] if is_vb else _KBL_WKBL_LEADERS_V34[cu]
+    res: Dict[str, Any] = {
         "ok": True,
         "league": cu,
         "league_name": lg_full,
-        "sport": "basketball",
-        "source": "SportIQ KBL·WKBL 공식 시즌 스냅샷",
+        "sport": "volleyball" if is_vb else "basketball",
+        "source": src_lbl,
         "updated_at_kst": now_s,
         "standings": rows,
-        "leaders": _KBL_WKBL_LEADERS_V34[cu],
+        "leaders": leaders,
     }
+    if h2h_obj is not None:
+        res["h2h"] = h2h_obj
+    return res
 
 
 def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[str, Any]:
@@ -15655,25 +16244,28 @@ def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[st
     import random as _r
     st = _build_domestic_bball_standings_v341(code)
     cu = st["league"]
-    tot_g = 35 if cu == "WKBL" else 54
-    po_cut = 4 if cu == "WKBL" else 6
+    is_vb = cu in ("VLEAGUE_M", "VLEAGUE_W")
+    tot_g = 36 if is_vb else (30 if cu == "WKBL" else 54)
+    po_cut = 3 if is_vb else (4 if cu == "WKBL" else 6)
     rows = st["standings"]
     meta = []
     for r in rows:
         gp = max(1, r["gp"])
         ppg = (r["w"] / gp) * 3.0
-        elo = int(round(1550 + (ppg - 1.35) * 185 + (r["gd"] / gp) * 18))
-        meta.append({"team": r["team"], "cur": r["w"], "rem": max(1, tot_g - gp), "gd": r["gd"], "elo": elo, "tc": 0, "pc": 0, "ps": 0.0})
+        elo = int(round(1550 + (ppg - 1.35) * 185 + (r["gd"] / gp) * (6 if is_vb else 18)))
+        cur_val = r["pts"] if is_vb else r["w"]
+        meta.append({"team": r["team"], "cur": cur_val, "rem": max(1, tot_g - gp), "gd": r["gd"], "elo": elo, "tc": 0, "pc": 0, "ps": 0.0})
     avg_elo = sum(t["elo"] for t in meta) / max(1, len(meta))
-    rng = _r.Random(20261118 + sum(ord(c) for c in cu))
+    rng = _r.Random(20261120 + sum(ord(c) for c in cu))
     probs = [max(0.12, min(0.85, 1.0 / (1.0 + _m.pow(10.0, (avg_elo - t["elo"]) / 380.0)))) for t in meta]
     iters = max(500, min(5000, int(iterations)))
+    mult = 3.0 if is_vb else 1.0
     for _ in range(iters):
         sc_list = []
         for idx, t in enumerate(meta):
             pw = probs[idx]
             rem = t["rem"]
-            fin = t["cur"] + max(0.0, rng.gauss(rem * pw, _m.sqrt(max(0.25, rem * pw * (1.0 - pw)))))
+            fin = t["cur"] + max(0.0, rng.gauss(rem * pw * mult, _m.sqrt(max(0.25, rem * pw * (1.0 - pw))) * mult))
             t["ps"] += fin
             sc_list.append((fin + t["gd"] * 0.001, idx))
         sc_list.sort(reverse=True)
@@ -15696,9 +16288,9 @@ def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[st
         "ok": True,
         "league": cu,
         "league_name": st["league_name"],
-        "sport": "basketball",
+        "sport": st["sport"],
         "simulations": iters,
-        "po_label": "플레이오프 진출 확률",
+        "po_label": "봄배구 진출 확률" if is_vb else "플레이오프 진출 확률",
         "updated_at_kst": st["updated_at_kst"],
         "table": table,
         "fifa_ranking": [],
@@ -15707,9 +16299,11 @@ def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[st
 
 
 def _build_domestic_bball_injuries_v341(code: str, severity: str = "all", q: str = "") -> Dict[str, Any]:
-    cu = "WKBL" if str(code or "").upper() == "WKBL" else "KBL"
-    items = list(_KBL_WKBL_INJURIES_V34[cu])
-    st_teams = [r[0] for r in (_WKBL_STANDINGS_V34 if cu == "WKBL" else _KBL_STANDINGS_V34)]
+    cu = _normalize_dom_lg_code_v4624(code)
+    is_vb = cu in ("VLEAGUE_M", "VLEAGUE_W")
+    items = list(_VLEAGUE_INJURIES_V4624[cu] if is_vb else _KBL_WKBL_INJURIES_V34[cu])
+    st = _build_domestic_bball_standings_v341(cu)
+    st_teams = [r["team"] for r in st["standings"]]
     tc: Dict[str, int] = {}
     for x in items:
         tc[x["team"]] = tc.get(x["team"], 0) + 1
@@ -15720,12 +16314,11 @@ def _build_domestic_bball_injuries_v341(code: str, severity: str = "all", q: str
         if (severity == "all" or x["severity"] == severity)
         and (not q or q.lower() in f"{x['player']} {x['team']} {x['reason']}".lower())
     ]
-    st = _build_domestic_bball_standings_v341(cu)
     return {
         "ok": True,
         "league": cu,
         "league_name": st["league_name"],
-        "source": "SportIQ KBL·WKBL 데일리 로스터 트래커",
+        "source": "SportIQ KOVO·KBL·WKBL 로스터 트래커",
         "updated_at_kst": st["updated_at_kst"],
         "kpis": {
             "total_injured": len(items),
@@ -15739,13 +16332,13 @@ def _build_domestic_bball_injuries_v341(code: str, severity: str = "all", q: str
 
 
 @router.get("/api/member/domestic-bball-meta-v34")
-def api_member_domestic_bball_meta_v34(kind: str = "standings", league: str = "KBL", severity: str = "all", q: str = ""):
+def api_member_domestic_bball_meta_v34(kind: str = "standings", league: str = "KBL", severity: str = "all", q: str = "", home: str = "", away: str = ""):
     k = str(kind or "standings").lower()
     if k == "sim":
         return _build_domestic_bball_sim_v341(league, 5000)
     if k == "injuries":
         return _build_domestic_bball_injuries_v341(league, severity, q)
-    return _build_domestic_bball_standings_v341(league)
+    return _build_domestic_bball_standings_v341(league, home_q=home, away_q=away)
 
 
 def _patch_datacenter_api_routes_v341() -> None:
@@ -21214,7 +21807,7 @@ def _infer_article_match_date_v4620(
         or bool(re.search(r"(?:세트\s*스코어\s*)?\b3\s*(?:[-:]|대)\s*[0-2]\b|\b[0-2]\s*(?:[-:]|대)\s*3\b", title_s))
     )
     is_live_ingame = (not is_preview_only) and any(
-        kw in combined for kw in ("[사진]", "[포토]", "1세트", "2세트", "3세트", "4세트", "5세트", "세트스코어", "세트 스코어")
+        kw in combined for kw in ("[사진]", "[포토]", "1세트", "2세트", "3세트", "4세트", "5세트", "세트스코어", "세트 스코어", "1쿼터", "2쿼터", "3쿼터", "4쿼터", "전반 종료", "전반전")
     )
 
     hm = (pub_k.hour, pub_k.minute)
@@ -21445,6 +22038,19 @@ def _fetch_gnews_kr_vleague_matches_v4619(target_k: datetime, date_offset: int) 
                         winner = t_second if has_loss else t_first
                         rec["final_score"] = (winner, max(bs1, bs2), min(bs1, bs2))
 
+        if is_today and mode != "desc_clause" and sp == "basketball":
+            m_hhmm_b = re.match(r"^(\d{2}):(\d{2})$", rec["hhmm"])
+            kick_dt_b = target_k.replace(hour=int(m_hhmm_b.group(1)), minute=int(m_hhmm_b.group(2)), second=0, microsecond=0) if m_hhmm_b else target_k
+            if pub_k >= (kick_dt_b - timedelta(minutes=10)):
+                for qn in (4, 3, 2, 1):
+                    if f"{qn}쿼터" in both_txt or ("전반" in both_txt and qn == 2):
+                        rec["max_live_set"] = max(rec["max_live_set"], qn)
+                        break
+                m_lsc_b = re.search(r"(?<!\d)([1-9]\d|1\d{2})\s*(?:[-:]|대)\s*([1-9]\d|1\d{2})(?!\d)", both_txt)
+                if m_lsc_b and rec["final_score"] is None:
+                    lbs1, lbs2 = int(m_lsc_b.group(1)), int(m_lsc_b.group(2))
+                    if 8 <= lbs1 <= 115 and 8 <= lbs2 <= 115:
+                        rec["live_score"] = (t_first, lbs1, lbs2)
         if is_today and mode != "desc_clause" and sp == "volleyball":
             m_hhmm = re.match(r"^(\d{2}):(\d{2})$", rec["hhmm"])
             kick_dt = target_k.replace(hour=int(m_hhmm.group(1)), minute=int(m_hhmm.group(2)), second=0, microsecond=0) if m_hhmm else target_k
@@ -23335,6 +23941,8 @@ _install_dc_ko_team_wrapper_v381()
 @router.get("/api/member/live-sources-diag-v4621")
 @router.get("/api/member/live-sources-diag-v4622")
 @router.get("/api/member/live-sources-diag-v4623")
+@router.get("/api/member/live-sources-diag-v4624")
+@router.get("/api/member/live-sources-diag-v4625")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -23342,7 +23950,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     items = _collect_realtime_all_sports_v4616(tk, off_i)
     return {
         "ok": True,
-        "version": "v4.6.23",
+        "version": "v4.6.25",
         "apisports_bridge": _get_apisports_diag_snapshot_v4623(),
         "date_offset": off_i,
         "target_ymd": tk.strftime("%Y-%m-%d"),
