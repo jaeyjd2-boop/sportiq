@@ -2763,6 +2763,26 @@ _FRONTEND_V22_JS = r'''
         })(bar, barIsVisible);
       }
 
+      var navAnc = bar.parentElement;
+      if (navAnc && navAnc !== document.body && !navAnc.__sqLateDcChildObsV4611 && typeof MutationObserver !== "undefined") {
+        navAnc.__sqLateDcChildObsV4611 = true;
+        var ancTarget = (navAnc.parentElement && navAnc.parentElement !== document.body && navAnc.parentElement.tagName !== "MAIN") ? navAnc.parentElement : navAnc;
+        var lateDcObs = new MutationObserver(function (muts) {
+          for (var mi = 0; mi < muts.length; mi++) {
+            var added = muts[mi].addedNodes;
+            if (!added || !added.length) continue;
+            for (var ai2 = 0; ai2 < added.length; ai2++) {
+              var nd = added[ai2];
+              if (nd && nd.nodeType === 1 && /데이터\s*센터/.test(nd.textContent || "")) {
+                safeRunStepV4610(enforceSingleLineMainTabBar);
+                return;
+              }
+            }
+          }
+        });
+        lateDcObs.observe(ancTarget, { childList: true, subtree: true });
+      }
+
       bindDataCenterMainTabClickV26(bar);
     }
 
@@ -10584,8 +10604,8 @@ _FRONTEND_V22_JS = r'''
       }, ms);
     });
     setInterval(function () {
-      if (typeof document !== "undefined" && document.hidden) return;
       safeRunStepV4610(enforceSingleLineMainTabBar);
+      if (typeof document !== "undefined" && document.hidden) return;
       safeRunStepV4610(stabilizeHofLaunchCardV29);
       safeRunStepV4610(dedupLabKellyMonitorV36);
       safeRunStepV4610(polishModalsAndCloseIconsV29);
@@ -10613,7 +10633,9 @@ _FRONTEND_V22_JS = r'''
   safeRunStepV4610(installLiveScoresFetchTapV30);
   safeRunStepV4610(installTopControlCaptureSyncV304);
   safeRunStepV4610(installGlobalCardClickCaptureV30);
-  [60, 200, 380, 700, 1300, 2400].forEach(function (ms) {
+  safeRunStepV4610(injectUxV22Styles);
+  safeRunStepV4610(enforceSingleLineMainTabBar);
+  [0, 60, 180, 350, 600, 1000, 1600, 2500, 3800, 5500].forEach(function (ms) {
     setTimeout(function () {
       safeRunStepV4610(injectUxV22Styles);
       safeRunStepV4610(enforceSingleLineMainTabBar);
@@ -12165,7 +12187,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.6.10-fault-isolated-verified",
+        "engine_version": "4.6.11-instant-onload-7tab",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
@@ -12444,7 +12466,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46100_{int(time.time())}"
+_BOOT_VER_V30 = f"46110_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -16238,7 +16260,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.6.10-fault-isolated-verified",
+        "engine_version": "4.6.11-instant-onload-7tab",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
@@ -16434,20 +16456,30 @@ def serve_lounge_home(request: Request):
                 rendered,
             )
             rendered = inject_seo_and_og_head_v27(rendered)
-            if "sqInline7TabBootV4610" not in rendered and "</body>" in rendered:
+            if "sqInline7TabBootV4611" not in rendered and "</body>" in rendered:
                 _inline_7tab = (
-                    '<script id="sqInline7TabBootV4610">'
-                    '(function(){function f(){try{if(window.__SPORTIQ_MEMBER_UX_V22__)return;'
-                    'var bs=document.querySelectorAll("button,a");var t1=null;'
-                    'for(var i=0;i<bs.length;i++){var x=(bs[i].textContent||"").replace(/\\s+/g," ").trim();'
-                    'if(x.length<=28&&x.indexOf("실시간 분석 피드")!==-1){t1=bs[i];break;}}'
-                    'if(!t1||!t1.parentElement)return;var bar=t1.parentElement;'
-                    'for(var j=0;j<bs.length;j++){var b=bs[j];if(b.parentElement===bar||b.closest("#dcMainHubSection,#proLiveTickerBar,#mobile-nav"))continue;'
-                    'var bx=(b.textContent||"").replace(/\\s+/g," ").trim();'
-                    'if(bx.length<=22&&/데이터\\s*센터/.test(bx)&&!/펼치기|접기|동기화|SportIQ/.test(bx)){bar.appendChild(b);break;}}'
-                    'bar.style.setProperty("display","flex","important");bar.style.setProperty("flex-wrap","nowrap","important");bar.style.setProperty("overflow-x","auto","important");'
-                    '}catch(e){}}[120,450,1100].forEach(function(m){setTimeout(f,m);});})();'
-                    '</script>'
+                    '<style id="sqCritical7TabCssV4611">'
+                    '[data-sq-7tab-strip="1"],#sqDesktopMainTabStrip{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;grid-template-columns:none!important;align-items:center!important;gap:5px!important;width:100%!important;max-width:100%!important;overflow-x:auto!important;scrollbar-width:none!important;}'
+                    '[data-sq-7tab-strip="1"]::-webkit-scrollbar,#sqDesktopMainTabStrip::-webkit-scrollbar{display:none!important;}'
+                    '[data-sq-7tab-strip="1"]>*{flex:0 0 auto!important;white-space:nowrap!important;width:auto!important;height:32px!important;padding:5.5px 8.5px!important;font-size:11.9px!important;display:inline-flex!important;align-items:center!important;margin-top:0!important;margin-bottom:0!important;}'
+                    '</style>'
+                    '<script id="sqInline7TabBootV4611">'
+                    '(function(){function sync7(){try{'
+                    'var all=document.querySelectorAll("button,a,[role=\'tab\'],.tab-btn,.nav-tab");var feeds=[];'
+                    'for(var i=0;i<all.length;i++){var el=all[i];if(el.closest&&el.closest("#mobile-nav,#proLiveTickerBar,#dcMainHubSection"))continue;'
+                    'var tx=(el.textContent||"").replace(/\\s+/g," ").trim();if(tx.length<=28&&tx.indexOf("실시간 분석 피드")!==-1)feeds.push(el);}'
+                    'for(var fi=0;fi<feeds.length;fi++){var f=feeds[fi],bar=f.parentElement;'
+                    'if(!bar)continue;bar.setAttribute("data-sq-7tab-strip","1");if(bar.classList)bar.classList.remove("flex-wrap","sq-mobile-bottom-nav-bar","grid");'
+                    'var br=bar.getBoundingClientRect?bar.getBoundingClientRect():null;var best=null,bestD=9999;'
+                    'for(var j=0;j<all.length;j++){var c=all[j];if(!c||bar.contains(c)||c.contains(bar)||(c.closest&&c.closest("#mobile-nav,#proLiveTickerBar,#dcMainHubSection,article,#feedList")))continue;'
+                    'var cx=(c.textContent||"").replace(/\\s+/g," ").trim();if(cx.length>24||!/데이터\\s*센터/.test(cx)||/펼치기|접기|동기화|연동|자동|SportIQ/i.test(cx))continue;'
+                    'if(br&&br.height>0&&c.getBoundingClientRect){var cr=c.getBoundingClientRect();if(cr.width<=8||cr.height<=8)continue;var d=Math.abs(cr.top-br.top);if(d<=220&&d<bestD){bestD=d;best=c;}}'
+                    'else if(bar.parentElement&&bar.parentElement.contains(c)){best=c;break;}}'
+                    'if(best&&best.parentElement!==bar){var op=best.parentElement;if(best.tagName==="BUTTON"||best.tagName==="A")best.className="tab-btn whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-bold transition border border-cyan-500/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25";bar.appendChild(best);if(op&&op!==bar&&!op.contains(bar)&&!(op.textContent||"").trim())op.style.display="none";}'
+                    'bar.style.setProperty("display","flex","important");bar.style.setProperty("flex-wrap","nowrap","important");}'
+                    '}catch(_e){}}sync7();[30,120,320,650,1200,2200].forEach(function(m){setTimeout(sync7,m);});'
+                    'if(typeof MutationObserver!=="undefined"&&document.body){var o=new MutationObserver(function(ms){for(var k=0;k<ms.length;k++){var ad=ms[k].addedNodes;for(var a=0;a<(ad?ad.length:0);a++){if(ad[a]&&ad[a].nodeType===1&&/데이터\\s*센터/.test(ad[a].textContent||"")){sync7();return;}}}});o.observe(document.body,{childList:true,subtree:true});setTimeout(function(){o.disconnect();},12000);}'
+                    '})();</script>'
                 )
                 rendered = rendered.replace("</body>", _inline_7tab + "\n</body>", 1)
             _pq = (request.query_params.get("post") if request and hasattr(request, "query_params") else "") or ""
