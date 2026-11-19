@@ -1,3 +1,4 @@
+import hashlib
 import html as _html_lib
 import json
 import os
@@ -13,7 +14,7 @@ from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
@@ -3538,10 +3539,13 @@ _FRONTEND_V22_JS = r'''
         var seenC = {};
         combinedC.forEach(function (c) {
           if (!c || !c.text) return;
+          if (c.id && reactionCache.deleted_comment_keys && reactionCache.deleted_comment_keys[String(c.id)]) return;
           var ck = String(c.user || "").trim() + "::" + String(c.text || "").trim();
           if (!seenC[ck]) {
-            seenC[ck] = true;
+            seenC[ck] = c;
             dedupC.push(c);
+          } else if (c.id && !seenC[ck].id) {
+            seenC[ck].id = c.id;
           }
         });
         p.comments = dedupC;
@@ -3615,12 +3619,23 @@ _FRONTEND_V22_JS = r'''
             var pFound = (state.posts || []).find(function (x) { return x && String(x.id) === curId; });
             setTimeout(function () {
               if (pFound) injectPostPreviewIntoCommentModalV29(pFound);
+              decorateCommentModalDeleteButtonsV4612();
               polishModalsAndCloseIconsV29();
             }, 25);
           });
         }
       }
       var actionBar = (cmtBtn && cmtBtn.parentElement) || (bmBtn && bmBtn.parentElement);
+      if (actionBar && !actionBar.querySelector("[data-sq-del]")) {
+        var admDelBtn = document.createElement("button");
+        admDelBtn.type = "button";
+        admDelBtn.setAttribute("data-sq-del", cid);
+        admDelBtn.setAttribute("data-sq-nonmember-del", "1");
+        admDelBtn.className = "rounded-lg px-2 py-1 bg-slate-800/90 text-[11px] text-rose-300 hover:bg-rose-500/20";
+        admDelBtn.title = "관리자 마스터 키로 게시글 영구 삭제";
+        admDelBtn.textContent = "🗑️ 삭제";
+        actionBar.appendChild(admDelBtn);
+      }
       if (actionBar && !actionBar.querySelector("[data-sq-share-btn='1']")) {
         var shBtn = document.createElement("button");
         shBtn.type = "button";
@@ -3735,9 +3750,23 @@ _FRONTEND_V22_JS = r'''
         (d.bookmarked_ids || []).forEach(function (id) { reactionCache.bookmarked_ids[String(id)] = true; });
         reactionCache.bookmarked_titles = {};
         (d.bookmarked_titles || []).forEach(function (t) { if (t) reactionCache.bookmarked_titles[String(t).trim()] = true; });
+        reactionCache.deleted_post_ids = {};
+        (d.deleted_post_ids || []).forEach(function (id) { if (id) reactionCache.deleted_post_ids[String(id)] = true; });
+        reactionCache.deleted_comment_keys = {};
+        (d.deleted_comment_keys || []).forEach(function (k) { if (k) reactionCache.deleted_comment_keys[String(k)] = true; });
+        if (Array.isArray(state.posts) && d.deleted_post_ids && d.deleted_post_ids.length) {
+          state.posts = state.posts.filter(function (p) { return p && !reactionCache.deleted_post_ids[String(p.id)]; });
+        }
 
         var existingMap = {};
-        (state.posts || []).forEach(function (p) { if (p && p.id) existingMap[p.id] = p; });
+        (state.posts || []).forEach(function (p) {
+          if (p && p.id) existingMap[p.id] = p;
+        });
+        (d.posts || []).forEach(function (sp) {
+          if (sp && sp.id && existingMap[sp.id] && Array.isArray(sp.comments)) {
+            existingMap[sp.id].comments = sp.comments.slice();
+          }
+        });
         var incoming = (d.posts || []).filter(function (p) { return p && p.id && !existingMap[p.id]; });
         if (incoming.length) {
           state.posts = incoming.concat(state.posts || []);
@@ -4710,6 +4739,7 @@ _FRONTEND_V22_JS = r'''
     }
     setTimeout(function () {
       injectPostPreviewIntoCommentModalV29(postObj);
+      decorateCommentModalDeleteButtonsV4612();
       polishModalsAndCloseIconsV29();
     }, 20);
     return true;
@@ -9313,6 +9343,7 @@ _FRONTEND_V22_JS = r'''
       return;
     }
     var directHideIds = {
+      sqDeleteAuthModalV4612: 1,
       dcQuickMatchModal: 1,
       sqPartnerInquiryModalV46: 1,
       sqLegalPolicyModal: 1,
@@ -9340,6 +9371,7 @@ _FRONTEND_V22_JS = r'''
     window.addEventListener("keydown", function (ev) {
       if (ev.key !== "Escape" && ev.key !== "Esc" && ev.keyCode !== 27) return;
       var candidates = [
+        document.getElementById("sqDeleteAuthModalV4612"),
         document.getElementById("dcQuickMatchModal"),
         document.getElementById("sqPartnerInquiryModalV46"),
         document.getElementById("sqLegalPolicyModal"),
@@ -10512,6 +10544,707 @@ _FRONTEND_V22_JS = r'''
     try { fn(); } catch (_eStep) {}
   }
 
+
+  // ============================================================================
+  // v4.6.12 Admin Master-Key Permanent Post / Comment / Cheer Deletion UI
+  // ============================================================================
+  var SS_ADMIN_MOD_KEY_V4612 = "sq_admin_session_key";
+  var _memAdminKeyV4612 = "";
+
+  function getSavedAdminKeyV4612() {
+    try {
+      var v = (sessionStorage.getItem(SS_ADMIN_MOD_KEY_V4612) || "").trim();
+      if (v) return v;
+    } catch (e) {}
+    return _memAdminKeyV4612 || String(window.__sqAdminSessionKeyFallbackV4612 || "").trim();
+  }
+
+  function saveAdminKeyV4612(k) {
+    var clean = k ? String(k).trim() : "";
+    _memAdminKeyV4612 = clean;
+    window.__sqAdminSessionKeyFallbackV4612 = clean;
+    try {
+      if (clean) sessionStorage.setItem(SS_ADMIN_MOD_KEY_V4612, clean);
+      else sessionStorage.removeItem(SS_ADMIN_MOD_KEY_V4612);
+    } catch (e) {}
+  }
+
+  function persistLocalPostRemovalV4612(pid) {
+    var spid = String(pid || "");
+    if (!spid) return;
+    reactionCache.deleted_post_ids = reactionCache.deleted_post_ids || {};
+    reactionCache.deleted_post_ids[spid] = true;
+    if (typeof state === "object" && state && Array.isArray(state.posts)) {
+      state.posts = state.posts.filter(function (x) { return x && String(x.id) !== spid; });
+    }
+    if (typeof saveState === "function") {
+      try { saveState(); } catch (e) {}
+    }
+    if (typeof window.renderFeed === "function") {
+      try { window.renderFeed(); } catch (e2) {}
+    }
+    syncRenderedFeedReactionButtonsDom();
+  }
+
+  function persistLocalCommentRemovalV4612(pid, commentId, commentUser, commentText) {
+    var spid = String(pid || "");
+    var cidNum = Number(commentId || 0);
+    if (cidNum > 0) {
+      reactionCache.deleted_comment_keys = reactionCache.deleted_comment_keys || {};
+      reactionCache.deleted_comment_keys[String(cidNum)] = true;
+    }
+    var matchFn = function (c) {
+      if (!c) return false;
+      if (cidNum > 0 && Number(c.id || 0) === cidNum) return false;
+      if (commentText && String(c.text || "").trim() === String(commentText).trim()) {
+        if (!commentUser || String(c.user || "").trim() === String(commentUser).trim()) return false;
+      }
+      return true;
+    };
+    if (spid && reactionCache.extra_comments && Array.isArray(reactionCache.extra_comments[spid])) {
+      reactionCache.extra_comments[spid] = reactionCache.extra_comments[spid].filter(matchFn);
+    }
+    var targetPost = null;
+    if (typeof state === "object" && state && Array.isArray(state.posts)) {
+      state.posts.forEach(function (p) {
+        if (!p) return;
+        if (!spid || String(p.id) === spid) {
+          if (Array.isArray(p.comments)) p.comments = p.comments.filter(matchFn);
+          if (String(p.id) === spid) targetPost = p;
+        }
+      });
+    }
+    if (typeof saveState === "function") {
+      try { saveState(); } catch (e) {}
+    }
+    if (targetPost) {
+      if (typeof window.renderCommentModalList === "function") {
+        try { window.renderCommentModalList(targetPost); } catch (eL) {}
+      }
+      var cm = document.getElementById("commentModal") || document.getElementById("post-modal");
+      if (cm && !isModalHiddenV4612(cm)) {
+        if (typeof window.openComments === "function" && document.getElementById("commentModal")) {
+          try { window.openComments(spid); } catch (eO) {}
+        } else if (typeof window.openPostModal === "function" && document.getElementById("post-modal")) {
+          try { window.openPostModal(spid); } catch (eP) {}
+        }
+        setTimeout(function () {
+          injectPostPreviewIntoCommentModalV29(targetPost);
+          decorateCommentModalDeleteButtonsV4612();
+        }, 20);
+      }
+    }
+    if (typeof window.renderFeed === "function") {
+      try { window.renderFeed(); } catch (eF) {}
+    }
+    syncRenderedFeedReactionButtonsDom();
+  }
+
+  function isModalHiddenV4612(el) {
+    if (!el) return true;
+    if (el.classList && el.classList.contains("hidden")) return true;
+    var ds = window.getComputedStyle ? window.getComputedStyle(el).display : el.style.display;
+    return !ds || ds === "none";
+  }
+
+  function openDeleteAuthModalV4612(opts) {
+    opts = opts || {};
+    var mode = opts.mode || "post"; // "post" | "comment"
+    var postId = String(opts.postId || "");
+    var isMemberPost = Boolean(opts.isMemberPost);
+    var savedAdm = getSavedAdminKeyV4612();
+    var savedPin = "";
+    try { savedPin = (localStorage.getItem("sportiq_member_pin_v1") || localStorage.getItem("sq_member_pin") || "").trim(); } catch (e) {}
+
+    var modal = document.getElementById("sqDeleteAuthModalV4612");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "sqDeleteAuthModalV4612";
+      modal.style.cssText = "position:fixed;inset:0;z-index:100060;background:rgba(2,6,23,.82);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:10px;box-sizing:border-box;";
+      modal.addEventListener("click", function (ev) {
+        if (ev.target === modal) modal.style.display = "none";
+      });
+      document.body.appendChild(modal);
+    }
+
+    var titleLabel = (mode === "comment")
+      ? "🗑️ 댓글 DB 영구 삭제 (관리자 전용)"
+      : (isMemberPost ? "🗑️ 게시글 영구 삭제 (PIN 또는 마스터 키)" : "🛡️ 시드·자동분석 게시글 관리자 영구 삭제");
+    var descHtml = (mode === "comment")
+      ? "관리자 마스터 키로 해당 악성·도배 댓글을 SQLite 및 PostgreSQL 백업에서 즉시 영구 삭제합니다."
+      : (isMemberPost
+          ? "작성 시 설정한 <strong>숫자 4자리 PIN</strong>을 입력하거나, PIN을 모를 경우 <strong>관리자 마스터 키</strong>를 입력하면 DB에서 즉시 영구 삭제됩니다."
+          : "관리자 마스터 키를 입력하면 해당 게시글과 연결된 댓글·신고 기록까지 DB에서 영구 삭제됩니다.");
+    var placeholderTxt = (mode === "comment" || !isMemberPost)
+      ? "관리자 마스터 키 입력 (6자 이상)"
+      : "작성자 4자리 PIN 또는 관리자 마스터 키 입력";
+    var prefillVal = savedAdm ? savedAdm : ((mode === "post" && isMemberPost) ? savedPin : "");
+    var sessionBadgeHtml = savedAdm
+      ? "<div style='margin-bottom:8px;padding:6px 9px;border-radius:8px;background:rgba(16,185,129,.14);border:1px solid rgba(52,211,153,.4);color:#6ee7b7;font-size:11.5px;font-weight:700;'>👑 현재 세션에 관리자 마스터 키가 인증되어 있습니다. 바로 [영구 삭제]를 누르면 즉시 처리됩니다.</div>"
+      : "";
+
+    modal.innerHTML = [
+      "<div style='width:100%;max-width:370px;background:#0f172a;border:1px solid #334155;border-radius:16px;padding:15px 16px;box-shadow:0 20px 50px rgba(0,0,0,.65);box-sizing:border-box;color:#f8fafc;'>",
+      "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;'>",
+      "    <div style='font-size:14.5px;font-weight:900;color:#fda4af;'>" + titleLabel + "</div>",
+      "    <button type='button' id='sqCloseDelModalBtnV4612' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:3px 9px;font-size:11.5px;font-weight:800;cursor:pointer;'>✕ 닫기</button>",
+      "  </div>",
+      "  <div style='font-size:12px;line-height:1.5;color:#cbd5e1;margin-bottom:10px;'>" + descHtml + "</div>",
+      sessionBadgeHtml,
+      (opts.previewText ? "<div style='margin-bottom:9px;padding:7px 9px;border-radius:8px;background:#020617;border:1px solid #1e293b;font-size:11.5px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>대상: " + uxEsc(opts.previewText) + "</div>" : ""),
+      "  <input id='sqDelSecretInputV4612' type='password' value='" + uxEsc(prefillVal) + "' placeholder='" + placeholderTxt + "' style='width:100%;box-sizing:border-box;background:#020617;border:1px solid #475569;border-radius:10px;padding:9px 11px;color:#fff;font-size:13px;margin-bottom:8px;' />",
+      "  <div id='sqDelErrMsgV4612' style='display:none;font-size:11.5px;color:#fb7185;margin-bottom:8px;font-weight:700;'></div>",
+      "  <div style='display:flex;justify-content:flex-end;gap:7px;'>",
+      "    <button type='button' id='sqCancelDelBtnV4612' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;'>취소</button>",
+      "    <button type='button' id='sqConfirmDelBtnV4612' style='background:linear-gradient(135deg,#e11d48,#be123c);border:none;color:#fff;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;'>🗑️ 영구 삭제</button>",
+      "  </div>",
+      "</div>"
+    ].join("");
+
+    modal.style.display = "flex";
+    var inp = document.getElementById("sqDelSecretInputV4612");
+    var errBox = document.getElementById("sqDelErrMsgV4612");
+    var confirmBtn = document.getElementById("sqConfirmDelBtnV4612");
+    document.getElementById("sqCloseDelModalBtnV4612").onclick = function () { modal.style.display = "none"; };
+    document.getElementById("sqCancelDelBtnV4612").onclick = function () { modal.style.display = "none"; };
+
+    var submitDelete = function () {
+      var secret = inp ? inp.value.trim() : "";
+      if (!secret) {
+        errBox.style.display = "block";
+        errBox.textContent = (mode === "comment" || !isMemberPost) ? "관리자 마스터 키를 입력해 주세요." : "작성자 4자리 PIN 또는 관리자 마스터 키를 입력해 주세요.";
+        return;
+      }
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = "삭제 처리 중...";
+      errBox.style.display = "none";
+
+      if (mode === "comment") {
+        fetch("/api/admin/moderation/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-SportIQ-Admin-Key": secret },
+          body: JSON.stringify({
+            target_type: "comment",
+            post_id: postId,
+            comment_id: opts.commentId || null,
+            comment_user: opts.commentUser || "",
+            comment_text: opts.commentText || "",
+            admin_key: secret
+          })
+        }).then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+          .then(function (res) {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = "🗑️ 영구 삭제";
+            if (res.status !== 200 || !res.data || !res.data.ok) {
+              errBox.style.display = "block";
+              errBox.textContent = (res.data && res.data.detail) || "댓글 삭제에 실패했습니다.";
+              return;
+            }
+            saveAdminKeyV4612(secret);
+            modal.style.display = "none";
+            persistLocalCommentRemovalV4612(postId, opts.commentId, opts.commentUser, opts.commentText);
+            if (typeof showToast === "function") showToast("🗑️ 관리자 권한으로 댓글이 영구 삭제되었습니다.");
+          })
+          .catch(function () {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = "🗑️ 영구 삭제";
+            errBox.style.display = "block";
+            errBox.textContent = "네트워크 오류가 발생했습니다.";
+          });
+        return;
+      }
+
+      // Post deletion: determine whether input is 4-digit numeric PIN or Admin Master Key
+      var digitsOnly = secret.replace(/\D/g, "");
+      var isFourDigitPin = (secret.length === 4 && digitsOnly.length === 4 && isMemberPost && secret !== savedAdm);
+      var headers = {};
+      var url = "/api/posts/" + encodeURIComponent(postId);
+      if (isFourDigitPin) {
+        url += "?pin=" + encodeURIComponent(digitsOnly);
+      } else {
+        headers["X-SportIQ-Admin-Key"] = secret;
+        url += "?pin=" + encodeURIComponent(secret);
+      }
+      fetch(url, { method: "DELETE", headers: headers })
+        .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+        .then(function (res) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = "🗑️ 영구 삭제";
+          if (res.status !== 200 || !res.data || !res.data.ok) {
+            errBox.style.display = "block";
+            errBox.textContent = (res.data && res.data.detail) || "게시글 삭제에 실패했습니다.";
+            return;
+          }
+          if (res.data.by_admin) {
+            saveAdminKeyV4612(secret);
+          }
+          modal.style.display = "none";
+          persistLocalPostRemovalV4612(postId);
+          var cm = document.getElementById("commentModal") || document.getElementById("post-modal");
+          if (cm && typeof state === "object" && state && String(state.activePostId) === postId) {
+            cm.classList.add("hidden");
+            cm.style.display = "none";
+          }
+          if (typeof showToast === "function") {
+            showToast(res.data.by_admin ? "🛡️ 관리자 권한으로 게시글과 댓글이 영구 삭제되었습니다." : "🗑️ 게시글이 삭제되었습니다.");
+          }
+        })
+        .catch(function () {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = "🗑️ 영구 삭제";
+          errBox.style.display = "block";
+          errBox.textContent = "네트워크 오류가 발생했습니다.";
+        });
+    };
+
+    confirmBtn.onclick = submitDelete;
+    if (inp) {
+      inp.onkeydown = function (ev) {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          submitDelete();
+        }
+      };
+      setTimeout(function () { try { inp.focus(); inp.select(); } catch (e) {} }, 25);
+    }
+  }
+
+  function decorateCommentModalDeleteButtonsV4612() {
+    var cm = document.getElementById("commentModal") || document.getElementById("post-modal");
+    if (!cm || isModalHiddenV4612(cm)) return;
+    var listEl = document.getElementById("commentModalList") || document.getElementById("modal-comments-list");
+    if (!listEl) return;
+    var activePid = (typeof state === "object" && state && state.activePostId) ? String(state.activePostId) : "";
+    var postObj = (typeof state === "object" && state && Array.isArray(state.posts))
+      ? state.posts.find(function (x) { return x && String(x.id) === activePid; })
+      : null;
+    var commentsArr = (postObj && Array.isArray(postObj.comments)) ? postObj.comments : [];
+
+    // Also add an admin post delete button inside #sqModalPostBodyBoxV29 header if not present
+    var headerBox = document.getElementById("sqModalPostBodyBoxV29");
+    if (headerBox && activePid && !headerBox.querySelector("[data-sq-modal-post-del-v4612]")) {
+      var topRow = headerBox.firstElementChild;
+      var btnWrap = topRow ? topRow.lastElementChild : null;
+      if (btnWrap) {
+        var pDelBtn = document.createElement("button");
+        pDelBtn.type = "button";
+        pDelBtn.setAttribute("data-sq-modal-post-del-v4612", activePid);
+        pDelBtn.style.cssText = "background:rgba(225,29,72,.16);border:1px solid rgba(244,63,94,.45);color:#fda4af;border-radius:8px;padding:3px 7px;font-size:11px;font-weight:800;cursor:pointer;";
+        pDelBtn.textContent = "🗑️ 글삭제";
+        pDelBtn.onclick = function (ev) {
+          ev.stopPropagation();
+          openDeleteAuthModalV4612({
+            mode: "post",
+            postId: activePid,
+            isMemberPost: Boolean(postObj && postObj.isMemberServerPost),
+            previewText: postObj ? postObj.title : activePid
+          });
+        };
+        btnWrap.appendChild(pDelBtn);
+      }
+    }
+
+    var children = Array.prototype.slice.call(listEl.children || []);
+    children.forEach(function (itemEl, idx) {
+      if (!itemEl || itemEl.tagName === "P" && itemEl.textContent.indexOf("아직") !== -1) return;
+      if (itemEl.querySelector && itemEl.querySelector("[data-sq-del-cmt-v4612]")) return;
+      var rawTxt = String(itemEl.textContent || "").trim();
+      if (!rawTxt || rawTxt.indexOf("첫 댓글") !== -1 || rawTxt.indexOf("의견을 남겨") !== -1) return;
+
+      var cMeta = commentsArr[idx] || null;
+      if (!cMeta) {
+        for (var k = 0; k < commentsArr.length; k++) {
+          if (commentsArr[k] && commentsArr[k].text && rawTxt.indexOf(commentsArr[k].text) !== -1) {
+            cMeta = commentsArr[k];
+            break;
+          }
+        }
+      }
+      var cId = cMeta && cMeta.id ? Number(cMeta.id) : 0;
+      var cUser = cMeta && cMeta.user ? String(cMeta.user) : "";
+      var cText = cMeta && cMeta.text ? String(cMeta.text) : rawTxt;
+
+      itemEl.style.position = "relative";
+      itemEl.style.paddingRight = "54px";
+      var delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.setAttribute("data-sq-del-cmt-v4612", "1");
+      delBtn.style.cssText = "position:absolute;top:7px;right:7px;background:rgba(15,23,42,.9);border:1px solid rgba(244,63,94,.38);color:#fda4af;border-radius:6px;padding:2px 6px;font-size:10.5px;font-weight:800;cursor:pointer;line-height:1.3;";
+      delBtn.title = "관리자 마스터 키로 이 댓글 영구 삭제";
+      delBtn.textContent = "🗑️ 삭제";
+      delBtn.onclick = function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openDeleteAuthModalV4612({
+          mode: "comment",
+          postId: activePid,
+          commentId: cId,
+          commentUser: cUser,
+          commentText: cText,
+          previewText: (cUser ? cUser + ": " : "") + cText
+        });
+      };
+      itemEl.appendChild(delBtn);
+    });
+  }
+
+  function installAdminModerationConsoleTabV4612() {
+    if (window.__sqAdminModInstalledV4612) return;
+    window.__sqAdminModInstalledV4612 = true;
+
+    // 1. Capture-phase click interceptor on `[data-sq-del]` BEFORE UPGRADE_JS's `window.prompt` bubble handler!
+    document.addEventListener("click", function (ev) {
+      var delBtn = (ev.target && ev.target.closest) ? ev.target.closest("[data-sq-del]") : null;
+      if (!delBtn) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (typeof ev.stopImmediatePropagation === "function") ev.stopImmediatePropagation();
+      var dpid = String(delBtn.getAttribute("data-sq-del") || "");
+      if (!dpid) return;
+      var pObj = (typeof state === "object" && state && Array.isArray(state.posts))
+        ? state.posts.find(function (x) { return x && String(x.id) === dpid; })
+        : null;
+      openDeleteAuthModalV4612({
+        mode: "post",
+        postId: dpid,
+        isMemberPost: Boolean(pObj && pObj.isMemberServerPost && !delBtn.getAttribute("data-sq-nonmember-del")),
+        previewText: pObj ? pObj.title : dpid
+      });
+    }, true);
+
+    // 2. Watch `#commentModal` & `#post-modal` so comment delete buttons stay attached after every render/addComment
+    ["commentModal", "post-modal"].forEach(function (mid) {
+      var mEl = document.getElementById(mid);
+      if (mEl && typeof MutationObserver !== "undefined" && !mEl.__sqCmtDelObsV4612) {
+        mEl.__sqCmtDelObsV4612 = true;
+        var obs = new MutationObserver(function () {
+          decorateCommentModalDeleteButtonsV4612();
+        });
+        obs.observe(mEl, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style"] });
+      }
+    });
+
+    // 3. Upgrade `#sqAdminRaffleModal` with a 2-tab switcher (`🎁 주간 추첨 관리` | `🛡️ 게시글·댓글 영구 삭제`)
+    var modState = { tab: "raffle", filter: "posts", query: "", data: null };
+
+    function renderModerationConsoleBodyV4612() {
+      var modBox = document.getElementById("sqAdminModerationBodyV4612");
+      if (!modBox) return;
+      var d = modState.data;
+      if (!d || !d.ok) {
+        modBox.innerHTML = "<div style='padding:14px;text-align:center;color:#94a3b8;'>상단 입력창에 <strong>관리자 마스터 키</strong>를 입력하고 <strong>[불러오기]</strong>를 누르면 전체 게시글·신고글·댓글·응원톡을 즉시 영구 삭제할 수 있습니다.</div>";
+        return;
+      }
+      var c = d.counts || {};
+      var q = (modState.query || "").trim().toLowerCase();
+      var f = modState.filter || "posts";
+
+      var filterBar = [
+        "<div style='display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;margin-bottom:9px;'>",
+        "  <div style='display:flex;flex-wrap:wrap;gap:5px;'>",
+        "    <button type='button' data-sq-mod-f='posts' style='padding:5px 9px;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer;border:1px solid " + (f === "posts" ? "#38bdf8;background:rgba(56,189,248,.18);color:#bae6fd;" : "#334155;background:#0f172a;color:#cbd5e1;") + "'>📝 게시글 (" + (c.posts || 0) + ")</button>",
+        "    <button type='button' data-sq-mod-f='reported' style='padding:5px 9px;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer;border:1px solid " + (f === "reported" ? "#fb7185;background:rgba(244,63,94,.2);color:#fecdd3;" : "#334155;background:#0f172a;color:#fda4af;") + "'>🚨 신고글 (" + (c.reported_posts || 0) + ")</button>",
+        "    <button type='button' data-sq-mod-f='comments' style='padding:5px 9px;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer;border:1px solid " + (f === "comments" ? "#34d399;background:rgba(16,185,129,.18);color:#a7f3d0;" : "#334155;background:#0f172a;color:#cbd5e1;") + "'>💬 댓글 (" + (c.comments || 0) + ")</button>",
+        "    <button type='button' data-sq-mod-f='cheers' style='padding:5px 9px;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer;border:1px solid " + (f === "cheers" ? "#fbbf24;background:rgba(245,158,11,.18);color:#fde68a;" : "#334155;background:#0f172a;color:#cbd5e1;") + "'>📣 응원톡 (" + (c.cheers || 0) + ")</button>",
+        "  </div>",
+        "  <input id='sqModSearchInputV4612' type='text' value='" + uxEsc(modState.query) + "' placeholder='제목·작성자·내용 검색' style='background:#020617;border:1px solid #334155;border-radius:8px;padding:5px 9px;color:#fff;font-size:11.5px;min-width:145px;flex:1;max-width:210px;' />",
+        "</div>"
+      ].join("");
+
+      var rowsHtml = "";
+      if (f === "posts" || f === "reported") {
+        var listP = (d.posts || []).filter(function (p) {
+          if (f === "reported" && !(p.report_count > 0)) return false;
+          if (!q) return true;
+          return (String(p.title || "") + " " + String(p.author || "") + " " + String(p.body_preview || "")).toLowerCase().indexOf(q) !== -1;
+        });
+        if (!listP.length) {
+          rowsHtml = "<div style='padding:16px;text-align:center;color:#64748b;'>조건에 해당하는 게시글이 없습니다.</div>";
+        } else {
+          rowsHtml = listP.map(function (p) {
+            var repBadge = p.report_count > 0
+              ? "<span style='background:rgba(244,63,94,.22);border:1px solid rgba(244,63,94,.5);color:#fecdd3;padding:1px 6px;border-radius:999px;font-size:10.5px;font-weight:800;'>🚨 신고 " + p.report_count + "건</span> "
+              : "";
+            return [
+              "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid rgba(51,65,85,.55);background:rgba(2,6,23,.55);border-radius:9px;margin-bottom:5px;'>",
+              "  <div style='min-width:0;flex:1;'>",
+              "    <div style='font-size:12px;font-weight:800;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" + repBadge + "[" + uxEsc(p.league) + "] " + uxEsc(p.title) + "</div>",
+              "    <div style='font-size:11px;color:#94a3b8;margin-top:2px;'>작성자: " + uxEsc(p.author) + " · 댓글 " + p.comment_count + " · 추천 " + p.likes + " · " + uxEsc(p.created_kst) + (p.latest_report_reason ? " · 사유: " + uxEsc(p.latest_report_reason) : "") + "</div>",
+              "  </div>",
+              "  <button type='button' data-sq-adm-del-post='" + uxEsc(p.id) + "' style='flex:0 0 auto;background:linear-gradient(135deg,#e11d48,#be123c);border:none;color:#fff;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;'>영구 삭제</button>",
+              "</div>"
+            ].join("");
+          }).join("");
+        }
+      } else if (f === "comments") {
+        var listC = (d.comments || []).filter(function (cmItem) {
+          if (!q) return true;
+          return (String(cmItem.text || "") + " " + String(cmItem.user || "") + " " + String(cmItem.post_title || "")).toLowerCase().indexOf(q) !== -1;
+        });
+        if (!listC.length) {
+          rowsHtml = "<div style='padding:16px;text-align:center;color:#64748b;'>조건에 해당하는 댓글이 없습니다.</div>";
+        } else {
+          rowsHtml = listC.map(function (cmItem) {
+            return [
+              "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid rgba(51,65,85,.55);background:rgba(2,6,23,.55);border-radius:9px;margin-bottom:5px;'>",
+              "  <div style='min-width:0;flex:1;'>",
+              "    <div style='font-size:12px;font-weight:700;color:#f1f5f9;word-break:break-word;'>" + uxEsc(cmItem.text) + "</div>",
+              "    <div style='font-size:10.8px;color:#94a3b8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>작성자: <strong style='color:#cbd5e1;'>" + uxEsc(cmItem.user) + "</strong> · 원문: " + uxEsc(cmItem.post_title) + " · " + uxEsc(cmItem.created_kst) + "</div>",
+              "  </div>",
+              "  <button type='button' data-sq-adm-del-cmt='" + cmItem.id + "' data-sq-adm-del-cmt-pid='" + uxEsc(cmItem.post_id) + "' data-sq-adm-del-cmt-txt='" + uxEsc(cmItem.text) + "' data-sq-adm-del-cmt-usr='" + uxEsc(cmItem.user) + "' style='flex:0 0 auto;background:linear-gradient(135deg,#e11d48,#be123c);border:none;color:#fff;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;'>댓글 삭제</button>",
+              "</div>"
+            ].join("");
+          }).join("");
+        }
+      } else {
+        var listCh = (d.cheers || []).filter(function (ch) {
+          if (!q) return true;
+          return (String(ch.message || "") + " " + String(ch.author || "") + " " + String(ch.team || "")).toLowerCase().indexOf(q) !== -1;
+        });
+        if (!listCh.length) {
+          rowsHtml = "<div style='padding:16px;text-align:center;color:#64748b;'>등록된 응원톡 메시지가 없습니다.</div>";
+        } else {
+          rowsHtml = listCh.map(function (ch) {
+            return [
+              "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid rgba(51,65,85,.55);background:rgba(2,6,23,.55);border-radius:9px;margin-bottom:5px;'>",
+              "  <div style='min-width:0;flex:1;'>",
+              "    <div style='font-size:12px;font-weight:700;color:#f1f5f9;word-break:break-word;'>" + uxEsc(ch.message) + "</div>",
+              "    <div style='font-size:10.8px;color:#94a3b8;margin-top:2px;'>작성자: " + uxEsc(ch.author) + " (" + uxEsc(ch.team) + ") · " + uxEsc(ch.created_kst) + "</div>",
+              "  </div>",
+              "  <button type='button' data-sq-adm-del-cheer='" + ch.id + "' style='flex:0 0 auto;background:linear-gradient(135deg,#e11d48,#be123c);border:none;color:#fff;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;'>삭제</button>",
+              "</div>"
+            ].join("");
+          }).join("");
+        }
+      }
+
+      modBox.innerHTML = filterBar + "<div style='max-height:330px;overflow-y:auto;padding-right:3px;'>" + rowsHtml + "</div>";
+
+      modBox.querySelectorAll("[data-sq-mod-f]").forEach(function (fb) {
+        fb.onclick = function () {
+          modState.filter = fb.getAttribute("data-sq-mod-f") || "posts";
+          renderModerationConsoleBodyV4612();
+        };
+      });
+      var sInp = document.getElementById("sqModSearchInputV4612");
+      if (sInp) {
+        sInp.oninput = function () {
+          var pos = sInp.selectionStart || 0;
+          modState.query = sInp.value;
+          renderModerationConsoleBodyV4612();
+          var sInp2 = document.getElementById("sqModSearchInputV4612");
+          if (sInp2) { try { sInp2.focus(); sInp2.setSelectionRange(pos, pos); } catch (e) {} }
+        };
+      }
+
+      modBox.querySelectorAll("[data-sq-adm-del-post]").forEach(function (b) {
+        b.onclick = function () {
+          var pid = b.getAttribute("data-sq-adm-del-post");
+          var admK = readCurrentModalAdminKeyV4612();
+          if (!admK) { if (typeof showToast === "function") showToast("❌ 상단에 관리자 마스터 키를 먼저 입력해 주세요."); return; }
+          b.disabled = true;
+          b.textContent = "삭제중...";
+          fetch("/api/admin/moderation/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-SportIQ-Admin-Key": admK },
+            body: JSON.stringify({ target_type: "post", post_id: pid, admin_key: admK })
+          }).then(function (r) { return r.json().then(function (x) { return { status: r.status, data: x }; }); })
+            .then(function (res) {
+              if (res.status !== 200 || !res.data || !res.data.ok) {
+                b.disabled = false;
+                b.textContent = "영구 삭제";
+                if (typeof showToast === "function") showToast("❌ " + ((res.data && res.data.detail) || "삭제 실패"));
+                return;
+              }
+              persistLocalPostRemovalV4612(pid);
+              if (typeof showToast === "function") showToast("🛡️ 게시글과 연결 댓글이 DB에서 영구 삭제되었습니다.");
+              loadAdminModerationOverviewV4612(admK);
+            });
+        };
+      });
+
+      modBox.querySelectorAll("[data-sq-adm-del-cmt]").forEach(function (b) {
+        b.onclick = function () {
+          var cid = Number(b.getAttribute("data-sq-adm-del-cmt") || 0);
+          var pid = b.getAttribute("data-sq-adm-del-cmt-pid") || "";
+          var ctxt = b.getAttribute("data-sq-adm-del-cmt-txt") || "";
+          var cusr = b.getAttribute("data-sq-adm-del-cmt-usr") || "";
+          var admK = readCurrentModalAdminKeyV4612();
+          if (!admK) { if (typeof showToast === "function") showToast("❌ 상단에 관리자 마스터 키를 먼저 입력해 주세요."); return; }
+          b.disabled = true;
+          b.textContent = "삭제중...";
+          fetch("/api/admin/moderation/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-SportIQ-Admin-Key": admK },
+            body: JSON.stringify({ target_type: "comment", comment_id: cid, post_id: pid, comment_text: ctxt, comment_user: cusr, admin_key: admK })
+          }).then(function (r) { return r.json().then(function (x) { return { status: r.status, data: x }; }); })
+            .then(function (res) {
+              if (res.status !== 200 || !res.data || !res.data.ok) {
+                b.disabled = false;
+                b.textContent = "댓글 삭제";
+                if (typeof showToast === "function") showToast("❌ " + ((res.data && res.data.detail) || "댓글 삭제 실패"));
+                return;
+              }
+              persistLocalCommentRemovalV4612(pid, cid, cusr, ctxt);
+              if (typeof showToast === "function") showToast("🗑️ 댓글이 DB에서 영구 삭제되었습니다.");
+              loadAdminModerationOverviewV4612(admK);
+            });
+        };
+      });
+
+      modBox.querySelectorAll("[data-sq-adm-del-cheer]").forEach(function (b) {
+        b.onclick = function () {
+          var chid = Number(b.getAttribute("data-sq-adm-del-cheer") || 0);
+          var admK = readCurrentModalAdminKeyV4612();
+          if (!admK) { if (typeof showToast === "function") showToast("❌ 상단에 관리자 마스터 키를 먼저 입력해 주세요."); return; }
+          b.disabled = true;
+          b.textContent = "삭제중...";
+          fetch("/api/admin/moderation/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-SportIQ-Admin-Key": admK },
+            body: JSON.stringify({ target_type: "cheer", cheer_id: chid, admin_key: admK })
+          }).then(function (r) { return r.json().then(function (x) { return { status: r.status, data: x }; }); })
+            .then(function (res) {
+              if (res.status !== 200 || !res.data || !res.data.ok) {
+                b.disabled = false;
+                b.textContent = "삭제";
+                if (typeof showToast === "function") showToast("❌ " + ((res.data && res.data.detail) || "응원톡 삭제 실패"));
+                return;
+              }
+              if (typeof window.loadCheersFromServer === "function") {
+                try { window.loadCheersFromServer(); } catch (eC) {}
+              }
+              if (typeof showToast === "function") showToast("🗑️ 응원톡 메시지가 영구 삭제되었습니다.");
+              loadAdminModerationOverviewV4612(admK);
+            });
+        };
+      });
+    }
+
+    function readCurrentModalAdminKeyV4612() {
+      var ki = document.getElementById("sqAdminKeyInput");
+      var v = ki ? ki.value.trim() : "";
+      if (v) saveAdminKeyV4612(v);
+      return v || getSavedAdminKeyV4612();
+    }
+
+    function loadAdminModerationOverviewV4612(keyOverride) {
+      var k = (keyOverride || readCurrentModalAdminKeyV4612() || "").trim();
+      var modBox = document.getElementById("sqAdminModerationBodyV4612");
+      if (!k) {
+        modState.data = null;
+        renderModerationConsoleBodyV4612();
+        return;
+      }
+      if (modBox && !modState.data) {
+        modBox.innerHTML = "<div style='padding:14px;text-align:center;color:#94a3b8;'>게시글·댓글·신고 목록을 불러오는 중...</div>";
+      }
+      fetch("/api/admin/moderation/overview", {
+        headers: { "X-SportIQ-Admin-Key": k }
+      }).then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+        .then(function (res) {
+          if (res.status !== 200 || !res.data || !res.data.ok) {
+            modState.data = null;
+            if (modBox) {
+              modBox.innerHTML = "<div style='padding:14px;text-align:center;color:#fb7185;font-weight:700;'>❌ " + uxEsc((res.data && res.data.detail) || "관리자 마스터 키를 확인해 주세요.") + "</div>";
+            }
+            return;
+          }
+          saveAdminKeyV4612(k);
+          modState.data = res.data;
+          renderModerationConsoleBodyV4612();
+        })
+        .catch(function () {
+          if (modBox) modBox.innerHTML = "<div style='padding:14px;text-align:center;color:#fb7185;'>네트워크 오류가 발생했습니다.</div>";
+        });
+    }
+
+    function ensureAdminModalTabsMountedV4612() {
+      var m = document.getElementById("sqAdminRaffleModal");
+      if (!m) return;
+      var h3 = m.querySelector("h3");
+      if (h3 && h3.textContent.indexOf("게시글") === -1) {
+        h3.textContent = "👑 관리자 통합 콘솔 (주간 추첨 · 게시글·댓글 영구 삭제)";
+      }
+      var raffleBody = document.getElementById("sqAdminConsoleBody");
+      if (!raffleBody || !raffleBody.parentNode) return;
+
+      var tabBar = document.getElementById("sqAdminConsoleTabsV4612");
+      if (!tabBar) {
+        tabBar = document.createElement("div");
+        tabBar.id = "sqAdminConsoleTabsV4612";
+        tabBar.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:11px;";
+        tabBar.innerHTML = [
+          "<button type='button' id='sqAdminTabRaffleV4612' style='padding:8px 10px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>🎁 주간 추첨 관리</button>",
+          "<button type='button' id='sqAdminTabModV4612' style='padding:8px 10px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>🛡️ 게시글·댓글 영구 삭제</button>"
+        ].join("");
+        raffleBody.parentNode.insertBefore(tabBar, raffleBody);
+
+        var modBody = document.createElement("div");
+        modBody.id = "sqAdminModerationBodyV4612";
+        modBody.style.cssText = "display:none;font-size:12.5px;color:#cbd5e1;";
+        raffleBody.parentNode.insertBefore(modBody, raffleBody.nextSibling);
+
+        var syncTabStyles = function () {
+          var isMod = (modState.tab === "mod");
+          var bRaf = document.getElementById("sqAdminTabRaffleV4612");
+          var bMod = document.getElementById("sqAdminTabModV4612");
+          if (bRaf) {
+            bRaf.style.cssText = "padding:8px 10px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;border:1px solid " +
+              (!isMod ? "#f59e0b;background:rgba(245,158,11,.18);color:#fde68a;" : "#334155;background:#020617;color:#94a3b8;");
+          }
+          if (bMod) {
+            bMod.style.cssText = "padding:8px 10px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;border:1px solid " +
+              (isMod ? "#f43f5e;background:rgba(225,29,72,.2);color:#fecdd3;" : "#334155;background:#020617;color:#94a3b8;");
+          }
+          raffleBody.style.display = isMod ? "none" : "block";
+          modBody.style.display = isMod ? "block" : "none";
+          if (isMod) {
+            loadAdminModerationOverviewV4612();
+          }
+        };
+
+        document.getElementById("sqAdminTabRaffleV4612").onclick = function () {
+          modState.tab = "raffle";
+          syncTabStyles();
+        };
+        document.getElementById("sqAdminTabModV4612").onclick = function () {
+          modState.tab = "mod";
+          syncTabStyles();
+        };
+        tabBar.__syncTabsV4612 = syncTabStyles;
+        syncTabStyles();
+      }
+
+      // Hook `#sqLoadAdminRoundsBtn` so clicking it while on Moderation tab also reloads moderation data!
+      var loadBtn = document.getElementById("sqLoadAdminRoundsBtn");
+      if (loadBtn && !loadBtn.__sqModBoundV4612) {
+        loadBtn.__sqModBoundV4612 = true;
+        loadBtn.textContent = "인증 · 현황 불러오기";
+        loadBtn.addEventListener("click", function () {
+          var k = readCurrentModalAdminKeyV4612();
+          if (modState.tab === "mod" && k) {
+            loadAdminModerationOverviewV4612(k);
+          }
+        });
+      }
+    }
+
+    // Observe body for `#sqAdminRaffleModal` creation & authBox updates
+    if (typeof MutationObserver !== "undefined") {
+      var bodyObs = new MutationObserver(function () {
+        if (document.getElementById("sqAdminRaffleModal")) {
+          ensureAdminModalTabsMountedV4612();
+        }
+        var admHubBtn = document.getElementById("sqOpenAdminRaffleBtn");
+        if (admHubBtn && admHubBtn.textContent.indexOf("관리") !== -1 && admHubBtn.textContent.indexOf("글관리") === -1) {
+          admHubBtn.textContent = "👑 추첨 · 글관리";
+        }
+      });
+      bodyObs.observe(document.body, { childList: true, subtree: true });
+    }
+  }
+
   function bootMemberUxV22() {
     safeRunStepV4610(injectUxV22Styles);
     safeRunStepV4610(enforceSingleLineMainTabBar);
@@ -10546,6 +11279,7 @@ _FRONTEND_V22_JS = r'''
     safeRunStepV4610(installMatchInsightModalV30);
     safeRunStepV4610(refreshScoreboardSuiteV30);
     safeRunStepV4610(handleDeepLinkPostOnBootV29);
+    safeRunStepV4610(installAdminModerationConsoleTabV4612);
     safeRunStepV4610(function () {
       if (typeof window.submitComment === "function" && !window.__sqSubmitCommentWrappedV29) {
         window.__sqSubmitCommentWrappedV29 = true;
@@ -12298,7 +13032,7 @@ def _trigger_smu_pg_backup(*tables: str) -> None:
 
 
 def _register_ux_v22_pg_tables() -> None:
-    extra = ("community_post_likes", "community_post_like_totals", "member_post_bookmarks", "match_fan_votes_v32", "match_fan_vote_totals_v32")
+    extra = ("community_post_likes", "community_post_like_totals", "member_post_bookmarks", "match_fan_votes_v32", "match_fan_vote_totals_v32", "admin_deleted_tombstones")
     cur = getattr(_smu, "BACKUP_TABLES", ())
     if isinstance(cur, (tuple, list)):
         merged = tuple(dict.fromkeys(list(cur) + list(extra)))
@@ -12307,6 +13041,7 @@ def _register_ux_v22_pg_tables() -> None:
         from app.sportiq_auto_analyst import register_snapshot_table
         register_snapshot_table("community_post_like_totals", "post_id")
         register_snapshot_table("match_fan_vote_totals_v32", "match_key")
+        register_snapshot_table("admin_deleted_tombstones", "tombstone_key")
     except Exception:
         pass
 
@@ -12355,6 +13090,12 @@ def _init_ux_v22_tables() -> None:
                     draw_votes INTEGER NOT NULL DEFAULT 0,
                     away_votes INTEGER NOT NULL DEFAULT 0,
                     updated_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS admin_deleted_tombstones (
+                    tombstone_key TEXT PRIMARY KEY,
+                    target_type TEXT NOT NULL,
+                    target_id TEXT NOT NULL,
+                    deleted_at REAL NOT NULL
                 );
                 """
             )
@@ -12466,7 +13207,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46110_{int(time.time())}"
+_BOOT_VER_V30 = f"46120_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -12548,6 +13289,18 @@ def _ensure_tactical_posts_seeded_v22() -> bool:
                     now - 6400,
                 ),
             ]
+            tombstoned_seed_ids = set()
+            has_tomb = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='admin_deleted_tombstones'"
+            ).fetchone()
+            if has_tomb:
+                tomb_rows = conn.execute(
+                    "SELECT target_id FROM admin_deleted_tombstones WHERE target_type = 'post'"
+                ).fetchall()
+                tombstoned_seed_ids = {str(tr['target_id']) for tr in tomb_rows}
+            seeds = [s for s in seeds if s[0] not in tombstoned_seed_ids]
+            if not seeds:
+                return False
             conn.executemany(
                 """
                 INSERT OR IGNORE INTO community_member_posts(
@@ -12572,6 +13325,11 @@ def _ensure_tactical_posts_seeded_v22() -> bool:
     return seeded_now
 
 
+def _build_comment_sig_v4612(post_id: str, user_label: str, comment_text: str) -> str:
+    raw = f"{(post_id or '').strip()}::{(user_label or '').strip()}::{(comment_text or '').strip()}"
+    return "sig_" + hashlib.sha1(raw.encode("utf-8", errors="ignore")).hexdigest()[:16]
+
+
 @router.get("/api/posts")
 def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[str] = ""):
     _ensure_tactical_posts_seeded_v22()
@@ -12589,11 +13347,20 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
             )
             c_rows = (
                 conn.execute(
-                    "SELECT post_id, user_name, user_badge, comment_text, created_at FROM community_post_comments ORDER BY id ASC"
+                    "SELECT id, post_id, user_name, user_badge, comment_text, created_at FROM community_post_comments ORDER BY id ASC"
                 ).fetchall()
                 if "community_post_comments" in tables
                 else []
             )
+            tomb_rows = (
+                conn.execute(
+                    "SELECT target_type, target_id FROM admin_deleted_tombstones"
+                ).fetchall()
+                if "admin_deleted_tombstones" in tables
+                else []
+            )
+            deleted_post_ids: Set[str] = {str(tr['target_id']) for tr in tomb_rows if tr['target_type'] == 'post'}
+            deleted_comment_keys: Set[str] = {str(tr['target_id']) for tr in tomb_rows if tr['target_type'] in ('comment', 'comment_sig')}
             tot_rows = (
                 conn.execute("SELECT post_id, like_count FROM community_post_like_totals").fetchall()
                 if "community_post_like_totals" in tables
@@ -12629,10 +13396,16 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
                 except Exception:
                     auto_rows = []
 
-        comments_by_post: Dict[str, List[Dict[str, str]]] = {}
+        comments_by_post: Dict[str, List[Dict[str, Any]]] = {}
         for c in c_rows:
+            cid_int = int(c['id'])
+            if str(cid_int) in deleted_comment_keys or c['post_id'] in deleted_post_ids:
+                continue
             label = f"{c['user_name']} {c['user_badge']}".strip()
-            comments_by_post.setdefault(c["post_id"], []).append({"user": label, "text": c["comment_text"]})
+            sig_k = _build_comment_sig_v4612(c['post_id'], label, c['comment_text'])
+            if sig_k in deleted_comment_keys:
+                continue
+            comments_by_post.setdefault(c["post_id"], []).append({"id": cid_int, "user": label, "text": c["comment_text"]})
 
         now = time.time()
         posts: List[Dict[str, Any]] = []
@@ -12640,6 +13413,8 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
 
         for r in p_rows:
             pid = r["id"]
+            if pid in deleted_post_ids:
+                continue
             seen_ids.add(pid)
             mins = max(0, int((now - float(r["created_at"] or now)) // 60))
             base_lk = int(r["likes"] or 1)
@@ -12675,6 +13450,8 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
             "liked_ids": sorted(liked_ids),
             "bookmarked_ids": sorted(bookmarked_ids),
             "bookmarked_titles": sorted(bookmarked_titles),
+            "deleted_post_ids": sorted(deleted_post_ids),
+            "deleted_comment_keys": sorted(deleted_comment_keys),
         }
 
     return run_with_db_retry(_op)
@@ -16298,6 +17075,435 @@ _start_coldboot_schedule_prewarmer_v373()
 
 
 
+
+
+# ============================================================================
+# v4.6.12 Admin Master-Key Permanent Deletion (Posts · Comments · Cheers)
+# ============================================================================
+class AdminModerationDeleteInV4612(BaseModel):
+    target_type: str = "post"  # "post" | "comment" | "cheer"
+    post_id: Optional[str] = ""
+    comment_id: Optional[int] = None
+    comment_user: Optional[str] = ""
+    comment_text: Optional[str] = ""
+    cheer_id: Optional[int] = None
+    admin_key: Optional[str] = ""
+
+
+def _verify_admin_key_v4612(candidate_key: Optional[str], raise_on_error: bool = True) -> bool:
+    cand = (candidate_key or "").strip()
+    if not cand:
+        if raise_on_error:
+            raise HTTPException(status_code=401, detail="관리자 마스터 키를 입력해 주세요.")
+        return False
+    req_fn = getattr(_smu, "_require_admin_auth", None)
+    if callable(req_fn):
+        try:
+            req_fn(cand)
+            return True
+        except HTTPException:
+            if raise_on_error:
+                raise
+            return False
+    if raise_on_error:
+        raise HTTPException(status_code=500, detail="관리자 인증 모듈을 불러올 수 없습니다.")
+    return False
+
+
+def _fmt_kst_mod_v4612(epoch_or_str: Any) -> str:
+    try:
+        kst_tz = timezone(timedelta(hours=9))
+        return datetime.fromtimestamp(float(epoch_or_str), tz=kst_tz).strftime("%m-%d %H:%M")
+    except Exception:
+        return str(epoch_or_str or "")[:16]
+
+
+def _execute_permanent_post_delete_v4612(post_id: str, by_admin: bool = True, raw_pin: str = "") -> Dict[str, Any]:
+    pid = (post_id or "").strip()[:80]
+    if not pid:
+        raise HTTPException(status_code=400, detail="삭제할 게시글 ID가 비어 있습니다.")
+    now = time.time()
+
+    def _op() -> Dict[str, Any]:
+        deleted_post_rows = 0
+        deleted_comments = 0
+        with _smu_db_session(write=True) as conn:
+            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            row = (
+                conn.execute("SELECT id, author, pin_hash FROM community_member_posts WHERE id = ?", (pid,)).fetchone()
+                if "community_member_posts" in tables
+                else None
+            )
+            if not by_admin:
+                if not row:
+                    raise HTTPException(status_code=404, detail="삭제할 게시글을 찾을 수 없습니다.")
+                expected = row["pin_hash"] or ""
+                hash_fn = getattr(_smu, "_hash_pin", None)
+                cand_hash = hash_fn(row["author"], raw_pin) if callable(hash_fn) else ""
+                if not expected or cand_hash != expected:
+                    raise HTTPException(status_code=403, detail="작성 시 설정한 4자리 PIN이 일치하지 않습니다.")
+
+            if "community_member_posts" in tables:
+                cur_p = conn.execute("DELETE FROM community_member_posts WHERE id = ?", (pid,))
+                deleted_post_rows = int(cur_p.rowcount or 0)
+            if "community_post_comments" in tables:
+                cur_c = conn.execute("DELETE FROM community_post_comments WHERE post_id = ?", (pid,))
+                deleted_comments = int(cur_c.rowcount or 0)
+            if "community_post_likes" in tables:
+                conn.execute("DELETE FROM community_post_likes WHERE post_id = ?", (pid,))
+            if "community_post_like_totals" in tables:
+                conn.execute("DELETE FROM community_post_like_totals WHERE post_id = ?", (pid,))
+            if "member_post_bookmarks" in tables:
+                conn.execute("DELETE FROM member_post_bookmarks WHERE post_id = ?", (pid,))
+            if "post_reports" in tables:
+                conn.execute("DELETE FROM post_reports WHERE post_id = ?", (pid,))
+            if "auto_analyst_posts" in tables:
+                try:
+                    cols = {c[1] for c in conn.execute("PRAGMA table_info(auto_analyst_posts)").fetchall()}
+                    if "id" in cols:
+                        conn.execute("DELETE FROM auto_analyst_posts WHERE id = ?", (pid,))
+                except Exception:
+                    pass
+            if by_admin and "admin_deleted_tombstones" in tables:
+                conn.execute(
+                    "INSERT OR REPLACE INTO admin_deleted_tombstones(tombstone_key, target_type, target_id, deleted_at) VALUES (?, 'post', ?, ?)",
+                    (f"post:{pid}", pid, now),
+                )
+        return {"deleted_post_rows": deleted_post_rows, "deleted_comments": deleted_comments}
+
+    res = run_with_db_retry(_op)
+
+    def _clean_lounge_reports() -> None:
+        try:
+            with _db_session(write=True) as lconn:
+                has_rep = lconn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='post_reports'"
+                ).fetchone()
+                if has_rep:
+                    lconn.execute("DELETE FROM post_reports WHERE post_id = ?", (pid,))
+        except Exception:
+            pass
+
+    run_with_db_retry(_clean_lounge_reports)
+    _trigger_smu_pg_backup(
+        "community_member_posts",
+        "community_post_comments",
+        "community_post_likes",
+        "community_post_like_totals",
+        "member_post_bookmarks",
+        "post_reports",
+        "admin_deleted_tombstones",
+    )
+    return {
+        "ok": True,
+        "deleted_id": pid,
+        "by_admin": by_admin,
+        "deleted_post_rows": res["deleted_post_rows"],
+        "deleted_comments": res["deleted_comments"],
+    }
+
+
+@router.delete("/api/posts/{post_id}")
+def delete_community_post_or_admin_v4612(
+    post_id: str,
+    pin: str = "",
+    admin_key: str = "",
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+):
+    eff_admin = (x_sportiq_admin_key or admin_key or "").strip()
+    if eff_admin:
+        _verify_admin_key_v4612(eff_admin, raise_on_error=True)
+        return _execute_permanent_post_delete_v4612(post_id, by_admin=True)
+
+    trimmed_pin = (pin or "").strip()
+    if trimmed_pin and _verify_admin_key_v4612(trimmed_pin, raise_on_error=False):
+        return _execute_permanent_post_delete_v4612(post_id, by_admin=True)
+
+    raw_pin = re.sub(r"\D", "", trimmed_pin)
+    if trimmed_pin and len(raw_pin) != 4 and len(trimmed_pin) >= 6:
+        raise HTTPException(status_code=403, detail="관리자 마스터 키가 일치하지 않습니다.")
+    if len(raw_pin) != 4:
+        raise HTTPException(status_code=400, detail="작성자 4자리 PIN 또는 관리자 마스터 키를 입력해 주세요.")
+
+    return _execute_permanent_post_delete_v4612(post_id, by_admin=False, raw_pin=raw_pin)
+
+
+@router.post("/api/posts/{post_id}/comments")
+def add_community_comment_v4612(post_id: str, payload: _smu.CommentCreateIn):
+    txt = (payload.text or "").strip()[:500]
+    if not txt:
+        raise HTTPException(status_code=400, detail="댓글 내용을 입력해 주세요.")
+    user = (payload.nickname or payload.user or "익명팬").strip()[:28]
+
+    def _op() -> Dict[str, Any]:
+        badge = ""
+        now = time.time()
+        with _smu_db_session(write=True) as conn:
+            acc = conn.execute(
+                "SELECT active_badge FROM member_accounts WHERE lower(nickname)=lower(?)", (user,)
+            ).fetchone()
+            if acc and acc["active_badge"]:
+                badge = acc["active_badge"]
+            cur = conn.execute(
+                "INSERT INTO community_post_comments(post_id, user_name, user_badge, comment_text, created_at) VALUES (?, ?, ?, ?, ?)",
+                (post_id[:64], user, badge, txt, now),
+            )
+            new_cid = int(cur.lastrowid or 0)
+        label = f"{user} {badge}".strip()
+        return {"id": new_cid, "user": label, "text": txt}
+
+    c_obj = run_with_db_retry(_op)
+    _trigger_smu_pg_backup("community_post_comments")
+    return {"ok": True, "comment": c_obj}
+
+
+@router.get("/api/admin/moderation/overview")
+def admin_moderation_overview_v4612(
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+    admin_key: Optional[str] = "",
+):
+    _verify_admin_key_v4612(x_sportiq_admin_key or admin_key, raise_on_error=True)
+
+    def _read_smu() -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Set[str]]:
+        with _smu_db_session(write=False) as conn:
+            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            tomb_posts: Set[str] = set()
+            tomb_cmts: Set[str] = set()
+            if "admin_deleted_tombstones" in tables:
+                for tr in conn.execute("SELECT target_type, target_id FROM admin_deleted_tombstones").fetchall():
+                    if tr["target_type"] == "post":
+                        tomb_posts.add(str(tr["target_id"]))
+                    elif tr["target_type"] in ("comment", "comment_sig"):
+                        tomb_cmts.add(str(tr["target_id"]))
+
+            p_rows = (
+                conn.execute(
+                    "SELECT id, league, author, author_badge, title, body, likes, pin_hash, created_at FROM community_member_posts ORDER BY created_at DESC LIMIT 80"
+                ).fetchall()
+                if "community_member_posts" in tables
+                else []
+            )
+            c_rows = (
+                conn.execute(
+                    "SELECT id, post_id, user_name, user_badge, comment_text, created_at FROM community_post_comments ORDER BY id DESC LIMIT 120"
+                ).fetchall()
+                if "community_post_comments" in tables
+                else []
+            )
+        p_list = [dict(r) for r in p_rows if str(r["id"]) not in tomb_posts]
+        c_list = [
+            dict(c)
+            for c in c_rows
+            if str(c["id"]) not in tomb_cmts and str(c["post_id"]) not in tomb_posts
+        ]
+        return p_list, c_list, tomb_posts
+
+    p_list, c_list, tomb_posts = run_with_db_retry(_read_smu)
+
+    def _read_lounge() -> Tuple[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
+        rep_map: Dict[str, Dict[str, Any]] = {}
+        cheers_out: List[Dict[str, Any]] = []
+        with _db_session(write=False) as lconn:
+            ltables = {r[0] for r in lconn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            if "post_reports" in ltables:
+                for rr in lconn.execute(
+                    "SELECT post_id, reason, created_at FROM post_reports ORDER BY id DESC LIMIT 200"
+                ).fetchall():
+                    rpid = str(rr["post_id"] or "")
+                    if not rpid or rpid in tomb_posts:
+                        continue
+                    ent = rep_map.setdefault(
+                        rpid,
+                        {"count": 0, "latest_reason": rr["reason"] or "신고 접수", "latest_at": rr["created_at"]},
+                    )
+                    ent["count"] += 1
+            if "cheers" in ltables:
+                for ch in lconn.execute(
+                    "SELECT id, author, team, message, created_at FROM cheers ORDER BY id DESC LIMIT 60"
+                ).fetchall():
+                    cheers_out.append(
+                        {
+                            "id": int(ch["id"]),
+                            "author": ch["author"] or "익명팬",
+                            "team": ch["team"] or "ALL",
+                            "message": ch["message"] or "",
+                            "created_kst": _fmt_kst_mod_v4612(ch["created_at"]),
+                        }
+                    )
+        return rep_map, cheers_out
+
+    rep_map, cheers_out = run_with_db_retry(_read_lounge)
+
+    cmt_count_by_post: Dict[str, int] = {}
+    for c in c_list:
+        cmt_count_by_post[c["post_id"]] = cmt_count_by_post.get(c["post_id"], 0) + 1
+
+    title_by_post: Dict[str, str] = {str(p["id"]): str(p["title"] or "") for p in p_list}
+    posts_out: List[Dict[str, Any]] = []
+    seen_pids: Set[str] = set()
+    for p in p_list:
+        pid = str(p["id"])
+        seen_pids.add(pid)
+        rep_info = rep_map.get(pid, {"count": 0, "latest_reason": ""})
+        posts_out.append(
+            {
+                "id": pid,
+                "league": p["league"] or "EPL",
+                "author": p["author"] or "익명",
+                "title": p["title"] or "",
+                "body_preview": (p["body"] or "")[:110],
+                "likes": int(p["likes"] or 0),
+                "has_pin": bool(p["pin_hash"]),
+                "comment_count": cmt_count_by_post.get(pid, 0),
+                "report_count": int(rep_info["count"]),
+                "latest_report_reason": rep_info["latest_reason"],
+                "created_kst": _fmt_kst_mod_v4612(p["created_at"]),
+            }
+        )
+
+    # Also surface reported posts whose IDs were client/auto posts not in community_member_posts
+    for rpid, rinfo in rep_map.items():
+        if rpid not in seen_pids and rpid not in tomb_posts:
+            posts_out.insert(
+                0,
+                {
+                    "id": rpid,
+                    "league": "신고대상",
+                    "author": "외부/시드글",
+                    "title": f"[신고 접수 ID: {rpid}] 피드 노출 게시글",
+                    "body_preview": f"최근 신고 사유: {rinfo['latest_reason']}",
+                    "likes": 0,
+                    "has_pin": False,
+                    "comment_count": cmt_count_by_post.get(rpid, 0),
+                    "report_count": int(rinfo["count"]),
+                    "latest_report_reason": rinfo["latest_reason"],
+                    "created_kst": _fmt_kst_mod_v4612(rinfo.get("latest_at")),
+                },
+            )
+
+    comments_out: List[Dict[str, Any]] = []
+    for c in c_list[:100]:
+        pid = str(c["post_id"])
+        u_label = f"{c['user_name']} {c['user_badge']}".strip()
+        comments_out.append(
+            {
+                "id": int(c["id"]),
+                "post_id": pid,
+                "post_title": title_by_post.get(pid) or f"게시글 ({pid})",
+                "user": u_label,
+                "text": c["comment_text"] or "",
+                "created_kst": _fmt_kst_mod_v4612(c["created_at"]),
+            }
+        )
+
+    reported_total = sum(1 for x in posts_out if x["report_count"] > 0)
+    return {
+        "ok": True,
+        "counts": {
+            "posts": len(posts_out),
+            "reported_posts": reported_total,
+            "comments": len(comments_out),
+            "cheers": len(cheers_out),
+        },
+        "posts": posts_out,
+        "comments": comments_out,
+        "cheers": cheers_out,
+    }
+
+
+@router.post("/api/admin/moderation/delete")
+def admin_moderation_delete_v4612(
+    payload: AdminModerationDeleteInV4612,
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+):
+    eff_key = (x_sportiq_admin_key or payload.admin_key or "").strip()
+    _verify_admin_key_v4612(eff_key, raise_on_error=True)
+
+    ttype = (payload.target_type or "post").strip().lower()
+    now = time.time()
+
+    if ttype == "post":
+        return _execute_permanent_post_delete_v4612(payload.post_id or "", by_admin=True)
+
+    if ttype == "comment":
+        cid = int(payload.comment_id) if payload.comment_id is not None else 0
+        pid = (payload.post_id or "").strip()[:80]
+        c_user = (payload.comment_user or "").strip()[:60]
+        c_text = (payload.comment_text or "").strip()[:500]
+        if cid <= 0 and not (pid and c_text):
+            raise HTTPException(status_code=400, detail="삭제할 댓글 ID 또는 댓글 정보가 필요합니다.")
+
+        sig_key = _build_comment_sig_v4612(pid, c_user, c_text) if (pid and c_text) else ""
+
+        def _del_comment_op() -> int:
+            removed = 0
+            with _smu_db_session(write=True) as conn:
+                tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+                if "community_post_comments" in tables:
+                    if cid > 0:
+                        row_c = conn.execute(
+                            "SELECT id, post_id, user_name, user_badge, comment_text FROM community_post_comments WHERE id = ?",
+                            (cid,),
+                        ).fetchone()
+                        cur = conn.execute("DELETE FROM community_post_comments WHERE id = ?", (cid,))
+                        removed += int(cur.rowcount or 0)
+                        if row_c and "admin_deleted_tombstones" in tables:
+                            lbl = f"{row_c['user_name']} {row_c['user_badge']}".strip()
+                            row_sig = _build_comment_sig_v4612(row_c["post_id"], lbl, row_c["comment_text"])
+                            conn.execute(
+                                "INSERT OR REPLACE INTO admin_deleted_tombstones(tombstone_key, target_type, target_id, deleted_at) VALUES (?, 'comment_sig', ?, ?)",
+                                (f"comment_sig:{row_sig}", row_sig, now),
+                            )
+                    if removed == 0 and pid and c_text:
+                        cur2 = conn.execute(
+                            "DELETE FROM community_post_comments WHERE post_id = ? AND comment_text = ?",
+                            (pid, c_text),
+                        )
+                        removed += int(cur2.rowcount or 0)
+                if "admin_deleted_tombstones" in tables:
+                    if cid > 0:
+                        conn.execute(
+                            "INSERT OR REPLACE INTO admin_deleted_tombstones(tombstone_key, target_type, target_id, deleted_at) VALUES (?, 'comment', ?, ?)",
+                            (f"comment:{cid}", str(cid), now),
+                        )
+                    if sig_key:
+                        conn.execute(
+                            "INSERT OR REPLACE INTO admin_deleted_tombstones(tombstone_key, target_type, target_id, deleted_at) VALUES (?, 'comment_sig', ?, ?)",
+                            (f"comment_sig:{sig_key}", sig_key, now),
+                        )
+            return removed
+
+        removed_cnt = run_with_db_retry(_del_comment_op)
+        _trigger_smu_pg_backup("community_post_comments", "admin_deleted_tombstones")
+        return {
+            "ok": True,
+            "target_type": "comment",
+            "deleted_comment_id": cid,
+            "deleted_sig": sig_key,
+            "deleted_rows": removed_cnt,
+        }
+
+    if ttype == "cheer":
+        chid = int(payload.cheer_id) if payload.cheer_id is not None else 0
+        if chid <= 0:
+            raise HTTPException(status_code=400, detail="삭제할 응원톡 ID가 필요합니다.")
+
+        def _del_cheer_op() -> int:
+            with _db_session(write=True) as lconn:
+                cur = lconn.execute("DELETE FROM cheers WHERE id = ?", (chid,))
+                return int(cur.rowcount or 0)
+
+        removed_ch = run_with_db_retry(_del_cheer_op)
+        try:
+            from app import sportiq_auto_analyst as _analyst
+            threading.Thread(target=_analyst._backup_tables_to_pg, args=("cheers",), daemon=True).start()
+        except Exception:
+            pass
+        return {"ok": True, "target_type": "cheer", "deleted_cheer_id": chid, "deleted_rows": removed_ch}
+
+    raise HTTPException(status_code=400, detail="지원하지 않는 삭제 대상 유형입니다.")
+
+
 router.include_router(upgrade_router)
 
 
@@ -16507,6 +17713,7 @@ def lounge_health():
         "member_upgrade_v1": True,
         "match_sort_bar_dedup": _SORT_DEDUP_APPLIED,
         "ai_iq_hyper_search_v2": True,
+        "admin_moderation_v4612": True,
         "member_ux_v22": True,
         "seo_og_v27": True,
     }
