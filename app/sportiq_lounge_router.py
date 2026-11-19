@@ -1200,6 +1200,85 @@ _FRONTEND_V22_JS = r'''
       "    white-space: nowrap !important;",
       "  }",
       "}",
+      "/* v4.2 Clean Ranking Podium + AI Lab Sub-Navigation & 2-Col Kelly/Injury Grids */",
+      "#sqLivePinMemberBoard[data-sq-pinrk-folded='1'] > :not([data-sq-pinrk-hdr='1']) {",
+      "  display: none !important;",
+      "}",
+      "#tab-lab, #tab-ranking, #tab-lab > *, #tab-ranking > * {",
+      "  min-width: 0 !important;",
+      "  max-width: 100% !important;",
+      "  box-sizing: border-box !important;",
+      "}",
+      "#sqLabSubNavV42 {",
+      "  display: flex;",
+      "  flex-wrap: nowrap;",
+      "  width: 100%;",
+      "  min-width: 0 !important;",
+      "  max-width: 100% !important;",
+      "  box-sizing: border-box !important;",
+      "  overflow-x: auto;",
+      "  -webkit-overflow-scrolling: touch;",
+      "  scrollbar-width: none;",
+      "  gap: 6px;",
+      "  padding: 9px 12px;",
+      "  margin-bottom: 14px;",
+      "  background: rgba(9, 15, 31, 0.94);",
+      "  border: 1px solid rgba(56, 189, 248, 0.32);",
+      "  border-radius: 14px;",
+      "}",
+      "#sqLabSubNavV42::-webkit-scrollbar { display: none; }",
+      ".sq-v42-subpill {",
+      "  flex: 0 0 auto;",
+      "  white-space: nowrap;",
+      "  background: rgba(15, 23, 42, 0.9);",
+      "  border: 1px solid rgba(51, 65, 85, 0.85);",
+      "  color: #cbd5e1;",
+      "  border-radius: 999px;",
+      "  padding: 5px 12px;",
+      "  font-size: 12px;",
+      "  font-weight: 800;",
+      "  cursor: pointer;",
+      "  transition: all 0.15s ease;",
+      "}",
+      ".sq-v42-subpill:hover { border-color: #38bdf8; color: #f8fafc; }",
+      ".sq-v42-subpill.active {",
+      "  background: linear-gradient(135deg, #0284c7, #10b981);",
+      "  border-color: #34d399;",
+      "  color: #f8fafc;",
+      "}",
+      ".sq-v42-lab-grid2 {",
+      "  display: grid !important;",
+      "  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;",
+      "  gap: 10px !important;",
+      "  margin-top: 10px !important;",
+      "}",
+      ".sq-v42-lab-grid2 > * { margin: 0 !important; min-width: 0 !important; box-sizing: border-box !important; }",
+      ".sq-v42-calc-grid3 {",
+      "  display: grid !important;",
+      "  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;",
+      "  gap: 10px !important;",
+      "}",
+      "#tab-lab > div, #tab-lab > section {",
+      "  border-radius: 16px !important;",
+      "}",
+      "@media (max-width: 760px) {",
+      "  .sq-v42-lab-grid2, .sq-v42-calc-grid3 { grid-template-columns: 1fr !important; }",
+      "}",
+      "@media (max-width: 640px) {",
+      "  .sq-v42-mob-swipe {",
+      "    display: flex !important;",
+      "    flex-wrap: nowrap !important;",
+      "    min-width: 0 !important;",
+      "    max-width: 100% !important;",
+      "    overflow-x: auto !important;",
+      "    -webkit-overflow-scrolling: touch;",
+      "    scrollbar-width: none;",
+      "    gap: 5px !important;",
+      "    padding-bottom: 2px;",
+      "  }",
+      "  .sq-v42-mob-swipe::-webkit-scrollbar { display: none; }",
+      "  .sq-v42-mob-swipe > button { flex: 0 0 auto !important; white-space: nowrap !important; }",
+      "}",
       ".sq-v30-fbtn {",
       "  background: rgba(15, 23, 42, 0.9);",
       "  border: 1px solid #334155;",
@@ -2841,13 +2920,35 @@ _FRONTEND_V22_JS = r'''
             "</div>"
           );
         }).join("");
+        card.setAttribute("data-sq-pinrk-folded", "1");
+        card.style.cssText = "background:rgba(15,23,42,.88);border:1px solid rgba(52,211,153,.35);border-radius:14px;padding:10px 15px;margin-bottom:12px;";
         card.innerHTML = [
-          "<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px;'>",
-          "  <span style='font-size:13.5px;font-weight:900;color:#6ee7b7;'>🔐 실시간 4자리 PIN 인증 회원 포인트 TOP 랭킹</span>",
-          "  <span style='font-size:11px;color:#94a3b8;'>출석(+20P)·분석글(+15P)·추천(+2P) 실시간 DB 연동</span>",
+          "<div data-sq-pinrk-hdr='1' style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;cursor:pointer;'>",
+          "  <div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;'>",
+          "    <span style='font-size:13px;font-weight:900;color:#6ee7b7;'>🔐 실시간 4자리 PIN 인증 회원 포인트 TOP 랭킹 (" + d.members.length + "명)</span>",
+          "    <span style='font-size:11px;color:#94a3b8;'>실시간 DB 연동</span>",
+          "  </div>",
+          "  <button type='button' id='sqPinRankToggleBtnV42' class='sq-v40-fold-btn'>PIN 인증 순위 펼치기 ▼</button>",
           "</div>",
-          "<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px;'>" + rowsHtml + "</div>"
+          "<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px;margin-top:10px;'>" + rowsHtml + "</div>"
         ].join("");
+        var pHdr = card.querySelector("[data-sq-pinrk-hdr='1']");
+        var pBtn = card.querySelector("#sqPinRankToggleBtnV42");
+        if (pHdr && pBtn) {
+          var togPinFn = function (ev) {
+            if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+            var nowFolded = card.getAttribute("data-sq-pinrk-folded") === "1";
+            if (nowFolded) {
+              card.removeAttribute("data-sq-pinrk-folded");
+              pBtn.textContent = "접기 ▲";
+            } else {
+              card.setAttribute("data-sq-pinrk-folded", "1");
+              pBtn.textContent = "PIN 인증 순위 펼치기 ▼";
+            }
+          };
+          pBtn.onclick = togPinFn;
+          pHdr.addEventListener("click", togPinFn);
+        }
         rankSec.insertBefore(card, rankSec.firstChild);
       })
       .catch(function () {});
@@ -6502,6 +6603,270 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
+
+  var _v42RankProShowAll = false;
+  var _v42RankMemShowAll = false;
+  var _v42LabActiveTool = "all";
+  var _v42KellyShowAll = false;
+  var _v42InjuryShowAll = false;
+
+  function translateInlineVsAndClubPrefixV42(text) {
+    if (!text || !/[A-Za-z]/.test(text)) return text;
+    var out = String(text);
+    out = out.replace(/((?:EPL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|UCL|UNL|NBA|NHL|MLB|KBO|ABL)\s*\|\s*)?([A-Za-z][A-Za-z0-9\.\-'\s]{1,22}?)\s+vs\s+([A-Za-z][A-Za-z0-9\.\-'\s]{1,22})(?=$|\s|·|\||@|\()/g, function (full, pre, t1, t2) {
+      var cleanPre = pre || "";
+      var raw1 = t1.trim();
+      var leadLg = "";
+      var mLg = raw1.match(/^(EPL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|UCL|UNL|NBA|NHL|MLB|KBO|ABL)\s*(.+)$/i);
+      if (mLg && localizeTeamKoJsV381(mLg[2]) !== mLg[2]) {
+        leadLg = mLg[1] + " ";
+        raw1 = mLg[2].trim();
+      }
+      var k1 = localizeTeamKoJsV381(raw1);
+      var k2 = localizeTeamKoJsV381(t2.trim());
+      if (k1 === raw1 && k2 === t2.trim()) return full;
+      return cleanPre + leadLg + k1 + " vs " + k2;
+    });
+    out = out.replace(/(^|[\s:•·])([A-Za-z][A-Za-z\.\s]{1,18}?)(?=\s*(?:측면|주전|로테이션|핵심|승\s*\(|표\s*·))/g, function (full, lead, eng) {
+      var ko = localizeTeamKoJsV381(eng.trim());
+      return ko !== eng.trim() ? (lead + ko) : full;
+    });
+    return out;
+  }
+
+  function localizeLabAndScheduleDomV42() {
+    ["tab-lab", "tab-schedule", "tab-matches"].forEach(function (secId) {
+      var sec = document.getElementById(secId);
+      if (!sec) return;
+      var walker = document.createTreeWalker(sec, NodeFilter.SHOW_TEXT, null);
+      var node;
+      while ((node = walker.nextNode())) {
+        var val = node.nodeValue;
+        if (!val || !/[A-Za-z]/.test(val)) continue;
+        var nextVal = translateInlineVsAndClubPrefixV42(val);
+        if (nextVal !== val) node.nodeValue = nextVal;
+      }
+      Array.prototype.forEach.call(sec.querySelectorAll("select"), function (sel) {
+        var seenOptPairs = {};
+        Array.prototype.slice.call(sel.options || []).forEach(function (opt) {
+          var oTxt = opt.textContent || "";
+          var nTxt = translateInlineVsAndClubPrefixV42(oTxt);
+          if (nTxt !== oTxt) opt.textContent = nTxt;
+          var pKey = nTxt.replace(/\s+/g, " ").trim();
+          if (seenOptPairs[pKey]) {
+            if (opt.parentNode) opt.parentNode.removeChild(opt);
+          } else {
+            seenOptPairs[pKey] = true;
+          }
+        });
+      });
+    });
+    try { dedupLabKellyMonitorV36(); } catch (e) {}
+  }
+
+  function applyCompactListCapV42(listEl, capCount, isExpanded, moreWrapId, btnOpenTextFn, btnCloseText, borderColor, textColor, onToggle) {
+    if (!listEl || !listEl.children) return;
+    var validRows = Array.prototype.slice.call(listEl.children).filter(function (ch) {
+      return ch && ch.nodeType === 1 && ch.getAttribute("data-sq-kelly-dup") !== "1";
+    });
+    validRows.forEach(function (row, idx) {
+      if (!isExpanded && idx >= capCount) {
+        row.setAttribute("data-sq-v42-capped", "1");
+        row.style.display = "none";
+      } else if (row.getAttribute("data-sq-v42-capped") === "1") {
+        row.removeAttribute("data-sq-v42-capped");
+        row.style.display = "";
+      }
+    });
+
+    var wrap = document.getElementById(moreWrapId);
+    if (validRows.length > capCount && listEl.parentElement) {
+      if (!wrap) {
+        wrap = document.createElement("div");
+        wrap.id = moreWrapId;
+        wrap.style.cssText = "margin-top:10px;text-align:center;";
+        listEl.insertAdjacentElement("afterend", wrap);
+      }
+      wrap.style.display = "block";
+      var b = wrap.querySelector("button");
+      if (!b) {
+        b = document.createElement("button");
+        b.type = "button";
+        b.className = "sq-v40-fold-btn";
+        b.style.cssText = "padding:5px 15px;border-color:" + borderColor + ";color:" + textColor + ";font-size:11.4px;";
+        wrap.appendChild(b);
+      }
+      b.textContent = isExpanded ? btnCloseText : btnOpenTextFn(validRows.length, validRows.length - capCount);
+      b.onclick = function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        onToggle();
+      };
+    } else if (wrap) {
+      wrap.style.display = "none";
+    }
+  }
+
+  function organizeRankingAndLabTabsV42() {
+    localizeLabAndScheduleDomV42();
+
+    var rankSec = document.getElementById("tab-ranking");
+    if (rankSec) {
+      var rDivs = rankSec.querySelectorAll("div, section, tbody");
+      for (var ri = 0; ri < rDivs.length; ri++) {
+        var rd = rDivs[ri];
+        if (rd.id === "sqLivePinMemberBoard" || rd.closest("#sqLivePinMemberBoard")) continue;
+
+        if (rd.children && rd.children.length >= 5 && rd.children.length <= 9 && rd.querySelectorAll("button").length >= 5) {
+          var rbt = rd.textContent || "";
+          if (rbt.indexOf("전체 TOP") !== -1 && rbt.indexOf("축구") !== -1) {
+            rd.classList.add("sq-v42-mob-swipe");
+          }
+        }
+
+        if (rd.children && rd.children.length >= 6 && rd.children.length <= 20) {
+          var c0Txt = rd.children[0] ? (rd.children[0].textContent || "") : "";
+          var c1Txt = rd.children[1] ? (rd.children[1].textContent || "") : "";
+          if (c0Txt.indexOf("적중률") !== -1 && c1Txt.indexOf("적중률") !== -1) {
+            applyCompactListCapV42(
+              rd, 5, _v42RankProShowAll, "sqRankProMoreWrapV42",
+              function (tot, rem) { return "🏆 PRO 분석가 TOP " + tot + " 전체 보기 (+" + rem + "명 더보기 ▼)"; },
+              "▲ 상위 5위까지만 간략히 보기",
+              "rgba(56,189,248,0.55)", "#7dd3fc",
+              function () { _v42RankProShowAll = !_v42RankProShowAll; organizeRankingAndLabTabsV42(); }
+            );
+          } else if (/\d+\s*P\b/.test(c0Txt) && /\d+\s*P\b/.test(c1Txt) && c0Txt.indexOf("적중률") === -1) {
+            applyCompactListCapV42(
+              rd, 5, _v42RankMemShowAll, "sqRankMemMoreWrapV42",
+              function (tot, rem) { return "👑 예측왕 포인트 랭킹 TOP " + tot + " 전체 보기 (+" + rem + "명 더보기 ▼)"; },
+              "▲ 상위 5위까지만 간략히 보기",
+              "rgba(250,204,21,0.55)", "#fde68a",
+              function () { _v42RankMemShowAll = !_v42RankMemShowAll; organizeRankingAndLabTabsV42(); }
+            );
+          }
+        }
+      }
+    }
+
+    var labSec = document.getElementById("tab-lab");
+    if (labSec) {
+      var toolMap = [];
+      var labHost = labSec;
+      var directBlocks = Array.prototype.slice.call(labHost.children || []).filter(function (el) {
+        return el && el.tagName && el.id !== "sqLabSubNavV42";
+      });
+      if (directBlocks.length === 1 && directBlocks[0].children && directBlocks[0].children.length >= 3) {
+        labHost = directBlocks[0];
+        labHost.style.minWidth = "0";
+        labHost.style.maxWidth = "100%";
+        directBlocks = Array.prototype.slice.call(labHost.children).filter(function (el) {
+          return el && el.tagName && el.id !== "sqLabSubNavV42";
+        });
+      }
+
+      directBlocks.forEach(function (blk) {
+        var tx = blk.textContent || "";
+        var kind = "";
+        if (tx.indexOf("켈리") !== -1 || tx.indexOf("배당 흐름") !== -1) kind = "kelly";
+        else if (tx.indexOf("계산기 3종") !== -1 || tx.indexOf("공정배당") !== -1) kind = "calc";
+        else if (tx.indexOf("승률 시뮬레이터") !== -1 || tx.indexOf("가중치 실험실") !== -1) kind = "sim";
+        else if (tx.indexOf("인터랙티브 라인업 전술판") !== -1 || tx.indexOf("전술판 갤러리") !== -1) kind = "tactic";
+        else if (tx.indexOf("부상 · 결장") !== -1 || tx.indexOf("라인업 체크 보드") !== -1) kind = "injury";
+        if (kind) {
+          blk.setAttribute("data-sq-lab-kind", kind);
+          toolMap.push({ el: blk, kind: kind });
+        }
+      });
+
+      if (toolMap.length >= 2) {
+        var subNav = document.getElementById("sqLabSubNavV42");
+        if (!subNav) {
+          subNav = document.createElement("div");
+          subNav.id = "sqLabSubNavV42";
+          labSec.insertBefore(subNav, labSec.firstChild);
+        }
+        var pills = [
+          { k: "all", lbl: "⚡ 실험실 전체 요약" },
+          { k: "tactic", lbl: "📋 라인업 전술판" },
+          { k: "kelly", lbl: "📉 배당·켈리 모니터" },
+          { k: "sim", lbl: "🎛️ 승률 시뮬레이터" },
+          { k: "calc", lbl: "🧮 계산기 3종" },
+          { k: "injury", lbl: "🏥 부상·결장 보드" }
+        ];
+        var navSig = _v42LabActiveTool;
+        if (subNav.getAttribute("data-sq-sig") !== navSig) {
+          subNav.setAttribute("data-sq-sig", navSig);
+          subNav.innerHTML = pills.map(function (p) {
+            return "<button type='button' class='sq-v42-subpill" + (_v42LabActiveTool === p.k ? " active" : "") + "' data-sq-lab-pick='" + p.k + "'>" + p.lbl + "</button>";
+          }).join("");
+          subNav.querySelectorAll("[data-sq-lab-pick]").forEach(function (b) {
+            b.onclick = function () {
+              _v42LabActiveTool = b.getAttribute("data-sq-lab-pick") || "all";
+              organizeRankingAndLabTabsV42();
+            };
+          });
+        }
+
+        toolMap.forEach(function (entry) {
+          var showBlk = (_v42LabActiveTool === "all" || _v42LabActiveTool === entry.kind);
+          entry.el.style.display = showBlk ? "" : "none";
+
+          if (entry.kind === "calc") {
+            Array.prototype.forEach.call(entry.el.querySelectorAll("div"), function (cd) {
+              if (cd.children && cd.children.length === 3 && (cd.textContent || "").indexOf("공정배당") !== -1) {
+                cd.classList.add("sq-v42-calc-grid3");
+              }
+            });
+          }
+
+          Array.prototype.forEach.call(entry.el.querySelectorAll("div"), function (subD) {
+            if (subD.children && subD.children.length >= 4 && subD.children.length <= 8 && subD.querySelectorAll("button").length >= 4 && !subD.querySelector("input, select")) {
+              var sbt = subD.textContent || "";
+              if (sbt.indexOf("4-3-3") !== -1 || (sbt.indexOf("전체") !== -1 && sbt.indexOf("축구") !== -1)) {
+                subD.classList.add("sq-v42-mob-swipe");
+              }
+            }
+          });
+
+          if (entry.kind === "kelly" || entry.kind === "injury") {
+            var candLists = entry.el.querySelectorAll("div");
+            for (var li = 0; li < candLists.length; li++) {
+              var cl = candLists[li];
+              if (cl.children && cl.children.length >= 5) {
+                var vsCount = 0;
+                for (var vi = 0; vi < Math.min(cl.children.length, 6); vi++) {
+                  if (/\s+vs\s+/i.test(cl.children[vi].textContent || "")) vsCount++;
+                }
+                if (vsCount >= 3) {
+                  cl.classList.add("sq-v42-lab-grid2");
+                  var forceAll = (_v42LabActiveTool === entry.kind);
+                  if (entry.kind === "kelly") {
+                    applyCompactListCapV42(
+                      cl, 4, forceAll || _v42KellyShowAll, "sqLabKellyMoreWrapV42",
+                      function (tot, rem) { return "📉 배당·켈리 밸류 모니터 전체 보기 (+" + rem + "경기 더보기 ▼)"; },
+                      "▲ 상위 4경기만 간략히 보기",
+                      "rgba(52,211,153,0.55)", "#6ee7b7",
+                      function () { _v42KellyShowAll = !_v42KellyShowAll; organizeRankingAndLabTabsV42(); }
+                    );
+                  } else {
+                    applyCompactListCapV42(
+                      cl, 4, forceAll || _v42InjuryShowAll, "sqLabInjuryMoreWrapV42",
+                      function (tot, rem) { return "🏥 부상·결장 체크 보드 전체 보기 (+" + rem + "경기 더보기 ▼)"; },
+                      "▲ 주요 4경기만 간략히 보기",
+                      "rgba(248,113,113,0.55)", "#fca5a5",
+                      function () { _v42InjuryShowAll = !_v42InjuryShowAll; organizeRankingAndLabTabsV42(); }
+                    );
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+  }
+
   function refreshScoreboardSuiteV30() {
     ensureDomesticBasketballUiControlsV34();
     ensureRootTickerObserverV31();
@@ -6517,6 +6882,7 @@ _FRONTEND_V22_JS = r'''
     localizeScoreStripDomV381();
     try { organizeBelowScoreboardSectionsV40(); } catch (eV40) {}
     try { organizeSidebarAndIssuesTabV41(); } catch (eV41) {}
+    try { organizeRankingAndLabTabsV42(); } catch (eV42) {}
   }
 
   function getSportTacticalViewV33(it, hp, ap) {
@@ -9455,7 +9821,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"4100_{int(time.time())}"
+_BOOT_VER_V30 = f"4200_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -13249,7 +13615,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.1-clean-sidebar-and-issues",
+        "engine_version": "4.2-clean-ranking-and-lab-hub",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
