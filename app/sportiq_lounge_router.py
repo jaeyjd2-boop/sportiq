@@ -227,7 +227,9 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
     window.__lastAiSearchMatchesV37 = games || [];
     var qaCardHtml = "";
     if (sqa) {
+      var qaCap = 6;
       var qaRows = (sqa.items || []).map(function (it, idx) {
+        var hideExtraQa = idx >= qaCap ? " data-ai-extra-qa='1' style='display:none;" : " style='display:flex;";
         var aiO = it.ai || {};
         var oddsO = aiO.odds || {};
         var isPre = (it.state === "pre");
@@ -238,7 +240,7 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
               ? "<span style='background:#334155;color:#e2e8f0;padding:1px 6px;border-radius:5px;font-size:10.5px;font-weight:800;'>" + esc(it.home_score + ":" + it.away_score) + " 종료</span>"
               : "<span style='color:#6ee7b7;font-size:11px;font-weight:800;'>AI " + esc(aiO.home_pct || 50) + "%:" + esc(aiO.away_pct || 50) + "%</span> <span style='color:#94a3b8;font-size:10.5px;'>(배당 " + esc(oddsO.home || "-") + "/" + esc(oddsO.away || "-") + ")</span>");
         return (
-          "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;background:rgba(2,6,23,.65);border:1px solid rgba(51,65,85,.75);border-radius:9px;flex-wrap:wrap;'>" +
+          "<div" + hideExtraQa + "justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;background:rgba(2,6,23,.65);border:1px solid rgba(51,65,85,.75);border-radius:9px;flex-wrap:wrap;'>" +
           "  <div style='display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0;'>" +
           "    <span style='color:#fde68a;font-weight:800;font-size:12px;min-width:40px;'>- " + esc(it.time_kst || "예정") + "</span>" +
           (sqa.items.length > 1 && it.league ? "<span style='background:#1e293b;color:#93c5fd;border-radius:5px;padding:1px 5px;font-size:10px;font-weight:800;'>" + esc(it.league) + "</span>" : "") +
@@ -266,6 +268,9 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
         "    </div>",
         "  </div>",
         "  <div style='display:grid;gap:6px;'>" + qaRows + "</div>",
+        ((sqa.items && sqa.items.length > qaCap)
+          ? "<button type='button' id='sqAiMoreQaBtnV46' style='width:100%;margin-top:7px;background:#0f172a;border:1px solid rgba(52,211,153,.4);color:#6ee7b7;border-radius:9px;padding:6px;font-size:11.5px;font-weight:800;cursor:pointer;'>🏟️ 일정 +" + (sqa.items.length - qaCap) + "경기 더 펼쳐보기 ▼</button>"
+          : ""),
         "</div>"
       ].join("");
     }
@@ -275,13 +280,11 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
       "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;'>",
       "    <div style='display:flex;align-items:center;gap:7px;flex-wrap:wrap;'>",
       "      <span style='font-weight:900;color:#67e8f9;font-size:13.5px;'>🧠 AI 아이큐 초정밀 통합 브리핑</span>",
-      "      <span style='background:rgba(16,185,129,.18);border:1px solid rgba(52,211,153,.45);color:#6ee7b7;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;'>총 " + esc(totalCnt) + "건 정밀 매칭</span>",
+      "      <span style='background:rgba(16,185,129,.18);border:1px solid rgba(52,211,153,.45);color:#6ee7b7;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;'>총 " + esc(totalCnt) + "건 매칭</span>",
+      (expanded.length > 1 ? "<span title='" + esc(expanded.slice(0, 6).join(" · ")) + "' style='background:rgba(14,165,233,.14);border:1px solid rgba(56,189,248,.35);color:#7dd3fc;border-radius:999px;padding:1px 7px;font-size:10.5px;font-weight:700;'>🌐 한·영 확장</span>" : ""),
       "    </div>",
-      "    <span style='font-size:11px;color:#94a3b8;'>" + esc(d.searched_at_kst || "") + "</span>",
+      "    <span style='font-size:10.8px;color:#94a3b8;'>" + esc(d.searched_at_kst || "") + "</span>",
       "  </div>",
-      (expanded.length > 1
-        ? "<div style='font-size:11px;color:#93c5fd;background:rgba(2,6,23,.55);border-radius:8px;padding:4px 9px;margin-bottom:8px;'>🌐 한·영 동의어 자동 확장: <strong>" + expanded.slice(0, 6).map(esc).join(" · ") + "</strong></div>"
-        : ""),
       "  <div style='font-size:13px;color:#f1f5f9;line-height:1.68;'>" + summaryHtml + "</div>",
       "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:11px;padding-top:9px;border-top:1px dashed rgba(148,163,184,.2);'>",
       "    <div style='display:flex;gap:5px;flex-wrap:wrap;'>",
@@ -396,26 +399,29 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
       out.push("</div>");
     }
 
-    // 5. High-Precision Domestic & Global News List (Up to 28 items with Expand Toggle!)
+    // 5. High-Precision Domestic & Global News List (Top-6 2-Column Grid + Expand Toggle!)
     if (news.length) {
-      var initialCap = 12;
-      out.push("<div data-ai-sec='news'><div style='font-weight:800;color:#38bdf8;font-size:12.5px;margin:10px 0 6px;'>🌐 정확도순 국내·해외 실시간 스포츠 뉴스 (" + news.length + "건)</div>");
+      var initialCap = 6;
+      out.push("<div data-ai-sec='news'><div style='font-weight:800;color:#38bdf8;font-size:12.3px;margin:8px 0 6px;'>🌐 정확도순 국내·해외 실시간 스포츠 뉴스 (" + news.length + "건)</div><div class='sq-v46-ai-news-grid' style='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;'>");
       news.forEach(function (n, idx) {
-        var extraAttr = idx >= initialCap ? " data-ai-extra-news='1' style='display:none;text-decoration:none;'" : " style='display:block;text-decoration:none;'";
+        var extraAttr = idx >= initialCap ? " data-ai-extra-news='1' style='display:none;text-decoration:none;'" : " style='display:flex;flex-direction:column;justify-content:space-between;text-decoration:none;'";
         out.push(
           "<a href='" + esc(n.url) + "' target='_blank' rel='noopener noreferrer' class='sq-ai-iq-card'" + extraAttr + ">" +
-          "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;'>" +
-          "    <span style='font-size:11px;font-weight:800;color:#22d3ee;'>📰 " + esc(n.source) + (n.lang_badge ? " <span style='color:#a5b4fc;'>[" + esc(n.lang_badge) + "]</span>" : "") + "</span>" +
-          "    <span style='display:inline-flex;align-items:center;gap:6px;'>" + pctBadge(n.match_pct) + "<span style='font-size:11px;color:#94a3b8;'>🕒 " + esc(n.published_kst) + " ↗</span></span>" +
+          "  <div>" +
+          "    <div style='display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;'>" +
+          "      <span style='font-size:10.8px;font-weight:800;color:#22d3ee;'>📰 " + esc(n.source) + (n.lang_badge ? " <span style='color:#a5b4fc;'>[" + esc(n.lang_badge) + "]</span>" : "") + "</span>" +
+          "      <span style='display:inline-flex;align-items:center;gap:5px;'>" + pctBadge(n.match_pct) + "<span style='font-size:10.5px;color:#94a3b8;'>" + esc(n.published_kst) + " ↗</span></span>" +
+          "    </div>" +
+          "    <div style='font-weight:800;color:#f8fafc;font-size:12.4px;line-height:1.42;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>" + esc(n.title) + "</div>" +
+          (n.snippet ? "<div style='font-size:11.2px;color:#94a3b8;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>" + esc(n.snippet) + "</div>" : "") +
           "  </div>" +
-          "  <div style='font-weight:800;color:#f8fafc;font-size:13px;'>" + esc(n.title) + "</div>" +
-          (n.snippet ? "<div style='font-size:11.5px;color:#94a3b8;margin-top:3px;'>" + esc(n.snippet) + "</div>" : "") +
           "</a>"
         );
       });
+      out.push("</div>");
       if (news.length > initialCap) {
         out.push(
-          "<button type='button' id='sqAiMoreNewsBtn' style='width:100%;margin-top:6px;background:#0f172a;border:1px solid #334155;color:#7dd3fc;border-radius:10px;padding:8px;font-size:12px;font-weight:800;cursor:pointer;'>➕ 정확도 검증 뉴스 나머지 " + (news.length - initialCap) + "건 더 펼쳐보기 ▼</button>"
+          "<button type='button' id='sqAiMoreNewsBtn' style='width:100%;margin-top:7px;background:#0f172a;border:1px solid #334155;color:#7dd3fc;border-radius:10px;padding:7px;font-size:11.5px;font-weight:800;cursor:pointer;'>📰 정확도 검증 뉴스 +" + (news.length - initialCap) + "건 더 보기 ▼</button>"
         );
       }
       out.push("</div>");
@@ -440,15 +446,26 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
       };
     });
 
-    // Expand extra news button
+    var moreQaBtn = document.getElementById("sqAiMoreQaBtnV46");
+    if (moreQaBtn) {
+      moreQaBtn.onclick = function () {
+        box.querySelectorAll("[data-ai-extra-qa='1']").forEach(function (el) {
+          el.style.display = "flex";
+        });
+        moreQaBtn.style.display = "none";
+      };
+    }
     var moreBtn = document.getElementById("sqAiMoreNewsBtn");
     if (moreBtn) {
       moreBtn.onclick = function () {
         box.querySelectorAll("[data-ai-extra-news='1']").forEach(function (el) {
-          el.style.display = "block";
+          el.style.display = "flex";
         });
         moreBtn.style.display = "none";
       };
+    }
+    if (typeof window.__foldAiModalHintsOnResultV46 === "function") {
+      try { window.__foldAiModalHintsOnResultV46(true); } catch (eFH) {}
     }
 
     // Jump handlers for match, datacenter insight, and feed post cards
@@ -515,19 +532,36 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
     var wBtn = document.getElementById("sqAiWriteFromSearchBtn");
     if (wBtn) {
       wBtn.onclick = function () {
-        var modal = document.getElementById("sqAiIqModal");
-        if (modal) modal.style.display = "none";
+        if (typeof window.__closeAiSearchModalCompletelyV372 === "function") {
+          window.__closeAiSearchModalCompletelyV372();
+        } else {
+          var modal = document.getElementById("sqAiIqModal");
+          if (modal) modal.style.display = "none";
+        }
+        if (typeof window.__organizeModalsAndMemberHubV44 === "function") {
+          try { window.__organizeModalsAndMemberHubV44(); } catch (eO) {}
+        }
         var tEl = document.getElementById("postTitle");
         var bEl = document.getElementById("postContent");
+        var lEl = document.getElementById("postLeague");
+        if (lEl && d.query && typeof window.__mapLeagueCodeForWriteV44 === "function") {
+          var qLg = window.__mapLeagueCodeForWriteV44(d.query);
+          Array.prototype.forEach.call(lEl.options || [], function (opt) {
+            if (String(opt.value || "").toUpperCase() === qLg) lEl.value = opt.value;
+          });
+        }
         if (tEl) tEl.value = "[AI 아이큐 리서치] " + (d.query || "") + " 핵심 분석";
         if (bEl) {
-          var topLinks = (d.web_news || []).slice(0, 3).map(function (x) { return "- " + x.title + " (" + x.source + ")"; }).join("\n");
-          bEl.value = (d.ai_summary || "") + (topLinks ? "\n\n[참고 온라인 뉴스]\n" + topLinks : "") + "\n\n[내 승부예측 의견]\n";
+          var topLinks = (d.web_news || []).slice(0, 3).map(function (x) { return "• " + x.title + " (" + x.source + ")"; }).join("\n");
+          bEl.value = (d.ai_summary || "") + (topLinks ? "\n\n[참고 실시간 뉴스]\n" + topLinks : "") + "\n\n[🎯 내 승부예측 의견]\n• ";
         }
-        if (typeof window.openModal === "function") window.openModal("writeModal");
-        else {
-          var wm = document.getElementById("writeModal");
-          if (wm) wm.classList.remove("hidden");
+        if (typeof window.openModal === "function") {
+          try { window.openModal("writeModal"); } catch (eM) {}
+        }
+        var wm = document.getElementById("writeModal") || document.getElementById("write-modal");
+        if (wm) {
+          wm.classList.remove("hidden");
+          wm.style.setProperty("display", "flex", "important");
         }
       };
     }
@@ -1614,6 +1648,87 @@ _FRONTEND_V22_JS = r'''
       "  #dcQuickMatchModal { padding: 10px !important; }",
       "  #dcQuickMatchModal > div > div:first-child { padding: 10px 12px !important; }",
       "  #dcQuickMatchModal .sq-v32-vote-btn { padding: 5px 5px !important; gap: 1px !important; }",
+      "}",
+      "/* v4.6 Clean AI IQ Search Modal + 3-Tab Legal Policy Modal + Partner Inquiry Modal Polish */",
+      "#sqAiCatBar, .sq-v46-ai-swipe-row {",
+      "  display: flex !important;",
+      "  flex-wrap: nowrap !important;",
+      "  overflow-x: auto !important;",
+      "  -webkit-overflow-scrolling: touch;",
+      "  scrollbar-width: none !important;",
+      "  gap: 6px !important;",
+      "  align-items: center !important;",
+      "  padding-bottom: 2px !important;",
+      "}",
+      "#sqAiCatBar::-webkit-scrollbar, .sq-v46-ai-swipe-row::-webkit-scrollbar { display: none !important; }",
+      "#sqAiCatBar > button, .sq-v46-ai-swipe-row > button, .sq-v46-ai-swipe-row > span {",
+      "  flex: 0 0 auto !important;",
+      "  white-space: nowrap !important;",
+      "}",
+      ".sq-v46-ai-news-grid {",
+      "  display: grid !important;",
+      "  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;",
+      "  gap: 8px !important;",
+      "}",
+      ".sq-v46-ai-news-grid > .sq-ai-iq-card {",
+      "  margin: 0 !important;",
+      "  min-width: 0 !important;",
+      "  box-sizing: border-box !important;",
+      "}",
+      "[data-sq-ai-hints-wrap='1'][data-sq-ai-hints-folded='1'] > [data-sq-ai-hint-row='1'] {",
+      "  display: none !important;",
+      "}",
+      "#sqLegalTabsV46 {",
+      "  display: grid;",
+      "  grid-template-columns: repeat(3, minmax(0, 1fr));",
+      "  gap: 5px;",
+      "  padding: 4px;",
+      "  background: #020617;",
+      "  border: 1px solid #1e293b;",
+      "  border-radius: 12px;",
+      "  margin-bottom: 11px;",
+      "}",
+      "#sqPartnerTierBarV46 {",
+      "  display: grid;",
+      "  grid-template-columns: repeat(3, minmax(0, 1fr));",
+      "  gap: 6px;",
+      "}",
+      ".sq-v46-ptier-btn {",
+      "  background: #020617;",
+      "  border: 1px solid #334155;",
+      "  color: #94a3b8;",
+      "  border-radius: 9px;",
+      "  padding: 7px 6px;",
+      "  font-size: 11.2px;",
+      "  font-weight: 800;",
+      "  cursor: pointer;",
+      "  text-align: center;",
+      "  white-space: nowrap;",
+      "}",
+      ".sq-v46-ptier-btn.active {",
+      "  background: rgba(16, 185, 129, 0.18);",
+      "  border-color: rgba(52, 211, 153, 0.6);",
+      "  color: #6ee7b7;",
+      "}",
+      "@media (max-width: 680px) {",
+      "  .sq-v46-ai-news-grid { grid-template-columns: 1fr !important; }",
+      "}",
+      "@media (max-width: 640px) {",
+      "  #sqOfficialLegalFooter [data-sq-footer-btn-grid='1'] {",
+      "    display: grid !important;",
+      "    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;",
+      "    gap: 6px !important;",
+      "    width: 100% !important;",
+      "  }",
+      "  #sqOfficialLegalFooter [data-sq-footer-btn-grid='1'] > button {",
+      "    width: 100% !important;",
+      "    justify-content: center !important;",
+      "    text-align: center !important;",
+      "    white-space: nowrap !important;",
+      "    padding: 7px 8px !important;",
+      "    font-size: 11.2px !important;",
+      "  }",
+      "  .sq-v46-partner-grid2 { grid-template-columns: 1fr !important; }",
       "}",
       ".sq-v30-fbtn {",
       "  background: rgba(15, 23, 42, 0.9);",
@@ -3482,24 +3597,29 @@ _FRONTEND_V22_JS = r'''
   };
 
   function openLegalModalV22(docKey) {
-    var info = LEGAL_DOCS_V22[docKey] || LEGAL_DOCS_V22.terms;
+    var activeKey = LEGAL_DOCS_V22[docKey] ? docKey : "terms";
+    var info = LEGAL_DOCS_V22[activeKey];
     var modal = document.getElementById("sqLegalPolicyModal");
     if (!modal) {
       modal = document.createElement("div");
       modal.id = "sqLegalPolicyModal";
-      modal.style.cssText = "position:fixed;inset:0;z-index:9998;background:rgba(2,6,23,.82);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:16px;";
+      modal.style.cssText = "position:fixed;inset:0;z-index:100060;background:rgba(2,6,23,.84);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:14px;";
       modal.innerHTML = [
-        "<div style='max-width:580px;width:100%;background:#0f172a;border:1px solid #334155;border-radius:18px;padding:20px;box-shadow:0 24px 50px rgba(0,0,0,.6);color:#e2e8f0;'>",
-        "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;border-bottom:1px solid #1e293b;padding-bottom:10px;'>",
-        "    <h3 id='sqLegalModalTitle' style='margin:0;font-size:16px;font-weight:900;color:#f8fafc;'></h3>",
-        "    <button type='button' id='sqCloseLegalModalBtn' style='background:#1e293b;border:1px solid #475569;color:#cbd5e1;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:800;cursor:pointer;'>✕ 닫기 (Esc)</button>",
+        "<div style='max-width:540px;width:100%;max-height:88vh;overflow-y:auto;background:#0f172a;border:1px solid #334155;border-radius:18px;padding:16px 18px;box-shadow:0 24px 55px rgba(0,0,0,.65);color:#e2e8f0;box-sizing:border-box;'>",
+        "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;'>",
+        "    <h3 id='sqLegalModalTitle' style='margin:0;font-size:15.5px;font-weight:900;color:#f8fafc;min-width:0;flex:1 1 auto;'></h3>",
+        "    <button type='button' id='sqCloseLegalModalBtn' style='background:#1e293b;border:1px solid #475569;color:#cbd5e1;border-radius:8px;padding:4px 10px;font-size:11.8px;font-weight:800;cursor:pointer;flex-shrink:0;'>✕ 닫기</button>",
         "  </div>",
-        "  <div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;'>",
-        "    <button type='button' data-legal-tab='terms' class='sq-footer-link-btn'>서비스 이용약관</button>",
-        "    <button type='button' data-legal-tab='privacy' class='sq-footer-link-btn'>개인정보 · 4자리 PIN 보안</button>",
-        "    <button type='button' data-legal-tab='policy' class='sq-footer-link-btn'>건전 커뮤니티 운영정책</button>",
+        "  <div id='sqLegalTabsV46'>",
+        "    <button type='button' data-legal-tab='terms' class='sq-v44-hub-tab'>📜 이용약관</button>",
+        "    <button type='button' data-legal-tab='privacy' class='sq-v44-hub-tab'>🔐 PIN 보안</button>",
+        "    <button type='button' data-legal-tab='policy' class='sq-v44-hub-tab'>🛡️ 운영정책</button>",
         "  </div>",
-        "  <div id='sqLegalModalBody' style='font-size:13px;color:#cbd5e1;line-height:1.72;display:flex;flex-direction:column;gap:10px;'></div>",
+        "  <div id='sqLegalModalBody' style='font-size:12.4px;color:#cbd5e1;line-height:1.65;display:flex;flex-direction:column;gap:8px;'></div>",
+        "  <div style='margin-top:11px;padding-top:9px;border-top:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#94a3b8;'>",
+        "    <span>⚖️ 비베팅 순수 스포츠 데이터 플랫폼 · 사행성 홍보 무관용</span>",
+        "    <strong style='color:#6ee7b7;'>신고센터 1899-1119</strong>",
+        "  </div>",
         "</div>"
       ].join("");
       document.body.appendChild(modal);
@@ -3516,9 +3636,17 @@ _FRONTEND_V22_JS = r'''
         }
       });
     }
+    modal.querySelectorAll("[data-legal-tab]").forEach(function (tb) {
+      if (tb.getAttribute("data-legal-tab") === activeKey) tb.classList.add("active");
+      else tb.classList.remove("active");
+    });
     document.getElementById("sqLegalModalTitle").textContent = info.title;
     document.getElementById("sqLegalModalBody").innerHTML = info.body.map(function (line) {
-      return "<div style='background:rgba(2,6,23,.6);border:1px solid #1e293b;border-radius:10px;padding:10px 12px;'>" + uxEsc(line) + "</div>";
+      var safe = uxEsc(line);
+      var formatted = safe
+        .replace(/^(제\d+조\s*\([^)]+\))/, "<strong style='color:#6ee7b7;display:block;margin-bottom:3px;font-size:12.5px;'>$1</strong>")
+        .replace(/^(\d+\.\s*[^:]+:)/, "<strong style='color:#7dd3fc;display:block;margin-bottom:3px;font-size:12.5px;'>$1</strong>");
+      return "<div style='background:rgba(2,6,23,.72);border:1px solid #1e293b;border-radius:11px;padding:10px 12px;word-break:keep-all;'>" + formatted + "</div>";
     }).join("");
     modal.style.display = "flex";
   }
@@ -3542,11 +3670,11 @@ _FRONTEND_V22_JS = r'''
       "      <div style='font-weight:900;color:#f8fafc;font-size:13.5px;'>SportIQ Sports Data Intelligence Lounge · billnojay.com</div>",
       "      <div style='color:#64748b;font-size:11.5px;margin-top:2px;'>실시간 글로벌 스포츠 통계 · AI 시뮬레이션 · 4자리 PIN 비식별 보안 라운지 | 불법스포츠도박 신고센터 1899-1119</div>",
       "    </div>",
-      "    <div style='display:flex;gap:7px;flex-wrap:wrap;'>",
-      "      <button type='button' class='sq-footer-link-btn' data-sq-legal='terms'>서비스 이용약관</button>",
-      "      <button type='button' class='sq-footer-link-btn' data-sq-legal='privacy'>개인정보 · 4자리 PIN 보안안내</button>",
-      "      <button type='button' class='sq-footer-link-btn' data-sq-legal='policy'>건전 커뮤니티 운영정책</button>",
-      "      <button type='button' class='sq-footer-link-btn' id='sqFooterPartnerJumpBtn'>파트너·제휴 문의</button>",
+      "    <div data-sq-footer-btn-grid='1' style='display:flex;gap:7px;flex-wrap:wrap;'>",
+      "      <button type='button' class='sq-footer-link-btn' data-sq-legal='terms'>📜 이용약관</button>",
+      "      <button type='button' class='sq-footer-link-btn' data-sq-legal='privacy'>🔐 PIN 보안안내</button>",
+      "      <button type='button' class='sq-footer-link-btn' data-sq-legal='policy'>🛡️ 운영정책</button>",
+      "      <button type='button' class='sq-footer-link-btn' id='sqFooterPartnerJumpBtn'>🤝 파트너·제휴 문의</button>",
       "    </div>",
       "  </div>",
       "</div>"
@@ -3559,15 +3687,7 @@ _FRONTEND_V22_JS = r'''
     var pJump = document.getElementById("sqFooterPartnerJumpBtn");
     if (pJump) {
       pJump.onclick = function () {
-        var btns = document.querySelectorAll("button");
-        for (var i = 0; i < btns.length; i++) {
-          if ((btns[i].textContent || "").indexOf("입점·제휴 문의") !== -1) {
-            btns[i].scrollIntoView({ behavior: "smooth", block: "center" });
-            btns[i].click();
-            return;
-          }
-        }
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        openCleanPartnerModalV46();
       };
     }
   }
@@ -8110,10 +8230,266 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
+
+  window.__closeAiSearchModalCompletelyV372 = closeAiSearchModalCompletelyV372;
+  window.__mapLeagueCodeForWriteV44 = mapLeagueCodeForWriteV44;
+
+  var _v46PartnerSelectedTier = "PREMIUM_SPONSOR";
+
+  function openCleanPartnerModalV46() {
+    // Check if native partner modal exists AND polish it; otherwise open sleek built-in `#sqPartnerInquiryModalV46`!
+    var nativePm = document.getElementById("partnerModal") || document.getElementById("partner-inquiry-modal");
+    if (nativePm) {
+      polishNativePartnerModalV46(nativePm);
+      nativePm.classList.remove("hidden");
+      nativePm.style.setProperty("display", "flex", "important");
+      nativePm.style.setProperty("z-index", "100065", "important");
+      return;
+    }
+
+    var m = document.getElementById("sqPartnerInquiryModalV46");
+    if (!m) {
+      m = document.createElement("div");
+      m.id = "sqPartnerInquiryModalV46";
+      m.style.cssText = "position:fixed;inset:0;z-index:100065;background:rgba(2,6,23,.84);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:14px;";
+      m.innerHTML = [
+        "<div style='max-width:480px;width:100%;max-height:88vh;overflow-y:auto;background:#0f172a;border:1px solid #334155;border-radius:18px;padding:16px 18px;box-shadow:0 24px 55px rgba(0,0,0,.65);color:#f8fafc;box-sizing:border-box;'>",
+        "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;'>",
+        "    <div style='display:flex;align-items:center;gap:7px;min-width:0;'>",
+        "      <span style='background:#10b981;color:#022c22;border-radius:7px;padding:2px 7px;font-size:10.5px;font-weight:900;'>PARTNER</span>",
+        "      <h3 style='margin:0;font-size:15.5px;font-weight:900;color:#f8fafc;'>파트너 입점 · 제휴 문의</h3>",
+        "    </div>",
+        "    <button type='button' id='sqClosePartnerV46' style='background:#1e293b;border:1px solid #475569;color:#cbd5e1;border-radius:8px;padding:4px 10px;font-size:11.8px;font-weight:800;cursor:pointer;'>✕ 닫기</button>",
+        "  </div>",
+        "  <div id='sqPartnerTierBarV46' style='margin-bottom:10px;'>",
+        "    <button type='button' class='sq-v46-ptier-btn active' data-sq-ptier='PREMIUM_SPONSOR'>🏆 스폰서 배너</button>",
+        "    <button type='button' class='sq-v46-ptier-btn' data-sq-ptier='DATA_API'>📊 데이터 API</button>",
+        "    <button type='button' class='sq-v46-ptier-btn' data-sq-ptier='COMMERCE_CREATOR'>🛍️ 커머스·채널</button>",
+        "  </div>",
+        "  <div class='sq-v46-partner-grid2' style='display:grid;grid-template-columns:1.15fr 1fr;gap:8px;margin-bottom:8px;'>",
+        "    <input id='sqPartnerCompanyV46' placeholder='업체 · 브랜드 · 채널명' style='min-width:0;width:100%;background:#020617;border:1px solid #334155;border-radius:10px;padding:8px 10px;color:#f8fafc;font-size:12.2px;box-sizing:border-box;' />",
+        "    <input id='sqPartnerNameV46' placeholder='담당자 성함 / 직책' style='min-width:0;width:100%;background:#020617;border:1px solid #334155;border-radius:10px;padding:8px 10px;color:#f8fafc;font-size:12.2px;box-sizing:border-box;' />",
+        "  </div>",
+        "  <input id='sqPartnerContactV46' placeholder='회신 연락처 (이메일 또는 전화번호)' style='width:100%;background:#020617;border:1px solid #334155;border-radius:10px;padding:8px 10px;color:#f8fafc;font-size:12.2px;margin-bottom:8px;box-sizing:border-box;' />",
+        "  <textarea id='sqPartnerMsgV46' rows='3' placeholder='희망 제휴 구좌, 일정 또는 제안 내용을 간략히 남겨주세요.' style='width:100%;background:#020617;border:1px solid #334155;border-radius:10px;padding:9px 10px;color:#f8fafc;font-size:12.2px;line-height:1.5;resize:vertical;box-sizing:border-box;'></textarea>",
+        "  <div id='sqPartnerStatusV46' style='font-size:11px;color:#94a3b8;margin:7px 0 10px;word-break:keep-all;'>🔒 기재하신 연락처는 서버에서 자동 마스킹 보관되며 제휴 회신 목적 외에는 사용되지 않습니다.</div>",
+        "  <div style='display:flex;justify-content:flex-end;gap:7px;'>",
+        "    <button type='button' id='sqCancelPartnerV46' style='background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;'>취소</button>",
+        "    <button type='button' id='sqSubmitPartnerV46' style='background:linear-gradient(135deg,#10b981,#34d399);border:0;color:#022c22;border-radius:10px;padding:8px 16px;font-size:12px;font-weight:900;cursor:pointer;'>🤝 제휴 문의 접수</button>",
+        "  </div>",
+        "</div>"
+      ].join("");
+      document.body.appendChild(m);
+
+      var closeFn = function () { m.style.display = "none"; };
+      document.getElementById("sqClosePartnerV46").onclick = closeFn;
+      document.getElementById("sqCancelPartnerV46").onclick = closeFn;
+      m.addEventListener("click", function (ev) { if (ev.target === m) closeFn(); });
+      window.addEventListener("keydown", function (ev) {
+        if ((ev.key === "Escape" || ev.keyCode === 27) && m.style.display !== "none") closeFn();
+      });
+
+      m.querySelectorAll("[data-sq-ptier]").forEach(function (tb) {
+        tb.onclick = function () {
+          _v46PartnerSelectedTier = tb.getAttribute("data-sq-ptier") || "PREMIUM_SPONSOR";
+          m.querySelectorAll("[data-sq-ptier]").forEach(function (x) {
+            if (x === tb) x.classList.add("active");
+            else x.classList.remove("active");
+          });
+        };
+      });
+
+      document.getElementById("sqSubmitPartnerV46").onclick = function () {
+        var comp = String(document.getElementById("sqPartnerCompanyV46").value || "").trim();
+        var cname = String(document.getElementById("sqPartnerNameV46").value || "").trim();
+        var cinfo = String(document.getElementById("sqPartnerContactV46").value || "").trim();
+        var msg = String(document.getElementById("sqPartnerMsgV46").value || "").trim();
+        var stEl = document.getElementById("sqPartnerStatusV46");
+        if (!comp || !cname || !cinfo) {
+          stEl.style.color = "#fca5a5";
+          stEl.textContent = "⚠️ 업체명, 담당자 성함, 회신 연락처를 모두 입력해 주세요.";
+          return;
+        }
+        fetch("/api/partner-inquiries", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company: comp,
+            contact_name: cname,
+            contact_info: cinfo,
+            tier: _v46PartnerSelectedTier,
+            message: msg
+          })
+        })
+          .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+          .then(function (res) {
+            if (res.status !== 200 || !res.data || !res.data.ok) {
+              stEl.style.color = "#fca5a5";
+              stEl.textContent = "❌ " + ((res.data && res.data.detail) || "문의 접수 중 오류가 발생했습니다.");
+              return;
+            }
+            stEl.style.color = "#6ee7b7";
+            stEl.textContent = "✅ 제휴 문의가 정상 접수되었습니다! 담당팀 검토 후 신속히 회신드리겠습니다.";
+            document.getElementById("sqPartnerCompanyV46").value = "";
+            document.getElementById("sqPartnerNameV46").value = "";
+            document.getElementById("sqPartnerContactV46").value = "";
+            document.getElementById("sqPartnerMsgV46").value = "";
+            if (typeof showToast === "function") showToast("🤝 파트너 입점·제휴 문의가 접수되었습니다.");
+          })
+          .catch(function () {
+            stEl.style.color = "#fca5a5";
+            stEl.textContent = "⚠️ 일시적인 네트워크 오류입니다. 잠시 후 다시 시도해 주세요.";
+          });
+      };
+    }
+    m.style.display = "flex";
+  }
+
+  function polishNativePartnerModalV46(pm) {
+    if (!pm || pm.getAttribute("data-sq-v46-polished")) return;
+    pm.setAttribute("data-sq-v46-polished", "1");
+    var panel = pm.firstElementChild;
+    if (panel) {
+      panel.style.maxWidth = "480px";
+      panel.style.width = "100%";
+      panel.style.maxHeight = "88vh";
+      panel.style.overflowY = "auto";
+      panel.style.padding = "16px 18px";
+      panel.style.borderRadius = "18px";
+      panel.style.boxSizing = "border-box";
+      panel.querySelectorAll("div").forEach(function (d) {
+        if (d.children && d.children.length === 3 && Array.prototype.every.call(d.children, function (c) { return c.tagName === "BUTTON"; })) {
+          d.classList.add("sq-v46-ai-swipe-row");
+        }
+      });
+      if (!panel.querySelector("[data-sq-partner-mask-note='1']")) {
+        var note = document.createElement("div");
+        note.setAttribute("data-sq-partner-mask-note", "1");
+        note.style.cssText = "font-size:11px;color:#94a3b8;margin-top:6px;word-break:keep-all;";
+        note.textContent = "🔒 기재하신 연락처는 공개 목록에서 자동 마스킹 처리되며 제휴 회신 목적 외 사용되지 않습니다.";
+        panel.appendChild(note);
+      }
+    }
+  }
+
+  function foldAiModalHintsOnResultV46(shouldFold) {
+    var aiModal = findAiSearchModalContainerV372();
+    if (!aiModal) return;
+    var wrap = aiModal.querySelector("[data-sq-ai-hints-wrap='1']");
+    var togBtn = document.getElementById("sqAiHintsToggleBtnV46");
+    if (!wrap || !togBtn) return;
+    if (shouldFold) {
+      wrap.setAttribute("data-sq-ai-hints-folded", "1");
+      togBtn.style.display = "inline-flex";
+      togBtn.textContent = "🔎 추천 · 최근 검색어 ▾";
+    } else {
+      wrap.removeAttribute("data-sq-ai-hints-folded");
+      togBtn.textContent = "🔎 추천 검색어 접기 ▴";
+    }
+  }
+  window.__foldAiModalHintsOnResultV46 = foldAiModalHintsOnResultV46;
+
+  function polishAiModalChromeV46() {
+    var aiModal = findAiSearchModalContainerV372();
+    if (aiModal) {
+      var panel = aiModal.firstElementChild;
+      if (panel && panel.style) {
+        panel.style.maxHeight = "89vh";
+        panel.style.boxSizing = "border-box";
+      }
+
+      // 1) Shorten verbose 2-line subtitle (`구글·웹 실시간 뉴스...`) to 1 crisp line
+      aiModal.querySelectorAll("p, div").forEach(function (el) {
+        if (el.children && el.children.length > 2) return;
+        var tx = String(el.textContent || "").trim();
+        if (tx.indexOf("구글·웹 실시간 뉴스") !== -1 && tx.indexOf("동시에 온라인 탐색해") !== -1) {
+          el.innerHTML = "⚡ 경기일정 · 배당 · 구단뉴스 · 백과 실시간 통합 요약 <strong style='color:#34d399;'>(+3P 적립)</strong>";
+          el.style.fontSize = "11.5px";
+          el.style.lineHeight = "1.45";
+          el.style.marginBottom = "8px";
+          el.style.wordBreak = "keep-all";
+        }
+      });
+
+      // 2) Convert mode pills, recent searches, and trending rows to 1-line swipe strips + filter noisy chips + wrap for result auto-fold!
+      var hintRows = [];
+      aiModal.querySelectorAll("div").forEach(function (d) {
+        if (d.closest("#sqAiIqResultArea")) return;
+        var dtx = String(d.textContent || "").trim();
+        if (d.children && d.children.length >= 3 && d.children.length <= 5 && dtx.indexOf("통합 AI") !== -1 && dtx.indexOf("백과") !== -1 && Array.prototype.every.call(d.children, function (c) { return c.tagName === "BUTTON"; })) {
+          d.classList.add("sq-v46-ai-swipe-row");
+          if (!document.getElementById("sqAiHintsToggleBtnV46")) {
+            var hBtn = document.createElement("button");
+            hBtn.type = "button";
+            hBtn.id = "sqAiHintsToggleBtnV46";
+            hBtn.className = "sq-v44-qchip";
+            hBtn.style.cssText = "display:none;margin-left:auto;font-size:10.8px;padding:3px 9px;color:#93c5fd;border-color:rgba(56,189,248,.4);";
+            hBtn.textContent = "🔎 추천 · 최근 검색어 ▾";
+            hBtn.onclick = function () {
+              var w = aiModal.querySelector("[data-sq-ai-hints-wrap='1']");
+              var nowFolded = w && w.getAttribute("data-sq-ai-hints-folded") === "1";
+              foldAiModalHintsOnResultV46(!nowFolded);
+            };
+            d.appendChild(hBtn);
+          }
+        } else if (d !== panel && !d.querySelector("input, h3, #sqAiIqResultArea") && dtx.length <= 160 && (dtx.indexOf("최근 검색") === 0 || dtx.indexOf("🔥 실시간 추천") === 0 || dtx.indexOf("실시간 추천:") === 0) && d.querySelectorAll("button").length >= 1 && d.children.length <= 14) {
+          d.classList.add("sq-v46-ai-swipe-row");
+          d.setAttribute("data-sq-ai-hint-row", "1");
+          hintRows.push(d);
+          // Filter noisy non-sport/external betting-board keywords from trending pills
+          d.querySelectorAll("button").forEach(function (b) {
+            var bt = String(b.textContent || "").trim();
+            if (/네임드|토토|사설/.test(bt)) b.style.display = "none";
+          });
+        }
+      });
+
+      if (hintRows.length > 0 && !aiModal.querySelector("[data-sq-ai-hints-wrap='1']")) {
+        var firstH = hintRows[0];
+        if (firstH && firstH.parentElement) {
+          var hWrap = document.createElement("div");
+          hWrap.setAttribute("data-sq-ai-hints-wrap", "1");
+          firstH.parentElement.insertBefore(hWrap, firstH);
+          hintRows.forEach(function (hr) { hWrap.appendChild(hr); });
+        }
+      }
+
+      var resArea = document.getElementById("sqAiIqResultArea");
+      if (resArea && resArea.children && resArea.children.length > 0) {
+        var hw = aiModal.querySelector("[data-sq-ai-hints-wrap='1']");
+        if (hw && !hw.hasAttribute("data-sq-ai-user-toggled")) {
+          hw.setAttribute("data-sq-ai-user-toggled", "1");
+          foldAiModalHintsOnResultV46(true);
+        }
+      }
+    }
+
+    // Also polish any native partner modal if present in DOM
+    var pmNat = document.getElementById("partnerModal") || document.getElementById("partner-inquiry-modal");
+    if (pmNat) polishNativePartnerModalV46(pmNat);
+
+    // Bind sidebar '입점·제휴 문의 접수하기' button directly to openCleanPartnerModalV46 if no native modal opened
+    document.querySelectorAll("button").forEach(function (b) {
+      if (b.id === "sqFooterPartnerJumpBtn" || b.getAttribute("data-sq-part-bound-v46")) return;
+      var bt = String(b.textContent || "").trim();
+      if (bt.indexOf("입점·제휴 문의") !== -1 || bt.indexOf("제휴 문의 접수") !== -1) {
+        b.setAttribute("data-sq-part-bound-v46", "1");
+        b.addEventListener("click", function () {
+          setTimeout(function () {
+            var pm = document.getElementById("partnerModal") || document.getElementById("partner-inquiry-modal");
+            var vis = pm && !pm.classList.contains("hidden") && window.getComputedStyle(pm).display !== "none";
+            if (!vis) openCleanPartnerModalV46();
+          }, 25);
+        });
+      }
+    });
+  }
+
   function organizeModalsAndMemberHubV44() {
     polishWriteModalV44();
     polishMemberHubAndProfilePopupsV44();
     ensureCommentModalWrappedV45();
+    polishAiModalChromeV46();
   }
   window.__organizeModalsAndMemberHubV44 = organizeModalsAndMemberHubV44;
 
@@ -8620,7 +8996,7 @@ _FRONTEND_V22_JS = r'''
 
           var btns = [
             "<button type='button' class='sq-v32-vote-btn" + (myP === "H" ? " is-picked-H" : "") + "' data-sq-v32-pick='H'>" +
-            "  <span style='font-size:11px;color:#cbd5e1;font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" + (myP === "H" ? "✓ " : "🏠 ") + uxEsc(it.home) + " 승</span>" +
+            "  <span style='font-size:11px;color:#cbd5e1;font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" + (myP === "H" ? "✓ " : "🏠 ") + uxEsc(it.home) + "</span>" +
             "  <strong style='font-size:14px;color:#34d399;'>" + fHp + "%</strong>" +
             "  <span style='font-size:10px;color:#64748b;'>" + hv + "표</span>" +
             "</button>"
@@ -8636,7 +9012,7 @@ _FRONTEND_V22_JS = r'''
           }
           btns.push(
             "<button type='button' class='sq-v32-vote-btn" + (myP === "A" ? " is-picked-A" : "") + "' data-sq-v32-pick='A'>" +
-            "  <span style='font-size:11px;color:#cbd5e1;font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" + (myP === "A" ? "✓ " : "✈️ ") + uxEsc(it.away) + " 승</span>" +
+            "  <span style='font-size:11px;color:#cbd5e1;font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" + (myP === "A" ? "✓ " : "✈️ ") + uxEsc(it.away) + "</span>" +
             "  <strong style='font-size:14px;color:#38bdf8;'>" + fAp + "%</strong>" +
             "  <span style='font-size:10px;color:#64748b;'>" + av + "표</span>" +
             "</button>"
@@ -9350,7 +9726,7 @@ def _ensure_upgrade_js_dedup_patched() -> bool:
     else:
         _SORT_DEDUP_APPLIED = True
 
-    if "sqAiCatBar" not in updated:
+    if "id='sqAiCatBar'" not in updated:
         p2 = re.compile(
             r"function\s+renderAiIqSearchResult\s*\(\s*d\s*\)\s*\{.*?(?=\n\s*function\s+openAiIqModal\s*\()",
             flags=re.DOTALL,
@@ -11109,7 +11485,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"4500_{int(time.time())}"
+_BOOT_VER_V30 = f"4600_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -14903,7 +15279,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.5-clean-comment-and-insight-modals",
+        "engine_version": "4.6-complete-all-modals-and-tabs-ux",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
