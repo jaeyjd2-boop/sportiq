@@ -937,6 +937,7 @@ _FRONTEND_V22_JS = r'''
       "  border-radius: 10px;",
       "}",
       "#sqV39AlertDrawer.is-open { display: flex !important; }",
+      "body.sq-v39-cards-ready #dcLiveTickerTrack > :not(.sq-v39-card):not([data-sq-v31-empty]) { display: none !important; }",
       ".sq-v30-fbtn {",
       "  background: rgba(15, 23, 42, 0.9);",
       "  border: 1px solid #334155;",
@@ -3409,11 +3410,14 @@ _FRONTEND_V22_JS = r'''
       pending = true;
       setTimeout(function () {
         pending = false;
+        mountOrUpdateV30ScoreToolbar();
         syncSportPillLiveDotsV30();
         if (v30ScoreState.viewMode === "cards") {
+          renderCustomDateCardsIntoStripV31();
           decorateMiniScoreCardsV30();
         }
-      }, 15);
+        localizeScoreStripDomV381();
+      }, 8);
     });
     obs.observe(root, { childList: true, subtree: true });
   }
@@ -4127,6 +4131,7 @@ _FRONTEND_V22_JS = r'''
     }
     v30ScoreState.lastCardStripSig = stripSig;
 
+    if (document.body) document.body.classList.add("sq-v39-cards-ready");
     if (!items.length) {
       targetBox.innerHTML = "<div data-sq-v31-empty='1' style='padding:14px 18px;color:#94a3b8;font-size:12.5px;'>선택한 조건에 해당하는 경기가 없습니다.</div>";
       return;
@@ -5635,9 +5640,28 @@ _FRONTEND_V22_JS = r'''
       }
 
       if (leagueSlotEl) {
-        var lgSel = (ctrlRow && ctrlRow.querySelector("select")) || discoverTopLeagueSelectV304();
-        if (lgSel && lgSel.parentElement !== leagueSlotEl) {
-          leagueSlotEl.appendChild(lgSel);
+        var freshCtrlSel = ctrlRow ? ctrlRow.querySelector("select") : null;
+        var existingSlotSel = leagueSlotEl.querySelector("select");
+        var lgSel = freshCtrlSel || existingSlotSel || discoverTopLeagueSelectV304();
+        if (lgSel) {
+          if (freshCtrlSel && existingSlotSel && freshCtrlSel !== existingSlotSel) {
+            var prevVal = existingSlotSel.value;
+            if (prevVal && Array.prototype.some.call(freshCtrlSel.options || [], function (o) { return o.value === prevVal; })) {
+              freshCtrlSel.value = prevVal;
+            }
+          }
+          if (lgSel.parentElement !== leagueSlotEl || leagueSlotEl.children.length > 1) {
+            while (leagueSlotEl.firstChild) {
+              leagueSlotEl.removeChild(leagueSlotEl.firstChild);
+            }
+            leagueSlotEl.appendChild(lgSel);
+          }
+          // Hide/remove any stray extra league `<select>` inside `hubBox` outside `leagueSlotEl`
+          Array.prototype.slice.call(hubBox.querySelectorAll("select")).forEach(function (sEl) {
+            if (sEl !== lgSel && sEl.id !== "postLeague") {
+              if (sEl.parentNode) sEl.parentNode.removeChild(sEl);
+            }
+          });
         }
       }
 
@@ -5666,6 +5690,9 @@ _FRONTEND_V22_JS = r'''
             } else {
               ctrlRow.insertAdjacentElement("afterend", drawer);
             }
+          } else {
+            // Clear stale buttons from prior 20s refresh before appending fresh set!
+            drawer.innerHTML = "";
           }
           secondaryBtns.forEach(function (sb) {
             drawer.appendChild(sb);
@@ -8784,7 +8811,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3900_{int(time.time())}"
+_BOOT_VER_V30 = f"3910_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -12578,7 +12605,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "3.9-clean-unified-dashboard",
+        "engine_version": "3.9.1-autorefresh-dedup-fix",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
