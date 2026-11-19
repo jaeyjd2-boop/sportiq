@@ -5382,7 +5382,7 @@ _FRONTEND_V22_JS = r'''
             matched.push({ btn: directBtns[j], key: k });
           }
         }
-        if (hasSoccer && hasBaseball && matched.length >= 4) {
+        if (hasSoccer && matched.length >= 2) {
           matched.forEach(function (m) {
             m.btn.setAttribute("data-sq-v304-sport", m.key);
             out.push(m.btn);
@@ -13383,7 +13383,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46160_{int(time.time())}"
+_BOOT_VER_V30 = f"46170_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -18577,6 +18577,7 @@ def lounge_health(request: Request):
         "wp_cors_bridge_v4614": True,
         "authentic_scores_and_anti_abuse_v4615": True,
         "realtime_livescore_v4616": True,
+        "kr_and_global_live_v4617": True,
         "member_ux_v22": True,
         "seo_og_v27": True,
     }
@@ -19019,6 +19020,7 @@ def _decode_kr_bytes_v4616(raw_bytes: bytes, content_type: str = "", content_enc
 
 
 def _http_fetch_text_v4616(url: str, timeout: float = 4.0, headers: Optional[Dict[str, str]] = None) -> str:
+    import ssl as _ssl_v4617
     hdrs = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
@@ -19027,18 +19029,23 @@ def _http_fetch_text_v4616(url: str, timeout: float = 4.0, headers: Optional[Dic
     }
     if headers:
         hdrs.update(headers)
-    try:
-        req = urllib.request.Request(url, headers=hdrs)
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            if resp.status == 200:
-                raw = resp.read()
-                return _decode_kr_bytes_v4616(
-                    raw,
-                    str(resp.headers.get("Content-Type") or ""),
-                    str(resp.headers.get("Content-Encoding") or ""),
-                )
-    except Exception:
-        pass
+    for use_unverified in (False, True):
+        try:
+            req = urllib.request.Request(url, headers=hdrs)
+            ctx = _ssl_v4617._create_unverified_context() if use_unverified else None
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+                if resp.status == 200:
+                    raw = resp.read()
+                    return _decode_kr_bytes_v4616(
+                        raw,
+                        str(resp.headers.get("Content-Type") or ""),
+                        str(resp.headers.get("Content-Encoding") or ""),
+                    )
+            break
+        except Exception as exc:
+            if not use_unverified and ("SSL" in str(exc).upper() or "CERTIFICATE" in str(exc).upper()):
+                continue
+            break
     return ""
 
 
@@ -19764,6 +19771,8 @@ def _parse_espn_scoreboard_payload_v4616(
                                 p_txt = f"전반 {hv[0]}-{av[0]}"
                             elif sport == "basketball":
                                 p_txt = " · ".join(f"{idx_q+1}Q {hv[idx_q]}-{av[idx_q]}" for idx_q in range(min(n_p, 4)))
+                            elif sport == "hockey":
+                                p_txt = " · ".join(f"{idx_p+1}P {hv[idx_p]}-{av[idx_p]}" for idx_p in range(min(n_p, 3)))
                             elif sport == "tennis":
                                 p_txt = " · ".join(f"{idx_s+1}S {hv[idx_s]}-{av[idx_s]}" for idx_s in range(min(n_p, 5)))
                     except Exception:
@@ -19804,20 +19813,36 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
     d0 = (target_k - timedelta(days=1)).strftime("%Y%m%d")
 
     endpoints: List[Tuple[str, str, str, str, str]] = [
+        (f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={d0}&limit=30", "basketball", "NBA", "NBA", "미국 프로농구 NBA"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={d1}&limit=30", "basketball", "NBA", "NBA", "미국 프로농구 NBA"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates={d0}&limit=30", "hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates={d1}&limit=30", "hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates={d0}&limit=30", "baseball", "MLB", "MLB", "메이저리그 MLB"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates={d1}&limit=30", "baseball", "MLB", "MLB", "메이저리그 MLB"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d1}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d0}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard?dates={d1}&limit=20", "soccer", "EPL", "EPL", "프리미어리그"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates={d1}&limit=20", "soccer", "라리가", "LALIGA", "스페인 라리가"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ger.1/scoreboard?dates={d1}&limit=20", "soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates={d1}&limit=20", "soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d1}&limit=20", "soccer", "리그 1", "LIGUE1", "프랑스 리그 1"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/kor.1/scoreboard?dates={d1}&limit=20", "soccer", "K리그1", "KLEAGUE", "대한민국 K리그1"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/jpn.1/scoreboard?dates={d1}&limit=20", "soccer", "J1리그", "JLEAGUE", "일본 J1리그"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/aus.1/scoreboard?dates={d1}&limit=20", "soccer", "A리그", "ALEAGUE", "호주 A리그"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates={d0}&limit=25", "soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard?dates={d0}&limit=25", "soccer", "UEL", "UEL", "UEFA 유로파리그"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/afc.champions/scoreboard?dates={d1}&limit=25", "soccer", "ACL", "ACL", "AFC 챔피언스리그"),
         (f"https://site.api.espn.com/apis/site/v2/sports/tennis/atp/scoreboard?dates={d1}", "tennis", "ATP", "ATP", "ATP 투어"),
         (f"https://site.api.espn.com/apis/site/v2/sports/tennis/wta/scoreboard?dates={d1}", "tennis", "WTA", "WTA", "WTA 투어"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates={d0}", "ufc", "UFC", "UFC", "UFC 공식 대회"),
         (f"https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates={d1}", "ufc", "UFC", "UFC", "UFC 공식 대회"),
     ]
     if is_today:
-        endpoints.insert(
-            0,
+        endpoints = [
             ("https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
-        )
+            ("https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?limit=30", "basketball", "NBA", "NBA", "미국 프로농구 NBA"),
+            ("https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?limit=30", "hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
+        ] + endpoints
 
     out: List[Dict[str, Any]] = []
     with ThreadPoolExecutor(max_workers=8) as pool:
@@ -19903,9 +19928,22 @@ def _parse_naver_schedule_json_v4616(data: Optional[Dict[str, Any]], target_k: d
             continue
         h_c, _, _ = _clean_team_label_v4616(h_raw, sp)
         a_c, _, _ = _clean_team_label_v4616(a_raw, sp)
-        dt_str = str(g.get("gameDateTime") or g.get("gameStartTime") or "")
-        dt_k = _parse_espn_iso_kst_v4616(dt_str) or target_k
-        m_hm = re.search(r"(\d{2}:\d{2})", dt_str)
+        dt_str = str(g.get("gameDateTime") or g.get("gameDate") or g.get("gameStartTime") or "").strip()
+        dt_k = target_k
+        if dt_str:
+            if "Z" in dt_str or re.search(r"[+-]\d{2}:?\d{2}$", dt_str):
+                dt_k = _parse_espn_iso_kst_v4616(dt_str) or target_k
+            else:
+                m_nk = re.match(r"^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?", dt_str)
+                if m_nk:
+                    try:
+                        dt_k = datetime(
+                            int(m_nk.group(1)), int(m_nk.group(2)), int(m_nk.group(3)),
+                            int(m_nk.group(4) or 19), int(m_nk.group(5) or 0), tzinfo=KST,
+                        )
+                    except Exception:
+                        dt_k = target_k
+        m_hm = re.search(r"(\d{2}:\d{2})", str(g.get("gameStartTime") or dt_str))
         hhmm = m_hm.group(1) if m_hm else f"{dt_k.hour:02d}:{dt_k.minute:02d}"
         ev_mmdd = f"{dt_k.month:02d}.{dt_k.day:02d}"
         if not (is_today and state == "in") and ev_mmdd != expected_mmdd:
@@ -20037,17 +20075,105 @@ def _parse_spojoy_live_html_v4616(html_text: str, target_k: datetime) -> List[Di
     return out
 
 
+_LAST_SOURCE_DIAG_V4617: Dict[str, Any] = {}
+
+
+def _parse_kbl_official_json_v4617(data: Any, target_k: datetime, is_today: bool) -> List[Dict[str, Any]]:
+    rows: List[Any] = []
+    if isinstance(data, list):
+        rows = data
+    elif isinstance(data, dict):
+        for k_cand in ("data", "list", "matches", "gameList", "arr_game", "result"):
+            v = data.get(k_cand)
+            if isinstance(v, list):
+                rows = v
+                break
+            if isinstance(v, dict):
+                for sub_k in ("list", "matches", "gameList", "arr_game"):
+                    if isinstance(v.get(sub_k), list):
+                        rows = v[sub_k]
+                        break
+    if not rows:
+        return []
+    target_yyyymmdd = target_k.strftime("%Y%m%d")
+    out: List[Dict[str, Any]] = []
+    for g in rows:
+        if not isinstance(g, dict):
+            continue
+        g_dt = re.sub(r"\D+", "", str(g.get("gameDate") or g.get("gmDate") or g.get("sdate") or target_yyyymmdd))[:8]
+        h_raw = str(g.get("tnameH") or g.get("homeTeamName") or g.get("hTeamName") or g.get("home_name") or "").strip()
+        a_raw = str(g.get("tnameA") or g.get("awayTeamName") or g.get("aTeamName") or g.get("away_name") or "").strip()
+        if not h_raw or not a_raw:
+            continue
+        h_c, _, _ = _clean_team_label_v4616(h_raw, "basketball")
+        a_c, _, _ = _clean_team_label_v4616(a_raw, "basketball")
+        hs = int(float(g.get("scoreH") or g.get("homeScore") or g.get("hScore") or 0))
+        as_ = int(float(g.get("scoreA") or g.get("awayScore") or g.get("aScore") or 0))
+        is_ended = str(g.get("isEnded") or g.get("gameEnd") or g.get("endYn") or "").upper() in ("1", "Y", "TRUE", "END", "FINAL")
+        q_raw = str(g.get("quarter") or g.get("gameStatus") or g.get("stateTxt") or g.get("remTime") or "").strip()
+        raw_tm = re.sub(r"\D+", "", str(g.get("gameTime") or g.get("gmTime") or g.get("stime") or "1900"))
+        hhmm = f"{raw_tm[:2]}:{raw_tm[2:4]}" if len(raw_tm) >= 4 else "19:00"
+        if is_ended or "종료" in q_raw:
+            state, badge = "post", "종료"
+        elif (hs > 0 or as_ > 0) or any(t in q_raw.upper() for t in ("Q", "쿼터", "연장", "OT", "LIVE", "진행")):
+            state = "in"
+            badge = f"LIVE {q_raw}".strip() if q_raw else "LIVE 진행중"
+        else:
+            state, badge = "pre", "예정"
+        if not (is_today and state == "in") and g_dt and g_dt != target_yyyymmdd:
+            continue
+        venue = str(g.get("stadium") or g.get("sname") or g.get("arenaName") or "").strip()
+        it = _build_rt_item_v4616(
+            "kbl_official",
+            "basketball", "KBL", "KBL", "KBL 남자프로농구",
+            state, badge, target_k, hhmm, h_c, a_c, hs, as_, venue=venue,
+        )
+        if it:
+            out.append(it)
+    return out
+
+
 def _fetch_kr_official_portals_v4616(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
     is_today = (date_offset == 0)
     ymd = target_k.strftime("%Y-%m-%d")
     yyyymmdd = target_k.strftime("%Y%m%d")
-    naver_url = f"https://api-gw.sports.naver.com/schedule/games?fields=basic,schedule&fromDate={ymd}&toDate={ymd}"
-    naver_hdrs = {"Referer": "https://m.sports.naver.com/schedule/", "Origin": "https://m.sports.naver.com"}
+    naver_hdrs = {
+        "Referer": "https://m.sports.naver.com/schedule/",
+        "Origin": "https://m.sports.naver.com",
+        "Accept": "application/json, text/plain, */*",
+    }
+    naver_ucats = [
+        "basketball",
+        "volleyball",
+        "wfootball",
+        "kfootball",
+        "kbaseball",
+        "wbaseball",
+        "esports",
+    ]
+    kbl_url = f"https://api.kbl.or.kr/match/list?fromDate={yyyymmdd}&toDate={yyyymmdd}&seasonGrade=1"
+    kbl_hdrs = {
+        "Channel": "WEB",
+        "TeamCode": "XX",
+        "Origin": "https://www.kbl.or.kr",
+        "Referer": "https://www.kbl.or.kr/",
+        "Accept": "application/json, text/plain, */*",
+    }
     daum_codes = ["kbl", "wkbl", "kovo", "wkovo", "kbo", "kl"]
 
     out: List[Dict[str, Any]] = []
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        fut_naver = pool.submit(_http_fetch_json_v4616, naver_url, 3.8, naver_hdrs)
+    diag_counts: Dict[str, int] = {}
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        futs_naver = {
+            uc: pool.submit(
+                _http_fetch_json_v4616,
+                f"https://api-gw.sports.naver.com/schedule/games?fields=basic,schedule&upperCategoryId={uc}&fromDate={ymd}&toDate={ymd}",
+                3.8,
+                naver_hdrs,
+            )
+            for uc in naver_ucats
+        }
+        fut_kbl = pool.submit(_http_fetch_text_v4616, kbl_url, 3.8, kbl_hdrs)
         futs_daum = {
             lc: pool.submit(
                 _http_fetch_json_v4616,
@@ -20059,26 +20185,53 @@ def _fetch_kr_official_portals_v4616(target_k: datetime, date_offset: int) -> Li
         }
         fut_spojoy = pool.submit(_http_fetch_text_v4616, "https://www.spojoy.com/live/", 3.8, {"Referer": "https://www.spojoy.com/"}) if date_offset in (-1, 0, 1) else None
 
+        nv_total = 0
+        for uc, nfut in futs_naver.items():
+            try:
+                nv_js = nfut.result(timeout=4.2)
+                if nv_js:
+                    parsed_nv = _parse_naver_schedule_json_v4616(nv_js, target_k, is_today)
+                    nv_total += len(parsed_nv)
+                    diag_counts[f"naver_{uc}"] = len(parsed_nv)
+                    out.extend(parsed_nv)
+            except Exception:
+                continue
+        diag_counts["naver_total"] = nv_total
+
         try:
-            nv_js = fut_naver.result(timeout=4.2)
-            if nv_js:
-                out.extend(_parse_naver_schedule_json_v4616(nv_js, target_k, is_today))
+            kbl_txt = fut_kbl.result(timeout=4.0)
+            if kbl_txt:
+                kbl_obj = json.loads(kbl_txt)
+                parsed_kbl = _parse_kbl_official_json_v4617(kbl_obj, target_k, is_today)
+                diag_counts["kbl_official"] = len(parsed_kbl)
+                out.extend(parsed_kbl)
         except Exception:
             pass
+
+        daum_tot = 0
         for lc, dfut in futs_daum.items():
             try:
                 d_js = dfut.result(timeout=4.0)
                 if d_js:
-                    out.extend(_parse_daum_hermes_json_v4616(d_js, lc, target_k, is_today))
+                    parsed_d = _parse_daum_hermes_json_v4616(d_js, lc, target_k, is_today)
+                    daum_tot += len(parsed_d)
+                    out.extend(parsed_d)
             except Exception:
                 continue
+        diag_counts["daum_total"] = daum_tot
+
         if fut_spojoy is not None:
             try:
                 sp_html = fut_spojoy.result(timeout=4.2)
                 if sp_html:
-                    out.extend(_parse_spojoy_live_html_v4616(sp_html, target_k))
+                    parsed_sp = _parse_spojoy_live_html_v4616(sp_html, target_k)
+                    diag_counts["spojoy"] = len(parsed_sp)
+                    out.extend(parsed_sp)
             except Exception:
                 pass
+
+    if is_today:
+        _LAST_SOURCE_DIAG_V4617.update(diag_counts)
     return out
 
 
@@ -20096,12 +20249,16 @@ def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> 
         f_ls = pool.submit(_fetch_livescore_kr_v4616, target_k, date_offset)
         f_espn = pool.submit(_fetch_espn_global_live_v4616, target_k, date_offset)
         f_kr = pool.submit(_fetch_kr_official_portals_v4616, target_k, date_offset)
-        for fut in (f_ls, f_espn, f_kr):
+        for src_nm, fut in (("livescore_kr", f_ls), ("espn_global", f_espn), ("kr_portals", f_kr)):
             try:
-                res = fut.result(timeout=5.5)
+                res = fut.result(timeout=6.0)
+                if date_offset == 0:
+                    _LAST_SOURCE_DIAG_V4617[src_nm] = len(res or [])
                 if res:
                     merged_raw.extend(res)
-            except Exception:
+            except Exception as _e_rt:
+                if date_offset == 0:
+                    _LAST_SOURCE_DIAG_V4617[f"{src_nm}_err"] = str(_e_rt)[:80]
                 continue
 
     expected_mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
@@ -20397,3 +20554,27 @@ def _install_dc_ko_team_wrapper_v381(dc_mod: Any = None) -> bool:
 
 
 _install_dc_ko_team_wrapper_v381()
+
+
+@router.get("/api/member/live-sources-diag-v4617")
+def api_live_sources_diag_v4617():
+    tk = datetime.now(KST)
+    items = _collect_realtime_all_sports_v4616(tk, 0)
+    return {
+        "ok": True,
+        "version": "v4.6.17",
+        "server_kst": tk.strftime("%Y-%m-%d %H:%M:%S KST"),
+        "source_counts": dict(_LAST_SOURCE_DIAG_V4617),
+        "merged_counts": _recompute_sport_counts_v4615(items),
+        "live_sample": [
+            {
+                "sport": x.get("sport"),
+                "league": x.get("league"),
+                "home": x.get("home"),
+                "away": x.get("away"),
+                "score": f"{x.get('home_score')}:{x.get('away_score')}",
+                "badge": x.get("status_badge"),
+            }
+            for x in items if x.get("state") == "in"
+        ][:20],
+    }
