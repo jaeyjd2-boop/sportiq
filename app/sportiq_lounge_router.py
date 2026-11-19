@@ -10179,8 +10179,9 @@ _FRONTEND_V22_JS = r'''
             fetch("/api/cheers", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ nickname: nk, team: it.league || "ALL", message: "[" + it.home + " vs " + it.away + "] " + msg })
-            }).then(function () {
+              body: JSON.stringify({ author: nk, nickname: nk, team: it.league || "ALL", message: "[" + it.home + " vs " + it.away + "] " + msg })
+            }).then(function (r) {
+              if (!r || !r.ok) return;
               if (inp) inp.value = "";
               loadMatchCheers();
               if (typeof showToast === "function") showToast("💬 이 경기 한줄 응원톡이 등록되었습니다!");
@@ -10942,12 +10943,13 @@ _FRONTEND_V22_JS = r'''
       var filterBar = [
         "<div style='display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;margin-bottom:9px;'>",
         "  <div style='display:flex;flex-wrap:wrap;gap:5px;'>",
-        "    <button type='button' data-sq-mod-f='posts' style='padding:5px 9px;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer;border:1px solid " + (f === "posts" ? "#38bdf8;background:rgba(56,189,248,.18);color:#bae6fd;" : "#334155;background:#0f172a;color:#cbd5e1;") + "'>📝 게시글 (" + (c.posts || 0) + ")</button>",
-        "    <button type='button' data-sq-mod-f='reported' style='padding:5px 9px;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer;border:1px solid " + (f === "reported" ? "#fb7185;background:rgba(244,63,94,.2);color:#fecdd3;" : "#334155;background:#0f172a;color:#fda4af;") + "'>🚨 신고글 (" + (c.reported_posts || 0) + ")</button>",
-        "    <button type='button' data-sq-mod-f='comments' style='padding:5px 9px;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer;border:1px solid " + (f === "comments" ? "#34d399;background:rgba(16,185,129,.18);color:#a7f3d0;" : "#334155;background:#0f172a;color:#cbd5e1;") + "'>💬 댓글 (" + (c.comments || 0) + ")</button>",
-        "    <button type='button' data-sq-mod-f='cheers' style='padding:5px 9px;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer;border:1px solid " + (f === "cheers" ? "#fbbf24;background:rgba(245,158,11,.18);color:#fde68a;" : "#334155;background:#0f172a;color:#cbd5e1;") + "'>📣 응원톡 (" + (c.cheers || 0) + ")</button>",
+        "    <button type='button' data-sq-mod-f='posts' style='padding:5px 8.5px;border-radius:8px;font-size:11.3px;font-weight:800;cursor:pointer;border:1px solid " + (f === "posts" ? "#38bdf8;background:rgba(56,189,248,.18);color:#bae6fd;" : "#334155;background:#0f172a;color:#cbd5e1;") + "'>📝 게시글 (" + (c.posts || 0) + ")</button>",
+        "    <button type='button' data-sq-mod-f='reported' style='padding:5px 8.5px;border-radius:8px;font-size:11.3px;font-weight:800;cursor:pointer;border:1px solid " + (f === "reported" ? "#fb7185;background:rgba(244,63,94,.2);color:#fecdd3;" : "#334155;background:#0f172a;color:#fda4af;") + "'>🚨 신고글 (" + (c.reported_posts || 0) + ")</button>",
+        "    <button type='button' data-sq-mod-f='comments' style='padding:5px 8.5px;border-radius:8px;font-size:11.3px;font-weight:800;cursor:pointer;border:1px solid " + (f === "comments" ? "#34d399;background:rgba(16,185,129,.18);color:#a7f3d0;" : "#334155;background:#0f172a;color:#cbd5e1;") + "'>💬 댓글 (" + (c.comments || 0) + ")</button>",
+        "    <button type='button' data-sq-mod-f='cheers' style='padding:5px 8.5px;border-radius:8px;font-size:11.3px;font-weight:800;cursor:pointer;border:1px solid " + (f === "cheers" ? "#fbbf24;background:rgba(245,158,11,.18);color:#fde68a;" : "#334155;background:#0f172a;color:#cbd5e1;") + "'>📣 응원톡 (" + (c.cheers || 0) + ")</button>",
+        "    <button type='button' data-sq-mod-f='banwords' style='padding:5px 8.5px;border-radius:8px;font-size:11.3px;font-weight:800;cursor:pointer;border:1px solid " + (f === "banwords" ? "#c084fc;background:rgba(168,85,247,.22);color:#e9d5ff;" : "#334155;background:#0f172a;color:#d8b4fe;") + "'>🚫 금칙어 (" + (c.banwords || ((d.banwords || []).length)) + ")</button>",
         "  </div>",
-        "  <input id='sqModSearchInputV4612' type='text' value='" + uxEsc(modState.query) + "' placeholder='제목·작성자·내용 검색' style='background:#020617;border:1px solid #334155;border-radius:8px;padding:5px 9px;color:#fff;font-size:11.5px;min-width:145px;flex:1;max-width:210px;' />",
+        "  <input id='sqModSearchInputV4612' type='text' value='" + uxEsc(modState.query) + "' placeholder='" + (f === "banwords" ? "등록된 금칙어 검색" : "제목·작성자·내용 검색") + "' style='background:#020617;border:1px solid #334155;border-radius:8px;padding:5px 9px;color:#fff;font-size:11.5px;min-width:135px;flex:1;max-width:195px;' />",
         "</div>"
       ].join("");
 
@@ -10996,6 +10998,49 @@ _FRONTEND_V22_JS = r'''
             ].join("");
           }).join("");
         }
+      } else if (f === "banwords") {
+        var bwList = (d.banwords || []).filter(function (bw) {
+          if (!q) return true;
+          return (String(bw.word || "") + " " + String(bw.category || "")).toLowerCase().indexOf(q) !== -1;
+        });
+        var blockedLogs = d.recent_blocked || [];
+        var addControlsHtml = [
+          "<div style='background:rgba(2,6,23,.75);border:1px solid #334155;border-radius:10px;padding:9px 10px;margin-bottom:9px;'>",
+          "  <div style='display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;'>",
+          "    <span style='font-size:11.5px;font-weight:800;color:#e9d5ff;'>🛡️ 금칙어 등록 (띄어쓰기·특수문자 우회 변형까지 자동 탐지·차단)</span>",
+          "    <button type='button' id='sqResetDefaultBanwordsBtnV4613' style='background:#1e293b;border:1px solid #475569;color:#cbd5e1;border-radius:7px;padding:3px 8px;font-size:10.5px;font-weight:700;cursor:pointer;'>기본 금칙어 복원</button>",
+          "  </div>",
+          "  <div style='display:flex;flex-wrap:wrap;gap:6px;'>",
+          "    <select id='sqNewBanwordCatV4613' style='background:#0f172a;border:1px solid #475569;border-radius:8px;padding:6px 8px;color:#f8fafc;font-size:11.5px;font-weight:700;'>",
+          "      <option value='불법홍보'>불법홍보</option>",
+          "      <option value='연락처유도'>연락처유도</option>",
+          "      <option value='욕설·비방'>욕설·비방</option>",
+          "      <option value='도배·악성'>도배·악성</option>",
+          "    </select>",
+          "    <input id='sqNewBanwordInputV4613' type='text' placeholder='금칙어 입력 (쉼표 , 로 여러 단어 동시 등록 가능)' style='flex:1;min-width:150px;background:#0f172a;border:1px solid #475569;border-radius:8px;padding:6px 9px;color:#fff;font-size:12px;' />",
+          "    <button type='button' id='sqAddBanwordBtnV4613' style='background:linear-gradient(135deg,#9333ea,#7e22ce);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:800;cursor:pointer;white-space:nowrap;'>+ 추가</button>",
+          "  </div>",
+          "</div>"
+        ].join("");
+        var chipsHtml = !bwList.length
+          ? "<div style='padding:12px;text-align:center;color:#64748b;'>등록된 금칙어가 없습니다.</div>"
+          : "<div style='display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;'>" + bwList.map(function (bw) {
+              return "<span style='display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;background:rgba(15,23,42,.95);border:1px solid rgba(168,85,247,.4);font-size:11.3px;color:#f1f5f9;'>" +
+                "<span style='color:#c084fc;font-size:10px;font-weight:800;'>[" + uxEsc(bw.category) + "]</span> " +
+                "<strong>" + uxEsc(bw.word) + "</strong>" +
+                "<button type='button' data-sq-adm-del-bw='" + uxEsc(bw.word_norm) + "' title='금칙어 해제' style='background:transparent;border:none;color:#fda4af;font-weight:900;font-size:11px;cursor:pointer;padding:0 2px;line-height:1;'>✕</button>" +
+              "</span>";
+            }).join("") + "</div>";
+        var logHtml = blockedLogs.length
+          ? "<div style='border-top:1px solid rgba(51,65,85,.65);padding-top:8px;margin-top:4px;'>" +
+            "<div style='font-size:11px;font-weight:800;color:#fda4af;margin-bottom:5px;'>🚨 최근 자동 차단 기록 (" + blockedLogs.length + "건)</div>" +
+            blockedLogs.slice(0, 8).map(function (lg) {
+              return "<div style='font-size:10.8px;color:#94a3b8;padding:4px 6px;background:rgba(2,6,23,.5);border-radius:6px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" +
+                "[" + uxEsc(lg.time_kst) + " · " + uxEsc(lg.kind) + "] <strong style='color:#fecdd3;'>" + uxEsc(lg.reason) + "</strong> — " + uxEsc(lg.actor) + ": " + uxEsc(lg.snippet) +
+              "</div>";
+            }).join("") + "</div>"
+          : "<div style='font-size:10.8px;color:#64748b;padding-top:4px;'>최근 자동 차단된 도배·홍보 시도가 없습니다.</div>";
+        rowsHtml = addControlsHtml + chipsHtml + logHtml;
       } else {
         var listCh = (d.cheers || []).filter(function (ch) {
           if (!q) return true;
@@ -11119,6 +11164,73 @@ _FRONTEND_V22_JS = r'''
             });
         };
       });
+
+      var addBwBtn = document.getElementById("sqAddBanwordBtnV4613");
+      var addBwInp = document.getElementById("sqNewBanwordInputV4613");
+      var addBwCat = document.getElementById("sqNewBanwordCatV4613");
+      var submitAddBanword = function () {
+        var admK = readCurrentModalAdminKeyV4612();
+        if (!admK) { if (typeof showToast === "function") showToast("❌ 상단에 관리자 마스터 키를 먼저 입력해 주세요."); return; }
+        var wVal = addBwInp ? addBwInp.value.trim() : "";
+        var cVal = addBwCat ? addBwCat.value : "불법홍보";
+        if (!wVal) { if (typeof showToast === "function") showToast("추가할 금칙어를 입력해 주세요."); return; }
+        if (addBwBtn) { addBwBtn.disabled = true; addBwBtn.textContent = "추가중..."; }
+        fetch("/api/admin/moderation/banwords/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-SportIQ-Admin-Key": admK },
+          body: JSON.stringify({ words_input: wVal, category: cVal, admin_key: admK })
+        }).then(function (r) { return r.json().then(function (x) { return { status: r.status, data: x }; }); })
+          .then(function (res) {
+            if (addBwBtn) { addBwBtn.disabled = false; addBwBtn.textContent = "+ 추가"; }
+            if (res.status !== 200 || !res.data || !res.data.ok) {
+              if (typeof showToast === "function") showToast("❌ " + ((res.data && res.data.detail) || "금칙어 추가 실패"));
+              return;
+            }
+            if (addBwInp) addBwInp.value = "";
+            if (typeof showToast === "function") showToast("✅ 금칙어 " + res.data.added_count + "개가 등록되어 즉시 차단 적용되었습니다.");
+            loadAdminModerationOverviewV4612(admK);
+          });
+      };
+      if (addBwBtn) addBwBtn.onclick = submitAddBanword;
+      if (addBwInp) {
+        addBwInp.onkeydown = function (ev) {
+          if (ev.key === "Enter") { ev.preventDefault(); submitAddBanword(); }
+        };
+      }
+      var resetBwBtn = document.getElementById("sqResetDefaultBanwordsBtnV4613");
+      if (resetBwBtn) {
+        resetBwBtn.onclick = function () {
+          var admK = readCurrentModalAdminKeyV4612();
+          if (!admK) return;
+          fetch("/api/admin/moderation/banwords/reset-defaults", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-SportIQ-Admin-Key": admK },
+            body: JSON.stringify({ admin_key: admK })
+          }).then(function (r) { return r.json(); }).then(function (d) {
+            if (d && d.ok) {
+              if (typeof showToast === "function") showToast("✅ 기본 도배·불법홍보 금칙어 목록이 복원되었습니다.");
+              loadAdminModerationOverviewV4612(admK);
+            }
+          });
+        };
+      }
+      modBox.querySelectorAll("[data-sq-adm-del-bw]").forEach(function (b) {
+        b.onclick = function () {
+          var wn = b.getAttribute("data-sq-adm-del-bw") || "";
+          var admK = readCurrentModalAdminKeyV4612();
+          if (!admK || !wn) return;
+          fetch("/api/admin/moderation/banwords/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-SportIQ-Admin-Key": admK },
+            body: JSON.stringify({ word_norm: wn, admin_key: admK })
+          }).then(function (r) { return r.json(); }).then(function (d) {
+            if (d && d.ok) {
+              if (typeof showToast === "function") showToast("🗑️ 선택하신 금칙어가 해제되었습니다.");
+              loadAdminModerationOverviewV4612(admK);
+            }
+          });
+        };
+      });
     }
 
     function readCurrentModalAdminKeyV4612() {
@@ -11176,7 +11288,7 @@ _FRONTEND_V22_JS = r'''
         tabBar.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:11px;";
         tabBar.innerHTML = [
           "<button type='button' id='sqAdminTabRaffleV4612' style='padding:8px 10px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>🎁 주간 추첨 관리</button>",
-          "<button type='button' id='sqAdminTabModV4612' style='padding:8px 10px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>🛡️ 게시글·댓글 영구 삭제</button>"
+          "<button type='button' id='sqAdminTabModV4612' style='padding:8px 10px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>🛡️ 글·댓글 삭제 · 금칙어</button>"
         ].join("");
         raffleBody.parentNode.insertBefore(tabBar, raffleBody);
 
@@ -11281,24 +11393,66 @@ _FRONTEND_V22_JS = r'''
     safeRunStepV4610(handleDeepLinkPostOnBootV29);
     safeRunStepV4610(installAdminModerationConsoleTabV4612);
     safeRunStepV4610(function () {
-      if (typeof window.submitComment === "function" && !window.__sqSubmitCommentWrappedV29) {
-        window.__sqSubmitCommentWrappedV29 = true;
-        var origSubCmt = window.submitComment;
+      if (!window.__sqSubmitCommentReplacedV4613) {
+        window.__sqSubmitCommentReplacedV4613 = true;
         window.submitComment = function () {
           var inp = document.getElementById("commentModalInput");
-          var typed = inp ? inp.value.trim() : "";
+          if (!inp) return;
+          var typed = inp.value.trim();
           var activeId = (typeof state === "object" && state && state.activePostId) ? String(state.activePostId) : "";
-          var r = origSubCmt.apply(this, arguments);
-          if (typed && activeId) {
-            var nk = getSavedNickV22() || ((typeof state === "object" && state && state.role === "PRO") ? "PRO분석가" : "오픈게스트");
-            reactionCache.extra_comments[activeId] = reactionCache.extra_comments[activeId] || [];
-            reactionCache.extra_comments[activeId].push({ user: nk, text: typed });
-            setTimeout(function () {
+          if (!typed || !activeId) return;
+          var nk = getSavedNickV22() || ((typeof state === "object" && state && state.role === "PRO") ? "PRO분석가" : ((typeof state === "object" && state && state.role === "MEMBER") ? "정회원" : "오픈게스트"));
+          fetch("/api/posts/" + encodeURIComponent(activeId) + "/comments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user: nk, nickname: nk, text: typed })
+          }).then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+            .then(function (res) {
+              if (res.status !== 200 || !res.data || !res.data.ok) {
+                if (typeof showToast === "function") showToast("🚫 " + ((res.data && res.data.detail) || "금칙어 또는 도배 방지 정책에 의해 등록이 차단되었습니다."));
+                return;
+              }
+              var cObj = res.data.comment || { user: nk, text: typed };
+              inp.value = "";
+              reactionCache.extra_comments[activeId] = reactionCache.extra_comments[activeId] || [];
+              reactionCache.extra_comments[activeId].push(cObj);
+              var p = (typeof state === "object" && state && Array.isArray(state.posts))
+                ? state.posts.find(function (x) { return x && String(x.id) === activeId; })
+                : null;
+              if (p) {
+                p.comments = Array.isArray(p.comments) ? p.comments : [];
+                p.comments.push(cObj);
+                if (typeof window.renderCommentModalList === "function") window.renderCommentModalList(p);
+              }
               safeRunStepV4610(applyReactionStateToPosts);
+              if (typeof window.renderFeed === "function") safeRunStepV4610(window.renderFeed);
               safeRunStepV4610(syncRenderedFeedReactionButtonsDom);
-            }, 180);
+              setTimeout(decorateCommentModalDeleteButtonsV4612, 30);
+            });
+        };
+      }
+      if (typeof window.fetch === "function" && !window.__sqCheerSpamFetchGuardV4613) {
+        window.__sqCheerSpamFetchGuardV4613 = true;
+        var _prevFetchV4613 = window.fetch;
+        window.fetch = function (input, init) {
+          var u = (typeof input === "string") ? input : (input && input.url ? input.url : "");
+          var mth = (init && init.method ? String(init.method) : "GET").toUpperCase();
+          var p = _prevFetchV4613.apply(this, arguments);
+          if (mth === "POST" && u.indexOf("/api/cheers") !== -1) {
+            p.then(function (resp) {
+              if (resp && resp.status >= 400 && typeof resp.clone === "function") {
+                resp.clone().json().then(function (errJson) {
+                  if (errJson && errJson.detail && typeof showToast === "function") {
+                    showToast("🚫 " + errJson.detail);
+                  }
+                  if (typeof window.loadCheersFromServer === "function") {
+                    try { window.loadCheersFromServer(); } catch (eC) {}
+                  }
+                }).catch(function () {});
+              }
+            }).catch(function () {});
           }
-          return r;
+          return p;
         };
       }
     });
@@ -13032,7 +13186,7 @@ def _trigger_smu_pg_backup(*tables: str) -> None:
 
 
 def _register_ux_v22_pg_tables() -> None:
-    extra = ("community_post_likes", "community_post_like_totals", "member_post_bookmarks", "match_fan_votes_v32", "match_fan_vote_totals_v32", "admin_deleted_tombstones")
+    extra = ("community_post_likes", "community_post_like_totals", "member_post_bookmarks", "match_fan_votes_v32", "match_fan_vote_totals_v32", "admin_deleted_tombstones", "admin_banned_words")
     cur = getattr(_smu, "BACKUP_TABLES", ())
     if isinstance(cur, (tuple, list)):
         merged = tuple(dict.fromkeys(list(cur) + list(extra)))
@@ -13042,6 +13196,7 @@ def _register_ux_v22_pg_tables() -> None:
         register_snapshot_table("community_post_like_totals", "post_id")
         register_snapshot_table("match_fan_vote_totals_v32", "match_key")
         register_snapshot_table("admin_deleted_tombstones", "tombstone_key")
+        register_snapshot_table("admin_banned_words", "word_norm")
     except Exception:
         pass
 
@@ -13096,6 +13251,13 @@ def _init_ux_v22_tables() -> None:
                     target_type TEXT NOT NULL,
                     target_id TEXT NOT NULL,
                     deleted_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS admin_banned_words (
+                    word_norm TEXT PRIMARY KEY,
+                    word_display TEXT NOT NULL,
+                    category TEXT NOT NULL DEFAULT '불법홍보',
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    updated_at REAL NOT NULL
                 );
                 """
             )
@@ -13207,7 +13369,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46120_{int(time.time())}"
+_BOOT_VER_V30 = f"46130_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -17234,6 +17396,7 @@ def add_community_comment_v4612(post_id: str, payload: _smu.CommentCreateIn):
     if not txt:
         raise HTTPException(status_code=400, detail="댓글 내용을 입력해 주세요.")
     user = (payload.nickname or payload.user or "익명팬").strip()[:28]
+    _validate_clean_content_v4613([txt, user], kind_label="댓글", actor=user, check_flood=True)
 
     def _op() -> Dict[str, Any]:
         badge = ""
@@ -17397,6 +17560,9 @@ def admin_moderation_overview_v4612(
         )
 
     reported_total = sum(1 for x in posts_out if x["report_count"] > 0)
+    banwords_out = _ensure_banwords_seeded_and_loaded_v4613(force_reload=True)
+    with _BANWORD_CACHE_LOCK_V4613:
+        recent_blocked_out = list(_RECENT_BLOCKED_LOGS_V4613[:25])
     return {
         "ok": True,
         "counts": {
@@ -17404,10 +17570,14 @@ def admin_moderation_overview_v4612(
             "reported_posts": reported_total,
             "comments": len(comments_out),
             "cheers": len(cheers_out),
+            "banwords": len(banwords_out),
+            "blocked_recent": len(recent_blocked_out),
         },
         "posts": posts_out,
         "comments": comments_out,
         "cheers": cheers_out,
+        "banwords": banwords_out,
+        "recent_blocked": recent_blocked_out,
     }
 
 
@@ -17503,6 +17673,322 @@ def admin_moderation_delete_v4612(
 
     raise HTTPException(status_code=400, detail="지원하지 않는 삭제 대상 유형입니다.")
 
+
+
+# ============================================================================
+# v4.6.13 Automatic Banned-Word & Anti-Flood Filter + Admin Banword CRUD
+# ============================================================================
+_DEFAULT_BANNED_WORDS_V4613: Tuple[Tuple[str, str], ...] = (
+    ("먹튀검증", "불법홍보"),
+    ("사설토토", "불법홍보"),
+    ("불법토토", "불법홍보"),
+    ("바카라", "불법홍보"),
+    ("카지노사이트", "불법홍보"),
+    ("슬롯사이트", "불법홍보"),
+    ("꽁머니", "불법홍보"),
+    ("가입머니", "불법홍보"),
+    ("첫충", "불법홍보"),
+    ("매충", "불법홍보"),
+    ("환전보장", "불법홍보"),
+    ("총판모집", "불법홍보"),
+    ("유출픽", "불법홍보"),
+    ("조작픽", "불법홍보"),
+    ("오픈카톡", "연락처유도"),
+    ("오픈채팅", "연락처유도"),
+    ("텔레그램", "연락처유도"),
+    ("t.me/", "연락처유도"),
+    ("open.kakao.com", "연락처유도"),
+    ("대출상담", "도배·악성"),
+    ("작업대출", "도배·악성"),
+    ("성인용품", "도배·악성"),
+    ("조건만남", "도배·악성"),
+)
+
+_BANWORD_STRIP_RE_V4613 = re.compile(r"[\s\u200b-\u200f\ufeff\.\,\-\_\~\!\@\#\$\%\^\&\*\(\)\[\]\{\}\|\\\:\;\'\"\?\<\>\`\+\/]+")
+_REPEAT_CHAR_RE_V4613 = re.compile(r"(.)\1{11,}")
+_BANWORD_CACHE_LOCK_V4613 = threading.RLock()
+_BANWORD_CACHE_V4613: Dict[str, Any] = {"ts": 0.0, "seeded": False, "items": []}
+_RECENT_SUBMISSIONS_V4613: Dict[str, List[Tuple[float, str]]] = {}
+_RECENT_BLOCKED_LOGS_V4613: List[Dict[str, Any]] = []
+
+
+class AdminBanwordAddInV4613(BaseModel):
+    words_input: str
+    category: str = "불법홍보"
+    admin_key: Optional[str] = ""
+
+
+class AdminBanwordDeleteInV4613(BaseModel):
+    word_norm: str
+    admin_key: Optional[str] = ""
+
+
+class AdminBanwordResetInV4613(BaseModel):
+    admin_key: Optional[str] = ""
+
+
+def _normalize_banword_key_v4613(raw_word: str) -> str:
+    s = (raw_word or "").strip().lower()
+    if not s:
+        return ""
+    # Preserve URL-like tokens (`t.me/`, `open.kakao.com`) with whitespace stripped; strip separators on general words
+    if "." in s or "/" in s:
+        if any(dom in s for dom in ("t.me", "kakao.com", "http", ".com", ".net", ".kr", ".gg")):
+            return re.sub(r"\s+", "", s)[:48]
+    return _BANWORD_STRIP_RE_V4613.sub("", s)[:48]
+
+
+def _ensure_banwords_seeded_and_loaded_v4613(force_reload: bool = False) -> List[Dict[str, Any]]:
+    now_m = time.monotonic()
+    with _BANWORD_CACHE_LOCK_V4613:
+        if not force_reload and _BANWORD_CACHE_V4613["seeded"] and (now_m - _BANWORD_CACHE_V4613["ts"]) < 15.0:
+            return list(_BANWORD_CACHE_V4613["items"])
+
+    def _op() -> List[Dict[str, Any]]:
+        now_ep = time.time()
+        with _smu_db_session(write=True) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS admin_banned_words (
+                    word_norm TEXT PRIMARY KEY,
+                    word_display TEXT NOT NULL,
+                    category TEXT NOT NULL DEFAULT '불법홍보',
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    updated_at REAL NOT NULL
+                )
+                """
+            )
+            seed_params = [
+                (_normalize_banword_key_v4613(w), w, cat, now_ep)
+                for w, cat in _DEFAULT_BANNED_WORDS_V4613
+                if _normalize_banword_key_v4613(w)
+            ]
+            conn.executemany(
+                """
+                INSERT OR IGNORE INTO admin_banned_words(word_norm, word_display, category, is_active, updated_at)
+                VALUES (?, ?, ?, 1, ?)
+                """,
+                seed_params,
+            )
+            rows = conn.execute(
+                "SELECT word_norm, word_display, category, updated_at FROM admin_banned_words WHERE is_active = 1 ORDER BY updated_at DESC, word_display ASC"
+            ).fetchall()
+            return [
+                {
+                    "word_norm": str(r["word_norm"]),
+                    "word": str(r["word_display"]),
+                    "category": str(r["category"] or "불법홍보"),
+                    "updated_kst": _fmt_kst_mod_v4612(r["updated_at"]),
+                }
+                for r in rows
+            ]
+
+    items = run_with_db_retry(_op)
+    with _BANWORD_CACHE_LOCK_V4613:
+        _BANWORD_CACHE_V4613["ts"] = time.monotonic()
+        _BANWORD_CACHE_V4613["seeded"] = True
+        _BANWORD_CACHE_V4613["items"] = items
+    return list(items)
+
+
+def _record_blocked_attempt_v4613(kind_label: str, actor: str, reason: str, sample_text: str) -> None:
+    entry = {
+        "time_kst": _fmt_kst_mod_v4612(time.time()),
+        "kind": kind_label,
+        "actor": (actor or "익명")[:24],
+        "reason": reason[:80],
+        "snippet": re.sub(r"\s+", " ", (sample_text or "").strip())[:70],
+    }
+    with _BANWORD_CACHE_LOCK_V4613:
+        _RECENT_BLOCKED_LOGS_V4613.insert(0, entry)
+        if len(_RECENT_BLOCKED_LOGS_V4613) > 50:
+            del _RECENT_BLOCKED_LOGS_V4613[50:]
+
+
+def _validate_clean_content_v4613(
+    texts: List[Optional[str]],
+    kind_label: str = "게시글",
+    actor: Optional[str] = "",
+    check_flood: bool = True,
+) -> None:
+    joined = " ".join(str(t or "").strip() for t in texts if str(t or "").strip())
+    if not joined:
+        return
+
+    # 1. Excessive repeated-character flood (e.g., 12+ identical chars in a row)
+    no_ws = re.sub(r"\s+", "", joined)
+    if _REPEAT_CHAR_RE_V4613.search(no_ws):
+        reason = "과도한 반복 문자(도배)"
+        _record_blocked_attempt_v4613(kind_label, actor or "익명", reason, joined)
+        raise HTTPException(status_code=400, detail="과도한 반복 문자(도배)가 포함되어 등록할 수 없습니다.")
+
+    # 2. Obfuscation-resistant Banned-Word check
+    lower_no_ws = no_ws.lower()
+    compact_norm = _BANWORD_STRIP_RE_V4613.sub("", lower_no_ws)
+    active_words = _ensure_banwords_seeded_and_loaded_v4613(force_reload=False)
+
+    for bw in active_words:
+        wn = bw["word_norm"]
+        if not wn:
+            continue
+        is_url_token = ("." in wn or "/" in wn)
+        matched = (wn in lower_no_ws) if is_url_token else (wn in compact_norm or wn in lower_no_ws)
+        if matched:
+            disp = bw["word"]
+            cat = bw["category"]
+            _record_blocked_attempt_v4613(kind_label, actor or "익명", f"금칙어({cat}: {disp})", joined)
+            raise HTTPException(
+                status_code=400,
+                detail=f"금칙어('{disp}') 또는 불법 홍보·부적절 표현이 포함되어 등록할 수 없습니다.",
+            )
+
+    # 3. Duplicate text flood & burst rate limit
+    if check_flood:
+        actor_key = f"{kind_label}:{(actor or 'anon').strip().lower()[:32]}"
+        body_sig = hashlib.sha1(compact_norm[:600].encode("utf-8", errors="ignore")).hexdigest()[:16]
+        now_ep = time.time()
+        with _BANWORD_CACHE_LOCK_V4613:
+            hist = [x for x in _RECENT_SUBMISSIONS_V4613.get(actor_key, []) if (now_ep - x[0]) < 60.0]
+            if body_sig and len(compact_norm) >= 4 and any(sig == body_sig for _ts, sig in hist):
+                _RECENT_SUBMISSIONS_V4613[actor_key] = hist
+                _record_blocked_attempt_v4613(kind_label, actor or "익명", "60초 내 동일 문구 중복 도배", joined)
+                raise HTTPException(status_code=429, detail="동일한 내용을 연속으로 도배할 수 없습니다.")
+            recent_burst = sum(1 for ts, _sig in hist if (now_ep - ts) < 5.0)
+            if recent_burst >= 4:
+                _RECENT_SUBMISSIONS_V4613[actor_key] = hist
+                _record_blocked_attempt_v4613(kind_label, actor or "익명", "5초 내 연속 등록 도배", joined)
+                raise HTTPException(status_code=429, detail="짧은 시간 내 연속 등록(도배)이 감지되었습니다. 잠시 후 다시 시도해 주세요.")
+            hist.append((now_ep, body_sig))
+            _RECENT_SUBMISSIONS_V4613[actor_key] = hist[-20:]
+
+
+@router.post("/api/posts")
+def create_community_post_filtered_v4613(payload: _smu.PostCreateIn):
+    _validate_clean_content_v4613(
+        [payload.title, payload.body, payload.author, *(payload.tags or [])],
+        kind_label="게시글",
+        actor=payload.author or "익명",
+        check_flood=True,
+    )
+    return _smu.create_community_post(payload)
+
+
+@router.put("/api/posts/{post_id}")
+def update_community_post_filtered_v4613(post_id: str, payload: _smu.PostUpdateIn):
+    _validate_clean_content_v4613(
+        [payload.title, payload.body, *(payload.tags or [])],
+        kind_label="게시글수정",
+        actor=payload.author or post_id,
+        check_flood=False,
+    )
+    return _smu.update_community_post(post_id, payload)
+
+
+@router.get("/api/admin/moderation/banwords")
+def admin_list_banwords_v4613(
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+    admin_key: Optional[str] = "",
+):
+    _verify_admin_key_v4612(x_sportiq_admin_key or admin_key, raise_on_error=True)
+    words = _ensure_banwords_seeded_and_loaded_v4613(force_reload=True)
+    with _BANWORD_CACHE_LOCK_V4613:
+        recent_b = list(_RECENT_BLOCKED_LOGS_V4613[:30])
+    return {"ok": True, "count": len(words), "words": words, "recent_blocked": recent_b}
+
+
+@router.post("/api/admin/moderation/banwords/add")
+def admin_add_banwords_v4613(
+    payload: AdminBanwordAddInV4613,
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+):
+    _verify_admin_key_v4612(x_sportiq_admin_key or payload.admin_key, raise_on_error=True)
+    raw_tokens = [t.strip() for t in re.split(r"[,\n\r]+", payload.words_input or "") if t.strip()]
+    cat = (payload.category or "불법홍보").strip()[:20] or "불법홍보"
+    parsed: List[Tuple[str, str]] = []
+    for tok in raw_tokens[:50]:
+        wn = _normalize_banword_key_v4613(tok)
+        if len(wn) < 2 or len(tok) > 40:
+            continue
+        parsed.append((wn, tok[:40]))
+    if not parsed:
+        raise HTTPException(status_code=400, detail="2~40자 이내의 추가할 금칙어를 입력해 주세요.")
+
+    def _add_op() -> int:
+        now_ep = time.time()
+        with _smu_db_session(write=True) as conn:
+            for wn, disp in parsed:
+                conn.execute(
+                    """
+                    INSERT INTO admin_banned_words(word_norm, word_display, category, is_active, updated_at)
+                    VALUES (?, ?, ?, 1, ?)
+                    ON CONFLICT(word_norm) DO UPDATE SET
+                        word_display = excluded.word_display,
+                        category = excluded.category,
+                        is_active = 1,
+                        updated_at = excluded.updated_at
+                    """,
+                    (wn, disp, cat, now_ep),
+                )
+        return len(parsed)
+
+    added_cnt = run_with_db_retry(_add_op)
+    words = _ensure_banwords_seeded_and_loaded_v4613(force_reload=True)
+    _trigger_smu_pg_backup("admin_banned_words")
+    return {"ok": True, "added_count": added_cnt, "count": len(words), "words": words}
+
+
+@router.post("/api/admin/moderation/banwords/delete")
+def admin_delete_banword_v4613(
+    payload: AdminBanwordDeleteInV4613,
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+):
+    _verify_admin_key_v4612(x_sportiq_admin_key or payload.admin_key, raise_on_error=True)
+    wn = _normalize_banword_key_v4613(payload.word_norm) or (payload.word_norm or "").strip()
+    if not wn:
+        raise HTTPException(status_code=400, detail="삭제할 금칙어를 선택해 주세요.")
+
+    def _del_op() -> int:
+        with _smu_db_session(write=True) as conn:
+            cur = conn.execute(
+                "UPDATE admin_banned_words SET is_active = 0, updated_at = ? WHERE word_norm = ?",
+                (time.time(), wn),
+            )
+            return int(cur.rowcount or 0)
+
+    removed = run_with_db_retry(_del_op)
+    words = _ensure_banwords_seeded_and_loaded_v4613(force_reload=True)
+    _trigger_smu_pg_backup("admin_banned_words")
+    return {"ok": True, "deleted": removed > 0, "count": len(words), "words": words}
+
+
+@router.post("/api/admin/moderation/banwords/reset-defaults")
+def admin_reset_default_banwords_v4613(
+    payload: Optional[AdminBanwordResetInV4613] = None,
+    x_sportiq_admin_key: Optional[str] = Header(default=None),
+):
+    eff_k = x_sportiq_admin_key or (payload.admin_key if payload else "")
+    _verify_admin_key_v4612(eff_k, raise_on_error=True)
+
+    def _reset_op() -> None:
+        now_ep = time.time()
+        with _smu_db_session(write=True) as conn:
+            for w, cat in _DEFAULT_BANNED_WORDS_V4613:
+                wn = _normalize_banword_key_v4613(w)
+                if not wn:
+                    continue
+                conn.execute(
+                    """
+                    INSERT INTO admin_banned_words(word_norm, word_display, category, is_active, updated_at)
+                    VALUES (?, ?, ?, 1, ?)
+                    ON CONFLICT(word_norm) DO UPDATE SET is_active = 1, updated_at = excluded.updated_at
+                    """,
+                    (wn, w, cat, now_ep),
+                )
+
+    run_with_db_retry(_reset_op)
+    words = _ensure_banwords_seeded_and_loaded_v4613(force_reload=True)
+    _trigger_smu_pg_backup("admin_banned_words")
+    return {"ok": True, "count": len(words), "words": words}
 
 router.include_router(upgrade_router)
 
@@ -17714,6 +18200,7 @@ def lounge_health():
         "match_sort_bar_dedup": _SORT_DEDUP_APPLIED,
         "ai_iq_hyper_search_v2": True,
         "admin_moderation_v4612": True,
+        "banword_spam_filter_v4613": True,
         "member_ux_v22": True,
         "seo_og_v27": True,
     }
@@ -17786,6 +18273,7 @@ def register_hashtag(payload: HashtagIn):
     tag = raw if raw.startswith("#") else f"#{raw}"
     if len(tag) < 2 or len(tag) > 32:
         raise HTTPException(status_code=400, detail="해시태그는 1~30자 이내로 입력해 주세요.")
+    _validate_clean_content_v4613([raw], kind_label="해시태그", actor="hashtag", check_flood=False)
     now = time.time()
 
     def _op() -> list[dict]:
@@ -17899,6 +18387,7 @@ def post_cheer(payload: CheerIn, request: Request):
     sid = (payload.session_id or (request.client.host if request.client else "anon")).strip()[:64]
     now = time.time()
     author = (payload.author or "익명팬").strip()[:30]
+    _validate_clean_content_v4613([msg, author], kind_label="응원톡", actor=sid, check_flood=True)
     role = (payload.role or "GUEST").strip()[:20]
     team = (payload.team or "ALL").strip()[:30]
     clean_msg = msg[:300]
