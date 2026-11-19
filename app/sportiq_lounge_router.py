@@ -15,7 +15,7 @@ from email.utils import parsedate_to_datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from fastapi import APIRouter, Header, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from app.sqlite_guard import (
@@ -11544,6 +11544,8 @@ def _ensure_upgrade_js_dedup_patched() -> bool:
     if not isinstance(js_raw, str) or not js_raw:
         return False
     updated = js_raw
+    updated = updated.replace('sessionStorage.getItem(SS_ADMIN_KEY)', '(function(){try{return sessionStorage.getItem(SS_ADMIN_KEY)||window.__sqAdminSessionKeyFallbackV4612||"";}catch(e){return window.__sqAdminSessionKeyFallbackV4612||"";}})()')
+    updated = re.sub(r"sessionStorage\.setItem\(SS_ADMIN_KEY,\s*([^)]+)\)", r"(function(v){window.__sqAdminSessionKeyFallbackV4612=v;try{sessionStorage.setItem(SS_ADMIN_KEY,v);}catch(e){}})(\1)", updated)
     if "cleanupDuplicateMatchSortBars" not in updated:
         p1 = re.compile(
             r"function\s+sortRenderedMatchCardStrips\s*\(\s*forceResort\s*\)\s*\{.*?(?=\n\s*function\s+mountSortToggleAboveStrip\s*\()",
@@ -13369,7 +13371,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46130_{int(time.time())}"
+_BOOT_VER_V30 = f"46140_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -17990,6 +17992,97 @@ def admin_reset_default_banwords_v4613(
     _trigger_smu_pg_backup("admin_banned_words")
     return {"ok": True, "count": len(words), "words": words}
 
+
+# ============================================================================
+# v4.6.14 WordPress Cross-Origin (CORS) Bridge Support (/api/wp/*)
+# ============================================================================
+def _build_wp_cors_headers_v4614(request: Optional[Request] = None) -> Dict[str, str]:
+    raw_allowed = os.environ.get("SPORTIQ_WP_ALLOWED_ORIGINS", "").strip()
+    req_origin = (request.headers.get("origin") or "").strip() if request else ""
+    allow_origin = "*"
+    if raw_allowed and raw_allowed != "*":
+        allowed_set = {o.strip().rstrip("/").lower() for o in raw_allowed.split(",") if o.strip()}
+        norm_req = req_origin.rstrip("/").lower()
+        if norm_req and norm_req in allowed_set:
+            allow_origin = req_origin
+        else:
+            first_allowed = next(iter(o.strip().rstrip("/") for o in raw_allowed.split(",") if o.strip()), "")
+            allow_origin = first_allowed or "*"
+    elif req_origin.startswith(("https://", "http://")):
+        allow_origin = req_origin
+
+    headers = {
+        "Access-Control-Allow-Origin": allow_origin,
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, X-SportIQ-WP-Origin",
+        "Access-Control-Max-Age": "86400",
+    }
+    if allow_origin != "*":
+        headers["Vary"] = "Origin"
+    return headers
+
+
+def _execute_wp_cors_endpoint_v4614(request: Request, handler_fn, *args, **kwargs) -> JSONResponse:
+    cors_hdrs = _build_wp_cors_headers_v4614(request)
+    try:
+        data = handler_fn(*args, **kwargs)
+        return JSONResponse(status_code=200, content=data, headers=cors_hdrs)
+    except HTTPException as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"ok": False, "detail": exc.detail},
+            headers=cors_hdrs,
+        )
+
+
+@router.options("/api/wp/{rest_of_path:path}")
+def wp_bridge_cors_preflight_v4614(rest_of_path: str, request: Request):
+    return Response(status_code=204, headers=_build_wp_cors_headers_v4614(request))
+
+
+@router.options("/api/lounge/health")
+def lounge_health_cors_preflight_v4614(request: Request):
+    return Response(status_code=204, headers=_build_wp_cors_headers_v4614(request))
+
+
+@router.get("/api/wp/member/catalog")
+def wp_member_catalog_cors_v4614(request: Request):
+    return _execute_wp_cors_endpoint_v4614(
+        request,
+        lambda: {
+            "ok": True,
+            "catalog": getattr(_smu, "SHOP_CATALOG", []),
+            "tier_thresholds": {"MEMBER": 150, "PRO": 350},
+        },
+    )
+
+
+@router.get("/api/wp/member/public-profile")
+def wp_public_profile_cors_v4614(nickname: str, request: Request):
+    return _execute_wp_cors_endpoint_v4614(request, _smu.wp_get_public_member_profile, nickname)
+
+
+@router.post("/api/wp/member/verify")
+def wp_verify_member_cors_v4614(payload: _smu.WPMemberVerifyIn, request: Request):
+    return _execute_wp_cors_endpoint_v4614(request, _smu.wp_verify_member_bridge, payload)
+
+
+@router.post("/api/wp/member/checkin")
+def wp_checkin_member_cors_v4614(payload: _smu.WPMemberCheckinIn, request: Request):
+    return _execute_wp_cors_endpoint_v4614(request, _smu.wp_member_daily_checkin, payload)
+
+
+@router.post("/api/wp/member/equip-badge")
+def wp_equip_badge_cors_v4614(payload: _smu.WPMemberEquipIn, request: Request):
+    return _execute_wp_cors_endpoint_v4614(request, _smu.wp_member_equip_badge, payload)
+
+
+@router.post("/api/wp/member/reward")
+def wp_activity_reward_cors_v4614(payload: _smu.WPMemberRewardIn, request: Request):
+    if payload.nickname:
+        _validate_clean_content_v4613([payload.nickname], kind_label="WP보상닉네임", actor=payload.nickname, check_flood=False)
+    return _execute_wp_cors_endpoint_v4614(request, _smu.wp_member_activity_reward, payload)
+
 router.include_router(upgrade_router)
 
 
@@ -18184,13 +18277,13 @@ def serve_lounge_home(request: Request):
 
 
 @router.get("/api/lounge/health")
-def lounge_health():
+def lounge_health(request: Request):
     def _op() -> None:
         with _db_session(write=False) as conn:
             conn.execute("SELECT 1").fetchone()
 
     run_with_db_retry(_op)
-    return {
+    payload = {
         "status": "ok",
         "service": "sportiq-lounge",
         "storage": "sqlite-wal",
@@ -18201,9 +18294,11 @@ def lounge_health():
         "ai_iq_hyper_search_v2": True,
         "admin_moderation_v4612": True,
         "banword_spam_filter_v4613": True,
+        "wp_cors_bridge_v4614": True,
         "member_ux_v22": True,
         "seo_og_v27": True,
     }
+    return JSONResponse(status_code=200, content=payload, headers=_build_wp_cors_headers_v4614(request))
 
 
 def _presence_stats(conn: sqlite3.Connection) -> dict:
