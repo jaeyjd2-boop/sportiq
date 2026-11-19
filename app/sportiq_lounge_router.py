@@ -1038,21 +1038,23 @@ _FRONTEND_V22_JS = r'''
       "#sqDesktopMainTabStrip > .tab-btn,",
       "#sqDesktopMainTabStrip > button,",
       "#sqDesktopMainTabStrip > a,",
-      "[data-sq-7tab-strip='1'] > button,",
-      "[data-sq-7tab-strip='1'] > a {",
+      "#sqDesktopMainTabStrip > *,",
+      "[data-sq-7tab-strip='1'] > * {",
       "  flex: 0 0 auto !important;",
       "  width: auto !important;",
+      "  max-width: none !important;",
       "  min-width: max-content !important;",
       "  white-space: nowrap !important;",
-      "  padding: 6px 9.5px !important;",
-      "  font-size: 12px !important;",
+      "  margin-top: 0 !important;",
+      "  margin-bottom: 0 !important;",
+      "  padding: 6px 8.5px !important;",
+      "  font-size: 11.9px !important;",
       "  line-height: 1.25 !important;",
       "}",
-      "@media (min-width: 1280px) {",
+      "@media (min-width: 1340px) {",
       "  #sqDesktopMainTabStrip, [data-sq-7tab-strip='1'] { gap: 6px !important; }",
-      "  #sqDesktopMainTabStrip > .tab-btn,",
-      "  #sqDesktopMainTabStrip > button,",
-      "  [data-sq-7tab-strip='1'] > button { padding: 7px 11.5px !important; font-size: 12.6px !important; }",
+      "  #sqDesktopMainTabStrip > *,",
+      "  [data-sq-7tab-strip='1'] > * { padding: 6.5px 10.5px !important; font-size: 12.4px !important; }",
       "}",
       "/* v3.0 Scorebase-Inspired Dual Scoreboard Table, Status/Star Filters & 5-Tab Match Insight Modal */",
       "/* v3.9 Unified Clean Scoreboard Hub — Zero Full-Bleed Overflow & Zero Duplicate Rows */",
@@ -1868,7 +1870,9 @@ _FRONTEND_V22_JS = r'''
       "  min-width: 0 !important;",
       "  box-sizing: border-box !important;",
       "}",
-      "[data-sq-ai-hints-wrap='1'][data-sq-ai-hints-folded='1'] > [data-sq-ai-hint-row='1'],",
+      "[data-sq-ai-hints-wrap='1'][data-sq-ai-hints-folded='1'],",
+      "[data-sq-ai-hints-wrap='1'][data-sq-ai-hints-folded='1'] > *,",
+      "[data-sq-ai-modal-folded='1'] [data-sq-ai-hint-row='1'],",
       "[data-sq-ai-hint-row='1'][data-sq-ai-hint-folded='1'],",
       "#sqAiHintsToggleBtnV46[data-sq-tog-hidden='1'],",
       "[data-sq-empty-tab-wrap='1'] {",
@@ -2368,15 +2372,15 @@ _FRONTEND_V22_JS = r'''
       "  background: rgba(16, 185, 129, 0.12);",
       "}",
       "/* v2.6 Active DataCenter 7th Tab Highlight & Sibling Tab De-Highlight */",
-      "#sqDesktopMainTabStrip[data-sq-dc-mode='1'] > button:not([data-sq-dc-active='1']),",
-      "#sqDesktopMainTabStrip[data-sq-dc-mode='1'] > a:not([data-sq-dc-active='1']) {",
+      "#sqDesktopMainTabStrip[data-sq-dc-mode='1'] > *:not([data-sq-dc-active='1']),",
+      "[data-sq-7tab-strip='1'][data-sq-dc-mode='1'] > *:not([data-sq-dc-active='1']) {",
       "  background: rgba(15, 23, 42, 0.86) !important;",
       "  color: #cbd5e1 !important;",
       "  border-color: rgba(51, 65, 85, 0.72) !important;",
       "  box-shadow: none !important;",
       "}",
-      "#sqDesktopMainTabStrip > button[data-sq-dc-active='1'],",
-      "#sqDesktopMainTabStrip > a[data-sq-dc-active='1'] {",
+      "#sqDesktopMainTabStrip > *[data-sq-dc-active='1'],",
+      "[data-sq-7tab-strip='1'] > *[data-sq-dc-active='1'] {",
       "  background: linear-gradient(135deg, #10b981, #06b6d4) !important;",
       "  color: #020617 !important;",
       "  font-weight: 900 !important;",
@@ -2510,82 +2514,172 @@ _FRONTEND_V22_JS = r'''
   // -------------------------------------------------------------------------
   // 1. 1-Row Main Tab Bar + Dynamic Match Count ('총 20경기' -> actual count)
   // -------------------------------------------------------------------------
+  function isExcludedFromMain7TabScanV467(el) {
+    if (!el || !el.closest) return true;
+    if (el.closest("#mobile-nav, #proLiveTickerBar, #dcMainHubSection, #sqOfficialLegalFooter, #sqAiIqModal, #aiIqModal, #sqAiSearchModal, #sqMemberHubModal, #dcQuickMatchModal, #writeModal, #commentModal, #sqLegalPolicyModal, #sqPartnerInquiryModalV46")) {
+      return true;
+    }
+    var cur = el;
+    var depth = 0;
+    while (cur && cur !== document.body && depth < 5) {
+      if (cur.id !== "sqDesktopMainTabStrip" && cur.getAttribute && cur.getAttribute("data-sq-7tab-strip") !== "1") {
+        var cs = window.getComputedStyle ? window.getComputedStyle(cur) : null;
+        if (cs && cs.position === "fixed") return true;
+      }
+      cur = cur.parentElement;
+      depth++;
+    }
+    return false;
+  }
+
+  function lowestCommonAncestorV467(a, b) {
+    if (!a || !b) return a ? a.parentElement : null;
+    var seen = [];
+    var cur = a;
+    while (cur && cur !== document.body) {
+      seen.push(cur);
+      cur = cur.parentElement;
+    }
+    var curB = b;
+    while (curB && curB !== document.body) {
+      if (seen.indexOf(curB) !== -1) return curB;
+      curB = curB.parentElement;
+    }
+    return a.parentElement;
+  }
+
+  function apply7TabInlineLockV467(bar) {
+    if (!bar || bar.__sqApplying7TabLock) return;
+    bar.__sqApplying7TabLock = true;
+    try {
+      bar.id = "sqDesktopMainTabStrip";
+      bar.setAttribute("data-sq-7tab-strip", "1");
+      if (bar.classList) {
+        bar.classList.remove("sq-mobile-bottom-nav-bar", "flex-wrap", "grid", "grid-cols-2", "grid-cols-3", "grid-cols-6");
+        bar.classList.add("sq-main-tabbar-row");
+      }
+      bar.style.setProperty("position", "static", "important");
+      bar.style.setProperty("display", "flex", "important");
+      bar.style.setProperty("grid-template-columns", "none", "important");
+      bar.style.setProperty("flex-direction", "row", "important");
+      bar.style.setProperty("flex-wrap", "nowrap", "important");
+      bar.style.setProperty("align-items", "center", "important");
+      bar.style.setProperty("justify-content", "flex-start", "important");
+      bar.style.setProperty("gap", "5px", "important");
+      bar.style.setProperty("width", "100%", "important");
+      bar.style.setProperty("max-width", "100%", "important");
+      bar.style.setProperty("min-width", "0", "important");
+      bar.style.setProperty("overflow-x", "auto", "important");
+      bar.style.setProperty("overflow-y", "hidden", "important");
+      Array.prototype.forEach.call(bar.children, function (ch) {
+        if (ch && ch.style) {
+          ch.style.setProperty("flex", "0 0 auto", "important");
+          ch.style.setProperty("white-space", "nowrap", "important");
+          ch.style.setProperty("width", "auto", "important");
+          ch.style.setProperty("max-width", "none", "important");
+          ch.style.setProperty("margin-top", "0px", "important");
+          ch.style.setProperty("margin-bottom", "0px", "important");
+        }
+      });
+    } finally {
+      bar.__sqApplying7TabLock = false;
+    }
+  }
+
   function enforceSingleLineMainTabBar() {
-    var bodyFeedBtn = null;
-    var allBtns = document.querySelectorAll("button, a, [role='tab'], [data-tab]");
-    for (var bi = 0; bi < allBtns.length; bi++) {
-      var cand = allBtns[bi];
-      if (cand.closest("#proLiveTickerBar, #dcMainHubSection, #sqOfficialLegalFooter, #sqAiIqModal, #sqMemberHubModal")) continue;
-      var ctx = String(cand.textContent || "").replace(/\s+/g, " ").trim();
-      if (ctx === "실시간 분석 피드" || ctx.indexOf("실시간 분석 피드") !== -1) {
-        bodyFeedBtn = cand;
-        break;
+    var tab1 = null;
+    var tab6 = null;
+    var cands = document.querySelectorAll("button, a, [role='tab'], .tab-btn, .nav-tab, [onclick]");
+    for (var i = 0; i < cands.length; i++) {
+      var el = cands[i];
+      if (isExcludedFromMain7TabScanV467(el)) continue;
+      // Must be a leaf tab control (never a container holding child buttons/links!)
+      if (el.querySelector && el.querySelector("button, a")) continue;
+      var tx = String(el.textContent || "").replace(/\s+/g, " ").trim();
+      if (!tx || tx.length > 24) continue;
+      if (!tab1 && /^(📰\s*)?실시간\s*분석\s*피드$/.test(tx)) {
+        tab1 = el;
+      } else if (!tab6 && /AI\s*실험실/.test(tx)) {
+        tab6 = el;
       }
     }
-    var fallbackBtn = document.querySelector("button.tab-btn[data-tab='feed'], button[onclick*=\"switchTab('feed')\"], button[data-nav='feed']");
-    var primaryFirstTab = bodyFeedBtn || fallbackBtn;
+
+    var fallbackBtn = document.querySelector("button.tab-btn[data-tab='feed'], button[onclick*=\"switchTab('feed')\"]");
+    var primaryFirstTab = tab1 || fallbackBtn;
     if (!primaryFirstTab || !primaryFirstTab.parentElement) return;
 
-    // Climb up if individual tabs are wrapped inside <li> or single-button wrappers until we reach the multi-tab row
-    var bar = primaryFirstTab.parentElement;
-    var climbGuard = 0;
-    while (bar && bar.parentElement && bar.parentElement !== document.body && climbGuard < 3) {
-      var directOrChildTabs = bar.querySelectorAll("button, a, [role='tab'], [data-tab]").length;
-      if (directOrChildTabs >= 4) break;
-      bar = bar.parentElement;
-      climbGuard++;
+    var bar = (tab1 && tab6) ? lowestCommonAncestorV467(tab1, tab6) : primaryFirstTab.parentElement;
+    if (!bar || bar === document.body) bar = primaryFirstTab.parentElement;
+
+    // If `bar` contains a nested single flex-row holding `tab1..tab6` while `bar` itself was 1 level higher, unwrap or step into it
+    if (tab1 && tab1.parentElement && tab1.parentElement !== bar && tab6 && tab6.parentElement === tab1.parentElement) {
+      bar = tab1.parentElement;
     }
-    if (!bar) return;
 
-    bar.id = "sqDesktopMainTabStrip";
-    bar.setAttribute("data-sq-7tab-strip", "1");
-    bar.classList.remove("sq-mobile-bottom-nav-bar", "flex-wrap", "grid");
-    bar.classList.add("sq-main-tabbar-row");
-
-    // Also strip flex-wrap / grid on up to 2 ancestor wrappers of `bar` so parent containers never wrap children onto a 2nd row
+    // Strip flex-wrap / grid classes on up to 3 ancestor wrappers of `bar`
     var anc = bar.parentElement;
-    for (var ai = 0; ai < 2 && anc && anc !== document.body; ai++) {
+    for (var ai = 0; ai < 3 && anc && anc !== document.body; ai++) {
       if (anc.classList) anc.classList.remove("sq-mobile-bottom-nav-bar", "flex-wrap");
       anc = anc.parentElement;
     }
 
-    // Locate ANY stray 7th '데이터센터' tab button anywhere near the main tab bar (even 2-3 divs higher in the DOM!)
-    // and append it directly inside `bar` as the 7th flex item!
+    // Scan ALL interactive/leaf elements across the document for the 7th '데이터센터' / '📊 데이터센터' tab
+    var allLeafs = document.querySelectorAll("button, a, [role='tab'], .tab-btn, .nav-tab, [onclick], div, span");
     var barRect = bar.getBoundingClientRect ? bar.getBoundingClientRect() : null;
-    for (var si = 0; si < allBtns.length; si++) {
-      var sb = allBtns[si];
-      if (!sb || sb === primaryFirstTab || sb.parentElement === bar || bar.contains(sb)) continue;
-      if (sb.closest("#proLiveTickerBar, #dcMainHubSection, #sqOfficialLegalFooter, #sqAiIqModal, #sqMemberHubModal, #dcQuickMatchModal")) continue;
-      if (sb.hasAttribute("data-nav")) continue;
+    for (var si = 0; si < allLeafs.length; si++) {
+      var sb = allLeafs[si];
+      if (!sb || sb === bar || sb === primaryFirstTab || sb.contains(bar)) continue;
+      if (isExcludedFromMain7TabScanV467(sb)) continue;
+      if (sb.querySelector && sb.querySelector("button, a")) continue;
+      if (sb.tagName === "DIV" || sb.tagName === "SPAN") {
+        // Only match standalone clickable div/span tabs, not inner label spans inside an already-matched button!
+        if (sb.closest("button, a")) continue;
+      }
       var stx = String(sb.textContent || "").replace(/\s+/g, " ").trim();
-      if (stx.length <= 24 && /데이터\s*센터/.test(stx) && !/펼치기|접기|동기화|연동/.test(stx)) {
-        if (barRect && sb.getBoundingClientRect) {
-          var sr = sb.getBoundingClientRect();
-          if (barRect.height > 0 && sr.height > 0 && Math.abs(sr.top - barRect.top) > 180) continue;
-        }
+      if (!/^(📊\s*)?데이터\s*센터$/.test(stx)) continue;
+      if (barRect && sb.getBoundingClientRect) {
+        var sr = sb.getBoundingClientRect();
+        if (barRect.height > 0 && sr.height > 0 && Math.abs(sr.top - barRect.top) > 220) continue;
+      }
+      // If `sb` is already a direct child of `bar`, keep it in place; otherwise move it into `bar` as the 7th child!
+      var movable = sb;
+      while (movable.parentElement && sb.parentElement !== bar && movable.parentElement !== document.body && movable.parentElement.children.length === 1 && String(movable.parentElement.textContent || "").replace(/\s+/g, " ").trim() === stx) {
+        // Stop climbing if parent is a structural row
+        if (movable.parentElement.tagName === "NAV" || movable.parentElement.tagName === "HEADER") break;
+        break;
+      }
+      if (sb.parentElement !== bar) {
         var oldParent = sb.parentElement;
-        sb.className = "tab-btn whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold transition border border-cyan-500/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25";
+        if (sb.tagName === "BUTTON" || sb.tagName === "A") {
+          sb.className = "tab-btn whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-bold transition border border-cyan-500/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25";
+        }
         bar.appendChild(sb);
-        if (oldParent && oldParent !== bar && !oldParent.contains(bar) && oldParent.children.length === 0 && String(oldParent.textContent || "").trim() === "") {
+        if (oldParent && oldParent !== bar && !oldParent.contains(bar) && String(oldParent.textContent || "").trim() === "") {
           oldParent.setAttribute("data-sq-empty-tab-wrap", "1");
+          oldParent.style.setProperty("display", "none", "important");
         }
       }
+      break;
     }
 
-    bar.style.setProperty("display", "flex", "important");
-    bar.style.setProperty("grid-template-columns", "none", "important");
-    bar.style.setProperty("flex-direction", "row", "important");
-    bar.style.setProperty("flex-wrap", "nowrap", "important");
-    bar.style.setProperty("overflow-x", "auto", "important");
-    Array.prototype.forEach.call(bar.children, function (ch) {
-      if (ch && ch.style) {
-        ch.style.setProperty("flex", "0 0 auto", "important");
-        ch.style.setProperty("white-space", "nowrap", "important");
-        ch.style.setProperty("width", "auto", "important");
-      }
-    });
+    apply7TabInlineLockV467(bar);
+
+    if (!bar.__sq7TabMutObsV467 && typeof MutationObserver !== "undefined") {
+      bar.__sq7TabMutObsV467 = true;
+      var barObs = new MutationObserver(function () {
+        if (bar.__sqApplying7TabLock) return;
+        if (bar.classList && (bar.classList.contains("sq-mobile-bottom-nav-bar") || bar.classList.contains("flex-wrap") || bar.classList.contains("grid"))) {
+          apply7TabInlineLockV467(bar);
+        } else if (bar.style.getPropertyValue("flex-wrap") !== "nowrap" || bar.style.getPropertyValue("display") !== "flex") {
+          apply7TabInlineLockV467(bar);
+        }
+      });
+      barObs.observe(bar, { attributes: true, attributeFilter: ["class", "style"] });
+    }
+
     bindDataCenterMainTabClickV26(bar);
   }
+
   function bindDataCenterMainTabClickV26(bar) {
     if (!bar) return;
     var dcBtn = null;
@@ -2682,43 +2776,27 @@ _FRONTEND_V22_JS = r'''
 
         var rect = targetEl.getBoundingClientRect();
         var curY = window.pageYOffset || document.documentElement.scrollTop || 0;
-        var destY = Math.max(0, rect.top + curY - 92);
-        try {
-          window.scrollTo({ top: destY, behavior: "smooth" });
-        } catch (e) {
-          window.scrollTo(0, destY);
-        }
+        var destY = Math.max(0, curY + rect.top - 74);
+        window.scrollTo({ top: destY, behavior: "smooth" });
       }, true);
     }
 
-    if (!bar.getAttribute("data-sq-dc-restore-bound-v26")) {
-      bar.setAttribute("data-sq-dc-restore-bound-v26", "1");
-      bar.addEventListener("click", function (ev) {
-        var clickedBtn = ev.target && ev.target.closest ? ev.target.closest("button, a") : null;
-        if (!clickedBtn || clickedBtn.parentElement !== bar) return;
-        if (/데이터\s*센터/.test(clickedBtn.textContent || "")) return;
-
-        if (bar.getAttribute("data-sq-dc-mode") === "1") {
-          bar.removeAttribute("data-sq-dc-mode");
-          Array.prototype.forEach.call(bar.children, function (b) {
-            b.removeAttribute("data-sq-dc-active");
-          });
-          document.querySelectorAll("[data-sq-hidden-by-dc='1']").forEach(function (sec) {
-            sec.style.removeProperty("display");
-            sec.removeAttribute("data-sq-hidden-by-dc");
-          });
-          var dcTabPanel2 = document.getElementById("tab-datacenter");
-          if (dcTabPanel2) {
-            dcTabPanel2.classList.add("hidden");
-            dcTabPanel2.style.display = "none";
-          }
-          var dcHub2 = document.getElementById("dcMainHubSection") || document.querySelector(".dc-hub-wrap");
-          if (dcHub2 && dcHub2.getAttribute("data-sq-dc-was-hidden") === "1") {
-            dcHub2.style.display = "none";
-          }
+    Array.prototype.forEach.call(bar.children, function (sib) {
+      if (!sib || sib === dcBtn || sib.getAttribute("data-sq-dc-sib-v26")) return;
+      sib.setAttribute("data-sq-dc-sib-v26", "1");
+      sib.addEventListener("click", function () {
+        bar.removeAttribute("data-sq-dc-mode");
+        dcBtn.removeAttribute("data-sq-dc-active");
+        document.querySelectorAll("[data-sq-hidden-by-dc='1']").forEach(function (sec) {
+          sec.removeAttribute("data-sq-hidden-by-dc");
+          sec.style.removeProperty("display");
+        });
+        var dcHub = document.getElementById("dcMainHubSection") || document.querySelector(".dc-hub-wrap");
+        if (dcHub && dcHub.getAttribute("data-sq-dc-was-hidden") === "1") {
+          dcHub.style.display = "none";
         }
       }, true);
-    }
+    });
   }
 
   function saveOrigPosV26(el) {
@@ -5486,9 +5564,21 @@ _FRONTEND_V22_JS = r'''
     window.fetch = function (input, init) {
       var u = typeof input === "string" ? input : (input && input.url ? input.url : "");
       return origFetch(input, init).then(function (resp) {
-        if (u.indexOf("ai-iq") !== -1) {
-          setTimeout(function () { if (window.__autoFoldAiOnRenderV465) window.__autoFoldAiOnRenderV465(); }, 40);
-          setTimeout(function () { if (window.__autoFoldAiOnRenderV465) window.__autoFoldAiOnRenderV465(); }, 180);
+        if (u.indexOf("ai-iq") !== -1 && u.indexOf("trending") === -1) {
+          var fireAiFoldWave = function () {
+            [10, 80, 240, 520].forEach(function (ms) {
+              setTimeout(function () {
+                var am = findAiSearchModalContainerV372();
+                if (am && am.getAttribute("data-sq-ai-manual-state") === "open") return;
+                if (window.__autoFoldAiOnRenderV465) window.__autoFoldAiOnRenderV465();
+              }, ms);
+            });
+          };
+          if (resp && typeof resp.clone === "function") {
+            resp.clone().text().then(fireAiFoldWave).catch(fireAiFoldWave);
+          } else {
+            fireAiFoldWave();
+          }
         }
         if (u.indexOf("/api/datacenter/live-scores") !== -1 && u.indexOf("_sq_bridge=1") === -1) {
           var reqOff = null;
@@ -8692,17 +8782,23 @@ _FRONTEND_V22_JS = r'''
 
   function extractAiModalResultSigV466(aiModal) {
     if (!aiModal) return "";
-    // Exclude input/hint rows and inspect whether search result headers/cards exist anywhere inside `aiModal`
     var fullTx = String(aiModal.textContent || "");
-    var m = fullTx.match(/총\s*\d+\s*건\s*매칭|초정밀\s*통합\s*브리핑|정확도순\s*국내[^\n]{0,30}\(\d+\s*건\)|실시간\s*매치\s*·\s*AI\s*승률/);
+    var m = fullTx.match(/총\s*\d+\s*건|초정밀\s*통합|통합\s*브리핑|정확도순|실시간\s*스포츠\s*뉴스|실시간\s*매치|원문\s*보기|AI\s*요약\s*브리핑/);
     if (m) {
       var inp = aiModal.querySelector("input");
       var qv = inp ? String(inp.value || "").trim() : "";
       return qv + "::" + m[0];
     }
-    var resArea = document.getElementById("sqAiIqResultArea");
-    if (resArea && resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec]")) {
-      return "dom::" + String(resArea.textContent || "").slice(0, 48);
+    var resArea = document.getElementById("sqAiIqResultArea") || aiModal.querySelector("[id*='Result'], [id*='result']");
+    if (resArea) {
+      var rtx = String(resArea.textContent || "").replace(/\s+/g, " ").trim();
+      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
+        return "dom::" + rtx.slice(0, 48);
+      }
+    }
+    if (aiModal.getAttribute("data-sq-ai-has-searched") === "1") {
+      var inp2 = aiModal.querySelector("input");
+      return "searched::" + (inp2 ? String(inp2.value || "").trim() : "1");
     }
     return "";
   }
@@ -8712,19 +8808,60 @@ _FRONTEND_V22_JS = r'''
     return Boolean(el.closest("[data-sq-ai-hints-wrap='1'], [data-sq-ai-hint-row='1'], #sqAiHintsToggleBtnV46"));
   }
 
+  function bindAiModalUserSearchTriggersV467(aiModal) {
+    if (!aiModal || aiModal.__sqTriggersBoundV467) return;
+    aiModal.__sqTriggersBoundV467 = true;
+
+    aiModal.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" && ev.target && ev.target.tagName === "INPUT") {
+        var v = String(ev.target.value || "").trim();
+        if (v) {
+          aiModal.removeAttribute("data-sq-ai-manual-state");
+          aiModal.setAttribute("data-sq-ai-has-searched", "1");
+          [60, 220, 480, 850].forEach(function (ms) {
+            setTimeout(function () {
+              if (aiModal.getAttribute("data-sq-ai-manual-state") !== "open") foldAiModalHintsOnResultV46(true);
+            }, ms);
+          });
+        }
+      }
+    }, true);
+
+    aiModal.addEventListener("click", function (ev) {
+      var btn = ev.target && ev.target.closest ? ev.target.closest("button") : null;
+      if (!btn || btn.id === "sqAiHintsToggleBtnV46") return;
+      var btx = String(btn.textContent || "").replace(/\s+/g, " ").trim();
+      if (/닫기|✕|^×$|취소/.test(btx)) return;
+      // Clicking '🔍 AI 검색' OR clicking a recent/trending search chip triggers a search -> auto-fold!
+      var isSearchSubmit = /AI\s*검색|^🔍\s*검색$|^검색$/.test(btx);
+      var isHintChip = Boolean(btn.closest("[data-sq-ai-hint-row='1'], [data-sq-ai-hints-wrap='1']"));
+      if (isSearchSubmit || isHintChip) {
+        var inp = aiModal.querySelector("input");
+        if (isHintChip || !inp || String(inp.value || "").trim().length > 0) {
+          aiModal.removeAttribute("data-sq-ai-manual-state");
+          aiModal.setAttribute("data-sq-ai-has-searched", "1");
+          [60, 220, 480, 850].forEach(function (ms) {
+            setTimeout(function () {
+              if (aiModal.getAttribute("data-sq-ai-manual-state") !== "open") foldAiModalHintsOnResultV46(true);
+            }, ms);
+          });
+        }
+      }
+    }, true);
+  }
+
   function tagAiModalHintAndModeRowsV464(aiModal) {
     if (!aiModal) return [];
+    bindAiModalUserSearchTriggersV467(aiModal);
     var panel = aiModal.firstElementChild;
     var modeRow = null;
-    var hintRows = [];
+    var existingWrap = aiModal.querySelector("[data-sq-ai-hints-wrap='1']");
 
     aiModal.querySelectorAll("div").forEach(function (d) {
-      if (d === aiModal || d === panel || d.closest("#sqAiIqResultArea") || d.id === "sqAiIqResultArea") return;
-      if (d.getAttribute("data-sq-ai-hints-wrap") === "1") return;
+      if (d === aiModal || d === panel || d === existingWrap || d.closest("#sqAiIqResultArea") || d.id === "sqAiIqResultArea") return;
       if (d.querySelector("input, h3, #sqAiIqResultArea")) return;
       var dtx = String(d.textContent || "").replace(/\s+/g, " ").trim();
-      // Skip containers that hold actual search results!
-      if (/총\s*\d+\s*건\s*매칭|초정밀\s*통합\s*브리핑|정확도순\s*국내/.test(dtx)) return;
+      if (/총\s*\d+\s*건|초정밀\s*통합\s*브리핑|정확도순\s*국내/.test(dtx)) return;
 
       if (!modeRow && dtx.indexOf("통합 AI") !== -1 && dtx.indexOf("백과") !== -1 && d.querySelectorAll("button").length >= 3 && d.children.length <= 8) {
         modeRow = d;
@@ -8733,14 +8870,13 @@ _FRONTEND_V22_JS = r'''
       }
       var isRecentOrTrendId = /^(sqAiRecent|sqAiTrend|aiRecent|aiTrend)/i.test(d.id || "");
       var startsWithHintLabel = /^(🕒\s*)?최근\s*검색|^🔥?\s*실시간\s*추천/.test(dtx);
-      if ((isRecentOrTrendId || (startsWithHintLabel && dtx.length <= 420)) && !d.querySelector("[data-sq-ai-hint-row='1']")) {
+      if (isRecentOrTrendId || (startsWithHintLabel && dtx.length <= 480)) {
         var childDivs = Array.prototype.filter.call(d.children || [], function (c) {
           return c.tagName === "DIV" && /^(🕒\s*)?최근\s*검색|^🔥?\s*실시간\s*추천/.test(String(c.textContent || "").trim());
         });
         if (childDivs.length >= 2) return;
         d.classList.add("sq-v46-ai-swipe-row");
         d.setAttribute("data-sq-ai-hint-row", "1");
-        hintRows.push(d);
         d.querySelectorAll("button").forEach(function (b) {
           var bt = String(b.textContent || "").trim();
           if (/네임드|토토|사설/.test(bt)) b.style.display = "none";
@@ -8748,17 +8884,26 @@ _FRONTEND_V22_JS = r'''
       }
     });
 
-    if (hintRows.length > 0 && !aiModal.querySelector("[data-sq-ai-hints-wrap='1']")) {
-      var firstH = hintRows[0];
-      if (firstH && firstH.parentElement) {
-        var hWrap = document.createElement("div");
-        hWrap.setAttribute("data-sq-ai-hints-wrap", "1");
-        firstH.parentElement.insertBefore(hWrap, firstH);
-        hintRows.forEach(function (hr) { hWrap.appendChild(hr); });
+    var allHintRows = Array.prototype.slice.call(aiModal.querySelectorAll("[data-sq-ai-hint-row='1']"));
+    if (allHintRows.length > 0) {
+      if (!existingWrap) {
+        var firstH = allHintRows[0];
+        if (firstH && firstH.parentElement) {
+          existingWrap = document.createElement("div");
+          existingWrap.setAttribute("data-sq-ai-hints-wrap", "1");
+          firstH.parentElement.insertBefore(existingWrap, firstH);
+        }
+      }
+      if (existingWrap) {
+        // Move ANY newly re-created hint rows outside `existingWrap` directly into `existingWrap`!
+        allHintRows.forEach(function (hr) {
+          if (hr.parentElement !== existingWrap && !hr.contains(existingWrap)) {
+            existingWrap.appendChild(hr);
+          }
+        });
       }
     }
 
-    var allHintRows = Array.prototype.slice.call(aiModal.querySelectorAll("[data-sq-ai-hint-row='1']"));
     if (allHintRows.length > 0 && !document.getElementById("sqAiHintsToggleBtnV46")) {
       var hBtn = document.createElement("button");
       hBtn.type = "button";
@@ -8769,36 +8914,46 @@ _FRONTEND_V22_JS = r'''
       hBtn.textContent = "🔎 추천 · 최근 검색어 ▾";
       hBtn.onclick = function (ev) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
-        var curRows = aiModal.querySelectorAll("[data-sq-ai-hint-row='1']");
-        var currentlyFolded = curRows.length > 0 && curRows[0].getAttribute("data-sq-ai-hint-folded") === "1";
+        var currentlyFolded = aiModal.getAttribute("data-sq-ai-modal-folded") === "1";
         aiModal.setAttribute("data-sq-ai-manual-state", currentlyFolded ? "open" : "folded");
         foldAiModalHintsOnResultV46(!currentlyFolded);
       };
       if (modeRow) {
         modeRow.appendChild(hBtn);
-      } else if (allHintRows[0] && allHintRows[0].parentElement) {
-        allHintRows[0].parentElement.insertAdjacentElement("beforebegin", hBtn);
+      } else if (existingWrap && existingWrap.parentElement) {
+        existingWrap.insertAdjacentElement("beforebegin", hBtn);
       }
     }
 
-    // Observe `aiModal` itself (`childList + subtree`) so ANY search result container ID or render function triggers instant auto-fold!
-    if (!aiModal.__sqModalResultObsV466 && typeof MutationObserver !== "undefined") {
-      aiModal.__sqModalResultObsV466 = true;
-      var modalObs = new MutationObserver(function (muts) {
+    // Observe `aiModal`: whenever search results exist OR `UPGRADE_JS` re-creates hint `<div>`s post-search, keep them folded!
+    if (!aiModal.__sqModalResultObsV467 && typeof MutationObserver !== "undefined") {
+      aiModal.__sqModalResultObsV467 = true;
+      var modalObs = new MutationObserver(function () {
         if (aiModal.__sqInFoldMutV466) return;
-        var nonHintMut = false;
-        for (var mi = 0; mi < muts.length; mi++) {
-          if (!isHintRowOrControlsInAiModalV466(muts[mi].target)) {
-            nonHintMut = true;
-            break;
-          }
-        }
-        if (!nonHintMut) return;
         var sig = extractAiModalResultSigV466(aiModal);
-        if (sig && sig !== aiModal.getAttribute("data-sq-last-res-sig")) {
+        if (!sig) return;
+        var lastSig = aiModal.getAttribute("data-sq-last-res-sig") || "";
+        if (sig !== lastSig && sig.indexOf("searched::") !== 0) {
           aiModal.setAttribute("data-sq-last-res-sig", sig);
+          aiModal.setAttribute("data-sq-ai-has-searched", "1");
           aiModal.removeAttribute("data-sq-ai-manual-state");
           foldAiModalHintsOnResultV46(true);
+          return;
+        }
+        // Even if `sig === lastSig`, if `UPGRADE_JS` just re-created `최근 검색:` / `실시간 추천:` DOM nodes via innerHTML,
+        // re-tag & fold them immediately unless the user explicitly clicked 'open'!
+        if (aiModal.getAttribute("data-sq-ai-manual-state") !== "open") {
+          var rowsNow = tagAiModalHintAndModeRowsV464(aiModal);
+          var hasUnfoldedRow = false;
+          for (var ri = 0; ri < rowsNow.length; ri++) {
+            if (rowsNow[ri].getAttribute("data-sq-ai-hint-folded") !== "1") {
+              hasUnfoldedRow = true;
+              break;
+            }
+          }
+          if (hasUnfoldedRow || aiModal.getAttribute("data-sq-ai-modal-folded") !== "1") {
+            foldAiModalHintsOnResultV46(true);
+          }
         }
       });
       modalObs.observe(aiModal, { childList: true, subtree: true });
@@ -8816,7 +8971,11 @@ _FRONTEND_V22_JS = r'''
       var togBtn = document.getElementById("sqAiHintsToggleBtnV46");
       if (!rows.length && !wrap) return;
       if (shouldFold) {
-        if (wrap) wrap.setAttribute("data-sq-ai-hints-folded", "1");
+        aiModal.setAttribute("data-sq-ai-modal-folded", "1");
+        if (wrap) {
+          wrap.setAttribute("data-sq-ai-hints-folded", "1");
+          wrap.style.setProperty("display", "none", "important");
+        }
         rows.forEach(function (r) {
           r.setAttribute("data-sq-ai-hint-folded", "1");
           r.style.setProperty("display", "none", "important");
@@ -8827,7 +8986,11 @@ _FRONTEND_V22_JS = r'''
           togBtn.textContent = "🔎 추천 · 최근 검색어 ▾";
         }
       } else {
-        if (wrap) wrap.removeAttribute("data-sq-ai-hints-folded");
+        aiModal.removeAttribute("data-sq-ai-modal-folded");
+        if (wrap) {
+          wrap.removeAttribute("data-sq-ai-hints-folded");
+          wrap.style.removeProperty("display");
+        }
         rows.forEach(function (r) {
           r.removeAttribute("data-sq-ai-hint-folded");
           r.style.removeProperty("display");
@@ -8845,7 +9008,10 @@ _FRONTEND_V22_JS = r'''
   window.__foldAiModalHintsOnResultV46 = foldAiModalHintsOnResultV46;
   window.__autoFoldAiOnRenderV465 = function () {
     var aiModal = findAiSearchModalContainerV372();
-    if (aiModal) aiModal.removeAttribute("data-sq-ai-manual-state");
+    if (aiModal) {
+      aiModal.removeAttribute("data-sq-ai-manual-state");
+      aiModal.setAttribute("data-sq-ai-has-searched", "1");
+    }
     polishAiModalChromeV46();
     foldAiModalHintsOnResultV46(true);
   };
@@ -8913,6 +9079,7 @@ _FRONTEND_V22_JS = r'''
   function closeSingleOverlayModalV461(el) {
     if (!el) return;
     if (el.id === "sqAiIqModal" || el.id === "aiIqModal" || el.id === "sqAiSearchModal" || el === findAiSearchModalContainerV372()) {
+      el.removeAttribute("data-sq-ai-manual-state");
       closeAiSearchModalCompletelyV372();
       el.style.display = "none";
       return;
@@ -11774,7 +11941,7 @@ def run_hyper_ai_iq_search(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "2.0-hyper",
+        "engine_version": "4.6.7-verified-7tab-autofold",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
@@ -12053,7 +12220,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"4660_{int(time.time())}"
+_BOOT_VER_V30 = f"4670_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -15847,7 +16014,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.6.6-live-dom-locked",
+        "engine_version": "4.6.7-verified-7tab-autofold",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
