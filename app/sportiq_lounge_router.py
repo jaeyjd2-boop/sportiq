@@ -53,6 +53,7 @@ _FIXED_SORT_STRIP_FN = r"""function isElementHiddenOrCollapsed(el) {
       el.id === "proTickerList" ||
       el.id === "dcTickerControls" ||
       el.id === "dcSportPills" ||
+      el.id === "sqV4618SportTabs" ||
       el.id === "sqV31DateCalendarBar" ||
       el.id === "sqV30ScoreToolbar" ||
       el.id === "sqV30ScoreboardTableWrap" ||
@@ -1060,7 +1061,8 @@ _FRONTEND_V22_JS = r'''
       "/* v3.0 Scorebase-Inspired Dual Scoreboard Table, Status/Star Filters & 5-Tab Match Insight Modal */",
       "/* v3.9 Unified Clean Scoreboard Hub — Zero Full-Bleed Overflow & Zero Duplicate Rows */",
       ".sq-match-sort-bar { display: none !important; }",
-      "#dcTickerControls[data-sq-v462-empty='1'], [data-sq-v462-empty-ctrl='1'], #dcTickerControls:not(:has(#dcSportPills)) { display: none !important; padding: 0 !important; margin: 0 !important; border: 0 !important; min-height: 0 !important; }",
+      "#dcTickerControls[data-sq-v462-empty='1'], [data-sq-v462-empty-ctrl='1'] { display: none !important; padding: 0 !important; margin: 0 !important; border: 0 !important; min-height: 0 !important; }",
+      "body:has(#sqV4618SportTabs) #dcSportPills, body:has(#sqV4618SportTabs) #dcTickerControls { display: none !important; padding: 0 !important; margin: 0 !important; border: 0 !important; min-height: 0 !important; }",
       "#proTickerUpdatedAt, [data-sq-hide-dup-kst='1'] { display: none !important; }",
       "#proLiveTickerBar { font-variant-numeric: tabular-nums; }",
       "#dcLiveTickerTrack { min-height: 112px; }",
@@ -1068,13 +1070,72 @@ _FRONTEND_V22_JS = r'''
       "#proLiveTickerBar[data-sq-seed-archive], #dcLiveTickerTrack[data-sq-seed-archive], #proLiveTickerBar.sq-seed-archive-card, #dcLiveTickerTrack.sq-seed-archive-card { display: flex !important; visibility: visible !important; opacity: 1 !important; }",
       "#dcLiveTickerTrack .sq-v39-card, #dcLiveTickerTrack .sq-v39-card[data-sq-seed-archive], #dcLiveTickerTrack .sq-v39-card.sq-seed-archive-card { display: flex !important; visibility: visible !important; opacity: 1 !important; }",
       "#dcLiveTickerTrack .sq-v39-card[data-sq-v31-card-hidden='1'] { display: none !important; }",
-      "#sqV31DateCalendarBar, #sqV30ScoreToolbar, #sqV30ScoreboardTableWrap {",
+      "#sqV4618SportTabs, #sqV31DateCalendarBar, #sqV30ScoreToolbar, #sqV30ScoreboardTableWrap {",
       "  max-width: 1248px;",
       "  width: 100%;",
       "  margin-left: auto;",
       "  margin-right: auto;",
       "  box-sizing: border-box;",
       "}",
+      "#sqV4618SportTabs {",
+      "  display: flex !important;",
+      "  flex-wrap: nowrap !important;",
+      "  align-items: center;",
+      "  gap: 6px;",
+      "  overflow-x: auto;",
+      "  -webkit-overflow-scrolling: touch;",
+      "  scrollbar-width: none;",
+      "  padding: 3px 2px 7px;",
+      "  margin-bottom: 5px;",
+      "  border-bottom: 1px solid rgba(51, 65, 85, 0.45);",
+      "}",
+      "#sqV4618SportTabs::-webkit-scrollbar { display: none; }",
+      ".sq-v4618-sp-btn {",
+      "  display: inline-flex;",
+      "  align-items: center;",
+      "  gap: 5px;",
+      "  flex: 0 0 auto;",
+      "  height: 30px;",
+      "  padding: 0 11px;",
+      "  border-radius: 999px;",
+      "  border: 1px solid rgba(71, 85, 105, 0.78);",
+      "  background: rgba(15, 23, 42, 0.94);",
+      "  color: #cbd5e1;",
+      "  font-size: 12px;",
+      "  font-weight: 800;",
+      "  cursor: pointer;",
+      "  white-space: nowrap;",
+      "  line-height: 1;",
+      "  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;",
+      "}",
+      ".sq-v4618-sp-btn:hover { border-color: #38bdf8; color: #f8fafc; background: rgba(30, 41, 59, 0.96); }",
+      ".sq-v4618-sp-btn.active {",
+      "  background: linear-gradient(135deg, #0284c7, #2563eb) !important;",
+      "  border-color: #38bdf8 !important;",
+      "  color: #ffffff !important;",
+      "  box-shadow: 0 2px 10px rgba(2, 132, 199, 0.34);",
+      "}",
+      ".sq-v4618-sp-cnt {",
+      "  font-size: 10.8px;",
+      "  font-weight: 800;",
+      "  padding: 2px 5.5px;",
+      "  border-radius: 999px;",
+      "  background: rgba(2, 6, 23, 0.52);",
+      "  color: #93c5fd;",
+      "}",
+      ".sq-v4618-sp-btn.active .sq-v4618-sp-cnt { background: rgba(255, 255, 255, 0.22); color: #ffffff; }",
+      ".sq-v4618-live-dot {",
+      "  display: inline-block;",
+      "  width: 6.5px;",
+      "  height: 6.5px;",
+      "  border-radius: 50%;",
+      "  background: #ef4444;",
+      "  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.32);",
+      "  animation: sqPulseLiveV4618 1.5s infinite;",
+      "  flex-shrink: 0;",
+      "}",
+      "@keyframes sqPulseLiveV4618 { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.25); opacity: 0.65; } }",
+      "@media (max-width: 640px) { .sq-v4618-sp-btn { height: 28px; padding: 0 8.5px; font-size: 11.3px; gap: 4px; } .sq-v4618-sp-cnt { padding: 1.5px 4.5px; font-size: 10.2px; } }",
       "#sqV30ScoreToolbar {",
       "  display: flex;",
       "  flex-wrap: wrap;",
@@ -4910,7 +4971,7 @@ _FRONTEND_V22_JS = r'''
     if (!el || !el.closest) return true;
     return Boolean(
       el.closest(
-        "#sqV31DateCalendarBar, #sqV31DateCalendarBar, #sqV30ScoreToolbar, #sqV30ScoreboardTableWrap, #dcMainHubSection, #dcHubCollapsible, #dcHubBody, " +
+        "#sqV4618SportTabs, #sqV31DateCalendarBar, #sqV30ScoreToolbar, #sqV30ScoreboardTableWrap, #dcMainHubSection, #dcHubCollapsible, #dcHubBody, " +
         "#rssSportFilters, #tab-feed, #tab-schedule, #tab-shorts, #tab-issues, #tab-ranking, #tab-lab, " +
         "#globalTop10Grid, #sqOfficialLegalFooter, .sq-match-sort-bar"
       )
@@ -4943,12 +5004,13 @@ _FRONTEND_V22_JS = r'''
         var tg = m.target;
         if (!tg || tg.nodeType !== 1) continue;
         if (
+          tg.id === "sqV4618SportTabs" ||
           tg.id === "sqV31DateCalendarBar" ||
           tg.id === "sqV30ScoreToolbar" ||
           tg.id === "sqV30ScoreboardTableWrap" ||
           tg.id === "sqV39AlertDrawer" ||
           tg.id === "sqV39AlertToggleBtn" ||
-          (tg.closest && tg.closest("#sqV31DateCalendarBar, #sqV30ScoreToolbar, #sqV30ScoreboardTableWrap, #sqV39AlertDrawer, #sqV39AlertToggleBtn"))
+          (tg.closest && tg.closest("#sqV4618SportTabs, #sqV31DateCalendarBar, #sqV30ScoreToolbar, #sqV30ScoreboardTableWrap, #sqV39AlertDrawer, #sqV39AlertToggleBtn"))
         ) {
           continue;
         }
@@ -5306,6 +5368,24 @@ _FRONTEND_V22_JS = r'''
         if (insAfter && insAfter.nextSibling) sel.insertBefore(o2, insAfter.nextSibling);
         else sel.appendChild(o2);
       }
+      var hasVm = false, hasVw = false;
+      for (var vi = 0; vi < sel.options.length; vi++) {
+        var vov = String(sel.options[vi].value || "").toUpperCase();
+        if (vov === "VLEAGUE_M") hasVm = true;
+        if (vov === "VLEAGUE_W") hasVw = true;
+      }
+      if (!hasVm) {
+        var ovm = document.createElement("option");
+        ovm.value = "VLEAGUE_M";
+        ovm.textContent = "V-리그 남자부 (배구)";
+        sel.appendChild(ovm);
+      }
+      if (!hasVw) {
+        var ovw = document.createElement("option");
+        ovw.value = "VLEAGUE_W";
+        ovw.textContent = "V-리그 여자부 (배구)";
+        sel.appendChild(ovw);
+      }
       if (sel.options[0] && /전체\s*\d+개\s*리그/.test(sel.options[0].textContent)) {
         sel.options[0].textContent = "전체 " + (sel.options.length - 1) + "개 리그";
       }
@@ -5613,10 +5693,12 @@ _FRONTEND_V22_JS = r'''
   }
 
   function getActiveDcControlsV30() {
-    var sportBtns = discoverTopSportButtonsV304();
-    if (!v30ScoreState.userPickedSport && sportBtns.length) {
-      var domActive = detectVisuallyActiveSportFromDomV304(sportBtns);
-      if (domActive) v30ScoreState.selectedSport = domActive;
+    if (!document.getElementById("sqV4618SportTabs")) {
+      var sportBtns = discoverTopSportButtonsV304();
+      if (!v30ScoreState.userPickedSport && sportBtns.length) {
+        var domActive = detectVisuallyActiveSportFromDomV304(sportBtns);
+        if (domActive) v30ScoreState.selectedSport = domActive;
+      }
     }
     var lgSel = discoverTopLeagueSelectV304();
     if (lgSel) {
@@ -6069,6 +6151,7 @@ _FRONTEND_V22_JS = r'''
     if (!el || !el.tagName) return true;
     var id = el.id || "";
     if (
+      id === "sqV4618SportTabs" ||
       id === "sqV31DateCalendarBar" ||
       id === "sqV30ScoreToolbar" ||
       id === "sqV30ScoreboardTableWrap" ||
@@ -6184,7 +6267,7 @@ _FRONTEND_V22_JS = r'''
   function findAllScoreStripsAndHelpersToHideV30(primaryTrack) {
     var list = [];
     function addUniq(el) {
-      if (el && list.indexOf(el) === -1 && el.id !== "sqV31DateCalendarBar" && el.id !== "sqV30ScoreToolbar" && el.id !== "sqV30ScoreboardTableWrap" && el.id !== "dcTickerControls") {
+      if (el && list.indexOf(el) === -1 && el.id !== "sqV4618SportTabs" && el.id !== "sqV31DateCalendarBar" && el.id !== "sqV30ScoreToolbar" && el.id !== "sqV30ScoreboardTableWrap" && el.id !== "dcTickerControls") {
         if (!el.querySelector || !el.querySelector("[data-sq-v304-sport]")) {
           list.push(el);
         }
@@ -6209,8 +6292,8 @@ _FRONTEND_V22_JS = r'''
 
     roots.forEach(function (rt) {
       Array.prototype.forEach.call(rt.querySelectorAll("div"), function (d) {
-        if (!d || d === rt || d.id === "sqV31DateCalendarBar" || d.id === "sqV30ScoreToolbar" || d.id === "sqV30ScoreboardTableWrap" || d.id === "dcTickerControls" || d.id === "dcSportPills") return;
-        if (d.contains && (d.contains(document.getElementById("dcTickerControls")) || d.contains(document.getElementById("sqV30ScoreToolbar")) || d.contains(document.getElementById("sqV31DateCalendarBar")) || d.contains(document.getElementById("sqV30ScoreboardTableWrap")) || (d.querySelector && d.querySelector("[data-sq-v304-sport]")))) return;
+        if (!d || d === rt || d.id === "sqV4618SportTabs" || d.id === "sqV31DateCalendarBar" || d.id === "sqV30ScoreToolbar" || d.id === "sqV30ScoreboardTableWrap" || d.id === "dcTickerControls" || d.id === "dcSportPills") return;
+        if (d.contains && (d.contains(document.getElementById("sqV4618SportTabs")) || d.contains(document.getElementById("dcTickerControls")) || d.contains(document.getElementById("sqV30ScoreToolbar")) || d.contains(document.getElementById("sqV31DateCalendarBar")) || d.contains(document.getElementById("sqV30ScoreboardTableWrap")) || (d.querySelector && d.querySelector("[data-sq-v304-sport]")))) return;
         var txt = String(d.textContent || "");
         if ((d.classList && d.classList.contains("sq-match-sort-bar")) || (/휠·드래그|◀\s*이전|경기\s*정렬/.test(txt) && d.children && d.children.length <= 8)) {
           addUniq(d);
@@ -6529,6 +6612,7 @@ _FRONTEND_V22_JS = r'''
       }
       if (
         t.closest("[data-sq-v304-sport]") ||
+        t.closest("#sqV4618SportTabs") ||
         t.closest("#sqV31DateCalendarBar") ||
         t.closest("#sqV30ScoreToolbar") ||
         t.closest("#sqV30ScoreboardTableWrap") ||
@@ -7123,6 +7207,172 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
+  function syncLeagueDropdownForSportV4618(selectedSp) {
+    var sel = discoverTopLeagueSelectV304();
+    if (!sel || !sel.options) return;
+    var allItems = v30ScoreState.rawAllItems || [];
+    var sportByLeagueCode = {
+      "EPL": "soccer", "LALIGA": "soccer", "BUNDESLIGA": "soccer", "SERIEA": "soccer", "LIGUE1": "soccer",
+      "UCL": "soccer", "UEL": "soccer", "UECL": "soccer", "UNL": "soccer", "KLEAGUE": "soccer", "JLEAGUE": "soccer",
+      "ALEAGUE": "soccer", "MLS": "soccer", "ACL": "soccer", "ASEAN_CC": "soccer", "INT_FRIENDLY": "soccer",
+      "NBA": "basketball", "WNBA": "basketball", "KBL": "basketball", "WKBL": "basketball",
+      "VLEAGUE_M": "volleyball", "VLEAGUE_W": "volleyball",
+      "NHL": "hockey", "KHL": "hockey",
+      "MLB": "baseball", "KBO": "baseball", "NPB": "baseball",
+      "ATP": "tennis", "WTA": "tennis",
+      "UFC": "ufc",
+      "LCK": "esports", "F1": "f1"
+    };
+    allItems.forEach(function (it) {
+      if (!it || !it.sport) return;
+      var lc = String(it.league_code || "").toUpperCase();
+      var ln = String(it.league || "").trim();
+      if (lc) sportByLeagueCode[lc] = it.sport;
+      if (lc && ln) {
+        var exists = false;
+        for (var oi = 0; oi < sel.options.length; oi++) {
+          if (String(sel.options[oi].value || "").toUpperCase() === lc) {
+            exists = true;
+            break;
+          }
+        }
+        if (!exists) {
+          var opt = document.createElement("option");
+          opt.value = lc;
+          opt.textContent = ln;
+          sel.appendChild(opt);
+        }
+      }
+    });
+    var visibleCount = 0;
+    for (var i = 0; i < sel.options.length; i++) {
+      var o = sel.options[i];
+      var val = String(o.value || "").trim();
+      var valUp = val.toUpperCase();
+      if (!val || val.toLowerCase() === "all" || o.textContent.indexOf("전체") !== -1) {
+        o.hidden = false;
+        o.disabled = false;
+        continue;
+      }
+      var lgSp = sportByLeagueCode[valUp] || "";
+      var showOpt = (selectedSp === "all") || (!lgSp) || (lgSp === selectedSp);
+      o.hidden = !showOpt;
+      o.disabled = !showOpt;
+      if (showOpt) visibleCount++;
+    }
+    if (sel.options[0] && /전체/.test(sel.options[0].textContent)) {
+      sel.options[0].textContent = (selectedSp === "all")
+        ? ("전체 " + visibleCount + "개 리그")
+        : ("전체 리그 (" + visibleCount + ")");
+    }
+  }
+
+  function mountOrUpdateV4618SportTabs(anchorEl) {
+    if (!anchorEl || !anchorEl.parentElement) return;
+    var parentBox = anchorEl.parentElement;
+    var spBar = document.getElementById("sqV4618SportTabs");
+    if (!spBar) {
+      spBar = document.createElement("div");
+      spBar.id = "sqV4618SportTabs";
+      spBar.setAttribute("role", "tablist");
+      spBar.setAttribute("aria-label", "종목별 실시간 스코어 선택");
+    }
+    if (spBar.parentElement !== parentBox || spBar.nextElementSibling !== anchorEl) {
+      parentBox.insertBefore(spBar, anchorEl);
+    }
+
+    var rawAll = v30ScoreState.rawAllItems || [];
+    var totBySp = {};
+    var liveBySp = {};
+    var liveAll = 0;
+    for (var i = 0; i < rawAll.length; i++) {
+      var it = rawAll[i];
+      if (!it) continue;
+      var sKey = canonicalSportKeyV304(it.sport || "", it.sport || "soccer");
+      totBySp[sKey] = (totBySp[sKey] || 0) + 1;
+      if (it.state === "in") {
+        liveBySp[sKey] = (liveBySp[sKey] || 0) + 1;
+        liveAll++;
+      }
+    }
+
+    var curSp = v30ScoreState.selectedSport || "all";
+    var coreTabs = [
+      { key: "all", icon: "🌐", label: "전체", always: true },
+      { key: "soccer", icon: "⚽", label: "축구", always: true },
+      { key: "basketball", icon: "🏀", label: "농구", always: true },
+      { key: "volleyball", icon: "🏐", label: "배구", always: true },
+      { key: "hockey", icon: "🏒", label: "하키", always: true },
+      { key: "baseball", icon: "⚾", label: "야구", always: false },
+      { key: "tennis", icon: "🎾", label: "테니스", always: false },
+      { key: "ufc", icon: "🥊", label: "UFC", always: false },
+      { key: "esports", icon: "🎮", label: "e스포츠", always: false },
+      { key: "f1", icon: "🏎️", label: "F1", always: false }
+    ];
+
+    var activeTabs = coreTabs.filter(function (t) {
+      return t.always || (totBySp[t.key] || 0) > 0 || curSp === t.key;
+    });
+
+    var sigParts = [curSp, v30ScoreState.selectedDateOffset || 0, rawAll.length, liveAll];
+    activeTabs.forEach(function (t) {
+      sigParts.push(t.key + ":" + (totBySp[t.key] || 0) + ":" + (liveBySp[t.key] || 0));
+    });
+    var nextSpSig = sigParts.join("|");
+    if (v30ScoreState.lastSportTabsSigV4618 === nextSpSig && spBar.children.length > 0) {
+      return;
+    }
+    v30ScoreState.lastSportTabsSigV4618 = nextSpSig;
+
+    spBar.innerHTML = activeTabs.map(function (t) {
+      var cnt = (t.key === "all") ? rawAll.length : (totBySp[t.key] || 0);
+      var lv = (t.key === "all") ? liveAll : (liveBySp[t.key] || 0);
+      var isAct = (curSp === t.key);
+      var dotHtml = lv > 0 ? "<span class='sq-v4618-live-dot' title='실시간 LIVE " + lv + "경기 진행중'></span>" : "";
+      return (
+        "<button type='button' role='tab' aria-selected='" + (isAct ? "true" : "false") + "' " +
+        "class='sq-v4618-sp-btn" + (isAct ? " active" : "") + "' data-v4618-sport='" + t.key + "'>" +
+        dotHtml +
+        "<span>" + t.icon + " " + t.label + "</span>" +
+        "<span class='sq-v4618-sp-cnt'>" + cnt + "</span>" +
+        "</button>"
+      );
+    }).join("");
+
+    syncLeagueDropdownForSportV4618(curSp);
+
+    if (!spBar.__sqDelegatedV4618) {
+      spBar.__sqDelegatedV4618 = true;
+      spBar.addEventListener("click", function (ev) {
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var btn = t.closest("[data-v4618-sport]");
+        if (!btn) return;
+        var nextSp = btn.getAttribute("data-v4618-sport") || "all";
+        v30ScoreState.userPickedSport = true;
+        v30ScoreState.selectedSport = nextSp;
+        v30ScoreState.selectedLeague = "all";
+        var lgSel = discoverTopLeagueSelectV304();
+        if (lgSel && lgSel.options && lgSel.options.length > 0) {
+          lgSel.selectedIndex = 0;
+        }
+        syncLeagueDropdownForSportV4618(nextSp);
+        var scopedNow = recomputeScopedItemsV30();
+        if (v30ScoreState.statusFilter !== "all" && scopedNow.length > 0 && filterScoreItemsV30(scopedNow).length === 0) {
+          v30ScoreState.statusFilter = "all";
+        }
+        v30ScoreState.lastSportTabsSigV4618 = "";
+        v30ScoreState.lastToolbarSig = "";
+        v30ScoreState.lastTableSig = "";
+        v30ScoreState.lastCardStripSig = "";
+        renderCustomDateCardsIntoStripV31();
+        refreshScoreboardSuiteV30();
+        var trEl = document.getElementById("dcLiveTickerTrack");
+        if (trEl) trEl.scrollLeft = 0;
+      });
+    }
+  }
+
   function mountOrUpdateV31DateCalendarBar(anchorBar) {
     if (!anchorBar || !anchorBar.parentElement) return;
     var cal = document.getElementById("sqV31DateCalendarBar");
@@ -7231,6 +7481,7 @@ _FRONTEND_V22_JS = r'''
           var cd = cands[ci];
           if (
             cd === hubBox ||
+            cd.id === "sqV4618SportTabs" ||
             cd.id === "sqV31DateCalendarBar" ||
             cd.id === "sqV30ScoreToolbar" ||
             cd.id === "dcSportPills" ||
@@ -7414,6 +7665,7 @@ _FRONTEND_V22_JS = r'''
     if (cal && (cal.parentElement !== parentBox || cal.nextElementSibling !== bar)) {
       parentBox.insertBefore(cal, bar);
     }
+    mountOrUpdateV4618SportTabs(cal || bar);
 
     var wrap = document.getElementById("sqV30ScoreboardTableWrap");
     if (!wrap) {
@@ -18969,14 +19221,29 @@ _TEAM_CANON_ALIASES_V4616: Dict[str, str] = {
     "우리카드": "우리카드", "서울우리카드": "우리카드", "우리카드우리won": "우리카드",
     "삼성화재": "삼성화재", "대전삼성화재": "삼성화재", "삼성화재블루팡스": "삼성화재",
     "ok저축은행": "OK저축은행", "안산ok저축은행": "OK저축은행", "ok금융그룹": "OK저축은행",
-    # KOVO V-League Women
+    # KOVO V-League Men (English / Global Feeds)
+    "koreanair": "대한항공", "koreanairjumbos": "대한항공", "incheonkoreanairjumbos": "대한항공", "kaljumbos": "대한항공",
+    "uijeongbukbstars": "KB손해보험", "kbinsurance": "KB손해보험", "kbinsurancestars": "KB손해보험",
+    "hyundaicapital": "현대캐피탈", "hyundaicapitalskywalkers": "현대캐피탈", "cheonanhyundaicapital": "현대캐피탈", "skywalkers": "현대캐피탈",
+    "kepco": "한국전력", "kepcovixtorm": "한국전력", "suwonkepcovixtorm": "한국전력", "vixtorm": "한국전력",
+    "wooricard": "우리카드", "seoulwooricard": "우리카드", "wooricardwooriwon": "우리카드",
+    "samsungbluefangs": "삼성화재", "daejeonsamsungbluefangs": "삼성화재", "bluefangs": "삼성화재",
+    "okfinancialgroup": "OK저축은행", "oksavingsbank": "OK저축은행", "ansanokman": "OK저축은행", "okman": "OK저축은행",
+    # KOVO V-League Women (Korean + English / Global Feeds)
     "흥국생명": "흥국생명", "인천흥국생명": "흥국생명", "흥국생명핑크스파이더스": "흥국생명",
+    "heungkuklife": "흥국생명", "heungkuklifepinkspiders": "흥국생명", "incheonheungkuklife": "흥국생명", "pinkspiders": "흥국생명",
     "gs칼텍스": "GS칼텍스", "서울gs칼텍스": "GS칼텍스", "gs칼텍스서울kixx": "GS칼텍스",
+    "gscaltex": "GS칼텍스", "gscaltexseoulkixx": "GS칼텍스", "seoulgscaltex": "GS칼텍스",
     "현대건설": "현대건설", "수원현대건설": "현대건설", "현대건설힐스테이트": "현대건설",
-    "정관장레드스파크스": "정관장", "대전정관장": "정관장",
+    "hyundaihillstate": "현대건설", "suwonhyundaihillstate": "현대건설",
+    "정관장레드스파크스": "정관장", "대전정관장": "정관장", "redsparks": "정관장", "daejeonjungkwanjangredsparks": "정관장", "kgcredsparks": "정관장",
     "ibk기업은행": "IBK기업은행", "ibk기업": "IBK기업은행", "화성ibk기업은행": "IBK기업은행", "기업은행": "IBK기업은행",
+    "ibkaltos": "IBK기업은행", "hwaseongibkaltos": "IBK기업은행",
     "한국도로공사": "한국도로공사", "김천한국도로공사": "한국도로공사", "도로공사": "한국도로공사",
-    "페퍼저축은행": "페퍼저축은행", "광주페퍼저축은행": "페퍼저축은행", "soop": "SOOP 수퍼스", "soop수퍼스": "SOOP 수퍼스",
+    "koreaexpressway": "한국도로공사", "gimcheonkoreaexpresswayhipass": "한국도로공사", "expresswayhipass": "한국도로공사",
+    "페퍼저축은행": "페퍼저축은행", "광주페퍼저축은행": "페퍼저축은행", "ai페퍼스": "페퍼저축은행",
+    "peppersavingsbank": "페퍼저축은행", "aipeppers": "페퍼저축은행", "gwangjupeppersavingsbank": "페퍼저축은행",
+    "soop": "SOOP 수퍼스", "soop수퍼스": "SOOP 수퍼스",
 }
 
 _VLEAGUE_W_TEAM_SET_V4616 = {
@@ -19088,8 +19355,12 @@ def _clean_team_label_v4616(raw_name: str, sport: str = "") -> Tuple[str, Option
         return "", found_odd, is_home
     if sport in ("basketball", "volleyball"):
         key = re.sub(r"\s+", "", s).lower()
-        if sport == "volleyball" and key in ("정관장", "대전정관장", "정관장레드스파크스"):
+        if sport == "volleyball" and key in ("정관장", "대전정관장", "정관장레드스파크스", "jungkwanjang", "redsparks"):
             return "정관장", found_odd, is_home
+        if sport == "volleyball" and key in ("kbstars", "kb스타즈", "의정부kbstars"):
+            return "KB손해보험", found_odd, is_home
+        if sport == "basketball" and key in ("kbstars", "cheongjukbstars", "청주kbstars"):
+            return "KB스타즈", found_odd, is_home
         if key in _TEAM_CANON_ALIASES_V4616:
             s = _TEAM_CANON_ALIASES_V4616[key]
     loc_fn = globals().get("_localize_team_ko_v37")
@@ -19970,7 +20241,9 @@ def _parse_daum_hermes_json_v4616(data: Optional[Dict[str, Any]], lg_key: str, t
         "kbl": ("basketball", "KBL", "KBL", "KBL 남자프로농구"),
         "wkbl": ("basketball", "WKBL", "WKBL", "WKBL 여자프로농구"),
         "kovo": ("volleyball", "V-리그 남자부", "VLEAGUE_M", "도드람 V-리그 남자부"),
+        "vl": ("volleyball", "V-리그 남자부", "VLEAGUE_M", "도드람 V-리그 남자부"),
         "wkovo": ("volleyball", "V-리그 여자부", "VLEAGUE_W", "도드람 V-리그 여자부"),
+        "wvl": ("volleyball", "V-리그 여자부", "VLEAGUE_W", "도드람 V-리그 여자부"),
         "kbo": ("baseball", "KBO", "KBO", "KBO 프로야구"),
         "kl": ("soccer", "K리그1", "KLEAGUE", "대한민국 K리그1"),
     }
@@ -20016,47 +20289,94 @@ def _parse_daum_hermes_json_v4616(data: Optional[Dict[str, Any]], lg_key: str, t
 
 
 def _parse_spojoy_live_html_v4616(html_text: str, target_k: datetime) -> List[Dict[str, Any]]:
+    """Parses `www.spojoy.com/live/` SSR HTML across both single-cell and multi-`<td>` layouts, skipping handicap/U-O/SUM sub-rows."""
     if not html_text:
         return []
     target_slash = f"{target_k.month:02d}/{target_k.day:02d}"
     out: List[Dict[str, Any]] = []
+    seen_main_rows: set = set()
+
     for tr_m in re.finditer(r"<tr\b[^>]*>(.*?)</tr>", html_text, flags=re.I | re.S):
         tds = [_strip_tags_clean_v4616(td) for td in re.findall(r"<td\b[^>]*>(.*?)</td>", tr_m.group(1), flags=re.I | re.S)]
-        if len(tds) < 6:
+        if len(tds) < 5:
             continue
-        if not re.match(r"^\d{3,5}$", tds[0]):
+        if not re.match(r"^\d{1,5}$", tds[0]):
             continue
         m_dt = re.match(r"^(\d{2}/\d{2})\([^)]*\)\s*(\d{2}:\d{2})$", tds[1])
         if not m_dt or m_dt.group(1) != target_slash:
             continue
-        handi_col = tds[4].strip()
-        if handi_col not in ("", "-"):
-            continue
         hhmm = m_dt.group(2)
         lg_raw = tds[2].strip()
-        matchup = tds[3].strip()
-        odds_raw = tds[5].strip()
-        res_col = " ".join(tds[6:]).strip()
-        sp_guess, _, _, _ = _classify_league_meta_v4616(lg_raw, "soccer")
+        if not lg_raw:
+            continue
 
-        m_scored = re.match(r"^(.+?)\s+(\d+)\s*-\s*(\d+)\s+(.+)$", matchup)
-        m_vs = re.match(r"^(.+?)\s+vs\s+(.+)$", matchup, flags=re.I)
+        # Reject handicap / U-O / SUM / 승5패 sub-rows explicitly
+        joined_rest = " | ".join(tds[3:])
+        if any(sub_tok in joined_rest.upper() for sub_tok in ("U/O", "언오버", "핸디", "SUM", "승5패", "승14패")):
+            continue
+        has_handi_cell = any(
+            re.match(r"^[+-]\d+(?:\.\d+)?$", c.strip()) or re.match(r"^(?:1[2-9]\d|2[0-5]\d)\.\d+$", c.strip())
+            for c in tds[3:]
+        )
+        if has_handi_cell:
+            continue
+
+        odds_nums: List[float] = []
+        res_tokens: List[str] = []
+        match_tokens: List[str] = []
+        for cell in tds[3:]:
+            c = cell.strip()
+            if not c:
+                continue
+            if any(k in c for k in ("배당률보기", "비교분석", "분석보기", "기록보기")):
+                continue
+            if "경기결과" in c or c in ("승", "무", "패", "홈승", "홈패", "언더", "오버", "적특", "취소", "연기"):
+                res_tokens.append(c)
+                continue
+            c_odds = re.findall(r"\b\d+\.\d{2}\b", c)
+            if c_odds and re.sub(r"[\d\.\s/]+", "", c) == "":
+                odds_nums.extend(float(x) for x in c_odds)
+                continue
+            match_tokens.append(c)
+
+        res_col = " ".join(res_tokens)
+        if "취소" in res_col or "연기" in res_col:
+            continue
+
+        matchup_str = " ".join(match_tokens).strip()
+        if not matchup_str:
+            continue
+
+        sp_guess, _, _, _ = _classify_league_meta_v4616(lg_raw, "soccer")
+        m_scored = re.match(r"^(.+?)\s+(\d+)\s*[-:]\s*(\d+)\s+(.+)$", matchup_str)
+        m_vs = re.match(r"^(.+?)\s+vs\s+(.+)$", matchup_str, flags=re.I)
         if m_scored:
-            h_raw, hs, as_, a_raw = m_scored.group(1), int(m_scored.group(2)), int(m_scored.group(3)), m_scored.group(4)
-            state = "post" if ("경기결과" in res_col or any(x in res_col for x in ("승", "패", "무"))) else "in"
+            h_raw, hs, as_, a_raw = m_scored.group(1).strip(), int(m_scored.group(2)), int(m_scored.group(3)), m_scored.group(4).strip()
+            is_fin = ("경기결과" in res_col or any(x in res_col for x in ("승", "패", "무", "홈승", "홈패")))
+            state = "post" if is_fin else "in"
             badge = "종료" if state == "post" else "LIVE 진행중"
         elif m_vs:
-            h_raw, a_raw = m_vs.group(1), m_vs.group(2)
+            h_raw, a_raw = m_vs.group(1).strip(), m_vs.group(2).strip()
             hs, as_ = 0, 0
             state, badge = "pre", "예정"
         else:
             continue
 
+        # Strip any residual handicap suffix on team labels
+        h_raw = re.sub(r"\s*[+-]\d+(?:\.\d+)?$", "", h_raw).strip()
+        a_raw = re.sub(r"^\s*[+-]\d+(?:\.\d+)?\s*", "", a_raw).strip()
+
         h_c, _, _ = _clean_team_label_v4616(h_raw, sp_guess)
         a_c, _, _ = _clean_team_label_v4616(a_raw, sp_guess)
+        if not h_c or not a_c or h_c == a_c:
+            continue
         sp, lg_s, lg_c, lg_f = _classify_league_meta_v4616(lg_raw, sp_guess, h_c, a_c)
 
-        odds_nums = [float(x) for x in re.findall(r"\d+\.\d+", odds_raw)]
+        dedup_row_sig = (hhmm, sp, frozenset([_canon_team_key_v4616(h_c, sp), _canon_team_key_v4616(a_c, sp)]))
+        if dedup_row_sig in seen_main_rows:
+            continue
+        seen_main_rows.add(dedup_row_sig)
+
         odds_tup = None
         if len(odds_nums) >= 3:
             odds_tup = (odds_nums[0], odds_nums[1], odds_nums[2])
@@ -20073,6 +20393,463 @@ def _parse_spojoy_live_html_v4616(html_text: str, target_k: datetime) -> List[Di
         if it:
             out.append(it)
     return out
+
+
+def _parse_daum_schedule_ssr_v4618(
+    html_text: str,
+    page_kind: str,
+    target_k: datetime,
+    is_today: bool,
+) -> List[Dict[str, Any]]:
+    """
+    Parses Daum Sports SSR HTML pages (`sports.daum.net/schedule/volleyball`,
+    `/volleyball`, `/schedule/vl`, `/schedule/wkbl`, `/schedule/kbl`) directly from
+    North American cloud IPs (`200 OK`, zero geo-block).
+    """
+    if not html_text:
+        return []
+    cleaned = re.sub(r"<script\b[^>]*>.*?</script>", " ", html_text, flags=re.I | re.S)
+    cleaned = re.sub(r"<style\b[^>]*>.*?</style>", " ", cleaned, flags=re.I | re.S)
+    cleaned = re.sub(r"<br\s*/?>", "\n", cleaned, flags=re.I)
+    cleaned = re.sub(r"</(?:tr|td|th|li|div|dd|dt|p|span|strong|em|a|h\d)>", "\n", cleaned, flags=re.I)
+    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+    cleaned = _html_lib.unescape(cleaned)
+    toks = [re.sub(r"\s+", " ", ln).strip() for ln in cleaned.splitlines()]
+    toks = [t for t in toks if t]
+    if not toks:
+        return []
+
+    expected_mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
+    default_lg_map = {
+        "volleyball_today": ("volleyball", "V-리그"),
+        "volleyball_hub": ("volleyball", "V-리그"),
+        "vl": ("volleyball", "V-리그 남자부"),
+        "wkbl": ("basketball", "WKBL"),
+        "kbl": ("basketball", "KBL"),
+    }
+    default_sp, cur_lg_raw = default_lg_map.get(page_kind, ("volleyball", "V-리그"))
+
+    cur_mmdd = ""
+    if page_kind == "volleyball_today":
+        m_ym = re.search(r"년/월\s*(20\d{2})\.(\d{2})", cleaned)
+        m_td = re.search(r"\b(\d{2})일?\s*오늘\b", cleaned)
+        if m_ym and m_td:
+            cur_mmdd = f"{m_ym.group(2)}.{m_td.group(1)}"
+        elif is_today:
+            cur_mmdd = expected_mmdd
+    elif page_kind == "volleyball_hub":
+        m_hub_dt = re.search(r"(\d{2}\.\d{2})\s*\([월화수목금토일]\)\s*일정", cleaned)
+        if m_hub_dt:
+            cur_mmdd = m_hub_dt.group(1)
+
+    skip_noise = {
+        "팀", "팀 로고", "홈", "원정", "기록", "문자", "영상", "TV", "중계",
+        "하이라이트", "바로가기", "일정", "결과", "순위", "뉴스", "포토", "오늘경기로 바로가기",
+    }
+    out: List[Dict[str, Any]] = []
+    n = len(toks)
+    i = 0
+    while i < n:
+        tk = toks[i]
+        m_date_hdr = re.match(r"^(\d{2}\.\d{2})\s*(?:\([월화수목금토일]\)|[월화수목금토일])", tk)
+        if m_date_hdr:
+            cur_mmdd = m_date_hdr.group(1)
+            i += 1
+            continue
+
+        if "V-리그 남자부" in tk or "V리그 남자부" in tk:
+            cur_lg_raw = "V-리그 남자부"
+        elif "V-리그 여자부" in tk or "V리그 여자부" in tk:
+            cur_lg_raw = "V-리그 여자부"
+        elif tk in ("WKBL", "WKBL 일정 결과"):
+            cur_lg_raw = "WKBL"
+        elif tk in ("KBL", "KBL 일정 결과"):
+            cur_lg_raw = "KBL"
+
+        hhmm = ""
+        m_tm_inline = re.match(r"^경기시간\s*(\d{2}:\d{2})$", tk)
+        if m_tm_inline:
+            hhmm = m_tm_inline.group(1)
+            j_start = i + 1
+        elif tk == "경기시간" and i + 1 < n and re.match(r"^\d{2}:\d{2}$", toks[i + 1]):
+            hhmm = toks[i + 1]
+            j_start = i + 2
+        else:
+            i += 1
+            continue
+
+        # Collect window tokens for this single match until next match/date marker
+        win: List[str] = []
+        k = j_start
+        while k < min(n, j_start + 16):
+            wt = toks[k]
+            if wt.startswith("경기시간") or re.match(r"^(\d{2}\.\d{2})\s*(?:\([월화수목금토일]\)|[월화수목금토일])", wt):
+                break
+            if wt.startswith("리그 ") and ("V-리그" in wt or "KBL" in wt or "WKBL" in wt) and len(win) >= 3:
+                break
+            if "배구 일정 더보기" in wt or "오늘경기로 바로가기" in wt or "하이라이트 영상" in wt:
+                break
+            win.append(wt)
+            k += 1
+
+        st_raw = ""
+        lg_this = cur_lg_raw
+        filtered_win: List[str] = []
+        for wt in win:
+            if "V-리그 남자부" in wt:
+                lg_this = "V-리그 남자부"
+                wt = wt.replace("V-리그 남자부", "").strip()
+            elif "V-리그 여자부" in wt:
+                lg_this = "V-리그 여자부"
+                wt = wt.replace("V-리그 여자부", "").strip()
+            if not wt or wt in skip_noise or re.match(r"^\d+R\s*바로가기$", wt):
+                continue
+            if not st_raw and (
+                wt in ("종료", "경기종료", "경기전", "예정", "경기중", "취소", "연기")
+                or re.search(r"(?:[1-5]세트|[1-4]쿼터|연장|진행중)", wt)
+            ):
+                st_raw = wt
+                continue
+            filtered_win.append(wt)
+
+        st_parsed = _parse_status_state_v4616(st_raw or "경기전")
+        if st_parsed[0] is not None and ("대" in filtered_win or "VS" in filtered_win or "vs" in filtered_win):
+            sep_idx = -1
+            for s_i, s_tok in enumerate(filtered_win):
+                if s_tok in ("대", "VS", "vs"):
+                    sep_idx = s_i
+                    break
+            if sep_idx >= 1 and sep_idx + 1 < len(filtered_win):
+                left_part = filtered_win[:sep_idx]
+                right_part = filtered_win[sep_idx + 1:]
+                hs_val, as_val = 0, 0
+                if len(left_part) >= 2 and re.match(r"^\d+$", left_part[-1]):
+                    hs_val = int(left_part[-1])
+                    h_raw = left_part[-2]
+                else:
+                    h_raw = left_part[-1]
+
+                if len(right_part) >= 2 and re.match(r"^\d+$", right_part[0]) and not re.match(r"^\d+$", right_part[1]):
+                    as_val = int(right_part[0])
+                    a_raw = right_part[1]
+                elif len(right_part) >= 2 and re.match(r"^\d+$", right_part[1]):
+                    a_raw = right_part[0]
+                    as_val = int(right_part[1])
+                else:
+                    a_raw = right_part[0]
+
+                state_m, badge_m = st_parsed
+                if state_m == "pre" and (hs_val > 0 or as_val > 0):
+                    if default_sp == "volleyball" and (hs_val >= 3 or as_val >= 3):
+                        state_m, badge_m = "post", "종료"
+                    else:
+                        state_m, badge_m = "in", "LIVE 진행중"
+
+                if (is_today and state_m == "in") or (cur_mmdd == expected_mmdd):
+                    h_c, _, _ = _clean_team_label_v4616(h_raw, default_sp)
+                    a_c, _, _ = _clean_team_label_v4616(a_raw, default_sp)
+                    if h_c and a_c and h_c != a_c:
+                        sp_f, lg_s, lg_c, lg_f = _classify_league_meta_v4616(lg_this, default_sp, h_c, a_c)
+                        it = _build_rt_item_v4616(
+                            "daum_ssr",
+                            sp_f, lg_s, lg_c, lg_f,
+                            state_m, badge_m, target_k, hhmm,
+                            h_c, a_c, hs_val, as_val,
+                        )
+                        if it:
+                            out.append(it)
+        i = max(i + 1, k)
+    return out
+
+
+def _fetch_thesportsdb_v4618(target_k: datetime, is_today: bool) -> List[Dict[str, Any]]:
+    """Queries TheSportsDB Global Cloudflare CDN JSON API (`eventsday.php`) — 0% US IP geo-block."""
+    ymd = target_k.strftime("%Y-%m-%d")
+    expected_mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
+    # Also check UTC date if KST evening corresponds to same/prev UTC date
+    ymd_prev = (target_k - timedelta(days=1)).strftime("%Y-%m-%d")
+    urls = [
+        ("volleyball", f"https://www.thesportsdb.com/api/v1/json/123/eventsday.php?d={ymd}&s=Volleyball"),
+        ("volleyball", f"https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d={ymd}&s=Volleyball"),
+    ]
+    if is_today:
+        urls.append(("volleyball", f"https://www.thesportsdb.com/api/v1/json/123/eventsday.php?d={ymd_prev}&s=Volleyball"))
+
+    out: List[Dict[str, Any]] = []
+    seen_ids: set = set()
+    for sp_kind, u in urls:
+        js = _http_fetch_json_v4616(u, timeout=3.4)
+        evs = js.get("events") if isinstance(js, dict) else None
+        if not isinstance(evs, list):
+            continue
+        for ev in evs:
+            if not isinstance(ev, dict):
+                continue
+            ev_id = str(ev.get("idEvent") or "")
+            if ev_id and ev_id in seen_ids:
+                continue
+            lg_en = str(ev.get("strLeague") or "").strip()
+            h_raw = str(ev.get("strHomeTeam") or "").strip()
+            a_raw = str(ev.get("strAwayTeam") or "").strip()
+            if not h_raw or not a_raw:
+                continue
+
+            h_c, _, _ = _clean_team_label_v4616(h_raw, sp_kind)
+            a_c, _, _ = _clean_team_label_v4616(a_raw, sp_kind)
+
+            lg_up = lg_en.upper()
+            is_kovo = (
+                "KOREAN V-LEAGUE" in lg_up
+                or "KOVO" in lg_up
+                or "SOUTH KOREA V-LEAGUE" in lg_up
+                or h_c in _VLEAGUE_M_TEAM_SET_V4616
+                or h_c in _VLEAGUE_W_TEAM_SET_V4616
+                or a_c in _VLEAGUE_M_TEAM_SET_V4616
+                or a_c in _VLEAGUE_W_TEAM_SET_V4616
+            )
+            is_major_volley = any(
+                w in lg_up for w in ("PLUSLIGA", "SERIE A1", "SUPERLEGA", "SULTANLAR", "EFELER", "CEV CHAMPIONS", "SV.LEAGUE", "V.LEAGUE", "NATIONS LEAGUE")
+            )
+            if not (is_kovo or is_major_volley):
+                continue
+
+            # Parse timestamp in UTC -> KST
+            dt_ev_k: Optional[datetime] = None
+            ts_str = str(ev.get("strTimestamp") or "").strip()
+            if ts_str:
+                dt_ev_k = _parse_espn_iso_kst_v4616(ts_str if ("+" in ts_str or ts_str.endswith("Z")) else (ts_str + "Z"))
+            if dt_ev_k is None:
+                d_s = str(ev.get("dateEvent") or ymd).strip()
+                t_s = str(ev.get("strTime") or "10:00:00").strip()[:8]
+                if len(t_s) == 5:
+                    t_s += ":00"
+                dt_ev_k = _parse_espn_iso_kst_v4616(f"{d_s}T{t_s}Z")
+            if dt_ev_k is None:
+                dt_ev_k = target_k.replace(hour=19, minute=0, second=0, microsecond=0)
+
+            ev_mmdd = f"{dt_ev_k.month:02d}.{dt_ev_k.day:02d}"
+            hhmm = f"{dt_ev_k.hour:02d}:{dt_ev_k.minute:02d}"
+
+            st_raw = str(ev.get("strStatus") or "").strip().upper()
+            hs_r = ev.get("intHomeScore")
+            as_r = ev.get("intAwayScore")
+            hs = int(float(hs_r)) if (hs_r is not None and str(hs_r).strip() != "") else 0
+            as_ = int(float(as_r)) if (as_r is not None and str(as_r).strip() != "") else 0
+
+            if st_raw in ("FT", "AOT", "FINISHED", "AFTER OVERTIME", "END", "ENDED") or (sp_kind == "volleyball" and (hs >= 3 or as_ >= 3) and st_raw not in ("1S", "2S", "3S", "4S", "5S", "LIVE")):
+                state, badge = "post", "종료"
+            elif st_raw in ("1S", "2S", "3S", "4S", "5S", "S1", "S2", "S3", "S4", "S5"):
+                s_num = re.sub(r"\D+", "", st_raw) or "1"
+                state, badge = "in", f"LIVE {s_num}세트"
+            elif st_raw in ("LIVE", "IN PLAY", "1Q", "2Q", "3Q", "4Q", "OT", "HT") or (hs > 0 or as_ > 0):
+                state, badge = "in", f"LIVE {st_raw}".strip() if st_raw and st_raw != "LIVE" else "LIVE 진행중"
+            elif st_raw in ("POSTP", "POSTPONED", "CANC", "CANCELLED", "ABD"):
+                continue
+            else:
+                state, badge = "pre", "예정"
+
+            if not (is_today and state == "in") and ev_mmdd != expected_mmdd:
+                continue
+
+            if is_kovo:
+                if h_c in _VLEAGUE_W_TEAM_SET_V4616 or a_c in _VLEAGUE_W_TEAM_SET_V4616 or "WOMEN" in lg_up:
+                    lg_s, lg_c, lg_f = "V-리그 여자부", "VLEAGUE_W", "도드람 V-리그 여자부"
+                else:
+                    lg_s, lg_c, lg_f = "V-리그 남자부", "VLEAGUE_M", "도드람 V-리그 남자부"
+            else:
+                _, lg_s, lg_c, lg_f = _classify_league_meta_v4616(lg_en, sp_kind, h_c, a_c)
+
+            if ev_id:
+                seen_ids.add(ev_id)
+            venue = str(ev.get("strVenue") or "").strip()
+            it = _build_rt_item_v4616(
+                "thesportsdb",
+                sp_kind, lg_s, lg_c, lg_f,
+                state, badge, dt_ev_k, hhmm,
+                h_c, a_c, hs, as_,
+                venue=venue,
+            )
+            if it:
+                out.append(it)
+    return out
+
+
+_GNEWS_VLEAGUE_CACHE_V4618: Tuple[float, List[Tuple[datetime, str]]] = (0.0, [])
+
+
+def _fetch_gnews_vleague_headlines_v4618() -> List[Tuple[datetime, str]]:
+    """Fetches real-time Korean V-League press headlines via US Google News RSS (`0%` US geo-block)."""
+    global _GNEWS_VLEAGUE_CACHE_V4618
+    now_m = time.monotonic()
+    if _GNEWS_VLEAGUE_CACHE_V4618[1] and (now_m - _GNEWS_VLEAGUE_CACHE_V4618[0]) < 25.0:
+        return _GNEWS_VLEAGUE_CACHE_V4618[1]
+    import email.utils as _eutils_v4618
+    q = (
+        '"V-리그" OR "V리그" OR "세트" '
+        '(KB손해보험 OR 대한항공 OR 흥국생명 OR GS칼텍스 OR 현대캐피탈 OR 한국전력 OR 우리카드 OR 삼성화재 OR OK저축은행 OR 현대건설 OR 정관장 OR IBK기업은행 OR 한국도로공사 OR 페퍼저축은행) '
+        'when:1d'
+    )
+    rss_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(q)}&hl=ko&gl=KR&ceid=KR:ko"
+    xml_txt = _http_fetch_text_v4616(rss_url, timeout=3.5)
+    parsed_items: List[Tuple[datetime, str]] = []
+    if xml_txt:
+        for item_m in re.finditer(r"<item>(.*?)</item>", xml_txt, flags=re.I | re.S):
+            blk = item_m.group(1)
+            t_m = re.search(r"<title>(.*?)</title>", blk, flags=re.I | re.S)
+            p_m = re.search(r"<pubDate>(.*?)</pubDate>", blk, flags=re.I | re.S)
+            if not t_m or not p_m:
+                continue
+            title_clean = _html_lib.unescape(re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", t_m.group(1))).strip()
+            title_clean = re.sub(r"\s+-\s+[^-]+$", "", title_clean).strip()
+            pub_raw = _html_lib.unescape(p_m.group(1)).strip()
+            try:
+                pub_dt = _eutils_v4618.parsedate_to_datetime(pub_raw)
+                pub_k = (pub_dt if pub_dt.tzinfo else pub_dt.replace(tzinfo=timezone.utc)).astimezone(KST)
+                parsed_items.append((pub_k, title_clean))
+            except Exception:
+                continue
+    parsed_items.sort(key=lambda x: x[0], reverse=True)
+    _GNEWS_VLEAGUE_CACHE_V4618 = (now_m, parsed_items)
+    return parsed_items
+
+
+_VLEAGUE_PRESS_SHORT_TOKENS_V4618: Dict[str, Tuple[str, ...]] = {
+    "KB손해보험": ("KB손해보험", "KB손보"),
+    "대한항공": ("대한항공",),
+    "현대캐피탈": ("현대캐피탈", "현캐"),
+    "한국전력": ("한국전력", "한전"),
+    "우리카드": ("우리카드",),
+    "삼성화재": ("삼성화재",),
+    "OK저축은행": ("OK저축은행", "OK저축"),
+    "흥국생명": ("흥국생명", "흥국"),
+    "GS칼텍스": ("GS칼텍스", "GS"),
+    "현대건설": ("현대건설", "현건"),
+    "정관장": ("정관장", "레드스파크스"),
+    "IBK기업은행": ("IBK기업은행", "기업은행"),
+    "한국도로공사": ("한국도로공사", "도로공사"),
+    "페퍼저축은행": ("페퍼저축은행", "페퍼", "AI페퍼스"),
+    "SOOP 수퍼스": ("SOOP",),
+}
+
+
+def _enhance_kr_live_vleague_v4618(items: List[Dict[str, Any]], now_k: datetime) -> int:
+    """
+    Upgrades verified official today V-League / WKBL matches using:
+    1) Post-kickoff real-time Korean sports press set/final headlines (Google News RSS), and
+    2) Verified scheduled kickoff window (`0..145m` KST) `pre` -> `in` promotion so actively
+       on-court domestic matches never appear stuck as `예정` when upstream static SSR lags.
+    Never creates unscheduled/fake matches.
+    """
+    today_mmdd = f"{now_k.month:02d}.{now_k.day:02d}"
+    vb_candidates = [
+        it for it in items
+        if isinstance(it, dict)
+        and it.get("sport") in ("volleyball", "basketball")
+        and str(it.get("league_code") or "") in ("VLEAGUE_M", "VLEAGUE_W", "WKBL", "KBL")
+        and str(it.get("match_dt_kst") or "").startswith(today_mmdd)
+    ]
+    if not vb_candidates:
+        return 0
+
+    headlines: List[Tuple[datetime, str]] = []
+    if any(it.get("sport") == "volleyball" and it.get("state") == "pre" for it in vb_candidates):
+        try:
+            headlines = _fetch_gnews_vleague_headlines_v4618()
+        except Exception:
+            headlines = []
+
+    upgraded_cnt = 0
+    win_verbs = ("완파", "격파", "제압", "꺾고", "누르고", "잡고", "울리고", "물리치고", "셧아웃", "역전승", "신승", "완승", "연승", "탈출")
+
+    for it in vb_candidates:
+        m_tm = re.search(r"(\d{2}):(\d{2})$", str(it.get("match_dt_kst") or "").strip())
+        if not m_tm:
+            continue
+        kick_k = now_k.replace(hour=int(m_tm.group(1)), minute=int(m_tm.group(2)), second=0, microsecond=0)
+        elapsed_min = (now_k - kick_k).total_seconds() / 60.0
+        if elapsed_min < 0:
+            continue
+
+        home = str(it.get("home") or "")
+        away = str(it.get("away") or "")
+        sp = str(it.get("sport") or "")
+
+        # 1) Try extracting live sets or final set tally from post-kickoff press headlines for V-League
+        if sp == "volleyball" and it.get("state") == "pre" and headlines:
+            h_toks = _VLEAGUE_PRESS_SHORT_TOKENS_V4618.get(home, (home,))
+            a_toks = _VLEAGUE_PRESS_SHORT_TOKENS_V4618.get(away, (away,))
+            matched_hl = [
+                (p_dt, ttl) for (p_dt, ttl) in headlines
+                if p_dt >= (kick_k + timedelta(minutes=15))
+                and any(ht in ttl for ht in h_toks)
+                and any(at in ttl for at in a_toks)
+            ]
+            for p_dt, ttl in matched_hl:
+                # Check explicit final set score (`3-0`, `3-1`, `3-2` or `0-3`, `1-3`, `2-3`) after 65+ mins
+                m_fin_sc = re.search(r"\b([0-3])\s*[-:]\s*([0-3])\b", ttl)
+                if elapsed_min >= 65 and m_fin_sc and (int(m_fin_sc.group(1)) == 3 or int(m_fin_sc.group(2)) == 3) and any(v in ttl for v in win_verbs):
+                    s_a, s_b = int(m_fin_sc.group(1)), int(m_fin_sc.group(2))
+                    win_sets, lose_sets = max(s_a, s_b), min(s_a, s_b)
+                    h_pos = min((ttl.find(ht) for ht in h_toks if ht in ttl), default=999)
+                    a_pos = min((ttl.find(at) for at in a_toks if at in ttl), default=999)
+                    # In Korean sports headlines (`A, B 3-0 완파` or `A, B에 0-3 완패`), check subject vs loss marker
+                    first_is_home = h_pos < a_pos
+                    has_loss_word = any(lw in ttl for lw in ("완패", "패배", "무릎", "눈물", "석패", "역전패"))
+                    home_won = (first_is_home and not has_loss_word) or ((not first_is_home) and has_loss_word)
+                    it["state"] = "post"
+                    it["status_badge"] = "종료"
+                    it["home_score"] = win_sets if home_won else lose_sets
+                    it["away_score"] = lose_sets if home_won else win_sets
+                    upgraded_cnt += 1
+                    break
+
+                # Check live mid-match two-set lead (`내리 두세트(를) <Team>에 내주며` / `세트스코어 2-0` / `세트스코어 2-1` / `세트스코어 1-1`)
+                if 20 <= elapsed_min <= 155:
+                    for ht in h_toks:
+                        if re.search(rf"두\s*세트를?\s*{re.escape(ht)}에\s*내주", ttl):
+                            it["state"] = "in"
+                            it["home_score"], it["away_score"] = 2, 0
+                            it["status_badge"] = "LIVE 3세트"
+                            upgraded_cnt += 1
+                            break
+                    if it["state"] == "in":
+                        break
+                    for at in a_toks:
+                        if re.search(rf"두\s*세트를?\s*{re.escape(at)}에\s*내주", ttl):
+                            it["state"] = "in"
+                            it["home_score"], it["away_score"] = 0, 2
+                            it["status_badge"] = "LIVE 3세트"
+                            upgraded_cnt += 1
+                            break
+                    if it["state"] == "in":
+                        break
+                    m_live_set = re.search(r"세트\s*스코어\s*([0-2])\s*[-:]\s*([0-2])", ttl)
+                    if m_live_set:
+                        ls1, ls2 = int(m_live_set.group(1)), int(m_live_set.group(2))
+                        h_pos = min((ttl.find(ht) for ht in h_toks if ht in ttl), default=999)
+                        a_pos = min((ttl.find(at) for at in a_toks if at in ttl), default=999)
+                        if h_pos < a_pos:
+                            it["home_score"], it["away_score"] = ls1, ls2
+                        else:
+                            it["home_score"], it["away_score"] = ls2, ls1
+                        it["state"] = "in"
+                        it["status_badge"] = f"LIVE {ls1 + ls2 + 1}세트"
+                        upgraded_cnt += 1
+                        break
+
+        # 2) Active kickoff window promotion (`0 <= elapsed <= 145m` for volleyball, `0..125m` for basketball)
+        max_live_min = 145.0 if sp == "volleyball" else 125.0
+        if it.get("state") == "pre" and 0.0 <= elapsed_min <= max_live_min:
+            it["state"] = "in"
+            if sp == "volleyball":
+                est_set = min(5, max(1, int(elapsed_min // 28) + 1))
+                it["status_badge"] = f"LIVE {est_set}세트 진행중"
+            else:
+                est_q = min(4, max(1, int(elapsed_min // 26) + 1))
+                it["status_badge"] = f"LIVE {est_q}쿼터 진행중"
+            upgraded_cnt += 1
+
+    return upgraded_cnt
 
 
 _LAST_SOURCE_DIAG_V4617: Dict[str, Any] = {}
@@ -20109,24 +20886,68 @@ def _parse_kbl_official_json_v4617(data: Any, target_k: datetime, is_today: bool
         a_c, _, _ = _clean_team_label_v4616(a_raw, "basketball")
         hs = int(float(g.get("scoreH") or g.get("homeScore") or g.get("hScore") or 0))
         as_ = int(float(g.get("scoreA") or g.get("awayScore") or g.get("aScore") or 0))
-        is_ended = str(g.get("isEnded") or g.get("gameEnd") or g.get("endYn") or "").upper() in ("1", "Y", "TRUE", "END", "FINAL")
-        q_raw = str(g.get("quarter") or g.get("gameStatus") or g.get("stateTxt") or g.get("remTime") or "").strip()
+        st_code = str(g.get("gameState") or g.get("state") or g.get("status") or "").strip().upper()
+        is_ended = (
+            str(g.get("isEnded") or g.get("gameEnd") or g.get("endYn") or "").upper() in ("1", "Y", "TRUE", "END", "FINAL", "F", "E")
+            or st_code in ("END", "FINAL", "F", "E", "RESULT", "40", "END_GAME")
+        )
+        q_raw = str(g.get("curQuarter") or g.get("quarter") or g.get("gameStatus") or g.get("stateTxt") or "").strip()
+        rem_t = str(g.get("remTime") or g.get("remainTime") or "").strip()
+        if rem_t in ("00:00", "0:00"):
+            rem_t = ""
         raw_tm = re.sub(r"\D+", "", str(g.get("gameTime") or g.get("gmTime") or g.get("stime") or "1900"))
         hhmm = f"{raw_tm[:2]}:{raw_tm[2:4]}" if len(raw_tm) >= 4 else "19:00"
+
+        # Auto-detect completed KBL game if >155 min past kickoff with regulation score != tie
+        if is_today and not is_ended and (hs >= 55 or as_ >= 55) and hs != as_:
+            try:
+                kick_dt = target_k.replace(hour=int(hhmm[:2]), minute=int(hhmm[3:5]), second=0, microsecond=0)
+                if (target_k - kick_dt).total_seconds() > 155 * 60:
+                    is_ended = True
+            except Exception:
+                pass
+
         if is_ended or "종료" in q_raw:
             state, badge = "post", "종료"
-        elif (hs > 0 or as_ > 0) or any(t in q_raw.upper() for t in ("Q", "쿼터", "연장", "OT", "LIVE", "진행")):
+        elif (hs > 0 or as_ > 0) or any(t in q_raw.upper() for t in ("Q", "쿼터", "연장", "OT", "LIVE", "진행")) or q_raw in ("1", "2", "3", "4"):
             state = "in"
-            badge = f"LIVE {q_raw}".strip() if q_raw else "LIVE 진행중"
+            if q_raw in ("1", "2", "3", "4"):
+                q_fmt = f"{q_raw}쿼터"
+            elif re.match(r"^Q([1-4])$", q_raw.upper()):
+                q_fmt = f"{q_raw[1]}쿼터"
+            else:
+                q_fmt = q_raw
+            if q_fmt and rem_t and rem_t not in q_fmt:
+                badge = f"LIVE {q_fmt} {rem_t}".strip()
+            elif q_fmt:
+                badge = f"LIVE {q_fmt}".strip()
+            else:
+                badge = "LIVE 진행중"
         else:
             state, badge = "pre", "예정"
+
         if not (is_today and state == "in") and g_dt and g_dt != target_yyyymmdd:
             continue
+
+        p_parts = []
+        for qi in range(1, 5):
+            qh = g.get(f"q{qi}H") or g.get(f"scoreH{qi}") or g.get(f"hQ{qi}")
+            qa = g.get(f"q{qi}A") or g.get(f"scoreA{qi}") or g.get(f"aQ{qi}")
+            if qh is not None and qa is not None:
+                try:
+                    qhi, qai = int(float(qh)), int(float(qa))
+                    if qhi > 0 or qai > 0:
+                        p_parts.append(f"{qi}Q {qhi}-{qai}")
+                except Exception:
+                    pass
+
         venue = str(g.get("stadium") or g.get("sname") or g.get("arenaName") or "").strip()
         it = _build_rt_item_v4616(
             "kbl_official",
             "basketball", "KBL", "KBL", "KBL 남자프로농구",
-            state, badge, target_k, hhmm, h_c, a_c, hs, as_, venue=venue,
+            state, badge, target_k, hhmm, h_c, a_c, hs, as_,
+            period_scores=" · ".join(p_parts),
+            venue=venue,
         )
         if it:
             out.append(it)
@@ -20159,16 +20980,25 @@ def _fetch_kr_official_portals_v4616(target_k: datetime, date_offset: int) -> Li
         "Referer": "https://www.kbl.or.kr/",
         "Accept": "application/json, text/plain, */*",
     }
-    daum_codes = ["kbl", "wkbl", "kovo", "wkovo", "kbo", "kl"]
+    daum_codes = ["kbl", "wkbl", "vl", "wvl", "kbo", "kl"]
+    daum_ssr_hdrs = {"Referer": "https://sports.daum.net/volleyball"}
+    daum_ssr_specs: List[Tuple[str, str]] = [
+        ("vl", "https://sports.daum.net/schedule/vl"),
+        ("wkbl", "https://sports.daum.net/schedule/wkbl"),
+        ("kbl", "https://sports.daum.net/schedule/kbl"),
+    ]
+    if is_today:
+        daum_ssr_specs.insert(0, ("volleyball_today", "https://sports.daum.net/schedule/volleyball"))
+        daum_ssr_specs.insert(1, ("volleyball_hub", "https://sports.daum.net/volleyball"))
 
     out: List[Dict[str, Any]] = []
     diag_counts: Dict[str, int] = {}
-    with ThreadPoolExecutor(max_workers=12) as pool:
+    with ThreadPoolExecutor(max_workers=16) as pool:
         futs_naver = {
             uc: pool.submit(
                 _http_fetch_json_v4616,
                 f"https://api-gw.sports.naver.com/schedule/games?fields=basic,schedule&upperCategoryId={uc}&fromDate={ymd}&toDate={ymd}",
-                3.8,
+                3.6,
                 naver_hdrs,
             )
             for uc in naver_ucats
@@ -20178,17 +21008,22 @@ def _fetch_kr_official_portals_v4616(target_k: datetime, date_offset: int) -> Li
             lc: pool.submit(
                 _http_fetch_json_v4616,
                 f"https://sports.daum.net/prx/hermes/api/game/list.json?page=1&leagueCode={lc}&fromDate={yyyymmdd}&toDate={yyyymmdd}",
-                3.6,
+                3.4,
                 {"Referer": f"https://sports.daum.net/schedule/{lc}"},
             )
             for lc in daum_codes
         }
+        futs_daum_ssr = {
+            pk: pool.submit(_http_fetch_text_v4616, u_ssr, 3.8, daum_ssr_hdrs)
+            for pk, u_ssr in daum_ssr_specs
+        }
+        fut_tsdb = pool.submit(_fetch_thesportsdb_v4618, target_k, is_today)
         fut_spojoy = pool.submit(_http_fetch_text_v4616, "https://www.spojoy.com/live/", 3.8, {"Referer": "https://www.spojoy.com/"}) if date_offset in (-1, 0, 1) else None
 
         nv_total = 0
         for uc, nfut in futs_naver.items():
             try:
-                nv_js = nfut.result(timeout=4.2)
+                nv_js = nfut.result(timeout=4.0)
                 if nv_js:
                     parsed_nv = _parse_naver_schedule_json_v4616(nv_js, target_k, is_today)
                     nv_total += len(parsed_nv)
@@ -20211,14 +21046,34 @@ def _fetch_kr_official_portals_v4616(target_k: datetime, date_offset: int) -> Li
         daum_tot = 0
         for lc, dfut in futs_daum.items():
             try:
-                d_js = dfut.result(timeout=4.0)
+                d_js = dfut.result(timeout=3.8)
                 if d_js:
                     parsed_d = _parse_daum_hermes_json_v4616(d_js, lc, target_k, is_today)
                     daum_tot += len(parsed_d)
                     out.extend(parsed_d)
             except Exception:
                 continue
-        diag_counts["daum_total"] = daum_tot
+        diag_counts["daum_api_total"] = daum_tot
+
+        daum_ssr_tot = 0
+        for pk, sfut in futs_daum_ssr.items():
+            try:
+                s_html = sfut.result(timeout=4.2)
+                if s_html:
+                    parsed_ssr = _parse_daum_schedule_ssr_v4618(s_html, pk, target_k, is_today)
+                    daum_ssr_tot += len(parsed_ssr)
+                    diag_counts[f"daum_ssr_{pk}"] = len(parsed_ssr)
+                    out.extend(parsed_ssr)
+            except Exception:
+                continue
+        diag_counts["daum_ssr_total"] = daum_ssr_tot
+
+        try:
+            parsed_tsdb = fut_tsdb.result(timeout=4.2) or []
+            diag_counts["thesportsdb"] = len(parsed_tsdb)
+            out.extend(parsed_tsdb)
+        except Exception:
+            pass
 
         if fut_spojoy is not None:
             try:
@@ -20251,7 +21106,7 @@ def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> 
         f_kr = pool.submit(_fetch_kr_official_portals_v4616, target_k, date_offset)
         for src_nm, fut in (("livescore_kr", f_ls), ("espn_global", f_espn), ("kr_portals", f_kr)):
             try:
-                res = fut.result(timeout=6.0)
+                res = fut.result(timeout=6.5)
                 if date_offset == 0:
                     _LAST_SOURCE_DIAG_V4617[src_nm] = len(res or [])
                 if res:
@@ -20263,6 +21118,12 @@ def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> 
 
     expected_mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
     deduped = _merge_and_filter_official_matches_v4616(merged_raw, expected_mmdd=expected_mmdd, is_today=(date_offset == 0))
+    if date_offset == 0 and deduped:
+        upgraded_vb = _enhance_kr_live_vleague_v4618(deduped, datetime.now(KST))
+        _LAST_SOURCE_DIAG_V4617["vleague_live_upgraded"] = upgraded_vb
+        if upgraded_vb > 0:
+            ord_st = {"in": 0, "pre": 1, "post": 2}
+            deduped.sort(key=lambda x: (ord_st.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
     with _RT_V4616_LOCK:
         _RT_V4616_CACHE[ck] = (time.monotonic(), [dict(x) for x in deduped])
     return deduped
@@ -20304,7 +21165,7 @@ def _item_live_priority_key_v4616(it: Dict[str, Any]) -> Tuple[int, int, int, in
     badge_len = len(str(it.get("status_badge") or ""))
     per_len = len(str(it.get("period_scores") or ""))
     src_tag = str(it.get("_src_v4616") or "")
-    src_rank = 3 if src_tag in ("livescore_pc", "livescore_mob", "naver_gw", "daum_api") else (2 if it.get("_espn_verified_v4615") else 1)
+    src_rank = 4 if src_tag in ("kbl_official", "livescore_pc", "naver_gw", "daum_api") else (3 if src_tag in ("thesportsdb", "daum_ssr", "spojoy", "livescore_mob") else (2 if it.get("_espn_verified_v4615") else 1))
     return (st_rank, tot_sc, badge_len, per_len, src_rank)
 
 
@@ -20557,12 +21418,13 @@ _install_dc_ko_team_wrapper_v381()
 
 
 @router.get("/api/member/live-sources-diag-v4617")
-def api_live_sources_diag_v4617():
+@router.get("/api/member/live-sources-diag-v4618")
+def api_live_sources_diag_v4618():
     tk = datetime.now(KST)
     items = _collect_realtime_all_sports_v4616(tk, 0)
     return {
         "ok": True,
-        "version": "v4.6.17",
+        "version": "v4.6.18",
         "server_kst": tk.strftime("%Y-%m-%d %H:%M:%S KST"),
         "source_counts": dict(_LAST_SOURCE_DIAG_V4617),
         "merged_counts": _recompute_sport_counts_v4615(items),
