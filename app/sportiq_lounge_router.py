@@ -8309,7 +8309,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3760_{int(time.time())}"
+_BOOT_VER_V30 = f"3800_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -9595,6 +9595,16 @@ def apply_dynamic_post_og_v29(html_text: str, post_meta: Optional[Dict[str, str]
                 out,
                 count=1,
             )
+    if re.search(r'<link\s+rel=["\']canonical["\']', out, flags=re.I):
+        out = re.sub(
+            r'(<link\s+rel=["\']canonical["\']\s+href=["\'])[^"\']*(["\'])',
+            lambda m: m.group(1) + esc_url + m.group(2),
+            out,
+            count=1,
+            flags=re.I,
+        )
+    elif "</head>" in out:
+        out = out.replace("</head>", f'  <link rel="canonical" href="{esc_url}" />\n</head>', 1)
     return out
 
 
@@ -9620,6 +9630,10 @@ def inject_seo_and_og_head_v27(html_text: str) -> str:
         extra_tags.append(f'  <meta name="naver-site-verification" content="{naver_token}" />')
     if 'name="robots"' not in out and "name='robots'" not in out:
         extra_tags.append('  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />')
+    if 'rel="canonical"' not in out and "rel='canonical'" not in out:
+        extra_tags.append('  <link rel="canonical" href="https://billnojay.com/" />')
+    if 'application/rss+xml' not in out:
+        extra_tags.append('  <link rel="alternate" type="application/rss+xml" title="SportIQ 실시간 스포츠 데이터 분석 RSS" href="https://billnojay.com/rss.xml" />')
     if 'property="og:site_name"' not in out and "property='og:site_name'" not in out:
         extra_tags.append('  <meta property="og:site_name" content="SportIQ" />')
     if 'property="og:locale"' not in out and "property='og:locale'" not in out:
@@ -9709,6 +9723,8 @@ def serve_hardened_robots_txt_v27():
         "User-agent: *\n"
         "Allow: /\n"
         "Allow: /og-cover.png\n"
+        "Allow: /rss.xml\n"
+        "Allow: /sitemap.xml\n"
         "Allow: /pwa-icon-192.png\n"
         "Allow: /pwa-icon-512.png\n"
         "Disallow: /api/admin/\n"
@@ -10750,27 +10766,204 @@ def submit_match_fan_vote_v32(payload: MatchFanVoteIn):
     return res_dict
 
 
+def _xml_safe_text_v38(val: Any) -> str:
+    s = str(val or "")
+    s = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", s)
+    return _html_lib.escape(s.strip(), quote=True)
+
+
+def _collect_indexable_posts_v38(limit: int = 60) -> List[Dict[str, Any]]:
+    try:
+        _ensure_tactical_posts_seeded_v22()
+    except Exception:
+        pass
+    now_ts = time.time()
+    items: List[Dict[str, Any]] = []
+    seen_ids: Set[str] = set()
+
+    def _op() -> List[Dict[str, Any]]:
+        out_rows: List[Dict[str, Any]] = []
+        with _smu_db_session(write=False) as conn:
+            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            if "community_member_posts" in tables:
+                try:
+                    rows = conn.execute(
+                        "SELECT * FROM community_member_posts ORDER BY rowid DESC LIMIT ?",
+                        (limit,),
+                    ).fetchall()
+                    for r in rows:
+                        rk = set(r.keys())
+                        pid = str((r["id"] if "id" in rk else "") or "").strip()
+                        title = str((r["title"] if "title" in rk else "") or "").strip()
+                        if not pid or not title or pid in seen_ids:
+                            continue
+                        seen_ids.add(pid)
+                        ts = (
+                            (_to_epoch_ts(r["updated_at"]) if "updated_at" in rk else None)
+                            or (_to_epoch_ts(r["created_at"]) if "created_at" in rk else None)
+                            or (now_ts - 600)
+                        )
+                        body_raw = str((r["body"] if "body" in rk else "") or "")
+                        body_clean = re.sub(r"\s+", " ", body_raw).strip()
+                        lg_val = str((r["league"] if "league" in rk else "") or "SPORTIQ").strip() or "SPORTIQ"
+                        au_val = str((r["author"] if "author" in rk else "") or "SportIQ 분석가").strip() or "SportIQ 분석가"
+                        out_rows.append({
+                            "id": pid,
+                            "title": title,
+                            "body": body_clean[:600] or title,
+                            "league": lg_val,
+                            "author": au_val,
+                            "ts": float(ts),
+                        })
+                except Exception:
+                    pass
+            if "auto_analyst_posts" in tables and len(out_rows) < limit:
+                try:
+                    arows = conn.execute(
+                        "SELECT * FROM auto_analyst_posts ORDER BY rowid DESC LIMIT ?",
+                        (max(10, limit - len(out_rows)),),
+                    ).fetchall()
+                    for ar in arows:
+                        rk = set(ar.keys())
+                        atitle = str((ar["title"] if "title" in rk else "") or "").strip()
+                        if not atitle:
+                            continue
+                        aid = str((ar["id"] if "id" in rk else "") or "").strip() or _fnv1a_aa_id_py_v29(atitle)
+                        if aid in seen_ids:
+                            continue
+                        seen_ids.add(aid)
+                        abody = re.sub(
+                            r"\s+",
+                            " ",
+                            str((ar["body"] if "body" in rk else "") or (ar["summary"] if "summary" in rk else "") or ""),
+                        ).strip()
+                        ats = (
+                            (_to_epoch_ts(ar["created_at"]) if "created_at" in rk else None)
+                            or (_to_epoch_ts(ar["published_at"]) if "published_at" in rk else None)
+                            or (now_ts - 1800)
+                        )
+                        alg = str((ar["league"] if "league" in rk else "") or "TOP20").strip() or "TOP20"
+                        out_rows.append({
+                            "id": aid,
+                            "title": atitle,
+                            "body": abody[:600] or atitle,
+                            "league": alg,
+                            "author": "SportIQ AI 분석팀",
+                            "ts": float(ats),
+                        })
+                except Exception:
+                    pass
+        return out_rows
+
+    try:
+        items = run_with_db_retry(_op) or []
+    except Exception:
+        items = []
+    items.sort(key=lambda x: float(x.get("ts") or 0.0), reverse=True)
+    return items[:limit]
+
+
 @router.api_route("/sitemap.xml", methods=["GET", "HEAD"])
 def serve_enriched_sitemap_xml_v27():
     from fastapi.responses import Response
-    today = datetime.now(KST).strftime("%Y-%m-%d")
-    xml = (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
-        'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n'
+    now_k = datetime.now(KST)
+    now_iso = now_k.strftime("%Y-%m-%dT%H:%M:%S+09:00")
+    posts = _collect_indexable_posts_v38(limit=60)
+
+    url_blocks = [
         "  <url>\n"
         "    <loc>https://billnojay.com/</loc>\n"
-        f"    <lastmod>{today}</lastmod>\n"
+        f"    <lastmod>{now_iso}</lastmod>\n"
         "    <changefreq>hourly</changefreq>\n"
         "    <priority>1.0</priority>\n"
         "    <image:image>\n"
         "      <image:loc>https://billnojay.com/og-cover.png?v=27</image:loc>\n"
         "      <image:title>SportIQ 실시간 분석 스포츠IQ 인사이트 라운지</image:title>\n"
         "    </image:image>\n"
-        "  </url>\n"
-        "</urlset>\n"
+        "  </url>"
+    ]
+    for p in posts:
+        pid_q = urllib.parse.quote(str(p["id"]), safe="")
+        loc_url = _xml_safe_text_v38(f"https://billnojay.com/?post={pid_q}")
+        try:
+            p_dt = datetime.fromtimestamp(float(p["ts"]), tz=KST)
+        except Exception:
+            p_dt = now_k
+        p_iso = p_dt.strftime("%Y-%m-%dT%H:%M:%S+09:00")
+        url_blocks.append(
+            "  <url>\n"
+            f"    <loc>{loc_url}</loc>\n"
+            f"    <lastmod>{p_iso}</lastmod>\n"
+            "    <changefreq>daily</changefreq>\n"
+            "    <priority>0.8</priority>\n"
+            "  </url>"
+        )
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+        'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n'
+        + "\n".join(url_blocks)
+        + "\n</urlset>\n"
     )
-    return Response(content=xml, media_type="application/xml; charset=utf-8")
+    return Response(
+        content=xml,
+        media_type="application/xml; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=180"},
+    )
+
+
+@router.api_route("/rss.xml", methods=["GET", "HEAD"])
+@router.api_route("/feed.xml", methods=["GET", "HEAD"])
+def serve_naver_rss_feed_v38():
+    from email.utils import format_datetime
+    from fastapi.responses import Response
+    now_k = datetime.now(KST)
+    posts = _collect_indexable_posts_v38(limit=40)
+    build_dt_rfc = format_datetime(now_k)
+
+    item_blocks: List[str] = []
+    for p in posts:
+        pid_q = urllib.parse.quote(str(p["id"]), safe="")
+        link_url = _xml_safe_text_v38(f"https://billnojay.com/?post={pid_q}")
+        title_x = _xml_safe_text_v38(p["title"])
+        desc_x = _xml_safe_text_v38(f"[{p['league']}] {p['body']} (작성: {p['author']})")
+        cat_x = _xml_safe_text_v38(p["league"])
+        try:
+            pub_dt = datetime.fromtimestamp(float(p["ts"]), tz=KST)
+        except Exception:
+            pub_dt = now_k
+        pub_rfc = _xml_safe_text_v38(format_datetime(pub_dt))
+        item_blocks.append(
+            "    <item>\n"
+            f"      <title>{title_x}</title>\n"
+            f"      <link>{link_url}</link>\n"
+            f'      <guid isPermaLink="true">{link_url}</guid>\n'
+            f"      <category>{cat_x}</category>\n"
+            f"      <description>{desc_x}</description>\n"
+            f"      <pubDate>{pub_rfc}</pubDate>\n"
+            "    </item>"
+        )
+
+    rss_xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
+        "  <channel>\n"
+        "    <title>SportIQ 실시간 분석 스포츠IQ 인사이트 라운지</title>\n"
+        "    <link>https://billnojay.com/</link>\n"
+        "    <description>9종목 24리그 실시간 경기 데이터 분석, 기대득점(xG) 전술 브리핑 및 커뮤니티 인사이트 피드</description>\n"
+        "    <language>ko</language>\n"
+        f"    <lastBuildDate>{_xml_safe_text_v38(build_dt_rfc)}</lastBuildDate>\n"
+        '    <atom:link href="https://billnojay.com/rss.xml" rel="self" type="application/rss+xml" />\n'
+        + "\n".join(item_blocks)
+        + "\n  </channel>\n"
+        "</rss>\n"
+    )
+    return Response(
+        content=rss_xml,
+        media_type="application/rss+xml; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=180"},
+    )
 
 
 
@@ -11864,7 +12057,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "3.7.6-ko-teams-kbl-dedup",
+        "engine_version": "3.8-dynamic-sitemap-rss",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
