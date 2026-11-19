@@ -8307,7 +8307,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3720_{int(time.time())}"
+_BOOT_VER_V30 = f"3730_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -10880,11 +10880,14 @@ def _fetch_espn_league_date_v37(lg_code: str, ymd: str) -> List[Dict[str, Any]]:
     ck = f"{lg_code}:{ymd}"
     now_t = time.time()
     hit = _ESPN_DIRECT_CACHE_V37.get(ck)
-    if hit and (now_t - hit[0]) < 180.0:
+    if hit and (now_t - hit[0]) < 300.0 and len(hit[1]) > 0:
         return list(hit[1])
     sport_key, lg_disp, path = meta
     url = f"https://site.api.espn.com/apis/site/v2/sports/{path}/scoreboard?dates={ymd}"
-    raw = _http_fetch_bytes(url, timeout=2.8)
+    raw = _http_fetch_bytes(url, timeout=6.5)
+    if not raw:
+        time.sleep(0.15)
+        raw = _http_fetch_bytes(url, timeout=5.5)
     if not raw:
         return []
     out: List[Dict[str, Any]] = []
@@ -11003,7 +11006,8 @@ def _fetch_espn_league_date_v37(lg_code: str, ymd: str) -> List[Dict[str, Any]]:
                     "odds": {"home": oh, "draw": od, "away": oa},
                 },
             })
-        _ESPN_DIRECT_CACHE_V37[ck] = (now_t, list(out))
+        if out:
+            _ESPN_DIRECT_CACHE_V37[ck] = (now_t, list(out))
     except Exception:
         pass
     return out
@@ -11286,11 +11290,11 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
         d0 = (target_k - timedelta(days=1)).strftime("%Y%m%d")
         d1 = target_k.strftime("%Y%m%d")
         tasks = [(lgc, dp) for lgc in espn_targets for dp in (d0, d1)]
-        with ThreadPoolExecutor(max_workers=min(8, max(1, len(tasks)))) as pool:
+        with ThreadPoolExecutor(max_workers=min(10, max(1, len(tasks)))) as pool:
             futs = [pool.submit(_fetch_espn_league_date_v37, lgc, dp) for lgc, dp in tasks]
             for fut in futs:
                 try:
-                    for ev_item in fut.result(timeout=3.0):
+                    for ev_item in fut.result(timeout=8.5):
                         if ev_item.get("ymd_kst") == target_ymd:
                             _add_item(ev_item)
                 except Exception:
@@ -11304,8 +11308,12 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
         for vlg in _build_vleague_games_v35(target_k):
             _add_item(vlg)
 
-    # 3. Fallback / supplement from scoreboard_v30 (-5 <= off <= 5) for KBO/NPB/KLEAGUE/LCK/ATP/WTA/F1 or cached games
-    if -5 <= off <= 5:
+    # 3. Fallback / supplement from scoreboard_v30 (-5 <= off <= 5) only if needed (never block ESPN hits on cold-boot!)
+    all_espn_or_dom = bool(league_codes) and all(
+        (c in _ESPN_LEAGUE_ENDPOINTS_V37 or c in ("KBL", "WKBL", "VLEAGUE")) for c in league_codes
+    )
+    need_sb_supplement = (not all_espn_or_dom) or (len(collected) == 0)
+    if need_sb_supplement and (-5 <= off <= 5):
         try:
             sb_res = api_member_scoreboard_v30(date_offset=off)
             for sbi in (sb_res.get("items") or []):
@@ -11364,7 +11372,10 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     with _HYPER_SEARCH_LOCK:
         hit = _HYPER_SEARCH_CACHE.get(cache_key)
         if hit and (now_m - hit[0]) <= 90.0:
-            cached_payload = dict(hit[1])
+            hp_cand = hit[1]
+            sqa_cand = hp_cand.get("schedule_qa") if isinstance(hp_cand, dict) else None
+            if not (isinstance(sqa_cand, dict) and int(sqa_cand.get("total_games") or 0) == 0):
+                cached_payload = dict(hp_cand)
 
     if cached_payload is None:
         sched_intent = _parse_schedule_intent_v37(q)
@@ -11381,7 +11392,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
         ext_know_lists: List[List[Dict[str, Any]]] = []
         schedule_matches: List[Dict[str, Any]] = []
 
-        with ThreadPoolExecutor(max_workers=10) as pool:
+        with ThreadPoolExecutor(max_workers=16) as pool:
             futs_sched = []
             if mode == "all":
                 for d_off in sched_intent["date_offsets"]:
@@ -11415,7 +11426,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
 
             for _doff, fs in futs_sched:
                 try:
-                    res_s = fs.result(timeout=4.0)
+                    res_s = fs.result(timeout=9.5)
                     if isinstance(res_s, list):
                         schedule_matches.extend(res_s)
                 except Exception:
@@ -11582,10 +11593,14 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
             "sportiq_posts": internal_ctx.get("posts", []),
             "related_queries": related_queries,
         }
-        with _HYPER_SEARCH_LOCK:
-            if len(_HYPER_SEARCH_CACHE) > 250:
-                _HYPER_SEARCH_CACHE.clear()
-            _HYPER_SEARCH_CACHE[cache_key] = (now_m, cached_payload)
+        has_empty_schedule_qa = bool(
+            isinstance(schedule_qa, dict) and int(schedule_qa.get("total_games") or 0) == 0
+        )
+        if not has_empty_schedule_qa:
+            with _HYPER_SEARCH_LOCK:
+                if len(_HYPER_SEARCH_CACHE) > 250:
+                    _HYPER_SEARCH_CACHE.clear()
+                _HYPER_SEARCH_CACHE[cache_key] = (now_m, cached_payload)
 
     total_cnt = int(cached_payload.get("total_count") or 0)
 
@@ -11622,11 +11637,42 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "3.7-schedule-qa",
+        "engine_version": "3.7.3-coldboot-guard",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
     }
+
+
+_ESPN_PREWARM_STARTED_V373 = False
+
+
+def _start_coldboot_schedule_prewarmer_v373() -> None:
+    global _ESPN_PREWARM_STARTED_V373
+    if _ESPN_PREWARM_STARTED_V373 or os.environ.get("SPORTIQ_DISABLE_ESPN_PREWARM") == "1":
+        return
+    _ESPN_PREWARM_STARTED_V373 = True
+
+    def _warm_worker() -> None:
+        time.sleep(0.8)
+        try:
+            base_k = datetime.now(KST)
+            ymds = [(base_k + timedelta(days=d)).strftime("%Y%m%d") for d in (-1, 0, 1, 2)]
+            warm_tasks = [(lg, yd) for lg in ("NBA", "EPL", "UCL", "MLB", "NHL") for yd in ymds]
+            with ThreadPoolExecutor(max_workers=6) as wp:
+                wfuts = [wp.submit(_fetch_espn_league_date_v37, lg, yd) for lg, yd in warm_tasks]
+                for wf in wfuts:
+                    try:
+                        wf.result(timeout=8.0)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    threading.Thread(target=_warm_worker, daemon=True, name="sq-espn-prewarm-v373").start()
+
+
+_start_coldboot_schedule_prewarmer_v373()
 
 
 
