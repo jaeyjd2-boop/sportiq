@@ -1711,14 +1711,14 @@ _FRONTEND_V22_JS = r'''
     }
 
     // 2. Locate right-bottom floating dock / pills (IQ중계티비 & AI 아이큐)
-    var dockWrapper = null;
-    var tvFixedEl = null;
-    var aiFixedEl = null;
-    if (document.body) {
+    var dockWrapper = document.querySelector("[data-sq-floating-dock='1']");
+    var tvFixedEl = document.querySelector("[data-sq-floating-item='tv']");
+    var aiFixedEl = document.querySelector("[data-sq-floating-item='ai']");
+    if (document.body && !dockWrapper && (!tvFixedEl || !aiFixedEl)) {
       var allEls = document.body.querySelectorAll("div, aside, nav, section, button, a");
       for (var i = 0; i < allEls.length; i++) {
         var el = allEls[i];
-        if (el === banner || el.id === "sqLegalPolicyModal" || el.id === "sqMemberHubModal" || el.id === "sqDesktopMainTabStrip") continue;
+        if (el === banner || el.id === "sqFloatingDockMinBtnV382" || el.id === "sqLegalPolicyModal" || el.id === "sqMemberHubModal" || el.id === "sqDesktopMainTabStrip") continue;
         if (el.classList && (el.classList.contains("sq-modal-backdrop") || el.classList.contains("inset-0") || el.classList.contains("hidden"))) continue;
         var pos = el.style.position || window.getComputedStyle(el).position;
         if (pos !== "fixed") continue;
@@ -1735,7 +1735,7 @@ _FRONTEND_V22_JS = r'''
       if (!dockWrapper) {
         for (var j = 0; j < allEls.length; j++) {
           var el2 = allEls[j];
-          if (el2 === banner || el2.id === "sqLegalPolicyModal" || el2.id === "sqMemberHubModal" || el2.id === "sqDesktopMainTabStrip") continue;
+          if (el2 === banner || el2.id === "sqFloatingDockMinBtnV382" || el2.id === "sqLegalPolicyModal" || el2.id === "sqMemberHubModal" || el2.id === "sqDesktopMainTabStrip") continue;
           if (el2.classList && (el2.classList.contains("sq-modal-backdrop") || el2.classList.contains("inset-0") || el2.classList.contains("hidden"))) continue;
           var pos2 = el2.style.position || window.getComputedStyle(el2).position;
           if (pos2 !== "fixed") continue;
@@ -1812,6 +1812,127 @@ _FRONTEND_V22_JS = r'''
       if (footer) {
         footer.style.setProperty("padding-bottom", "108px", "important");
       }
+    }
+
+    syncFloatingDockMinimizeToggleV382(dockWrapper, tvFixedEl, aiFixedEl, isMobile, banner, mobNavH);
+  }
+
+  function syncFloatingDockMinimizeToggleV382(dockWrapper, tvFixedEl, aiFixedEl, isMobile, banner, mobNavH) {
+    if (!document.body) return;
+    var targets = dockWrapper ? [dockWrapper] : [tvFixedEl, aiFixedEl].filter(Boolean);
+    var minBtn = document.getElementById("sqFloatingDockMinBtnV382");
+    if (!targets.length) {
+      if (minBtn) minBtn.style.display = "none";
+      return;
+    }
+
+    if (!minBtn) {
+      minBtn = document.createElement("button");
+      minBtn.id = "sqFloatingDockMinBtnV382";
+      minBtn.type = "button";
+      minBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var curMin = false;
+        try { curMin = (localStorage.getItem("sportiq_dock_minimized_v382") === "1"); } catch (e) {}
+        var nextMin = !curMin;
+        try { localStorage.setItem("sportiq_dock_minimized_v382", nextMin ? "1" : "0"); } catch (e) {}
+        harmonizeMobileFloatingOverlaysV26();
+      });
+      document.body.appendChild(minBtn);
+    }
+
+    var isMin = false;
+    try { isMin = (localStorage.getItem("sportiq_dock_minimized_v382") === "1"); } catch (e) {}
+
+    if (isMin) {
+      targets.forEach(function (t) {
+        t.setAttribute("data-sq-dock-min-hidden", "1");
+        t.style.setProperty("display", "none", "important");
+      });
+      var bannerVis = Boolean(banner && window.getComputedStyle(banner).display !== "none" && banner.offsetHeight > 0);
+      var bH = bannerVis ? (banner.offsetHeight || 54) : 0;
+      var minBot = isMobile ? ((bannerVis ? (10 + bH + 10) : 14) + (mobNavH || 0)) : 14;
+      var minRight = isMobile ? 10 : 14;
+      minBtn.setAttribute("aria-expanded", "false");
+      minBtn.setAttribute("aria-label", "플로팅 메뉴 펼치기");
+      minBtn.title = "IQ중계티비 · AI 아이큐 검색 펼치기";
+      if (minBtn.getAttribute("data-sq-mode") !== "min") {
+        minBtn.setAttribute("data-sq-mode", "min");
+        minBtn.textContent = "⚡ IQ ▴";
+      }
+      minBtn.style.cssText = [
+        "position:fixed !important",
+        "right:" + minRight + "px !important",
+        "bottom:" + minBot + "px !important",
+        "z-index:9998 !important",
+        "display:inline-flex !important",
+        "align-items:center",
+        "justify-content:center",
+        "gap:4px",
+        "padding:6px 11px",
+        "border-radius:999px",
+        "background:linear-gradient(135deg,rgba(15,23,42,0.95),rgba(30,41,59,0.95))",
+        "border:1px solid rgba(56,189,248,0.6)",
+        "color:#7dd3fc",
+        "font-size:11.5px",
+        "font-weight:800",
+        "line-height:1.1",
+        "cursor:pointer",
+        "box-shadow:0 6px 18px rgba(0,0,0,0.45)",
+        "backdrop-filter:blur(6px)",
+        "white-space:nowrap"
+      ].join(";");
+    } else {
+      targets.forEach(function (t) {
+        if (t.getAttribute("data-sq-dock-min-hidden") === "1") {
+          t.removeAttribute("data-sq-dock-min-hidden");
+          t.style.removeProperty("display");
+        }
+      });
+      var minTop = Infinity;
+      var maxRight = 0;
+      targets.forEach(function (t) {
+        var r = t.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) {
+          if (r.top < minTop) minTop = r.top;
+          if (r.right > maxRight) maxRight = r.right;
+        }
+      });
+      if (!isFinite(minTop) || maxRight <= 0) {
+        minBtn.style.display = "none";
+        return;
+      }
+      var expBot = Math.max(52, Math.round(window.innerHeight - minTop + 6));
+      var expRight = Math.max(10, Math.round(window.innerWidth - maxRight));
+      minBtn.setAttribute("aria-expanded", "true");
+      minBtn.setAttribute("aria-label", "플로팅 메뉴 접기");
+      minBtn.title = "본문 우측 버튼을 가릴 때 플로팅 버튼을 작게 접어둡니다";
+      if (minBtn.getAttribute("data-sq-mode") !== "exp") {
+        minBtn.setAttribute("data-sq-mode", "exp");
+        minBtn.textContent = "▾ 접기";
+      }
+      minBtn.style.cssText = [
+        "position:fixed !important",
+        "right:" + expRight + "px !important",
+        "bottom:" + expBot + "px !important",
+        "z-index:9998 !important",
+        "display:inline-flex !important",
+        "align-items:center",
+        "justify-content:center",
+        "padding:3px 9px",
+        "border-radius:999px",
+        "background:rgba(15,23,42,0.88)",
+        "border:1px solid rgba(71,85,105,0.85)",
+        "color:#cbd5e1",
+        "font-size:10.5px",
+        "font-weight:700",
+        "line-height:1.15",
+        "cursor:pointer",
+        "box-shadow:0 4px 12px rgba(0,0,0,0.35)",
+        "backdrop-filter:blur(6px)",
+        "white-space:nowrap"
+      ].join(";");
     }
   }
 
@@ -8400,7 +8521,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3810_{int(time.time())}"
+_BOOT_VER_V30 = f"3820_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -12194,7 +12315,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "3.8.1-national-teams-ko",
+        "engine_version": "3.8.2-floating-dock-minimize",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
