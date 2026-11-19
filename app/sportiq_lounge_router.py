@@ -1016,6 +1016,119 @@ _FRONTEND_V22_JS = r'''
       "  }",
       "  .sq-v39-nav-arrows { display: none !important; }",
       "}",
+      "/* v4.0 Clean DataCenter Quick-Launch Strip + Global Big Match TOP 20 Podium + Section Rhythm */",
+      "#dcMainHubSection, .dc-hub-wrap {",
+      "  max-width: 1180px;",
+      "  margin: 10px auto !important;",
+      "  padding: 10px 15px !important;",
+      "  border-radius: 16px !important;",
+      "  box-sizing: border-box;",
+      "}",
+      "#dcQuickExpandHint { display: none !important; }",
+      "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLauncherGrid,",
+      "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLaunchCards {",
+      "  display: flex !important;",
+      "  flex-wrap: nowrap !important;",
+      "  overflow-x: auto !important;",
+      "  -webkit-overflow-scrolling: touch;",
+      "  scrollbar-width: none;",
+      "  gap: 7px !important;",
+      "  margin-top: 8px !important;",
+      "  margin-bottom: 0 !important;",
+      "}",
+      "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLauncherGrid::-webkit-scrollbar,",
+      "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLaunchCards::-webkit-scrollbar { display: none; }",
+      "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLauncherGrid > *,",
+      "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLaunchCards > * {",
+      "  flex: 1 1 0% !important;",
+      "  min-width: max-content !important;",
+      "  white-space: nowrap !important;",
+      "  text-align: center !important;",
+      "  padding: 7px 10px !important;",
+      "  min-height: 0 !important;",
+      "  border-radius: 10px !important;",
+      "}",
+      "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLauncherGrid > * p,",
+      "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLauncherGrid > * .text-xs,",
+      "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLaunchCards > * p,",
+      "#dcMainHubSection:not([data-sq-dc-open='1']) #dcLaunchCards > * .text-xs {",
+      "  display: none !important;",
+      "}",
+      "#sqTop20BoxV40 {",
+      "  margin-top: 10px !important;",
+      "  margin-bottom: 12px !important;",
+      "  padding: 12px 15px !important;",
+      "  border-radius: 16px !important;",
+      "}",
+      "#sqTop20BoxV40[data-sq-top20-folded='1'] > :not([data-sq-top20-hdr='1']) {",
+      "  display: none !important;",
+      "}",
+      "#globalTop10Grid {",
+      "  display: grid !important;",
+      "  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;",
+      "  gap: 10px !important;",
+      "  margin-top: 9px !important;",
+      "}",
+      "#globalTop10Grid > * {",
+      "  padding: 10px 12px !important;",
+      "  border-radius: 13px !important;",
+      "  margin: 0 !important;",
+      "}",
+      "#sqBestTop3BoxV40 {",
+      "  margin-top: 10px !important;",
+      "  margin-bottom: 10px !important;",
+      "  padding: 9px 14px !important;",
+      "  border-radius: 14px !important;",
+      "}",
+      "#sqBestTop3BoxV40[data-sq-best-folded='1'] > :not([data-sq-best-hdr='1']) {",
+      "  display: none !important;",
+      "}",
+      "#sqAutoEngineBarV40 {",
+      "  margin-top: 8px !important;",
+      "  margin-bottom: 10px !important;",
+      "  padding: 8px 14px !important;",
+      "  border-radius: 12px !important;",
+      "}",
+      ".sq-v40-fold-btn {",
+      "  background: rgba(15, 23, 42, 0.92);",
+      "  border: 1px solid rgba(71, 85, 105, 0.85);",
+      "  color: #cbd5e1;",
+      "  border-radius: 8px;",
+      "  padding: 4px 10px;",
+      "  font-size: 11.3px;",
+      "  font-weight: 800;",
+      "  cursor: pointer;",
+      "  white-space: nowrap;",
+      "  transition: border-color 0.15s ease, color 0.15s ease;",
+      "}",
+      ".sq-v40-fold-btn:hover { border-color: #38bdf8; color: #7dd3fc; }",
+      "@media (max-width: 960px) {",
+      "  #dcMainHubSection:not([data-sq-dc-open='1']) #dcLauncherGrid > *,",
+      "  #dcMainHubSection:not([data-sq-dc-open='1']) #dcLaunchCards > * {",
+      "    flex: 0 0 auto !important;",
+      "  }",
+      "  #globalTop10Grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }",
+      "}",
+      "@media (max-width: 640px) {",
+      "  #dcMainHubSection, .dc-hub-wrap { margin: 8px 8px !important; padding: 9px 11px !important; }",
+      "  #sqTop20BoxV40 { margin: 9px 0 !important; padding: 10px 12px !important; }",
+      "  #globalTop10Grid:not([data-sq-top20-expanded='1']) {",
+      "    display: flex !important;",
+      "    flex-wrap: nowrap !important;",
+      "    overflow-x: auto !important;",
+      "    -webkit-overflow-scrolling: touch;",
+      "    scrollbar-width: none;",
+      "    gap: 8px !important;",
+      "  }",
+      "  #globalTop10Grid:not([data-sq-top20-expanded='1'])::-webkit-scrollbar { display: none; }",
+      "  #globalTop10Grid:not([data-sq-top20-expanded='1']) > * {",
+      "    flex: 0 0 258px !important;",
+      "    max-width: 266px !important;",
+      "  }",
+      "  #globalTop10Grid[data-sq-top20-expanded='1'] {",
+      "    grid-template-columns: 1fr !important;",
+      "  }",
+      "}",
       ".sq-v30-fbtn {",
       "  background: rgba(15, 23, 42, 0.9);",
       "  border: 1px solid #334155;",
@@ -1382,13 +1495,14 @@ _FRONTEND_V22_JS = r'''
       "/* v2.8 Protect DataCenter #dcHubBody & Cards (배당 급변 드롭오즈 / 순위 / 적중률) from Seed-Guard Hiding */",
       "#dcMainHubSection[data-sq-seed-archive],",
       "#dcHubCollapsible[data-sq-seed-archive],",
-      "#dcHubBody[data-sq-seed-archive],",
       "#dcMainHubSection.sq-seed-archive-card,",
-      "#dcHubCollapsible.sq-seed-archive-card,",
-      "#dcHubBody.sq-seed-archive-card {",
+      "#dcHubCollapsible.sq-seed-archive-card {",
       "  display: block !important;",
       "  visibility: visible !important;",
       "  opacity: 1 !important;",
+      "}",
+      "#dcHubBody:not([data-sq-dc-user-open='1']) {",
+      "  display: none !important;",
       "}",
       "#dcHubBody[data-sq-dc-user-open='1'] {",
       "  display: block !important;",
@@ -3026,6 +3140,8 @@ _FRONTEND_V22_JS = r'''
     var hint = document.getElementById("dcQuickExpandHint");
 
     function markDcBodyUserOpen() {
+      var mh = document.getElementById("dcMainHubSection") || document.querySelector(".dc-hub-wrap");
+      if (mh) mh.setAttribute("data-sq-dc-open", "1");
       var b = document.getElementById("dcHubBody");
       if (!b) return;
       b.setAttribute("data-sq-dc-user-open", "1");
@@ -3059,20 +3175,28 @@ _FRONTEND_V22_JS = r'''
 
     if (tog && !tog.getAttribute("data-sq-dc-tog-bound-v28")) {
       tog.setAttribute("data-sq-dc-tog-bound-v28", "1");
-      tog.addEventListener("click", function () {
-        setTimeout(function () {
-          var b = document.getElementById("dcHubBody");
-          if (!b) return;
-          var txt = tog.textContent || "";
-          if (txt.indexOf("펼치기") !== -1) {
-            b.removeAttribute("data-sq-dc-user-open");
-            b.style.setProperty("display", "none", "important");
-          } else {
-            b.setAttribute("data-sq-dc-user-open", "1");
-            b.style.setProperty("display", "block", "important");
-          }
-        }, 15);
-      });
+      tog.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (typeof ev.stopImmediatePropagation === "function") ev.stopImmediatePropagation();
+        var mh = document.getElementById("dcMainHubSection") || document.querySelector(".dc-hub-wrap");
+        var b = document.getElementById("dcHubBody");
+        if (!b) return;
+        var currentlyOpen = b.getAttribute("data-sq-dc-user-open") === "1";
+        if (currentlyOpen) {
+          b.removeAttribute("data-sq-dc-user-open");
+          b.style.setProperty("display", "none", "important");
+          if (mh) mh.removeAttribute("data-sq-dc-open");
+          tog.textContent = "상세 표 펼치기 ▼";
+        } else {
+          b.setAttribute("data-sq-dc-user-open", "1");
+          b.classList.remove("hidden");
+          b.style.setProperty("display", "block", "important");
+          if (mh) mh.setAttribute("data-sq-dc-open", "1");
+          tog.textContent = "접기 ▲";
+          setTimeout(unblindDataCenterSubtreeV28, 25);
+        }
+      }, true);
     }
 
     if (typeof window.__switchDcTab === "function" && !window.__sqSwitchDcWrappedV28) {
@@ -3515,12 +3639,15 @@ _FRONTEND_V22_JS = r'''
       col.classList.remove("hidden");
       col.style.setProperty("display", "block", "important");
     }
+    if (hub) hub.setAttribute("data-sq-dc-open", "1");
     var hb = document.getElementById("dcHubBody");
     if (hb) {
       hb.setAttribute("data-sq-dc-user-open", "1");
       hb.classList.remove("hidden");
       hb.style.setProperty("display", "block", "important");
     }
+    var tg = document.getElementById("dcToggleHubBtn");
+    if (tg) tg.textContent = "접기 ▲";
   }
 
   function jumpToLeagueStandingsV345(rawCode) {
@@ -5946,6 +6073,167 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
+
+  var _v40Top20ShowAll = false;
+  function organizeBelowScoreboardSectionsV40() {
+    // A) DataCenter (`#dcMainHubSection`): keep `#dcHubBody` folded on initial landing until user clicks a launcher card / toggle / tab!
+    var dcHub = document.getElementById("dcMainHubSection") || document.querySelector(".dc-hub-wrap");
+    var dcBody = document.getElementById("dcHubBody");
+    var dcTog = document.getElementById("dcToggleHubBtn");
+    if (dcHub && dcBody) {
+      var isUserOpen = dcBody.getAttribute("data-sq-dc-user-open") === "1";
+      if (!isUserOpen) {
+        dcHub.removeAttribute("data-sq-dc-open");
+        dcBody.style.setProperty("display", "none", "important");
+        if (dcTog && (dcTog.textContent || "").indexOf("펼치기") === -1) {
+          dcTog.textContent = "상세 표 펼치기 ▼";
+        }
+      } else {
+        dcHub.setAttribute("data-sq-dc-open", "1");
+        if (dcTog && (dcTog.textContent || "").indexOf("접기") === -1) {
+          dcTog.textContent = "접기 ▲";
+        }
+      }
+      installDataCenterPersistenceGuardV28();
+    }
+
+    // B) Global Big Match Buzz TOP 20 (`#globalTop10Grid` container):
+    var topGrid = document.getElementById("globalTop10Grid");
+    if (topGrid) {
+      var topBox = topGrid.parentElement;
+      while (topBox && topBox.parentElement && topBox.parentElement.id !== "tab-feed" && topBox.tagName !== "SECTION") {
+        if ((topBox.textContent || "").indexOf("화제성 TOP") !== -1) break;
+        topBox = topBox.parentElement;
+      }
+      if (topBox && topBox.id !== "tab-feed") {
+        topBox.id = "sqTop20BoxV40";
+        var firstHdr = topBox.firstElementChild;
+        if (firstHdr) {
+          firstHdr.setAttribute("data-sq-top20-hdr", "1");
+          var hdrFoldBtn = null;
+          Array.prototype.forEach.call(firstHdr.querySelectorAll("button"), function (b) {
+            var bt = String(b.textContent || "").trim();
+            if (/접기|펼치기/.test(bt)) hdrFoldBtn = b;
+          });
+          if (!hdrFoldBtn) {
+            hdrFoldBtn = document.createElement("button");
+            hdrFoldBtn.type = "button";
+            hdrFoldBtn.className = "sq-v40-fold-btn";
+            hdrFoldBtn.textContent = "접기 ▲";
+            firstHdr.appendChild(hdrFoldBtn);
+          }
+          if (!hdrFoldBtn.getAttribute("data-sq-v40-bound")) {
+            hdrFoldBtn.setAttribute("data-sq-v40-bound", "1");
+            hdrFoldBtn.classList.add("sq-v40-fold-btn");
+            (function (targetTopBox, btnRef) {
+              btnRef.onclick = function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                var nextFold = targetTopBox.getAttribute("data-sq-top20-folded") !== "1";
+                if (nextFold) {
+                  targetTopBox.setAttribute("data-sq-top20-folded", "1");
+                  btnRef.textContent = "TOP 20 펼치기 ▼";
+                } else {
+                  targetTopBox.removeAttribute("data-sq-top20-folded");
+                  btnRef.textContent = "접기 ▲";
+                }
+              };
+            })(topBox, hdrFoldBtn);
+          }
+        }
+      }
+
+      var cards = Array.prototype.slice.call(topGrid.children || []).filter(function (c) {
+        return c && c.tagName && (c.textContent || "").indexOf("표시할 경기가") === -1;
+      });
+      if (cards.length > 3) {
+        if (_v40Top20ShowAll) {
+          topGrid.setAttribute("data-sq-top20-expanded", "1");
+        } else {
+          topGrid.removeAttribute("data-sq-top20-expanded");
+        }
+        cards.forEach(function (c, idx) {
+          c.style.display = (!_v40Top20ShowAll && idx >= 3) ? "none" : "";
+        });
+
+        var moreWrap = document.getElementById("sqTop20MoreWrap");
+        if (!moreWrap && topGrid.parentElement) {
+          moreWrap = document.createElement("div");
+          moreWrap.id = "sqTop20MoreWrap";
+          moreWrap.style.cssText = "margin-top:9px;text-align:center;";
+          topGrid.parentElement.appendChild(moreWrap);
+        }
+        if (moreWrap) {
+          var wantLabel = _v40Top20ShowAll
+            ? "▲ 상위 3개 빅매치만 간략히 보기"
+            : ("🔥 빅매치 TOP " + cards.length + " 전체 보기 (+" + (cards.length - 3) + "경기 더보기 ▼)");
+          var mBtn = moreWrap.querySelector("button");
+          if (!mBtn) {
+            mBtn = document.createElement("button");
+            mBtn.type = "button";
+            moreWrap.appendChild(mBtn);
+          }
+          mBtn.className = "sq-v40-fold-btn";
+          mBtn.style.cssText = "padding:5px 15px;border-color:rgba(245,158,11,0.55);color:#fde68a;font-size:11.5px;";
+          if (mBtn.textContent !== wantLabel) mBtn.textContent = wantLabel;
+          mBtn.onclick = function (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            _v40Top20ShowAll = !_v40Top20ShowAll;
+            organizeBelowScoreboardSectionsV40();
+          };
+        }
+      }
+    }
+
+    // C) Secondary Blocks inside `#tab-feed` (`🔥 실시간 베스트 공감 브리핑 TOP 3` & `🤖 00:00 KST 자동 분석 엔진`):
+    var feedSec = document.getElementById("tab-feed") || document.getElementById("view-feed");
+    if (feedSec) {
+      var blocks = feedSec.querySelectorAll("div, section");
+      for (var bi = 0; bi < blocks.length; bi++) {
+        var blk = blocks[bi];
+        if (blk.id === "tab-feed" || blk.id === "feedList" || blk.id === "sqTop20BoxV40" || blk.querySelector("#feedList") || blk.querySelector("#globalTop10Grid")) continue;
+        var bTxt = blk.textContent || "";
+
+        if (!document.getElementById("sqBestTop3BoxV40") && bTxt.indexOf("베스트 공감 브리핑 TOP 3") !== -1 && blk.children.length >= 2 && blk.children.length <= 8) {
+          blk.id = "sqBestTop3BoxV40";
+          var bHdr = blk.firstElementChild;
+          if (bHdr) {
+            bHdr.setAttribute("data-sq-best-hdr", "1");
+            bHdr.style.cssText = (bHdr.style.cssText || "") + ";display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;";
+            blk.setAttribute("data-sq-best-folded", "1");
+            var bToggle = document.createElement("button");
+            bToggle.type = "button";
+            bToggle.id = "sqBestTop3ToggleV40";
+            bToggle.className = "sq-v40-fold-btn";
+            bToggle.textContent = "브리핑 3건 펼치기 ▼";
+            (function (targetBestBox, btnEl) {
+              var toggleBestFn = function (ev) {
+                if (ev && ev.target && ev.target.closest && ev.target.closest("a, [onclick]") && ev.target !== btnEl) return;
+                if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+                var isFolded = targetBestBox.getAttribute("data-sq-best-folded") === "1";
+                if (isFolded) {
+                  targetBestBox.removeAttribute("data-sq-best-folded");
+                  btnEl.textContent = "접기 ▲";
+                } else {
+                  targetBestBox.setAttribute("data-sq-best-folded", "1");
+                  btnEl.textContent = "브리핑 3건 펼치기 ▼";
+                }
+              };
+              btnEl.onclick = toggleBestFn;
+              bHdr.addEventListener("click", toggleBestFn);
+            })(blk, bToggle);
+            bHdr.appendChild(bToggle);
+          }
+        }
+
+        if (!document.getElementById("sqAutoEngineBarV40") && bTxt.indexOf("00:00 KST 글로벌 TOP 20 커뮤니티 자동 분석 엔진") !== -1 && blk.children.length <= 5) {
+          blk.id = "sqAutoEngineBarV40";
+        }
+      }
+    }
+  }
+
   function refreshScoreboardSuiteV30() {
     ensureDomesticBasketballUiControlsV34();
     ensureRootTickerObserverV31();
@@ -5959,6 +6247,7 @@ _FRONTEND_V22_JS = r'''
     mountOrUpdateV30ScoreToolbar();
     renderScoreboardTableV30(items);
     localizeScoreStripDomV381();
+    try { organizeBelowScoreboardSectionsV40(); } catch (eV40) {}
   }
 
   function getSportTacticalViewV33(it, hp, ap) {
@@ -8897,7 +9186,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3920_{int(time.time())}"
+_BOOT_VER_V30 = f"4000_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -12691,7 +12980,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "3.9.2-mobile-slim-toolbar",
+        "engine_version": "4.0-clean-datacenter-and-top20",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
