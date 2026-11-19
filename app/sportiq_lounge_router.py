@@ -1279,6 +1279,74 @@ _FRONTEND_V22_JS = r'''
       "  .sq-v42-mob-swipe::-webkit-scrollbar { display: none; }",
       "  .sq-v42-mob-swipe > button { flex: 0 0 auto !important; white-space: nowrap !important; }",
       "}",
+      "/* v4.3 Clean Schedule/Vote 2-Col Grid + 9:16 Tactical Shorts 3-Tab Companion & Playlist Polish */",
+      "#tab-matches, #tab-schedule, #tab-shorts, #tab-matches > *, #tab-schedule > *, #tab-shorts > * {",
+      "  min-width: 0 !important;",
+      "  max-width: 100% !important;",
+      "  box-sizing: border-box !important;",
+      "}",
+      ".sq-v43-matches-grid2 {",
+      "  display: grid !important;",
+      "  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;",
+      "  gap: 12px !important;",
+      "  margin-top: 12px !important;",
+      "}",
+      ".sq-v43-matches-grid2 > * {",
+      "  margin: 0 !important;",
+      "  min-width: 0 !important;",
+      "  border-radius: 15px !important;",
+      "  padding: 13px 15px !important;",
+      "  box-sizing: border-box !important;",
+      "}",
+      "[data-sq-v43-inj-box='1']:not([data-sq-v43-inj-open='1']) {",
+      "  display: none !important;",
+      "}",
+      "#sqShortsInteractiveTabsV43 {",
+      "  display: flex;",
+      "  flex-wrap: nowrap;",
+      "  overflow-x: auto;",
+      "  -webkit-overflow-scrolling: touch;",
+      "  scrollbar-width: none;",
+      "  gap: 6px;",
+      "  padding: 8px 10px;",
+      "  margin-top: 12px;",
+      "  margin-bottom: 10px;",
+      "  background: rgba(9, 15, 31, 0.94);",
+      "  border: 1px solid rgba(56, 189, 248, 0.3);",
+      "  border-radius: 13px;",
+      "  min-width: 0 !important;",
+      "  max-width: 100% !important;",
+      "  box-sizing: border-box !important;",
+      "}",
+      "#sqShortsInteractiveTabsV43::-webkit-scrollbar { display: none; }",
+      ".sq-v43-shorts-playlist {",
+      "  max-height: 410px;",
+      "  overflow-y: auto;",
+      "  padding-right: 4px;",
+      "}",
+      "@media (max-width: 820px) {",
+      "  .sq-v43-matches-grid2 { grid-template-columns: 1fr !important; }",
+      "}",
+      "@media (max-width: 760px) {",
+      "  .sq-v43-shorts-playlist {",
+      "    display: flex !important;",
+      "    flex-direction: row !important;",
+      "    flex-wrap: nowrap !important;",
+      "    max-height: none !important;",
+      "    overflow-x: auto !important;",
+      "    overflow-y: hidden !important;",
+      "    -webkit-overflow-scrolling: touch;",
+      "    scrollbar-width: none;",
+      "    gap: 8px !important;",
+      "    padding-bottom: 4px;",
+      "  }",
+      "  .sq-v43-shorts-playlist::-webkit-scrollbar { display: none; }",
+      "  .sq-v43-shorts-playlist > * {",
+      "    flex: 0 0 216px !important;",
+      "    max-width: 224px !important;",
+      "    margin: 0 !important;",
+      "  }",
+      "}",
       ".sq-v30-fbtn {",
       "  background: rgba(15, 23, 42, 0.9);",
       "  border: 1px solid #334155;",
@@ -6631,6 +6699,26 @@ _FRONTEND_V22_JS = r'''
       var ko = localizeTeamKoJsV381(eng.trim());
       return ko !== eng.trim() ? (lead + ko) : full;
     });
+    var venueMap = {
+      "Etihad Stadium": "에티하드 스타디움",
+      "Vitality Stadium": "바이탈리티 스타디움",
+      "Villa Park": "빌라 파크",
+      "Stamford Bridge": "스탬퍼드 브리지",
+      "Coventry Building Society Arena": "코번트리 아레나",
+      "Tottenham Hotspur Stadium": "토트넘 홋스퍼 스타디움",
+      "St. James' Park": "세인트 제임스 파크",
+      "Old Trafford": "올드 트래퍼드",
+      "Anfield": "안필드",
+      "Emirates Stadium": "에미레이츠 스타디움"
+    };
+    for (var vk in venueMap) {
+      if (out.indexOf(vk) !== -1) out = out.split(vk).join(venueMap[vk]);
+    }
+    out = out
+      .replace(/·\s*(?:football|soccer)\b/gi, "· 축구")
+      .replace(/·\s*basketball\b/gi, "· 농구")
+      .replace(/·\s*hockey\b/gi, "· 하키")
+      .replace(/·\s*baseball\b/gi, "· 야구");
     return out;
   }
 
@@ -6867,6 +6955,184 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
+
+  var _v43MatchesShowAll = false;
+  var _v43ShortsActiveWidget = "quiz";
+
+  function organizeScheduleAndShortsTabsV43() {
+    var matchSec = document.getElementById("tab-matches") || document.getElementById("tab-schedule");
+    if (matchSec) {
+      Array.prototype.forEach.call(matchSec.querySelectorAll("div"), function (d) {
+        if (d.children && d.children.length >= 5 && d.children.length <= 10 && d.querySelectorAll("button").length >= 5 && !d.querySelector("input")) {
+          var dtx = d.textContent || "";
+          if (dtx.indexOf("전체 TOP") !== -1 || dtx.indexOf("마이매치") !== -1) {
+            d.classList.add("sq-v42-mob-swipe");
+            Array.prototype.forEach.call(d.querySelectorAll("button"), function (b) {
+              var bt = String(b.textContent || "").trim();
+              if (bt.indexOf("마이매치") === -1 && /\(\s*0\s*\)\s*$/.test(bt)) {
+                b.style.display = "none";
+              }
+            });
+          }
+        }
+      });
+
+      var mLists = matchSec.querySelectorAll("div");
+      var voteListEl = null;
+      for (var mi = 0; mi < mLists.length; mi++) {
+        var ml = mLists[mi];
+        if (ml.children && ml.children.length >= 5 && ml.children.length <= 35) {
+          var sample0 = ml.children[0].textContent || "";
+          var sample1 = ml.children[1].textContent || "";
+          if (/\s+vs\s+/i.test(sample0) && /\s+vs\s+/i.test(sample1) && (sample0.indexOf("화제성") !== -1 || sample0.indexOf("참여") !== -1 || sample0.indexOf("모델 승률") !== -1)) {
+            voteListEl = ml;
+            break;
+          }
+        }
+      }
+
+      if (voteListEl) {
+        voteListEl.classList.add("sq-v43-matches-grid2");
+        dedupMatchupChildrenInContainerV362(voteListEl, false);
+
+        var uniqueCards = Array.prototype.slice.call(voteListEl.children).filter(function (c) {
+          return c && c.nodeType === 1 && c.getAttribute("data-sq-kelly-dup") !== "1";
+        });
+
+        uniqueCards.forEach(function (card, idx) {
+          var rk = idx + 1;
+          var walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT, null);
+          var tn;
+          while ((tn = walker.nextNode())) {
+            if (/화제성\s*#\d+/.test(tn.nodeValue || "")) {
+              var nextRkTxt = tn.nodeValue.replace(/^(?:\s*[🥇🥈🥉]\s*)?/, (rk === 1 ? "🥇 " : (rk === 2 ? "🥈 " : (rk === 3 ? "🥉 " : "")))).replace(/화제성\s*#\d+/, "화제성 #" + rk);
+              if (nextRkTxt !== tn.nodeValue) tn.nodeValue = nextRkTxt;
+              break;
+            }
+          }
+
+          var subDivs = card.querySelectorAll("div");
+          for (var sdi = 0; sdi < subDivs.length; sdi++) {
+            var sd = subDivs[sdi];
+            var stx = sd.textContent || "";
+            if (stx.indexOf("결장") !== -1 && stx.indexOf("리스크") !== -1 && sd.children.length <= 5 && !sd.querySelector("button")) {
+              if (!sd.hasAttribute("data-sq-v43-inj-box")) {
+                sd.setAttribute("data-sq-v43-inj-box", "1");
+                var togWrap = document.createElement("div");
+                togWrap.style.cssText = "margin:4px 0 6px;display:flex;justify-content:flex-end;";
+                var togBtn = document.createElement("button");
+                togBtn.type = "button";
+                togBtn.className = "sq-v40-fold-btn";
+                togBtn.setAttribute("data-sq-v43-inj-tog", "1");
+                togBtn.style.cssText = "padding:2.5px 9px;font-size:10.6px;color:#93c5fd;border-color:rgba(56,189,248,0.38);";
+                togBtn.textContent = "🏥 결장 · 리스크 브리핑 보기 ▾";
+                (function (targetSd, btnEl) {
+                  btnEl.onclick = function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    var openNow = targetSd.getAttribute("data-sq-v43-inj-open") !== "1";
+                    if (openNow) {
+                      targetSd.setAttribute("data-sq-v43-inj-open", "1");
+                      btnEl.textContent = "🏥 결장 · 리스크 접기 ▴";
+                    } else {
+                      targetSd.removeAttribute("data-sq-v43-inj-open");
+                      btnEl.textContent = "🏥 결장 · 리스크 브리핑 보기 ▾";
+                    }
+                  };
+                })(sd, togBtn);
+                togWrap.appendChild(togBtn);
+                sd.insertAdjacentElement("beforebegin", togWrap);
+              }
+              break;
+            }
+          }
+        });
+
+        var dedupCnt = uniqueCards.length;
+        if (dedupCnt > 0) {
+          Array.prototype.forEach.call(matchSec.querySelectorAll("button, span, div"), function (el) {
+            if (el.children && el.children.length > 0) return;
+            var tx = el.textContent || "";
+            if (/전체\s*TOP\s*20\s*\(\d+\)/.test(tx)) {
+              el.textContent = tx.replace(/\(\d+\)/, "(" + dedupCnt + ")");
+            } else if (tx.indexOf("화제성 TOP 20 연동") !== -1 && /총\s*\d+\s*경기/.test(tx)) {
+              el.textContent = tx.replace(/총\s*\d+\s*경기/, "총 " + dedupCnt + "경기");
+            }
+          });
+        }
+
+        applyCompactListCapV42(
+          voteListEl, 6, _v43MatchesShowAll, "sqMatchesVoteMoreWrapV43",
+          function (tot, rem) { return "🗳️ 빅매치 승부투표 전체 보기 (+" + rem + "경기 더보기 ▼)"; },
+          "▲ 상위 6경기만 간략히 보기",
+          "rgba(56,189,248,0.55)", "#7dd3fc",
+          function () { _v43MatchesShowAll = !_v43MatchesShowAll; organizeScheduleAndShortsTabsV43(); }
+        );
+      }
+    }
+
+    var shortsSec = document.getElementById("tab-shorts");
+    if (shortsSec) {
+      var quizBox = null, varBox = null, cmtBox = null;
+      var sDivs = shortsSec.querySelectorAll("div, section");
+      for (var si = 0; si < sDivs.length; si++) {
+        var sd = sDivs[si];
+        var stx = sd.textContent || "";
+
+        if (sd.children && sd.children.length >= 4 && sd.children.length <= 10 && sd.querySelectorAll("button").length >= 4 && !sd.querySelector("input, textarea")) {
+          if (stx.indexOf("축구") !== -1 || stx.indexOf("인기순") !== -1 || stx.indexOf("슬로모션") !== -1 || stx.indexOf("미쳤다") !== -1) {
+            sd.classList.add("sq-v42-mob-swipe");
+          }
+        }
+
+        if (sd.children && sd.children.length >= 5 && sd.children.length <= 16 && !sd.classList.contains("sq-v42-mob-swipe")) {
+          var c0 = sd.children[0].textContent || "";
+          var c1 = sd.children[1].textContent || "";
+          if ((c0.indexOf("❤️") !== -1 && c1.indexOf("❤️") !== -1) || (c0.indexOf("PITCH") !== -1 || c0.indexOf("TACTICAL") !== -1)) {
+            sd.classList.add("sq-v43-shorts-playlist");
+          }
+        }
+
+        if (!quizBox && stx.indexOf("미니 예측 퀴즈") !== -1 && sd.children.length >= 2 && sd.children.length <= 6 && stx.indexOf("타임스탬프 한줄평") === -1) {
+          quizBox = sd;
+        } else if (!varBox && stx.indexOf("밸런스 투표") !== -1 && sd.children.length >= 2 && sd.children.length <= 6 && stx.indexOf("미니 예측 퀴즈") === -1) {
+          varBox = sd;
+        } else if (!cmtBox && stx.indexOf("타임스탬프 한줄평") !== -1 && sd.children.length >= 2 && sd.children.length <= 6 && stx.indexOf("밸런스 투표") === -1) {
+          cmtBox = sd;
+        }
+      }
+
+      if (quizBox && varBox && cmtBox && quizBox.parentElement) {
+        var tabBar = document.getElementById("sqShortsInteractiveTabsV43");
+        if (!tabBar) {
+          tabBar = document.createElement("div");
+          tabBar.id = "sqShortsInteractiveTabsV43";
+          quizBox.insertAdjacentElement("beforebegin", tabBar);
+        }
+        var tabs = [
+          { k: "quiz", lbl: "🎯 +15P 미니 예측 퀴즈" },
+          { k: "var", lbl: "⚖️ VAR 판정 밸런스 투표" },
+          { k: "comment", lbl: "⏱️ 실시간 타임스탬프 한줄평" }
+        ];
+        if (tabBar.getAttribute("data-sq-sig") !== _v43ShortsActiveWidget) {
+          tabBar.setAttribute("data-sq-sig", _v43ShortsActiveWidget);
+          tabBar.innerHTML = tabs.map(function (t) {
+            return "<button type='button' class='sq-v42-subpill" + (_v43ShortsActiveWidget === t.k ? " active" : "") + "' data-sq-sh-tab='" + t.k + "'>" + t.lbl + "</button>";
+          }).join("");
+          tabBar.querySelectorAll("[data-sq-sh-tab]").forEach(function (b) {
+            b.onclick = function () {
+              _v43ShortsActiveWidget = b.getAttribute("data-sq-sh-tab") || "quiz";
+              organizeScheduleAndShortsTabsV43();
+            };
+          });
+        }
+        quizBox.style.display = (_v43ShortsActiveWidget === "quiz") ? "" : "none";
+        varBox.style.display = (_v43ShortsActiveWidget === "var") ? "" : "none";
+        cmtBox.style.display = (_v43ShortsActiveWidget === "comment") ? "" : "none";
+      }
+    }
+  }
+
   function refreshScoreboardSuiteV30() {
     ensureDomesticBasketballUiControlsV34();
     ensureRootTickerObserverV31();
@@ -6883,6 +7149,7 @@ _FRONTEND_V22_JS = r'''
     try { organizeBelowScoreboardSectionsV40(); } catch (eV40) {}
     try { organizeSidebarAndIssuesTabV41(); } catch (eV41) {}
     try { organizeRankingAndLabTabsV42(); } catch (eV42) {}
+    try { organizeScheduleAndShortsTabsV43(); } catch (eV43) {}
   }
 
   function getSportTacticalViewV33(it, hp, ap) {
@@ -9821,7 +10088,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"4200_{int(time.time())}"
+_BOOT_VER_V30 = f"4300_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -13615,7 +13882,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "4.2-clean-ranking-and-lab-hub",
+        "engine_version": "4.3-complete-7tabs-clean-ux",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
