@@ -938,6 +938,84 @@ _FRONTEND_V22_JS = r'''
       "}",
       "#sqV39AlertDrawer.is-open { display: flex !important; }",
       "body.sq-v39-cards-ready #dcLiveTickerTrack > :not(.sq-v39-card):not([data-sq-v31-empty]) { display: none !important; }",
+      ".sq-v39-sf-group, .sq-v39-vm-group { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }",
+      ".sq-v39-sf-group .sq-v30-fbtn, .sq-v39-vm-group .sq-v30-fbtn {",
+      "  display: inline-flex;",
+      "  align-items: center;",
+      "  justify-content: center;",
+      "  height: 28px;",
+      "  box-sizing: border-box;",
+      "  line-height: 1;",
+      "}",
+      "@media (max-width: 640px) {",
+      "  #dcSportPills {",
+      "    flex-wrap: nowrap !important;",
+      "    overflow-x: auto !important;",
+      "    -webkit-overflow-scrolling: touch;",
+      "    scrollbar-width: none;",
+      "    padding-bottom: 2px;",
+      "  }",
+      "  #dcSportPills::-webkit-scrollbar { display: none; }",
+      "  #dcSportPills > button { flex-shrink: 0 !important; white-space: nowrap !important; }",
+      "  #sqV30ScoreToolbar {",
+      "    display: flex !important;",
+      "    flex-wrap: wrap !important;",
+      "    align-items: center !important;",
+      "    gap: 6px !important;",
+      "    padding: 5px 0 7px !important;",
+      "  }",
+      "  #sqV39ToolbarBody { display: contents !important; }",
+      "  .sq-v39-sf-group {",
+      "    order: 1;",
+      "    flex: 1 1 100% !important;",
+      "    width: 100% !important;",
+      "    min-width: 0 !important;",
+      "    flex-wrap: nowrap !important;",
+      "    overflow-x: auto !important;",
+      "    -webkit-overflow-scrolling: touch;",
+      "    scrollbar-width: none;",
+      "    gap: 5px !important;",
+      "    padding-bottom: 1px;",
+      "  }",
+      "  .sq-v39-sf-group::-webkit-scrollbar { display: none; }",
+      "  .sq-v39-sf-group .sq-v30-fbtn {",
+      "    flex: 0 0 auto !important;",
+      "    height: 27px !important;",
+      "    white-space: nowrap !important;",
+      "    padding: 0 9px !important;",
+      "    font-size: 11.2px !important;",
+      "  }",
+      "  #sqV39LeagueSlot {",
+      "    order: 2;",
+      "    flex: 0 0 auto !important;",
+      "  }",
+      "  #sqV39LeagueSlot select {",
+      "    max-width: 110px !important;",
+      "    height: 27px !important;",
+      "    font-size: 11px !important;",
+      "    padding: 2px 6px !important;",
+      "  }",
+      "  .sq-v39-vm-group {",
+      "    order: 3;",
+      "    flex: 1 1 0% !important;",
+      "    min-width: 0 !important;",
+      "    justify-content: flex-end;",
+      "    flex-wrap: nowrap !important;",
+      "    overflow-x: auto !important;",
+      "    -webkit-overflow-scrolling: touch;",
+      "    scrollbar-width: none;",
+      "    gap: 4px !important;",
+      "  }",
+      "  .sq-v39-vm-group::-webkit-scrollbar { display: none; }",
+      "  .sq-v39-vm-group .sq-v30-fbtn {",
+      "    flex: 0 0 auto !important;",
+      "    height: 27px !important;",
+      "    white-space: nowrap !important;",
+      "    padding: 0 7px !important;",
+      "    font-size: 10.8px !important;",
+      "  }",
+      "  .sq-v39-nav-arrows { display: none !important; }",
+      "}",
       ".sq-v30-fbtn {",
       "  background: rgba(15, 23, 42, 0.9);",
       "  border: 1px solid #334155;",
@@ -5801,7 +5879,7 @@ _FRONTEND_V22_JS = r'''
 
     var navArrowsHtml = (vm === "cards")
       ? (
-        "<span style='display:inline-flex;gap:3px;margin-left:2px;'>" +
+        "<span class='sq-v39-nav-arrows' style='display:inline-flex;gap:3px;margin-left:2px;'>" +
         "  <button type='button' class='sq-v30-fbtn' data-v39-scroll='-1' title='이전 경기 카드' style='padding:4px 8px;'>◀</button>" +
         "  <button type='button' class='sq-v30-fbtn' data-v39-scroll='1' title='다음 경기 카드' style='padding:4px 8px;'>▶</button>" +
         "</span>"
@@ -5809,20 +5887,28 @@ _FRONTEND_V22_JS = r'''
       : "";
 
     tbBody.innerHTML = (
-      "<div style='display:flex;flex-wrap:wrap;gap:5px;align-items:center;'>" +
+      "<div class='sq-v39-sf-group'>" +
       "  <button type='button' class='sq-v30-fbtn" + (sf === "all" ? " active" : "") + "' data-v30-sf='all'>전체 (" + cntAll + ")</button>" +
       "  <button type='button' class='sq-v30-fbtn" + (sf === "live" ? " active-live" : "") + "' data-v30-sf='live'>🔴 LIVE (" + cntLive + ")</button>" +
       "  <button type='button' class='sq-v30-fbtn" + (sf === "pre" ? " active" : "") + "' data-v30-sf='pre'>⏳ 예정 (" + cntPre + ")</button>" +
       "  <button type='button' class='sq-v30-fbtn" + (sf === "post" ? " active" : "") + "' data-v30-sf='post'>✅ 종료 (" + cntPost + ")</button>" +
       "  <button type='button' class='sq-v30-fbtn" + (sf === "fav" ? " active" : "") + "' data-v30-sf='fav'>★ 관심 (" + cntFav + ")</button>" +
       "</div>" +
-      "<div style='display:flex;flex-wrap:wrap;gap:5px;align-items:center;'>" +
+      "<div class='sq-v39-vm-group'>" +
       "  <button type='button' class='sq-v30-fbtn" + (vm === "cards" ? " active-view" : "") + "' data-v30-vm='cards'>🃏 카드 트랙</button>" +
       "  <button type='button' class='sq-v30-fbtn" + (vm === "table-league" ? " active-view" : "") + "' data-v30-vm='table-league'>📋 리그별 표</button>" +
       "  <button type='button' class='sq-v30-fbtn" + (vm === "table-time" ? " active-view" : "") + "' data-v30-vm='table-time'>🕒 시간순 표</button>" +
       navArrowsHtml +
       "</div>"
     );
+    setTimeout(function () {
+      var sfGrp = tbBody.querySelector(".sq-v39-sf-group");
+      var actSf = sfGrp ? sfGrp.querySelector(".sq-v30-fbtn.active, .sq-v30-fbtn.active-live") : null;
+      if (sfGrp && actSf && sfGrp.scrollWidth > sfGrp.clientWidth + 6) {
+        var tgtLeft = actSf.offsetLeft - Math.round((sfGrp.clientWidth - actSf.offsetWidth) / 2);
+        sfGrp.scrollLeft = Math.max(0, tgtLeft);
+      }
+    }, 15);
 
     if (!bar.__sqDelegatedV30) {
       bar.__sqDelegatedV30 = true;
@@ -8811,7 +8897,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3910_{int(time.time())}"
+_BOOT_VER_V30 = f"3920_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -12605,7 +12691,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "3.9.1-autorefresh-dedup-fix",
+        "engine_version": "3.9.2-mobile-slim-toolbar",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
