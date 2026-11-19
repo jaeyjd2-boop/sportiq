@@ -8309,7 +8309,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"3740_{int(time.time())}"
+_BOOT_VER_V30 = f"3750_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -10924,6 +10924,37 @@ def _fetch_espn_json_fast_v374(path: str, ymd: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _parse_espn_iso_kst_v375(iso_str: str) -> Optional[datetime]:
+    if not iso_str:
+        return None
+    s = str(iso_str).strip()
+    if not s:
+        return None
+    try:
+        if s.endswith("Z") or s.endswith("z"):
+            s = s[:-1] + "+00:00"
+        if re.match(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?:[+\-]\d{2}:?\d{2})?$", s):
+            s = s[:16] + ":00" + s[16:]
+        if re.search(r"[+\-]\d{4}$", s):
+            s = s[:-2] + ":" + s[-2:]
+        dt = datetime.fromisoformat(s)
+        return (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).astimezone(KST)
+    except Exception:
+        pass
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?", str(iso_str).strip())
+    if m:
+        try:
+            dt_u = datetime(
+                int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                int(m.group(4)), int(m.group(5)), int(m.group(6) or 0),
+                tzinfo=timezone.utc,
+            )
+            return dt_u.astimezone(KST)
+        except Exception:
+            return None
+    return None
+
+
 def _fetch_espn_league_date_v37(lg_code: str, ymd: str) -> List[Dict[str, Any]]:
     meta = _ESPN_LEAGUE_ENDPOINTS_V37.get(lg_code)
     if not meta:
@@ -10942,13 +10973,7 @@ def _fetch_espn_league_date_v37(lg_code: str, ymd: str) -> List[Dict[str, Any]]:
         for ev in jd.get("events") or []:
             ev_id = str(ev.get("id") or "")
             iso_dt = str(ev.get("date") or "")
-            dt_kst: Optional[datetime] = None
-            if iso_dt:
-                try:
-                    dt_utc = datetime.fromisoformat(iso_dt.replace("Z", "+00:00"))
-                    dt_kst = dt_utc.astimezone(KST)
-                except Exception:
-                    dt_kst = None
+            dt_kst = _parse_espn_iso_kst_v375(iso_dt)
             if not dt_kst:
                 continue
             comps = ev.get("competitions") or []
@@ -11685,7 +11710,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     return {
         "ok": True,
         "assistant": "AI 아이큐",
-        "engine_version": "3.7.4-dualhost-priority",
+        "engine_version": "3.7.5-py310-iso-instant",
         "awarded_points": awarded_pts,
         "updated_points": updated_pts,
         **cached_payload,
@@ -11702,7 +11727,7 @@ def _start_coldboot_schedule_prewarmer_v373() -> None:
     _ESPN_PREWARM_STARTED_V373 = True
 
     def _warm_worker() -> None:
-        time.sleep(2.2)
+        time.sleep(0.5)
         try:
             base_k = datetime.now(KST)
             ymds = [(base_k + timedelta(days=d)).strftime("%Y%m%d") for d in (-1, 0, 1)]
