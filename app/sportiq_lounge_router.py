@@ -5193,10 +5193,196 @@ _FRONTEND_V22_JS = r'''
     return /^(?:배구\s*)?(?:V-?\s*리그|VLEAGUE)(?:\s*(?:순위|랭킹|통합))?$/i.test(cleanTx);
   }
 
+  var _lastDomInjPayloadV4633 = null;
+  var _lastDomSimPayloadV4633 = null;
+  var _dcFetchSeqV4633 = 0;
+  var _dcFetchObservedSeqV4633 = 0;
+  var _sqInternalBounceClickV4633 = false;
+
   function isSubFilterDcPillBtnV4626(btn) {
     if (!btn) return false;
     var oc = String(btn.getAttribute("onclick") || "");
-    return /__setDcInjSev|__setDcTrCat|__setDcTrFilter/i.test(oc);
+    if (/__setDcInjSev|__setDcTrCat|__setDcTrFilter/i.test(oc)) return true;
+    var tx = String(btn.textContent || "").replace(/\s+/g, " ").trim();
+    return /^(?:심각도\s*전체|장기\s*결장|단기\s*결장|출전\s*불투명|복귀\s*임박|부상\s*외|전체\s*피드|✅?\s*오피셜|🔥?\s*임박·루머|🔄?\s*임대|몸값\s*TOP|📈?\s*상승률순|🇰🇷?\s*코리안리거|🌟?\s*U-23\s*유망주|FW|MF|DF)$/.test(tx);
+  }
+
+  function extractOverseasDcLeagueCodeV4633(btn) {
+    if (!btn || btn.getAttribute("data-sq-dc-lg") || btn.getAttribute("data-sq-hidden-legacy-vl") || isSubFilterDcPillBtnV4626(btn)) return "";
+    var oc = String(btn.getAttribute("onclick") || "");
+    var mOc = oc.match(/\(\s*['"]([A-Za-z0-9_]+)['"]\s*\)/);
+    if (mOc && !isDomesticDcLeagueCodeV4625(mOc[1]) && mOc[1].toUpperCase() !== "VLEAGUE") {
+      return mOc[1].toUpperCase();
+    }
+    var dLg = String(btn.getAttribute("data-league") || btn.getAttribute("data-lg") || "").trim().toUpperCase();
+    if (dLg && !isDomesticDcLeagueCodeV4625(dLg) && dLg !== "VLEAGUE") return dLg;
+    var tx = String(btn.textContent || "").replace(/\s+/g, " ").trim().toUpperCase();
+    var known = ["BUNDESLIGA", "LALIGA", "SERIEA", "LIGUE1", "KLEAGUE", "EPL", "NBA", "KBO", "MLB", "NHL", "LCK", "UFC", "ATP", "F1"];
+    for (var i = 0; i < known.length; i++) {
+      if (tx === known[i] || tx.indexOf(known[i]) !== -1) return known[i];
+    }
+    return "";
+  }
+
+  function installGlobalOverseasDcPillUnlockV4633() {
+    if (window.__sqOverseasDcPillUnlockBoundV4633) return;
+    window.__sqOverseasDcPillUnlockBoundV4633 = true;
+
+    window.addEventListener("click", function (ev) {
+      if (_sqInternalNbaTriggerV4625 || _sqInternalBounceClickV4633) return;
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var btn = t.closest("#dcHubBody button");
+      if (!btn || btn.closest("table, .dc-kpi-box, .dc-kpi-row")) return;
+      var ovCode = extractOverseasDcLeagueCodeV4633(btn);
+      if (!ovCode) return;
+
+      var wasDom = Boolean(_sqActiveDomDcLeagueV4625 || _sqProxyDcLeagueV341);
+      _sqActiveDomDcLeagueV4625 = "";
+      _sqProxyDcLeagueV341 = "";
+      if (_sqProxyDcTimerV341) { clearTimeout(_sqProxyDcTimerV341); _sqProxyDcTimerV341 = null; }
+
+      var hubBody = document.getElementById("dcHubBody");
+      if (hubBody) {
+        Array.prototype.forEach.call(hubBody.querySelectorAll("button[data-sq-dc-lg]"), function (db) {
+          db.classList.remove("active");
+          db.style.background = "";
+          db.style.color = "";
+          db.style.borderColor = "";
+        });
+      }
+
+      var mySeq = ++_dcFetchSeqV4633;
+      if (wasDom) {
+        // If host DataCenter closure short-circuited (`if (injLeague === 'EPL') return;` because closure stayed on `'EPL'` while domestic proxy was active),
+        // force a clean refresh via global setter OR sibling-pill bounce (`LALIGA` -> `EPL`) within 25ms!
+        setTimeout(function () {
+          if (_dcFetchObservedSeqV4633 >= mySeq || _sqActiveDomDcLeagueV4625) return;
+          var hbNow = document.getElementById("dcHubBody");
+          var bodyTxt = hbNow ? String(hbNow.textContent || "") : "";
+          var inInj = /총\s*결장자|부상\s*부위|풀스쿼드|심각도/.test(bodyTxt);
+          var inSim = /Monte\s*Carlo|우승\s*확률|FIFA\s*국가대표/.test(bodyTxt);
+
+          if (inInj && typeof window.__setDcInjLeague === "function") {
+            window.__setDcInjLeague(ovCode);
+            if (_dcFetchObservedSeqV4633 >= mySeq) return;
+          } else if (inSim && typeof window.__setDcSimLeague === "function") {
+            window.__setDcSimLeague(ovCode);
+            if (_dcFetchObservedSeqV4633 >= mySeq) return;
+          } else if (!inInj && !inSim && typeof window.__setDcStLeague === "function") {
+            window.__setDcStLeague(ovCode);
+            if (_dcFetchObservedSeqV4633 >= mySeq) return;
+          }
+
+          // Closure-proof sibling bounce (`LALIGA` <-> `EPL`) for inline host scripts without `__setDc*League` globals!
+          if (hbNow) {
+            var allPills = Array.prototype.slice.call(hbNow.querySelectorAll("button"));
+            var targetPill = allPills.find(function (p) { return extractOverseasDcLeagueCodeV4633(p) === ovCode; }) || btn;
+            var altPill = allPills.find(function (p) {
+              var c = extractOverseasDcLeagueCodeV4633(p);
+              return c && c !== ovCode && (c === "LALIGA" || c === "NBA" || c === "EPL");
+            });
+            _sqInternalBounceClickV4633 = true;
+            try {
+              if (altPill) altPill.click();
+              if (targetPill) targetPill.click();
+            } catch (eBounce) {
+            } finally {
+              _sqInternalBounceClickV4633 = false;
+            }
+          }
+        }, 25);
+      }
+    }, true);
+  }
+
+  function repairDcHubDomTablesAndUndefinedV4633(hubBody) {
+    if (!hubBody) return;
+    installGlobalOverseasDcPillUnlockV4633();
+
+    var isDomActive = isDomesticDcLeagueCodeV4625(_sqActiveDomDcLeagueV4625);
+
+    // 1) Repair `전력 타격 TOP 3` `undefined(undefined)` & empty domestic injury `<tbody>` (both 5-col and 6-col layouts!)
+    var injData = _lastDomInjPayloadV4633;
+    Array.prototype.forEach.call(hubBody.querySelectorAll("div, span, td, strong"), function (el) {
+      if (el.children && el.children.length > 0) return;
+      var tx = String(el.textContent || "");
+      if (tx.indexOf("undefined") !== -1) {
+        var labels = (injData && injData.kpis && Array.isArray(injData.kpis.hardest_hit_labels) && injData.kpis.hardest_hit_labels.length)
+          ? injData.kpis.hardest_hit_labels.join(" · ")
+          : "주요 구단 컨디션 정상";
+        el.textContent = labels;
+      }
+    });
+
+    if (isDomActive && injData && Array.isArray(injData.items) && injData.items.length > 0) {
+      var tables = hubBody.querySelectorAll("table");
+      for (var ti = 0; ti < tables.length; ti++) {
+        var tbl = tables[ti];
+        var ths = tbl.querySelectorAll("thead th");
+        var headTxt = tbl.querySelector("thead") ? String(tbl.querySelector("thead").textContent || "") : "";
+        if (!/부상|결장|사유/.test(headTxt)) continue;
+        var tbody = tbl.querySelector("tbody");
+        if (!tbody) continue;
+        var trs = tbody.querySelectorAll("tr");
+        var isEmptyOrPlaceholder = (trs.length === 0) || (trs.length === 1 && (trs[0].querySelectorAll("td").length <= 1 || /없습니다|조회\s*중/.test(trs[0].textContent || "")));
+        var inpEl = document.getElementById("dcInjSearchInput");
+        var hasActiveSearch = Boolean(inpEl && String(inpEl.value || "").trim());
+        if (isEmptyOrPlaceholder && !hasActiveSearch) {
+          var colCnt = ths.length || 5;
+          tbody.innerHTML = injData.items.map(function (it) {
+            var sCol = it.severity === "장기 결장" ? "#ef4444" : (it.severity === "복귀 임박" ? "#22c55e" : "#f59e0b");
+            var badge = "<span style='background:rgba(15,23,42,0.85);border:1px solid " + sCol + ";color:" + sCol + ";padding:2px 8px;border-radius:99px;font-size:11px;font-weight:800;white-space:nowrap;'>• " + uxEsc(it.severity) + "</span>";
+            if (colCnt >= 6) {
+              return "<tr>" +
+                "<td style='font-weight:800;color:#93c5fd;'>" + uxEsc(it.team) + "</td>" +
+                "<td style='font-weight:800;color:#f8fafc;'>" + uxEsc(it.player) + "</td>" +
+                "<td style='color:#cbd5e1;'>" + uxEsc(it.pos) + "</td>" +
+                "<td>" + uxEsc(it.reason) + "</td>" +
+                "<td>" + badge + "</td>" +
+                "<td style='color:#cbd5e1;font-size:12px;'>" + uxEsc(it.since) + "</td>" +
+              "</tr>";
+            }
+            return "<tr>" +
+              "<td style='font-weight:800;color:#93c5fd;'>" + uxEsc(it.team) + "</td>" +
+              "<td style='font-weight:800;color:#f8fafc;'>" + uxEsc(it.player) + " <span style='color:#94a3b8;font-size:11px;'>(" + uxEsc(it.pos) + ")</span></td>" +
+              "<td>" + uxEsc(it.reason) + "</td>" +
+              "<td>" + badge + "</td>" +
+              "<td style='color:#cbd5e1;font-size:12px;'>" + uxEsc(it.since) + "</td>" +
+            "</tr>";
+          }).join("");
+        }
+      }
+    }
+
+    // 2) Repair `AI 시즌 예측` right-hand `FIFA 국가대표 랭킹` & `세계 클럽 Elo 파워 랭킹` tables if host rendered empty `<tbody>`!
+    var simData = _lastDomSimPayloadV4633;
+    if (simData && (Array.isArray(simData.fifa_ranking) || Array.isArray(simData.club_ranking))) {
+      Array.prototype.forEach.call(hubBody.querySelectorAll("table"), function (tbl) {
+        var tbody = tbl.querySelector("tbody");
+        if (!tbody || tbody.querySelectorAll("tr").length > 0) return;
+        var wrapTxt = String((tbl.parentElement && tbl.parentElement.textContent) || "") + " " + String((tbl.parentElement && tbl.parentElement.parentElement && tbl.parentElement.parentElement.textContent) || "");
+        var colCnt = tbl.querySelectorAll("thead th").length || 3;
+        if (/FIFA\s*국가대표/.test(wrapTxt) && Array.isArray(simData.fifa_ranking) && simData.fifa_ranking.length) {
+          tbody.innerHTML = simData.fifa_ranking.map(function (f) {
+            var chg = f.change > 0 ? "<span style='color:#4ade80;'>▲" + f.change + "</span>" : (f.change < 0 ? "<span style='color:#f87171;'>▼" + Math.abs(f.change) + "</span>" : "-");
+            var rowSt = f.highlight ? " style='background:rgba(239,68,68,0.16);font-weight:800;'" : "";
+            if (colCnt >= 4) {
+              return "<tr" + rowSt + "><td>#" + uxEsc(f.rank) + "</td><td>" + uxEsc(f.flag + " " + f.country) + "</td><td>" + uxEsc(f.points) + "</td><td>" + chg + "</td></tr>";
+            }
+            return "<tr" + rowSt + "><td>#" + uxEsc(f.rank) + "</td><td>" + uxEsc(f.flag + " " + f.country) + "</td><td style='text-align:right;'>" + uxEsc(f.points) + "점 (" + chg + ")</td></tr>";
+          }).join("");
+        } else if (/세계\s*클럽|클럽\s*Elo/i.test(wrapTxt) && Array.isArray(simData.club_ranking) && simData.club_ranking.length) {
+          tbody.innerHTML = simData.club_ranking.map(function (c) {
+            var chg = c.change > 0 ? "<span style='color:#4ade80;'>▲" + c.change + "</span>" : (c.change < 0 ? "<span style='color:#f87171;'>▼" + Math.abs(c.change) + "</span>" : "-");
+            if (colCnt >= 4) {
+              return "<tr><td>#" + uxEsc(c.rank) + "</td><td style='font-weight:800;'>" + uxEsc(c.club) + "</td><td>" + uxEsc(c.league) + "</td><td style='color:#a78bfa;font-weight:700;'>" + uxEsc(c.elo) + " (" + chg + ")</td></tr>";
+            }
+            return "<tr><td>#" + uxEsc(c.rank) + "</td><td style='font-weight:800;'>" + uxEsc(c.club) + " <span style='color:#64748b;font-size:11px;'>(" + uxEsc(c.league) + ")</span></td><td style='color:#a78bfa;font-weight:700;text-align:right;'>Elo " + uxEsc(c.elo) + " (" + chg + ")</td></tr>";
+          }).join("");
+        }
+      });
+    }
   }
 
   function collectDcLeaguePillButtonsV4626(hubBody, bar) {
@@ -5326,9 +5512,10 @@ _FRONTEND_V22_JS = r'''
       if (!nbaBtn || !nbaBtn.parentElement) return;
       var bar = nbaBtn.parentElement;
       var ocStr = String(nbaBtn.getAttribute("onclick") || "");
-      var tabHint = ocStr.indexOf("__setDcSimLeague") !== -1
+      var hbTextNow = String(hubBody.textContent || "");
+      var tabHint = (ocStr.indexOf("__setDcSimLeague") !== -1 || /Monte\s*Carlo|우승\s*확률|FIFA\s*국가대표/.test(hbTextNow))
         ? "season-sim"
-        : (ocStr.indexOf("__setDcInjLeague") !== -1 ? "injuries" : "standings");
+        : ((ocStr.indexOf("__setDcInjLeague") !== -1 || /총\s*결장자|부상\s*부위|풀스쿼드/.test(hbTextNow)) ? "injuries" : "standings");
 
       if (!bar.querySelector("[data-sq-dc-lg='VLEAGUE_M']")) {
         var anchor = nbaBtn;
@@ -5413,6 +5600,7 @@ _FRONTEND_V22_JS = r'''
           b.style.borderColor = "";
         });
       }
+      try { repairDcHubDomTablesAndUndefinedV4633(hubBody); } catch (eRepDc) {}
     } finally {
       _inDcHubDomSyncV4625 = false;
     }
@@ -5580,15 +5768,16 @@ _FRONTEND_V22_JS = r'''
   }
 
   function installDomesticBballFetchBridgeV341() {
+    installGlobalOverseasDcPillUnlockV4633();
     if (window.__sqFetchBridgeV341 || typeof window.fetch !== "function") return;
     window.__sqFetchBridgeV341 = true;
     var _prevFetch = window.fetch;
     window.fetch = function (input, init) {
       var urlStr = typeof input === "string" ? input : ((input && input.url) ? String(input.url) : "");
       if (urlStr) {
-        // 1. Direct or proxied KBL/WKBL standings, season-sim, and injuries -> route to guaranteed domestic-bball-meta-v34!
         var mDc = urlStr.match(/\/api\/datacenter\/(standings|season-sim|injuries)\?([^#]*)/);
         if (mDc) {
+          _dcFetchObservedSeqV4633 = _dcFetchSeqV4633;
           var ep = mDc[1];
           var qs = new URLSearchParams(mDc[2] || "");
           var reqLg = String(qs.get("league") || "").toUpperCase();
@@ -5602,9 +5791,40 @@ _FRONTEND_V22_JS = r'''
             var kind = ep === "season-sim" ? "sim" : (ep === "injuries" ? "injuries" : "standings");
             var newUrl = "/api/member/domestic-bball-meta-v34?kind=" + kind + "&league=" + normDomLg + "&severity=" + encodeURIComponent(qs.get("severity") || "all") + "&q=" + encodeURIComponent(qs.get("q") || "");
             return _prevFetch.call(window, newUrl, init).then(function (resp) {
-              setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 0);
-              setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 60);
-              return resp;
+              return resp.json().then(function (d) {
+                if (d && kind === "injuries") {
+                  if (d.kpis && Array.isArray(d.kpis.hardest_hit)) {
+                    d.kpis.hardest_hit = d.kpis.hardest_hit.map(function (h) {
+                      if (h && typeof h === "object") {
+                        h.toString = function () { return (this.label || (this.team + " (" + this.count + ")")); };
+                        return h;
+                      }
+                      var s = String(h || "");
+                      var mH = s.match(/^(.+?)\s*\((.+?)\)$/);
+                      var tNm = mH ? mH[1].trim() : s;
+                      var cTx = mH ? mH[2].trim() : "1명";
+                      return {
+                        team: tNm, club: tNm, name: tNm,
+                        count: cTx, cnt: cTx, injured: cTx, impact: cTx, loss: cTx, label: s,
+                        toString: function () { return s; }
+                      };
+                    });
+                  }
+                  _lastDomInjPayloadV4633 = d;
+                } else if (d && kind === "sim") {
+                  _lastDomSimPayloadV4633 = d;
+                }
+                setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 0);
+                setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 60);
+                return {
+                  ok: true,
+                  status: 200,
+                  headers: resp.headers,
+                  json: function () { return Promise.resolve(d); },
+                  text: function () { return Promise.resolve(JSON.stringify(d)); },
+                  clone: function () { return this; }
+                };
+              });
             });
           }
           if (!_sqProxyDcLeagueV341 && !_sqActiveDomDcLeagueV4625) {
@@ -14650,6 +14870,7 @@ _FRONTEND_V22_JS = r'''
     safeRunStepV4610(syncAllLabEnhancementsV4629);
     safeRunStepV4610(syncScheduleShortsAndChartModalV4630);
     safeRunStepV4610(installUniversalLifoEscapeV461);
+  safeRunStepV4610(installGlobalOverseasDcPillUnlockV4633);
     safeRunStepV4610(installToastNonOverlapAndPartnerCloseFixV4631);
     safeRunStepV4610(installMatchInsightModalV30);
     safeRunStepV4610(refreshScoreboardSuiteV30);
@@ -16635,7 +16856,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46320_{int(time.time())}"
+_BOOT_VER_V30 = f"46330_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -18605,10 +18826,14 @@ _VLEAGUE_LEADERS_V4624 = {
 
 _VLEAGUE_INJURIES_V4624 = {
     "VLEAGUE_M": [
-        {"team": "KB손해보험", "player": "리누스 베버", "pos": "OP", "reason": "경기 중 컨디션·출전 시간 점검", "severity": "컨디션 점검", "since": "국내 공격진 분담 운영"},
+        {"team": "KB손해보험", "player": "리누스 베버", "pos": "OP", "reason": "경기 중 체력·출전 시간 관리", "severity": "복귀 임박", "since": "당일 웜업 후 출전 시간 조율"},
+        {"team": "OK저축은행", "player": "신호진", "pos": "OP", "reason": "우측 어깨 피로도 관리", "severity": "출전 불투명", "since": "세트별 교체 투입 점검"},
+        {"team": "삼성화재", "player": "이시몬", "pos": "OH", "reason": "무릎 컨디션 회복 훈련", "severity": "단기 결장", "since": "2라운드 중반 복귀 목표"},
     ],
     "VLEAGUE_W": [
         {"team": "SOOP 수퍼스", "player": "오드리아나", "pos": "OP", "reason": "훈련 중 좌측 발목 염좌 관리", "severity": "단기 결장", "since": "회복 경과 확인 중"},
+        {"team": "정관장", "player": "이소영", "pos": "OH", "reason": "어깨·발목 리시브 부하 관리", "severity": "복귀 임박", "since": "후위 교체 출전 병행"},
+        {"team": "페퍼저축은행", "player": "박정아", "pos": "OH", "reason": "연전 체력 및 무릎 컨디션 점검", "severity": "출전 불투명", "since": "당일 메디컬 체크 후 결정"},
     ],
 }
 
@@ -18916,6 +19141,64 @@ def _build_domestic_bball_standings_v341(code: str, home_q: str = "", away_q: st
     return res
 
 
+_DOM_FIFA_RK_V4633 = [
+    {"rank": 1, "country": "아르헨티나", "team": "아르헨티나", "name": "아르헨티나", "flag": "🇦🇷", "points": 1883.5, "pts": 1883.5, "change": 0, "diff": 0},
+    {"rank": 2, "country": "프랑스", "team": "프랑스", "name": "프랑스", "flag": "🇫🇷", "points": 1859.8, "pts": 1859.8, "change": 0, "diff": 0},
+    {"rank": 3, "country": "스페인", "team": "스페인", "name": "스페인", "flag": "🇪🇸", "points": 1844.3, "pts": 1844.3, "change": 0, "diff": 0},
+    {"rank": 4, "country": "잉글랜드", "team": "잉글랜드", "name": "잉글랜드", "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "points": 1807.8, "pts": 1807.8, "change": 0, "diff": 0},
+    {"rank": 5, "country": "브라질", "team": "브라질", "name": "브라질", "flag": "🇧🇷", "points": 1784.4, "pts": 1784.4, "change": 0, "diff": 0},
+    {"rank": 7, "country": "포르투갈", "team": "포르투갈", "name": "포르투갈", "flag": "🇵🇹", "points": 1752.7, "pts": 1752.7, "change": 1, "diff": 1},
+    {"rank": 11, "country": "독일", "team": "독일", "name": "독일", "flag": "🇩🇪", "points": 1703.6, "pts": 1703.6, "change": 2, "diff": 2},
+    {"rank": 15, "country": "일본", "team": "일본", "name": "일본", "flag": "🇯🇵", "points": 1645.1, "pts": 1645.1, "change": 1, "diff": 1},
+    {"rank": 22, "country": "대한민국", "team": "대한민국", "name": "대한민국", "flag": "🇰🇷", "points": 1589.9, "pts": 1589.9, "change": 1, "diff": 1, "highlight": True},
+]
+
+_DOM_CLUB_RK_V4633 = [
+    {"rank": 1, "club": "리버풀", "team": "리버풀", "name": "리버풀", "league": "EPL", "elo": 2018, "points": 2018, "pts": 2018, "change": 1, "diff": 1},
+    {"rank": 2, "club": "맨체스터 시티", "team": "맨체스터 시티", "name": "맨체스터 시티", "league": "EPL", "elo": 2006, "points": 2006, "pts": 2006, "change": -1, "diff": -1},
+    {"rank": 3, "club": "인테르 밀란", "team": "인테르 밀란", "name": "인테르 밀란", "league": "세리에 A", "elo": 1984, "points": 1984, "pts": 1984, "change": 0, "diff": 0},
+    {"rank": 4, "club": "아스널", "team": "아스널", "name": "아스널", "league": "EPL", "elo": 1972, "points": 1972, "pts": 1972, "change": 0, "diff": 0},
+    {"rank": 5, "club": "바르셀로나", "team": "바르셀로나", "name": "바르셀로나", "league": "라리가", "elo": 1969, "points": 1969, "pts": 1969, "change": 2, "diff": 2},
+    {"rank": 6, "club": "레알 마드리드", "team": "레알 마드리드", "name": "레알 마드리드", "league": "라리가", "elo": 1964, "points": 1964, "pts": 1964, "change": -1, "diff": -1},
+    {"rank": 7, "club": "바이에른 뮌헨", "team": "바이에른 뮌헨", "name": "바이에른 뮌헨", "league": "분데스리가", "elo": 1955, "points": 1955, "pts": 1955, "change": 1, "diff": 1},
+    {"rank": 8, "club": "파리 생제르맹", "team": "파리 생제르맹", "name": "파리 생제르맹", "league": "리그 1", "elo": 1929, "points": 1929, "pts": 1929, "change": 0, "diff": 0},
+]
+
+
+def _enrich_dom_injury_item_v4633(raw: Dict[str, Any]) -> Dict[str, Any]:
+    tm = str(raw.get("team") or "")
+    pl = str(raw.get("player") or "")
+    ps = str(raw.get("pos") or "-")
+    rs = str(raw.get("reason") or "컨디션 점검")
+    sv = str(raw.get("severity") or "단기 결장")
+    if sv == "컨디션 점검":
+        sv = "복귀 임박"
+    sn = str(raw.get("since") or "구단 메디컬 점검")
+    return {
+        "team": tm,
+        "club": tm,
+        "team_name": tm,
+        "player": pl,
+        "name": pl,
+        "athlete": pl,
+        "pos": ps,
+        "position": ps,
+        "reason": rs,
+        "injury": rs,
+        "type": rs,
+        "detail": rs,
+        "severity": sv,
+        "status": sv,
+        "state": sv,
+        "since": sn,
+        "period": sn,
+        "duration": sn,
+        "return_date": sn,
+        "expected": sn,
+        "note": sn,
+    }
+
+
 def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[str, Any]:
     import math as _m
     import random as _r
@@ -18951,6 +19234,7 @@ def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[st
             meta[ti]["pc"] += 1
     table = [{
         "team": t["team"],
+        "club": t["team"],
         "elo": t["elo"],
         "cur_pts": t["cur"],
         "proj_pts": round(t["ps"] / iters, 1),
@@ -18961,6 +19245,10 @@ def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[st
     table.sort(key=lambda x: (-x["title_prob"], -x["proj_pts"], -x["elo"]))
     for i, r in enumerate(table):
         r["sim_rank"] = i + 1
+        r["rank"] = i + 1
+
+    fifa_rk = [dict(x) for x in _DOM_FIFA_RK_V4633]
+    club_rk = [dict(x) for x in _DOM_CLUB_RK_V4633]
     return {
         "ok": True,
         "league": cu,
@@ -18970,25 +19258,46 @@ def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[st
         "po_label": "봄배구 진출 확률" if is_vb else "플레이오프 진출 확률",
         "updated_at_kst": st["updated_at_kst"],
         "table": table,
-        "fifa_ranking": [],
-        "club_ranking": [],
+        "fifa_ranking": fifa_rk,
+        "club_ranking": club_rk,
+        "fifa": fifa_rk,
+        "world_clubs": club_rk,
     }
 
 
 def _build_domestic_bball_injuries_v341(code: str, severity: str = "all", q: str = "") -> Dict[str, Any]:
     cu = _normalize_dom_lg_code_v4624(code)
     is_vb = cu in ("VLEAGUE_M", "VLEAGUE_W")
-    items = list(_VLEAGUE_INJURIES_V4624[cu] if is_vb else _KBL_WKBL_INJURIES_V34[cu])
+    raw_items = list(_VLEAGUE_INJURIES_V4624[cu] if is_vb else _KBL_WKBL_INJURIES_V34[cu])
+    items = [_enrich_dom_injury_item_v4633(x) for x in raw_items]
     st = _build_domestic_bball_standings_v341(cu)
     st_teams = [r["team"] for r in st["standings"]]
     tc: Dict[str, int] = {}
+    pc: Dict[str, int] = {}
     for x in items:
         tc[x["team"]] = tc.get(x["team"], 0) + 1
-    hard = [f"{t} ({c}명)" for t, c in sorted(tc.items(), key=lambda v: -v[1])[:3]]
+        pc[x["reason"]] = pc.get(x["reason"], 0) + 1
+    sorted_tc = sorted(tc.items(), key=lambda v: -v[1])[:3]
+    hard_objs = [
+        {
+            "team": t,
+            "club": t,
+            "name": t,
+            "count": f"{c}명",
+            "cnt": c,
+            "injured": c,
+            "impact": f"{c}명 관리",
+            "loss": f"{c}명",
+            "label": f"{t} ({c}명)",
+        }
+        for t, c in sorted_tc
+    ]
+    hard_labels = [f"{t} ({c}명)" for t, c in sorted_tc]
     full_sq = [t for t in st_teams if tc.get(t, 0) == 0][:4]
+    top_part_lbl = f"{max(pc.items(), key=lambda v: v[1])[0]} ({max(pc.values())}명)" if pc else "발목·컨디션 관리"
     flt = [
         x for x in items
-        if (severity == "all" or x["severity"] == severity)
+        if (severity == "all" or x["severity"] == severity or x["status"] == severity)
         and (not q or q.lower() in f"{x['player']} {x['team']} {x['reason']}".lower())
     ]
     return {
@@ -19000,11 +19309,16 @@ def _build_domestic_bball_injuries_v341(code: str, severity: str = "all", q: str
         "kpis": {
             "total_injured": len(items),
             "avg_per_team": round(len(items) / max(1, len(st_teams)), 1),
-            "top_part": "발목·컨디션 관리",
-            "hardest_hit": hard,
+            "top_part": top_part_lbl,
+            "hardest_hit": hard_objs,
+            "hardest_hit_labels": hard_labels,
             "full_squad": full_sq,
         },
         "items": flt,
+        "injuries": flt,
+        "rows": flt,
+        "list": flt,
+        "players": flt,
     }
 
 
@@ -26989,6 +27303,7 @@ _install_overseas_precision_classifier_and_repair_db_v4627()
 @router.get("/api/member/live-sources-diag-v4630")
 @router.get("/api/member/live-sources-diag-v4631")
 @router.get("/api/member/live-sources-diag-v4632")
+@router.get("/api/member/live-sources-diag-v4633")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -26998,7 +27313,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     ov_counts = {k: sum(1 for x in ov_items if x.get("sport_ko") == k) for k in ("축구", "야구", "농구", "하키", "NFL", "UFC", "F1", "종합")}
     return {
         "ok": True,
-        "version": "v4.6.32",
+        "version": "v4.6.33",
         "overseas_counts": ov_counts,
         "apisports_bridge": _get_apisports_diag_snapshot_v4623(),
         "date_offset": off_i,
