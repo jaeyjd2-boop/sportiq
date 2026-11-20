@@ -4059,13 +4059,18 @@ _FRONTEND_V22_JS = r'''
     ["하키", "🏒 하키"],
     ["NFL", "🏈 NFL"],
     ["UFC", "🥊 UFC"],
-    ["F1", "🏎️ F1"]
+    ["F1", "🏎️ F1"],
+    ["종합", "🌐 종합"]
   ];
 
   function renderOverseasFilterBarV22() {
     var bar = document.getElementById("rssSportFilters");
     if (!bar) return;
-    bar.innerHTML = OVERSEAS_FILTER_TABS_V22.map(function (pair) {
+    var activeTabs = OVERSEAS_FILTER_TABS_V22.filter(function (pair) {
+      if (pair[0] !== "종합") return true;
+      return (overseasCountsV22 && overseasCountsV22["종합"] > 0) || overseasActiveSportV22 === "종합";
+    });
+    bar.innerHTML = activeTabs.map(function (pair) {
       var sp = pair[0];
       var label = pair[1];
       var cnt = overseasCountsV22[sp];
@@ -4107,7 +4112,7 @@ _FRONTEND_V22_JS = r'''
     var sliced = list.slice(0, 24);
     var initCap = 6;
     box.innerHTML = sliced.map(function (it, idx) {
-      var sBadge = it.sport_badge || ("⚽ " + (it.sport_ko || "해외스포츠"));
+      var sBadge = it.sport_badge || ("🌐 " + (it.sport_ko || "해외스포츠 종합"));
       var sColor = it.sport_color || "#38bdf8";
       var tBadge = it.topic_badge || "⚡ 현지 주요속보";
       var tColor = it.topic_color || "#7dd3fc";
@@ -14818,89 +14823,109 @@ def get_live_member_point_ranking_v22():
     return {"ok": True, "members": run_with_db_retry(_op)}
 
 
-# --- Overseas Sports News Korean Badge / 1-Line Summary Classifier & NFL/UFC/F1 Live Collector ---
-_OVERSEAS_ENTITY_KO_MAP: Tuple[Tuple[Tuple[str, ...], str], ...] = (
-    # Soccer Clubs & Stars
-    (("manchester united", "man utd", "man united", "amorim"), "맨유"),
-    (("manchester city", "man city", "haaland", "guardiola"), "맨시티"),
-    (("liverpool", "salah", "anfield", "arne slot"), "리버풀"),
-    (("arsenal", "saka", "arteta"), "아스널"),
-    (("tottenham", "spurs", "son heung-min", "heung-min son"), "토트넘·손흥민"),
-    (("chelsea", "cole palmer"), "첼시"),
-    (("newcastle",), "뉴캐슬"),
-    (("real madrid", "mbappe", "vinicius", "bellingham"), "레알 마드리드"),
-    (("barcelona", "yamal", "lewandowski", "flick"), "바르셀로나"),
-    (("bayern", "harry kane", "kim min-jae"), "바이에른 뮌헨"),
-    (("psg", "paris saint-germain", "lee kang-in"), "PSG"),
-    (("inter milan", "internazionale"), "인터 밀란"),
-    (("juventus",), "유벤투스"),
-    (("argentina", "messi", "alvarez", "álvarez", "nico paz"), "아르헨티나"),
-    (("portugal", "ronaldo", "forbs"), "포르투갈·호날두"),
-    (("england", "tuchel"), "잉글랜드"),
-    (("spain",), "스페인"),
-    (("brazil",), "브라질"),
-    (("france",), "프랑스"),
-    (("womens footballer", "women's footballer"), "올해의 여자축구상"),
-    # NBA
-    (("lakers", "lebron", "anthony davis"), "LA 레이커스"),
-    (("warriors", "stephen curry", "curry"), "골든스테이트·커리"),
-    (("celtics", "tatum"), "보스턴 셀틱스"),
-    (("mavericks", "mavs", "doncic"), "댈러스·돈치치"),
-    (("nuggets", "jokic"), "덴버·요키치"),
-    (("suns", "durant"), "피닉스 선즈"),
-    (("bucks", "giannis"), "밀워키·야니스"),
-    (("blazers", "trail blazers", "avdija"), "포틀랜드 블레이저스"),
-    (("timberwolves", "anthony edwards"), "미네소타 팀버울브스"),
-    (("knicks",), "뉴욕 닉스"),
-    (("thunder", "shai"), "오클라호마시티"),
-    (("spurs", "wembanyama"), "샌안토니오·웸반야마"),
-    # MLB
-    (("dodgers", "ohtani"), "다저스·오타니"),
-    (("yankees", "aaron judge", "juan soto"), "양키스·저지"),
-    (("mets",), "뉴욕 메츠"),
-    (("padres",), "샌디에이고"),
-    (("phillies",), "필라델피아"),
-    (("braves",), "애틀랜타"),
-    # NHL
-    (("oilers", "mcdavid"), "에드먼턴·맥데이비드"),
-    (("panthers",), "플로리다 팬서스"),
-    (("maple leafs", "matthews"), "토론토 메이플리프스"),
-    (("rangers",), "뉴욕 레인저스"),
-    (("avalanche", "mackinnon"), "콜로라도"),
-    (("capitals", "ovechkin"), "워싱턴·오베치킨"),
-    # NFL
-    (("chiefs", "mahomes", "kelce"), "캔자스시티·마홈스"),
-    (("lions", "jared goff"), "디트로이트 라이온스"),
-    (("bills", "josh allen"), "버팔로 빌스"),
-    (("ravens", "lamar jackson"), "볼티모어·라마 잭슨"),
-    (("eagles", "saquon", "jalen hurts"), "필라델피아 이글스"),
-    (("49ers", "niners", "purdy", "mccaffrey"), "샌프란시스코 49ers"),
-    (("cowboys", "dak prescott"), "댈러스 카우보이스"),
-    (("steelers", "russell wilson"), "피츠버그 스틸러스"),
-    (("packers", "jordan love"), "그린베이 패커스"),
-    (("bengals", "joe burrow"), "신시내티 벵골스"),
-    (("texans", "stroud"), "휴스턴 텍산스"),
-    (("commanders", "jayden daniels"), "워싱턴 커맨더스"),
-    (("patriots",), "뉴잉글랜드 패트리어츠"),
-    (("jets", "aaron rodgers"), "뉴욕 제츠"),
-    # UFC / MMA
-    (("jon jones", "stipe miocic"), "존 존스·헤비급"),
-    (("alex pereira", "pereira"), "알렉스 페레이라"),
-    (("ilia topuria", "topuria"), "일리아 토푸리아"),
-    (("islam makhachev", "makhachev"), "이슬람 마카체프"),
-    (("khamzat", "chimaev"), "함자트 치마예프"),
-    (("conor mcgregor", "mcgregor"), "코너 맥그리거"),
-    (("sean o'malley", "merab"), "밴텀급 타이틀전선"),
-    (("dricus", "du plessis", "strickland"), "미들급 타이틀전선"),
-    (("dana white",), "데이나 화이트·UFC"),
-    # F1
-    (("verstappen", "red bull"), "막스 베르스타펜·레드불"),
-    (("lando norris", "norris", "piastri", "mclaren"), "맥라렌·노리스"),
-    (("leclerc", "ferrari", "sainz"), "페라리·르클레르"),
-    (("hamilton", "russell", "mercedes"), "메르세데스·해밀턴"),
-    (("las vegas grand prix", "las vegas gp", "vegas gp"), "라스베이거스 GP"),
-    (("qatar grand prix", "abu dhabi"), "중동 파이널 GP"),
-    (("alonso", "aston martin"), "애스턴마틴·알론소"),
+# --- Overseas Sports News Korean Badge / 1-Line Summary Classifier & NFL/UFC/F1 Live Collector (v4.6.27 Precision) ---
+# Tuple schema: (allowed_sports_or_None, word_boundary_aliases, ko_label)
+_OVERSEAS_ENTITY_KO_SCOPED_V4627: Tuple[Tuple[Optional[Set[str]], Tuple[str, ...], str], ...] = (
+    # Soccer Clubs, National Teams & Stars (scoped to {"축구"} so Tottenham 'Spurs' never collides with NBA San Antonio 'Spurs')
+    ({"축구"}, ("manchester united", "man utd", "man united", "amorim"), "맨유"),
+    ({"축구"}, ("manchester city", "man city", "haaland", "guardiola"), "맨시티"),
+    ({"축구"}, ("liverpool", "salah", "anfield", "arne slot"), "리버풀"),
+    ({"축구"}, ("arsenal", "saka", "arteta"), "아스널"),
+    ({"축구"}, ("tottenham", "hotspur", "spurs", "son heung-min", "heung-min son"), "토트넘·손흥민"),
+    ({"축구"}, ("chelsea", "cole palmer"), "첼시"),
+    ({"축구"}, ("newcastle", "isak"), "뉴캐슬"),
+    ({"축구"}, ("aston villa",), "애스턴 빌라"),
+    ({"축구"}, ("real madrid", "mbappe", "vinicius", "bellingham"), "레알 마드리드"),
+    ({"축구"}, ("barcelona", "yamal", "lewandowski", "flick"), "바르셀로나"),
+    ({"축구"}, ("bayern", "harry kane", "kim min-jae"), "바이에른 뮌헨"),
+    ({"축구"}, ("dortmund",), "도르트문트"),
+    ({"축구"}, ("psg", "paris saint-germain", "lee kang-in"), "PSG·이강인"),
+    ({"축구"}, ("inter milan", "internazionale"), "인터 밀란"),
+    ({"축구"}, ("ac milan",), "AC 밀란"),
+    ({"축구"}, ("juventus",), "유벤투스"),
+    ({"축구"}, ("napoli",), "나폴리"),
+    ({"축구"}, ("usmnt", "pochettino"), "미국 대표팀·포체티노"),
+    ({"축구"}, ("mexico", "márquez", "marquez"), "멕시코 대표팀"),
+    ({"축구"}, ("argentina", "messi", "alvarez", "álvarez", "nico paz", "emi martínez", "emi martinez"), "아르헨티나"),
+    ({"축구"}, ("portugal", "ronaldo", "forbs"), "포르투갈·호날두"),
+    ({"축구"}, ("england", "tuchel"), "잉글랜드"),
+    ({"축구"}, ("spain",), "스페인"),
+    ({"축구"}, ("brazil",), "브라질"),
+    ({"축구"}, ("france",), "프랑스"),
+    ({"축구"}, ("womens footballer", "women's footballer"), "올해의 여자축구상"),
+    # NBA / Basketball (scoped to {"농구"})
+    ({"농구"}, ("lakers", "lebron", "anthony davis"), "LA 레이커스"),
+    ({"농구"}, ("warriors", "stephen curry", "curry"), "골든스테이트·커리"),
+    ({"농구"}, ("celtics", "tatum"), "보스턴 셀틱스"),
+    ({"농구"}, ("mavericks", "mavs", "doncic"), "댈러스·돈치치"),
+    ({"농구"}, ("nuggets", "jokic"), "덴버·요키치"),
+    ({"농구"}, ("suns", "durant"), "피닉스 선즈"),
+    ({"농구"}, ("bucks", "giannis"), "밀워키·야니스"),
+    ({"농구"}, ("blazers", "trail blazers", "avdija"), "포틀랜드 블레이저스"),
+    ({"농구"}, ("timberwolves", "anthony edwards"), "미네소타 팀버울브스"),
+    ({"농구"}, ("knicks",), "뉴욕 닉스"),
+    ({"농구"}, ("thunder", "shai"), "오클라호마시티"),
+    ({"농구"}, ("san antonio spurs", "spurs", "wembanyama"), "샌안토니오·웸반야마"),
+    ({"농구"}, ("miami heat", "heat", "vice city"), "마이애미 히트"),
+    ({"농구"}, ("atlanta hawks", "trae young"), "애틀랜타 호크스"),
+    ({"농구"}, ("clippers",), "LA 클리퍼스"),
+    # MLB / Baseball (scoped to {"야구"})
+    ({"야구"}, ("dodgers", "ohtani"), "다저스·오타니"),
+    ({"야구"}, ("yankees", "aaron judge", "juan soto", "bednar"), "양키스·저지"),
+    ({"야구"}, ("red sox", "bauers"), "보스턴 레드삭스"),
+    ({"야구"}, ("mets",), "뉴욕 메츠"),
+    ({"야구"}, ("padres",), "샌디에이고"),
+    ({"야구"}, ("phillies",), "필라델피아 필리스"),
+    ({"야구"}, ("braves",), "애틀랜타 브레이브스"),
+    ({"야구"}, ("twins", "jeffers"), "미네소타 트윈스"),
+    ({"야구"}, ("guardians", "clase"), "클리블랜드"),
+    # NHL / Hockey (scoped to {"하키"})
+    ({"하키"}, ("blackhawks", "bedard"), "시카고 블랙호크스·베다드"),
+    ({"하키"}, ("oilers", "mcdavid", "draisaitl"), "에드먼턴·맥데이비드"),
+    ({"하키"}, ("panthers",), "플로리다 팬서스"),
+    ({"하키"}, ("maple leafs", "matthews"), "토론토 메이플리프스"),
+    ({"하키"}, ("rangers",), "뉴욕 레인저스"),
+    ({"하키"}, ("islanders", "schaefer"), "뉴욕 아일랜더스"),
+    ({"하키"}, ("ducks", "gauthier"), "애너하임 덕스"),
+    ({"하키"}, ("avalanche", "mackinnon"), "콜로라도 애벌랜치"),
+    ({"하키"}, ("capitals", "ovechkin"), "워싱턴·오베치킨"),
+    ({"하키"}, ("penguins", "crosby"), "피츠버그 펭귄스"),
+    # NFL & College Football (scoped to {"NFL"})
+    ({"NFL"}, ("chiefs", "mahomes", "kelce"), "캔자스시티·마홈스"),
+    ({"NFL"}, ("lions", "jared goff"), "디트로이트 라이온스"),
+    ({"NFL"}, ("bills", "josh allen"), "버팔로 빌스"),
+    ({"NFL"}, ("ravens", "lamar jackson", "minter"), "볼티모어·라마 잭슨"),
+    ({"NFL"}, ("eagles", "saquon", "jalen hurts"), "필라델피아 이글스"),
+    ({"NFL"}, ("49ers", "niners", "purdy", "mccaffrey"), "샌프란시스코 49ers"),
+    ({"NFL"}, ("cowboys", "dak prescott"), "댈러스 카우보이스"),
+    ({"NFL"}, ("steelers", "russell wilson", "iheanachor"), "피츠버그 스틸러스"),
+    ({"NFL"}, ("packers", "jordan love"), "그린베이 패커스"),
+    ({"NFL"}, ("bengals", "joe burrow"), "신시내티 벵골스"),
+    ({"NFL"}, ("texans", "stroud"), "휴스턴 텍산스"),
+    ({"NFL"}, ("commanders", "jayden daniels"), "워싱턴 커맨더스"),
+    ({"NFL"}, ("patriots",), "뉴잉글랜드 패트리어츠"),
+    ({"NFL"}, ("jets", "aaron rodgers"), "뉴욕 제츠"),
+    ({"NFL"}, ("cardinals", "gardner minshew", "minshew"), "애리조나 카디널스"),
+    ({"NFL"}, ("texas tech", "tennessee", "group of 6", "group of 5", "cfp", "college football"), "미국 대학풋볼(NCAAF)"),
+    # UFC / MMA (scoped to {"UFC"})
+    ({"UFC"}, ("jon jones", "stipe miocic"), "존 존스·헤비급"),
+    ({"UFC"}, ("alex pereira", "pereira"), "알렉스 페레이라"),
+    ({"UFC"}, ("ilia topuria", "topuria"), "일리아 토푸리아"),
+    ({"UFC"}, ("islam makhachev", "makhachev"), "이슬람 마카체프"),
+    ({"UFC"}, ("khamzat", "chimaev"), "함자트 치마예프"),
+    ({"UFC"}, ("conor mcgregor", "mcgregor"), "코너 맥그리거"),
+    ({"UFC"}, ("amanda nunes", "kayla harrison"), "케일라 해리슨·누네스"),
+    ({"UFC"}, ("sean o'malley", "merab"), "밴텀급 타이틀전선"),
+    ({"UFC"}, ("dricus", "du plessis", "strickland"), "미들급 타이틀전선"),
+    ({"UFC"}, ("dana white",), "데이나 화이트·UFC"),
+    # F1 (scoped to {"F1"})
+    ({"F1"}, ("verstappen", "red bull", "antonelli"), "막스 베르스타펜·레드불"),
+    ({"F1"}, ("lando norris", "norris", "piastri", "mclaren"), "맥라렌·노리스"),
+    ({"F1"}, ("leclerc", "ferrari", "sainz"), "페라리·르클레르"),
+    ({"F1"}, ("hamilton", "russell", "mercedes"), "메르세데스·해밀턴"),
+    ({"F1"}, ("las vegas grand prix", "las vegas gp", "vegas gp"), "라스베이거스 GP"),
+    ({"F1"}, ("qatar grand prix", "abu dhabi"), "중동 파이널 GP"),
+    ({"F1"}, ("alonso", "aston martin", "dakar rally"), "애스턴마틴·알론소"),
 )
 
 _SPORT_META_KO: Dict[str, Tuple[str, str]] = {
@@ -14911,27 +14936,143 @@ _SPORT_META_KO: Dict[str, Tuple[str, str]] = {
     "NFL": ("🏈 NFL 미식축구", "#a78bfa"),
     "UFC": ("🥊 UFC·격투기", "#f43f5e"),
     "F1": ("🏎️ F1 포뮬러원", "#facc15"),
+    "종합": ("🌐 해외스포츠 종합", "#94a3b8"),
 }
 
+_RE_F1_V4627 = re.compile(
+    r"\b(?:formula\s*1|formula\s*one|f1|espn\s*f1|bbc\s*f1|grand\s*prix|dakar\s*rally|verstappen|norris|piastri|leclerc|sainz|hamilton|alonso|antonelli|red\s*bull\s*racing|mclaren|ferrari\s*f1|paddock|pole\s*position)\b",
+    re.I,
+)
+_RE_UFC_V4627 = re.compile(
+    r"\b(?:ufc|mma|octagon|bellator|pfl|jon\s*jones|miocic|alex\s*pereira|pereira|topuria|makhachev|chimaev|mcgregor|o'malley|dricus|strickland|dana\s*white|amanda\s*nunes|kayla\s*harrison|submission-loss|tko|knockout|bantamweight|featherweight|welterweight|middleweight|heavyweight\s*title|pound-for-pound|divisional\s*rankings)\b",
+    re.I,
+)
+_RE_NHL_V4627 = re.compile(
+    r"\b(?:nhl|stanley\s*cup|ice\s*hockey|hockey|blackhawks|bedard|oilers|mcdavid|draisaitl|maple\s*leafs|matthews|bruins|islanders|schaefer|canadiens|senators|sabres|red\s*wings|lightning|kucherov|flames|canucks|kraken|avalanche|mackinnon|golden\s*knights|predators|wild|sharks|ducks|gauthier|blue\s*jackets|penguins|crosby|ovechkin|capitals|flyers|devils|hurricanes|defenseman|goaltender|puck|power\s*play)\b",
+    re.I,
+)
+_RE_NFL_V4627 = re.compile(
+    r"\b(?:nfl|ncaaf|college\s*football|cfp|group\s*of\s*[56]|heisman|super\s*bowl|quarterback|qb|touchdown|wide\s*receiver|tight\s*end|running\s*game|running\s*back|pass\s*rush|linebacker|chiefs|mahomes|kelce|bills|josh\s*allen|ravens|lamar\s*jackson|minter|49ers|niners|cowboys|dak\s*prescott|steelers|iheanachor|packers|eagles|saquon|jalen\s*hurts|bengals|burrow|texans|stroud|patriots|seahawks|broncos|chargers|lions|jared\s*goff|vikings|commanders|falcons|saints|buccaneers|raiders|browns|titans|colts|jaguars|dolphins|tua|bears|caleb\s*williams|gardner\s*minshew|minshew|texas\s*tech|crimson\s*tide|buckeyes|longhorns|wolverines|fighting\s*irish)\b",
+    re.I,
+)
+_RE_MLB_V4627 = re.compile(
+    r"\b(?:mlb|baseball|minor\s*league|world\s*series|cy\s*young|silver\s*slugger|home\s*run|pitcher|hitter|hitters|checked-swing|inning|bullpen|shortstop|outfielder|tommy\s*john|dodgers|ohtani|yankees|bednar|aaron\s*judge|juan\s*soto|mets|padres|phillies|braves|red\s*sox|bauers|astros|cubs|white\s*sox|twins|jeffers|guardians|clase|orioles|tigers|royals|mariners|athletics|blue\s*jays|brewers|pirates|reds|rockies|diamondbacks|marlins|nationals)\b",
+    re.I,
+)
+_RE_NBA_V4627 = re.compile(
+    r"\b(?:nba|wnba|basketball|march\s*madness|triple-double|three-pointer|slip\s*on\s*court|vice\s*city|lakers|lebron|celtics|tatum|warriors|stephen\s*curry|curry|mavericks|mavs|doncic|nuggets|jokic|blazers|trail\s*blazers|avdija|timberwolves|knicks|bucks|giannis|suns|durant|thunder|shai|wembanyama|clippers|76ers|sixers|embiid|cavaliers|cavs|pacers|magic|pistons|raptors|grizzlies|pelicans|rockets|bulls|nets|hornets|wizards|jazz|atlanta\s*hawks|san\s*antonio\s*spurs|sacramento\s*kings|miami\s*heat)\b",
+    re.I,
+)
+_RE_SOCCER_V4627 = re.compile(
+    r"\b(?:soccer|premier\s*league|epl|la\s*liga|serie\s*a|bundesliga|ligue\s*1|champions\s*league|europa\s*league|nations\s*league|world\s*cup|copa\s*america|fa\s*cup|carabao\s*cup|mls|usmnt|uswnt|concacaf|conmebol|uefa|fifa|ballon\s*d'or|clean\s*sheet|penalty\s*shootout|midfielder|striker|goalkeeper|full-back|winger|footballer|arsenal|saka|arteta|liverpool|salah|anfield|arne\s*slot|manchester\s*united|man\s*utd|man\s*united|amorim|manchester\s*city|man\s*city|haaland|guardiola|chelsea|cole\s*palmer|tottenham|hotspur|son\s*heung-min|heung-min\s*son|newcastle|aston\s*villa|real\s*madrid|mbappe|vinicius|bellingham|barcelona|yamal|lewandowski|flick|atletico|bayern|harry\s*kane|kim\s*min-jae|dortmund|leverkusen|juventus|inter\s*milan|internazionale|ac\s*milan|napoli|psg|paris\s*saint-germain|lee\s*kang-in|pochettino|tuchel|argentina|messi|alvarez|álvarez|martinez|martínez|nico\s*paz|portugal|ronaldo|england|spain|brazil|france|mexico|jamaica|márquez|marquez)\b",
+    re.I,
+)
 
-def _detect_overseas_sport_ko(title: str, source: str = "", raw_sport: str = "") -> str:
-    low = f"{title or ''} {source or ''} {raw_sport or ''}".lower()
+
+def _detect_sport_from_url_v4627(link: str) -> str:
+    u = (link or "").strip().lower()
+    if not u:
+        return ""
+    if any(p in u for p in ("/soccer/", "bbc.co.uk/sport/football", "bbc.com/sport/football", "skysports.com/football", "theguardian.com/football", "uefa.com", "fifa.com", "premierleague.com")):
+        return "축구"
+    if any(p in u for p in ("/nfl/", "/college-football/", "/ncf/")):
+        return "NFL"
+    if any(p in u for p in ("/nba/", "/wnba/", "/mens-college-basketball/", "/womens-college-basketball/", "/ncb/", "/ncw/")):
+        return "농구"
+    if any(p in u for p in ("/mlb/", "/college-baseball/")):
+        return "야구"
+    if any(p in u for p in ("/nhl/", "/hockey/")):
+        return "하키"
+    if any(p in u for p in ("/mma/", "/ufc/", "/boxing/", "mixed-martial-arts")):
+        return "UFC"
+    if any(p in u for p in ("/f1/", "formula1", "/racing/", "/autoracing/")):
+        return "F1"
+    if any(p in u for p in ("/tennis/", "/golf/", "/olympics/", "/cricket/", "/rugby/", "/wwe/", "/poker/", "/espn/story/")):
+        return "종합"
+    return ""
+
+
+def _detect_overseas_sport_ko(title: str, source: str = "", raw_sport: str = "", link: str = "") -> str:
+    url_sp = _detect_sport_from_url_v4627(link)
+    if url_sp in ("축구", "야구", "농구", "하키", "NFL", "UFC", "F1"):
+        return url_sp
+
     rs = (raw_sport or "").strip()
     if rs in ("NFL", "UFC", "F1", "축구", "야구", "농구", "하키"):
         return rs
-    if any(k in low for k in ("formula 1", "formula one", " f1 ", "espn f1", "bbc f1", "grand prix", "verstappen", "mclaren", "leclerc", "ferrari f1", "paddock", "qualifying")):
+
+    t_str = title or ""
+    s_str = source or ""
+    probe = f"{t_str} {s_str}"
+
+    if _RE_F1_V4627.search(probe) or ("aston martin" in probe.lower() and re.search(r"\b(?:f1|alonso|stroll|grand\s*prix|rally|race)\b", probe, re.I)):
         return "F1"
-    if any(k in low for k in ("ufc", "mma", "octagon", "bellator", "jon jones", "pereira", "topuria", "makhachev", "dana white", "heavyweight title", "knockout")):
+    if _RE_UFC_V4627.search(probe):
         return "UFC"
-    if any(k in low for k in ("nfl", "quarterback", "touchdown", "super bowl", "chiefs", "mahomes", "bills", "ravens", "49ers", "cowboys", "steelers", "packers", "eagles", "bengals", "texans", "patriots", "seahawks", "broncos", "chargers")):
-        return "NFL"
-    if any(k in low for k in ("nhl", "stanley cup", "hockey", "oilers", "mcdavid", "maple leafs", "panthers", "bruins", "rangers", "avalanche", "ovechkin")):
+    if _RE_NHL_V4627.search(probe):
         return "하키"
-    if any(k in low for k in ("nba", "basketball", "lakers", "celtics", "warriors", "mavericks", "nuggets", "blazers", "timberwolves", "knicks", "bucks", "suns", "thunder", "wembanyama", "jokic", "lebron", "curry")):
-        return "농구"
-    if any(k in low for k in ("mlb", "baseball", "dodgers", "yankees", "ohtani", "mets", "padres", "phillies", "braves", "red sox", "home run", "cy young", "silver slugger")):
+    if _RE_NFL_V4627.search(probe) or (re.search(r"\bcardinals\b", t_str, re.I) and re.search(r"\b(?:qb|quarterback|minshew|kyler|murray|nfl|touchdown)\b", probe, re.I)):
+        return "NFL"
+    if _RE_MLB_V4627.search(probe) or (re.search(r"\bcardinals\b", t_str, re.I) and re.search(r"\b(?:mlb|pitcher|inning|home\s*run|baseball)\b", probe, re.I)):
         return "야구"
-    return "축구"
+    if _RE_NBA_V4627.search(probe):
+        return "농구"
+    if re.search(r"\bspurs\b", t_str, re.I) and re.search(r"\b(?:guard|forward|center|court|rebound|dunk|harper|castle|popovich|nba)\b", probe, re.I):
+        return "농구"
+    if re.search(r"\bheat\b", t_str, re.I) and re.search(r"\b(?:court|unveil|butler|adebayo|herro|spoelstra|nba)\b", probe, re.I):
+        return "농구"
+    if re.search(r"\bhawks\b", t_str, re.I) and not re.search(r"\b(?:blackhawks|seahawks|jayhawks|hawkeyes)\b", t_str, re.I) and re.search(r"\b(?:nba|trae|guard|forward|court|atlanta)\b", probe, re.I):
+        return "농구"
+
+    if url_sp == "종합":
+        return "종합"
+
+    if _RE_SOCCER_V4627.search(probe):
+        return "축구"
+    if re.search(r"\b(?:espn\s*soccer|bbc\s*(?:sport\s*)?football|sky\s*sports\s*football)\b", s_str, re.I):
+        return "축구"
+
+    # If raw_sport came from an explicit dedicated non-general source (not generic 'ESPN' / 'BBC·ESPN')
+    s_low = s_str.strip().lower()
+    rs_low = rs.lower()
+    if s_low not in ("", "espn", "bbc", "bbc·espn", "해외속보"):
+        if rs_low in ("basketball", "nba"):
+            return "농구"
+        if rs_low in ("baseball", "mlb"):
+            return "야구"
+        if rs_low in ("hockey", "nhl"):
+            return "하키"
+        if rs_low == "nfl":
+            return "NFL"
+        if rs_low in ("ufc", "mma"):
+            return "UFC"
+        if rs_low == "f1":
+            return "F1"
+        if rs_low in ("soccer", "football") and "soccer" in s_low:
+            return "축구"
+
+    # Never mislabel unmatched general ESPN / multi-sport headlines (Golf, Tennis, NCAAF politics, Olympics) as '⚽ 해외축구'!
+    return "종합"
+
+
+def classify_overseas_sport_accurately_v4627(title: str, default_sport: str = "general", link: str = "", source: str = "") -> Tuple[str, str]:
+    ds = (default_sport or "general").strip().lower()
+    explicit_ko = ""
+    if ds not in ("", "general", "soccer", "basketball"):
+        map_ds = {"nfl": "NFL", "ufc": "UFC", "mma": "UFC", "f1": "F1", "hockey": "하키", "nhl": "하키", "baseball": "야구", "mlb": "야구"}
+        explicit_ko = map_ds.get(ds, "")
+    sp_ko = _detect_overseas_sport_ko(title, source=source, raw_sport=explicit_ko, link=link)
+    ko_to_db = {
+        "축구": ("soccer", "해외축구 속보"),
+        "농구": ("basketball", "NBA 속보"),
+        "야구": ("baseball", "MLB 속보"),
+        "하키": ("hockey", "NHL 속보"),
+        "NFL": ("nfl", "NFL 속보"),
+        "UFC": ("ufc", "UFC 속보"),
+        "F1": ("f1", "F1 속보"),
+        "종합": ("general", "해외스포츠 종합"),
+    }
+    return ko_to_db.get(sp_ko, ("general", "해외스포츠 종합"))
 
 
 def _detect_overseas_topic_ko(title: str) -> Tuple[str, str, str]:
@@ -14979,14 +15120,15 @@ def enrich_overseas_news_item_ko(raw: Dict[str, Any]) -> Dict[str, Any]:
     raw_sport = str(raw.get("sport_ko") or raw.get("sport") or "").strip()
     pub_raw = str(raw.get("pubDate") or raw.get("published") or raw.get("time_kst") or raw.get("summary_tag") or "").strip()
 
-    sport_ko = _detect_overseas_sport_ko(title, source, raw_sport)
-    sport_badge, sport_color = _SPORT_META_KO.get(sport_ko, ("⚽ 해외축구", "#38bdf8"))
+    sport_ko = _detect_overseas_sport_ko(title, source, raw_sport, link=link)
+    sport_badge, sport_color = _SPORT_META_KO.get(sport_ko, ("🌐 해외스포츠 종합", "#94a3b8"))
     topic_badge, topic_color, topic_phrase = _detect_overseas_topic_ko(title)
 
-    low_title = title.lower()
     matched_ko: List[str] = []
-    for aliases, ko_label in _OVERSEAS_ENTITY_KO_MAP:
-        if any(a in low_title for a in aliases):
+    for allowed_sports, aliases, ko_label in _OVERSEAS_ENTITY_KO_SCOPED_V4627:
+        if allowed_sports is not None and sport_ko not in allowed_sports:
+            continue
+        if any(re.search(r"\b" + re.escape(a) + r"\b", title, re.I) for a in aliases):
             if ko_label not in matched_ko:
                 matched_ko.append(ko_label)
         if len(matched_ko) >= 3:
@@ -15361,7 +15503,7 @@ def get_daily_hashtags_live_v25():
 def get_enriched_overseas_news_api_v22(sport: str = "전체"):
     items = collect_enriched_overseas_news_v22(force=False)
     counts: Dict[str, int] = {"전체": len(items)}
-    for sp_key in ("축구", "야구", "농구", "하키", "NFL", "UFC", "F1"):
+    for sp_key in ("축구", "야구", "농구", "하키", "NFL", "UFC", "F1", "종합"):
         counts[sp_key] = sum(1 for x in items if x.get("sport_ko") == sp_key)
 
     sp_clean = (sport or "전체").strip()
@@ -23987,6 +24129,69 @@ def _install_dc_ko_team_wrapper_v381(dc_mod: Any = None) -> bool:
 _install_dc_ko_team_wrapper_v381()
 
 
+def _install_overseas_precision_classifier_and_repair_db_v4627() -> int:
+    global _OVERSEAS_V22_CACHE
+    try:
+        import app.sportiq_member_upgrade as _smu_mod
+        _smu_mod.classify_overseas_sport_accurately = classify_overseas_sport_accurately_v4627
+    except Exception:
+        pass
+    try:
+        from app import sportiq_autonomous_sec as _sec_mod
+        _sec_mod._classify_news_sport_and_tag = classify_overseas_sport_accurately_v4627
+    except Exception:
+        pass
+
+    repaired = 0
+    try:
+        def _repair_op() -> int:
+            cnt = 0
+            with _smu_db_session(write=True) as conn:
+                has_tbl = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='overseas_news_cache'"
+                ).fetchone()
+                if not has_tbl:
+                    return 0
+                cols = {r[1] for r in conn.execute("PRAGMA table_info(overseas_news_cache)").fetchall()}
+                has_link = "link" in cols
+                has_tag = "summary_tag" in cols
+                sel_link = "link" if has_link else "'' AS link"
+                rows = conn.execute(
+                    f"SELECT rowid AS _rid, title, source, sport, {sel_link} FROM overseas_news_cache"
+                ).fetchall()
+                for r in rows:
+                    new_sp, new_tag = classify_overseas_sport_accurately_v4627(
+                        str(r["title"] or ""),
+                        default_sport="general",
+                        link=str(r["link"] or ""),
+                        source=str(r["source"] or ""),
+                    )
+                    if new_sp != (r["sport"] or ""):
+                        if has_tag:
+                            conn.execute(
+                                "UPDATE overseas_news_cache SET sport = ?, summary_tag = ? WHERE rowid = ?",
+                                (new_sp, new_tag, r["_rid"]),
+                            )
+                        else:
+                            conn.execute(
+                                "UPDATE overseas_news_cache SET sport = ? WHERE rowid = ?",
+                                (new_sp, r["_rid"]),
+                            )
+                        cnt += 1
+            return cnt
+
+        repaired = int(run_with_db_retry(_repair_op) or 0)
+    except Exception:
+        repaired = 0
+
+    with _OVERSEAS_V22_LOCK:
+        _OVERSEAS_V22_CACHE = (0.0, [])
+    return repaired
+
+
+_install_overseas_precision_classifier_and_repair_db_v4627()
+
+
 @router.get("/api/member/live-sources-diag-v4617")
 @router.get("/api/member/live-sources-diag-v4618")
 @router.get("/api/member/live-sources-diag-v4619")
@@ -23997,14 +24202,18 @@ _install_dc_ko_team_wrapper_v381()
 @router.get("/api/member/live-sources-diag-v4624")
 @router.get("/api/member/live-sources-diag-v4625")
 @router.get("/api/member/live-sources-diag-v4626")
+@router.get("/api/member/live-sources-diag-v4627")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
     tk = now_k + timedelta(days=off_i)
     items = _collect_realtime_all_sports_v4616(tk, off_i)
+    ov_items = collect_enriched_overseas_news_v22(force=False)
+    ov_counts = {k: sum(1 for x in ov_items if x.get("sport_ko") == k) for k in ("축구", "야구", "농구", "하키", "NFL", "UFC", "F1", "종합")}
     return {
         "ok": True,
-        "version": "v4.6.26",
+        "version": "v4.6.27",
+        "overseas_counts": ov_counts,
         "apisports_bridge": _get_apisports_diag_snapshot_v4623(),
         "date_offset": off_i,
         "target_ymd": tk.strftime("%Y-%m-%d"),
