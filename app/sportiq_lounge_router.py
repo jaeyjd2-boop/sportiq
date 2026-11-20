@@ -2380,6 +2380,11 @@ _FRONTEND_V22_JS = r'''
       "  visibility: visible !important;",
       "  opacity: 1 !important;",
       "}",
+      "#dcHubBody [data-sq-hidden-legacy-vl='1'] {",
+      "  display: none !important;",
+      "  visibility: hidden !important;",
+      "  pointer-events: none !important;",
+      "}",
       "/* Guarantee #feedList is NEVER hidden by match-strip seed guards */",
       "#feedList {",
       "  display: block !important;",
@@ -4405,6 +4410,7 @@ _FRONTEND_V22_JS = r'''
     try { ensureDomesticBasketballUiControlsV34(); } catch (e) {}
     // Unblind any child cards/rows inside #dcHubBody that a seed guard may have hidden
     body.querySelectorAll("[data-sq-seed-archive], .sq-seed-archive-card").forEach(function (ch) {
+      if (ch.getAttribute && ch.getAttribute("data-sq-hidden-legacy-vl") === "1") return;
       ch.removeAttribute("data-sq-seed-archive");
       ch.classList.remove("sq-seed-archive-card", "hidden");
       if (ch.style && ch.style.display === "none") {
@@ -4416,6 +4422,7 @@ _FRONTEND_V22_JS = r'''
       var anyVis = kids.some(function (k) { return window.getComputedStyle(k).display !== "none"; });
       if (!anyVis) {
         kids.forEach(function (k) {
+          if (k.getAttribute && k.getAttribute("data-sq-hidden-legacy-vl") === "1") return;
           k.classList.remove("hidden", "sq-seed-archive-card");
           if (k.style && k.style.display === "none") k.style.removeProperty("display");
         });
@@ -5067,10 +5074,53 @@ _FRONTEND_V22_JS = r'''
 
   function isLegacyMixedVleaguePillBtnV4625(btn) {
     if (!btn || btn.getAttribute("data-sq-dc-lg")) return false;
+    var attrProbe = [
+      String(btn.getAttribute("onclick") || ""),
+      String(btn.getAttribute("data-league") || ""),
+      String(btn.getAttribute("data-code") || ""),
+      String(btn.getAttribute("data-lg") || "")
+    ].join(" ");
+    var tx = String(btn.textContent || "").replace(/\s+/g, " ").trim();
+    if (/남자|여자|VLEAGUE_M|VLEAGUE_W/i.test(tx + " " + attrProbe)) return false;
+    if (/\bVLEAGUE\b/i.test(attrProbe)) return true;
+    var cleanTx = tx.replace(/^[^A-Za-z0-9가-힣]+/, "").trim();
+    return /^(?:배구\s*)?(?:V-?\s*리그|VLEAGUE)(?:\s*(?:순위|랭킹|통합))?$/i.test(cleanTx);
+  }
+
+  function isSubFilterDcPillBtnV4626(btn) {
+    if (!btn) return false;
     var oc = String(btn.getAttribute("onclick") || "");
-    var tx = String(btn.textContent || "").trim();
-    if (/\(\s*['"]VLEAGUE['"]\s*\)/i.test(oc)) return true;
-    return /^(?:🏐\s*)?(?:V-?리그|VLEAGUE)$/i.test(tx);
+    return /__setDcInjSev|__setDcTrCat|__setDcTrFilter/i.test(oc);
+  }
+
+  function collectDcLeaguePillButtonsV4626(hubBody, bar) {
+    var out = [];
+    var seen = [];
+    function pushBtn(b) {
+      if (!b || isSubFilterDcPillBtnV4626(b)) return;
+      if (seen.indexOf(b) !== -1) return;
+      seen.push(b);
+      out.push(b);
+    }
+    if (bar) {
+      Array.prototype.forEach.call(bar.querySelectorAll("button"), pushBtn);
+    }
+    if (hubBody) {
+      Array.prototype.forEach.call(hubBody.querySelectorAll("button"), function (b) {
+        if (b.closest && b.closest("table, .dc-kpi-box, .dc-kpi-row")) return;
+        if (isSubFilterDcPillBtnV4626(b)) return;
+        var oc = String(b.getAttribute("onclick") || "");
+        var tx = String(b.textContent || "").replace(/\s+/g, " ").trim();
+        if (
+          b.getAttribute("data-sq-dc-lg") ||
+          /__setDcStLeague|__setDcSimLeague|__setDcInjLeague|__switchDcTab|Rank|Extra/i.test(oc) ||
+          /\b(?:UFC|ATP|WTA|F1|NFL|WNBA|MLS|UCL|EPL|NBA|KBO|MLB|NHL|LCK)\b|랭킹|F1\s*순위/i.test(tx)
+        ) {
+          pushBtn(b);
+        }
+      });
+    }
+    return out;
   }
 
   function installDcHubGlobalsBridgeV4625() {
@@ -5149,6 +5199,16 @@ _FRONTEND_V22_JS = r'''
       var hubBody = document.getElementById("dcHubBody");
       if (!hubBody) return;
       ensureDcHubBodyObserverV4625(hubBody);
+
+      // v4.6.26: Sweep ALL rows/containers inside #dcHubBody (including Row 2 next to UFC/ATP/F1) to hide legacy single V-리그 button!
+      Array.prototype.forEach.call(hubBody.querySelectorAll("button, a, [role='button']"), function (el) {
+        if (isLegacyMixedVleaguePillBtnV4625(el)) {
+          el.setAttribute("data-sq-hidden-legacy-vl", "1");
+          el.classList.remove("active");
+          if (el.style) el.style.setProperty("display", "none", "important");
+        }
+      });
+
       var allBtns = hubBody.querySelectorAll("button");
       var nbaBtn = null;
       for (var i = 0; i < allBtns.length; i++) {
@@ -5163,14 +5223,6 @@ _FRONTEND_V22_JS = r'''
       var tabHint = ocStr.indexOf("__setDcSimLeague") !== -1
         ? "season-sim"
         : (ocStr.indexOf("__setDcInjLeague") !== -1 ? "injuries" : "standings");
-
-      Array.prototype.forEach.call(bar.querySelectorAll("button"), function (b) {
-        if (isLegacyMixedVleaguePillBtnV4625(b)) {
-          b.style.display = "none";
-          b.classList.remove("active");
-          b.setAttribute("data-sq-hidden-legacy-vl", "1");
-        }
-      });
 
       if (!bar.querySelector("[data-sq-dc-lg='VLEAGUE_M']")) {
         var anchor = nbaBtn;
@@ -5213,7 +5265,8 @@ _FRONTEND_V22_JS = r'''
         });
       }
 
-      Array.prototype.forEach.call(bar.querySelectorAll("button"), function (b) {
+      var leagueBtns = collectDcLeaguePillButtonsV4626(hubBody, bar);
+      leagueBtns.forEach(function (b) {
         if (b.getAttribute("data-sq-dc-lg") || b.getAttribute("data-sq-hidden-legacy-vl")) return;
         if (!b.getAttribute("data-sq-nondom-bound")) {
           b.setAttribute("data-sq-nondom-bound", "1");
@@ -5221,7 +5274,7 @@ _FRONTEND_V22_JS = r'''
             if (_sqInternalNbaTriggerV4625) return;
             _sqActiveDomDcLeagueV4625 = "";
             _sqProxyDcLeagueV341 = "";
-            Array.prototype.forEach.call(bar.querySelectorAll("button[data-sq-dc-lg]"), function (db) {
+            Array.prototype.forEach.call(hubBody.querySelectorAll("button[data-sq-dc-lg]"), function (db) {
               db.classList.remove("active");
               db.style.background = "";
               db.style.color = "";
@@ -5232,7 +5285,7 @@ _FRONTEND_V22_JS = r'''
       });
 
       if (isDomesticDcLeagueCodeV4625(_sqActiveDomDcLeagueV4625)) {
-        Array.prototype.forEach.call(bar.querySelectorAll("button"), function (b) {
+        leagueBtns.forEach(function (b) {
           var dcLg = String(b.getAttribute("data-sq-dc-lg") || "").toUpperCase();
           if (dcLg === _sqActiveDomDcLeagueV4625) {
             b.classList.add("active");
@@ -5247,7 +5300,7 @@ _FRONTEND_V22_JS = r'''
           }
         });
       } else {
-        Array.prototype.forEach.call(bar.querySelectorAll("button[data-sq-dc-lg]"), function (b) {
+        Array.prototype.forEach.call(hubBody.querySelectorAll("button[data-sq-dc-lg]"), function (b) {
           b.classList.remove("active");
           b.style.background = "";
           b.style.color = "";
@@ -23943,6 +23996,7 @@ _install_dc_ko_team_wrapper_v381()
 @router.get("/api/member/live-sources-diag-v4623")
 @router.get("/api/member/live-sources-diag-v4624")
 @router.get("/api/member/live-sources-diag-v4625")
+@router.get("/api/member/live-sources-diag-v4626")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -23950,7 +24004,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     items = _collect_realtime_all_sports_v4616(tk, off_i)
     return {
         "ok": True,
-        "version": "v4.6.25",
+        "version": "v4.6.26",
         "apisports_bridge": _get_apisports_diag_snapshot_v4623(),
         "date_offset": off_i,
         "target_ymd": tk.strftime("%Y-%m-%d"),
