@@ -8771,9 +8771,11 @@ _FRONTEND_V22_JS = r'''
       if (k1 === raw1 && k2 === t2.trim()) return full;
       return cleanPre + leadLg + k1 + " vs " + k2;
     });
-    out = out.replace(/(^|[\s:•·])([A-Za-z][A-Za-z\.\s]{1,18}?)(?=\s*(?:측면|주전|로테이션|핵심|승\s*\(|표\s*·))/g, function (full, lead, eng) {
-      var ko = localizeTeamKoJsV381(eng.trim());
-      return ko !== eng.trim() ? (lead + ko) : full;
+    out = out.replace(/(^|[\s:•·|/(\[])([A-Za-z0-9][A-Za-z0-9\.\-'\s]{1,22}?)(?=\s*(?:측면|주전|로테이션|핵심|승\s*\(|승\b|우세|\d[\d,]*\s*(?:표|%|점)|표\s*·|의\s*(?:홈|역습)))/g, function (full, lead, eng) {
+      var trimmedEng = eng.trim();
+      if (/^(?:AI|EPL|UCL|UEL|UNL|NFL|NBA|WNBA|NHL|MLB|KBO|NPB|ABL|KBL|WKBL|UFC|F1|TOP|VS|PRO|NEW|UP|LIVE)$/i.test(trimmedEng)) return full;
+      var ko = localizeTeamKoJsV381(trimmedEng);
+      return ko !== trimmedEng ? (lead + ko) : full;
     });
     var venueMap = {
       "Etihad Stadium": "에티하드 스타디움",
@@ -8783,18 +8785,86 @@ _FRONTEND_V22_JS = r'''
       "Coventry Building Society Arena": "코번트리 아레나",
       "Tottenham Hotspur Stadium": "토트넘 홋스퍼 스타디움",
       "St. James' Park": "세인트 제임스 파크",
+      "St James' Park": "세인트 제임스 파크",
       "Old Trafford": "올드 트래퍼드",
       "Anfield": "안필드",
-      "Emirates Stadium": "에미레이츠 스타디움"
+      "Emirates Stadium": "에미레이츠 스타디움",
+      "Goodison Park": "구디슨 파크",
+      "London Stadium": "런던 스타디움",
+      "Amex Stadium": "아멕스 스타디움",
+      "Molineux Stadium": "몰리뉴 스타디움",
+      "City Ground": "시티 그라운드",
+      "Elland Road": "엘런드 로드",
+      "Portman Road": "포트먼 로드",
+      "Stadium of Light": "스타디움 오브 라이트",
+      "Craven Cottage": "크레이븐 코티지",
+      "Gtech Community Stadium": "지테크 커뮤니티 스타디움",
+      "Selhurst Park": "셀허스트 파크",
+      "King Power Stadium": "킹 파워 스타디움",
+      "St Mary's Stadium": "세인트 메리스 스타디움",
+      "Santiago Bernabeu": "산티아고 베르나베우",
+      "Spotify Camp Nou": "스포티파이 캄 노우",
+      "Camp Nou": "캄 노우",
+      "Signal Iduna Park": "지그날 이두나 파크",
+      "Allianz Arena": "알리안츠 아레나",
+      "San Siro": "산 시로",
+      "Parc des Princes": "파르크 데 프랭스",
+      // NFL Stadiums
+      "Reliant Stadium": "NRG 스타디움",
+      "NRG Stadium": "NRG 스타디움",
+      "Highmark Stadium": "하이마크 스타디움",
+      "Soldier Field": "솔저 필드",
+      "Lucas Oil Stadium": "루카스 오일 스타디움",
+      "Hard Rock Stadium": "하드록 스타디움",
+      "Caesars Superdome": "시저스 슈퍼돔",
+      "Superdome": "시저스 슈퍼돔",
+      "GEHA Field at Arrowhead Stadium": "애로헤드 스타디움",
+      "Arrowhead Stadium": "애로헤드 스타디움",
+      "Lambeau Field": "램보 필드",
+      "AT&T Stadium": "AT&T 스타디움",
+      "Levi's Stadium": "리바이스 스타디움",
+      "SoFi Stadium": "소파이 스타디움",
+      "MetLife Stadium": "메트라이프 스타디움",
+      "Gillette Stadium": "질레트 스타디움",
+      "Lincoln Financial Field": "링컨 파이낸셜 필드",
+      "Ford Field": "포드 필드",
+      "M&T Bank Stadium": "M&T 뱅크 스타디움",
+      "Acrisure Stadium": "애크리슈어 스타디움",
+      "U.S. Bank Stadium": "US 뱅크 스타디움",
+      "Lumen Field": "루멘 필드",
+      "Mercedes-Benz Stadium": "메르세데스-벤츠 스타디움",
+      "Allegiant Stadium": "얼리전트 스타디움",
+      "Raymond James Stadium": "레이먼드 제임스 스타디움",
+      "State Farm Stadium": "스테이트팜 스타디움",
+      "Paycor Stadium": "페이코어 스타디움",
+      "Empower Field at Mile High": "임파워 필드",
+      "Bank of America Stadium": "뱅크 오브 아메리카 스타디움",
+      "EverBank Stadium": "에버뱅크 스타디움",
+      "Nissan Stadium": "닛산 스타디움",
+      // NBA / NHL / ABL Venues
+      "Crypto.com Arena": "크립토닷컴 아레나",
+      "TD Garden": "TD 가든",
+      "Madison Square Garden": "매디슨 스퀘어 가든",
+      "Chase Center": "체이스 센터",
+      "Scotiabank Arena": "스코샤뱅크 아레나",
+      "Amalie Arena": "아말리 아레나",
+      "Perth Ballpark": "퍼스 볼파크"
     };
     for (var vk in venueMap) {
       if (out.indexOf(vk) !== -1) out = out.split(vk).join(venueMap[vk]);
     }
     out = out
+      .replace(/\bNFL\s*·\s*(?:nfl|football|american\s*football)\b/gi, "NFL · 미식축구")
+      .replace(/·\s*(?:nfl|american\s*football)\b/gi, "· 미식축구")
       .replace(/·\s*(?:football|soccer)\b/gi, "· 축구")
       .replace(/·\s*basketball\b/gi, "· 농구")
       .replace(/·\s*hockey\b/gi, "· 하키")
-      .replace(/·\s*baseball\b/gi, "· 야구");
+      .replace(/·\s*baseball\b/gi, "· 야구")
+      .replace(/·\s*(?:volleyball|vleague)\b/gi, "· 배구")
+      .replace(/·\s*(?:ufc|mma)\b/gi, "· 격투기")
+      .replace(/·\s*(?:esports|lck)\b/gi, "· e스포츠")
+      .replace(/·\s*(?:tennis|atp|wta)\b/gi, "· 테니스")
+      .replace(/·\s*f1\b/gi, "· 모터스포츠");
     return out;
   }
 
@@ -10151,10 +10221,14 @@ _FRONTEND_V22_JS = r'''
 
     var shortsSec = document.getElementById("tab-shorts");
     if (shortsSec) {
-      var quizBox = null, varBox = null, cmtBox = null;
+      var quizBox = shortsSec.querySelector("[data-sq-v43-shorts-panel='quiz']");
+      var varBox = shortsSec.querySelector("[data-sq-v43-shorts-panel='var']");
+      var cmtBox = shortsSec.querySelector("[data-sq-v43-shorts-panel='comment']");
+
       var sDivs = shortsSec.querySelectorAll("div, section");
       for (var si = 0; si < sDivs.length; si++) {
         var sd = sDivs[si];
+        if (sd.id === "sqShortsInteractiveTabsV43" || (sd.closest && sd.closest("#sqShortsInteractiveTabsV43"))) continue;
         var stx = sd.textContent || "";
 
         // Strict direct-button-only check so outer layout columns NEVER match `.sq-v42-mob-swipe`!
@@ -10172,13 +10246,31 @@ _FRONTEND_V22_JS = r'''
           }
         }
 
-        if (!quizBox && stx.indexOf("미니 예측 퀴즈") !== -1 && sd.children.length >= 2 && sd.children.length <= 6 && stx.indexOf("타임스탬프 한줄평") === -1) {
+        if (!quizBox && stx.indexOf("미니 예측 퀴즈") !== -1 && sd.children.length >= 2 && sd.children.length <= 8 && stx.indexOf("타임스탬프 한줄평") === -1 && stx.indexOf("밸런스 투표") === -1) {
           quizBox = sd;
-        } else if (!varBox && stx.indexOf("밸런스 투표") !== -1 && sd.children.length >= 2 && sd.children.length <= 6 && stx.indexOf("미니 예측 퀴즈") === -1) {
+          sd.setAttribute("data-sq-v43-shorts-panel", "quiz");
+        } else if (!varBox && stx.indexOf("밸런스 투표") !== -1 && sd.children.length >= 2 && sd.children.length <= 8 && stx.indexOf("미니 예측 퀴즈") === -1 && stx.indexOf("타임스탬프 한줄평") === -1) {
           varBox = sd;
-        } else if (!cmtBox && stx.indexOf("타임스탬프 한줄평") !== -1 && sd.children.length >= 2 && sd.children.length <= 6 && stx.indexOf("밸런스 투표") === -1) {
+          sd.setAttribute("data-sq-v43-shorts-panel", "var");
+        } else if (!cmtBox && stx.indexOf("타임스탬프 한줄평") !== -1 && sd.children.length >= 2 && sd.children.length <= 8 && stx.indexOf("밸런스 투표") === -1 && stx.indexOf("미니 예측 퀴즈") === -1) {
           cmtBox = sd;
+          sd.setAttribute("data-sq-v43-shorts-panel", "comment");
         }
+      }
+
+      // Safety fallback: if quizBox is found and varBox/cmtBox are direct siblings with slightly different child count, bind by sibling check!
+      if (quizBox && quizBox.parentElement && (!varBox || !cmtBox)) {
+        Array.prototype.forEach.call(quizBox.parentElement.children, function (sib) {
+          if (!sib || sib === quizBox || sib.id === "sqShortsInteractiveTabsV43") return;
+          var stx2 = sib.textContent || "";
+          if (!varBox && stx2.indexOf("밸런스 투표") !== -1 && stx2.indexOf("타임스탬프 한줄평") === -1) {
+            varBox = sib;
+            sib.setAttribute("data-sq-v43-shorts-panel", "var");
+          } else if (!cmtBox && stx2.indexOf("타임스탬프 한줄평") !== -1 && stx2.indexOf("밸런스 투표") === -1) {
+            cmtBox = sib;
+            sib.setAttribute("data-sq-v43-shorts-panel", "comment");
+          }
+        });
       }
 
       if (quizBox && varBox && cmtBox && quizBox.parentElement) {
@@ -10188,6 +10280,7 @@ _FRONTEND_V22_JS = r'''
           tabBar.id = "sqShortsInteractiveTabsV43";
           quizBox.insertAdjacentElement("beforebegin", tabBar);
         }
+        tabBar.style.display = "flex";
         var tabs = [
           { k: "quiz", lbl: "🎯 +15P 예측 퀴즈" },
           { k: "var", lbl: "⚖️ VAR 밸런스 투표" },
@@ -10208,9 +10301,231 @@ _FRONTEND_V22_JS = r'''
         quizBox.style.display = (_v43ShortsActiveWidget === "quiz") ? "" : "none";
         varBox.style.display = (_v43ShortsActiveWidget === "var") ? "" : "none";
         cmtBox.style.display = (_v43ShortsActiveWidget === "comment") ? "" : "none";
+        // Ensure inner content inside active varBox is also unhidden if any inner child was hidden
+        if (_v43ShortsActiveWidget === "var") {
+          Array.prototype.forEach.call(varBox.children || [], function (vch) {
+            if (vch && vch.style && vch.style.display === "none") vch.style.display = "";
+          });
+        }
+      }
+      installShortsPanelObserverV4630(shortsSec);
+    }
+    try { syncScheduleShortsAndChartModalV4630(); } catch (eV4630) {}
+  }
+
+  /* =========================================================================
+   * v4.6.30: Live Schedule/Vote Tab Re-render Korean Guard (Badge, Vote-Count
+   *          Summary Clubs, NFL Sport/Venues), Chart.js Radar Modal Korean
+   *          Header/Dataset Sync & 9:16 Shorts 3-Tab Persistence Observer
+   * ========================================================================= */
+  var _inSchedulePolishGuardV4630 = false;
+  var _inShortsPolishGuardV4630 = false;
+  var _inChartModalPolishGuardV4630 = false;
+
+  var _RAW_SPORT_WORD_KO_V4630 = {
+    "football": "축구",
+    "soccer": "축구",
+    "nfl": "미식축구",
+    "american football": "미식축구",
+    "basketball": "농구",
+    "hockey": "하키",
+    "baseball": "야구",
+    "volleyball": "배구",
+    "vleague": "배구",
+    "ufc": "격투기",
+    "mma": "격투기",
+    "esports": "e스포츠",
+    "tennis": "테니스",
+    "f1": "모터스포츠"
+  };
+
+  function localizeScheduleTextNodeV4630(rawVal, parentEl) {
+    if (!rawVal) return rawVal;
+    var lgCtx = detectCardLeagueHintV4629(parentEl);
+    var out = translateTextWithLeagueContextV4629(rawVal, lgCtx);
+
+    // 1) Handle vote summary lines like `Bournemouth 56표 · 무승부 29표 · Nottm Forest 50표` or `Texans / Colts`
+    out = out.replace(
+      /(^|[\s:•·|/(\[])([A-Za-z0-9][A-Za-z0-9\.\-'\/\s]{1,24}?)(?=\s*(?:\d[\d,]*\s*(?:표|%|점)|승\s*\(|승\b|우세|측면|주전|로테이션|핵심|\s*\/\s*[A-Za-z]))/g,
+      function (full, lead, eng) {
+        var trimmed = eng.trim();
+        if (/^(?:AI|EPL|UCL|UEL|UNL|NFL|NBA|WNBA|NHL|MLB|KBO|NPB|ABL|KBL|WKBL|UFC|F1|TOP|VS|PRO|NEW|UP|LIVE|Chart\.js)$/i.test(trimmed)) {
+          return full;
+        }
+        var ko = localizeTeamKoContextualV4629(trimmed, lgCtx);
+        return ko !== trimmed ? (lead + ko) : full;
+      }
+    );
+
+    // Also handle second team after `/` in `Texans / Colts` or `Bournemouth / Nottm Forest`
+    out = out.replace(
+      /(\/\s*)([A-Za-z0-9][A-Za-z0-9\.\-'\/\s]{1,24}?)(?=$|[\s·|)\]])/g,
+      function (full, slash, eng2) {
+        var trimmed2 = eng2.trim();
+        var ko2 = localizeTeamKoContextualV4629(trimmed2, lgCtx);
+        return ko2 !== trimmed2 ? (slash + ko2) : full;
+      }
+    );
+
+    // 2) Handle exact standalone text nodes inside spans (`<span>Texans</span>`, `<span>Bournemouth</span>`, `<span>football</span>`, `<span>nfl</span>`)
+    var cleanTrim = out.trim();
+    if (cleanTrim && cleanTrim.length <= 32) {
+      // Exact lowercase sport key (`football`, `nfl`, `basketball`, `hockey`, `baseball`) — preserve uppercase `NFL`, `NBA`, `NHL` league badges!
+      if (/^[a-z\s]+$/.test(cleanTrim) && _RAW_SPORT_WORD_KO_V4630[cleanTrim]) {
+        var koSp = (cleanTrim === "football" && lgCtx === "NFL") ? "미식축구" : _RAW_SPORT_WORD_KO_V4630[cleanTrim];
+        return out.replace(cleanTrim, koSp);
+      }
+      // Strip surrounding punctuation (`· football`, `Bournemouth:`, etc.)
+      var mPunct = cleanTrim.match(/^([·•|:\-\s]*)([A-Za-z0-9][A-Za-z0-9\.\-'\/\s]{1,24}?)([·•|:\-\s]*)$/);
+      if (mPunct) {
+        var core = mPunct[2].trim();
+        if (/^[a-z\s]+$/.test(core) && _RAW_SPORT_WORD_KO_V4630[core]) {
+          var koSp2 = (core === "football" && lgCtx === "NFL") ? "미식축구" : _RAW_SPORT_WORD_KO_V4630[core];
+          return out.replace(cleanTrim, mPunct[1] + koSp2 + mPunct[3]);
+        }
+        if (!/^(?:AI|EPL|UCL|UEL|UNL|NFL|NBA|WNBA|NHL|MLB|KBO|NPB|ABL|KBL|WKBL|UFC|F1|TOP|VS|PRO|NEW|UP|LIVE|Chart\.js)$/i.test(core)) {
+          var koTeam = localizeTeamKoContextualV4629(core, lgCtx);
+          if (koTeam !== core) {
+            return out.replace(cleanTrim, mPunct[1] + koTeam + mPunct[3]);
+          }
+        }
       }
     }
+
+    return out;
   }
+
+  function polishScheduleSectionDomV4630() {
+    var matchSec = document.getElementById("tab-matches") || document.getElementById("tab-schedule");
+    if (!matchSec || _inSchedulePolishGuardV4630) return;
+    _inSchedulePolishGuardV4630 = true;
+    try {
+      var walker = document.createTreeWalker(matchSec, NodeFilter.SHOW_TEXT, null);
+      var tNode;
+      while ((tNode = walker.nextNode())) {
+        var v = tNode.nodeValue;
+        if (!v || !/[A-Za-z]/.test(v)) continue;
+        var pEl = tNode.parentElement;
+        if (pEl && (pEl.tagName === "SCRIPT" || pEl.tagName === "STYLE")) continue;
+        var nextV = localizeScheduleTextNodeV4630(v, pEl);
+        if (nextV !== v) tNode.nodeValue = nextV;
+      }
+
+      if (!matchSec.__sqSchedObsV4630 && typeof MutationObserver !== "undefined") {
+        matchSec.__sqSchedObsV4630 = new MutationObserver(function () {
+          if (_inSchedulePolishGuardV4630) return;
+          polishScheduleSectionDomV4630();
+          // Re-apply 2-col grid, medals, injury toggle, and 6/18 cap (`_v43MatchesShowAll` preserved!) after vote/fav re-render
+          _inSchedulePolishGuardV4630 = true;
+          try { organizeScheduleAndShortsTabsV43(); } catch (eS) {} finally { _inSchedulePolishGuardV4630 = false; }
+        });
+        matchSec.__sqSchedObsV4630.observe(matchSec, { childList: true, subtree: true, characterData: true });
+      }
+    } finally {
+      _inSchedulePolishGuardV4630 = false;
+    }
+  }
+
+  function polishChartComparisonModalsV4630() {
+    if (_inChartModalPolishGuardV4630 || !document.body) return;
+    _inChartModalPolishGuardV4630 = true;
+    try {
+      var modals = document.body.querySelectorAll("div, section");
+      for (var i = 0; i < modals.length; i++) {
+        var md = modals[i];
+        if (!md || md.id === "tab-feed" || md.id === "tab-schedule" || md.id === "tab-matches" || md.id === "tab-lab" || md.id === "tab-issues" || md.id === "tab-ranking" || md.id === "tab-shorts") continue;
+        if (md.children && md.children.length > 25) continue;
+        var mtx = md.textContent || "";
+        if (mtx.indexOf("지표 비교") === -1 && mtx.indexOf("핵심 지표") === -1) continue;
+        if (!md.querySelector("canvas") && mtx.indexOf("5대 핵심 지표") === -1) continue;
+
+        var lgCtx = detectCardLeagueHintV4629(md);
+        var walker = document.createTreeWalker(md, NodeFilter.SHOW_TEXT, null);
+        var tn;
+        while ((tn = walker.nextNode())) {
+          var val = tn.nodeValue;
+          if (!val || !/[A-Za-z]/.test(val)) continue;
+          var pEl = tn.parentElement;
+          if (pEl && (pEl.tagName === "SCRIPT" || pEl.tagName === "STYLE")) continue;
+          var nv = localizeScheduleTextNodeV4630(val, pEl || md);
+          nv = nv
+            .replace(/\bNFL\s*·\s*(?:nfl|football)\b/gi, "NFL · 미식축구")
+            .replace(/·\s*(?:football|soccer)\b/gi, "· 축구")
+            .replace(/·\s*nfl\b/gi, "· 미식축구")
+            .replace(/·\s*basketball\b/gi, "· 농구")
+            .replace(/·\s*hockey\b/gi, "· 하키")
+            .replace(/·\s*baseball\b/gi, "· 야구");
+          if (nv !== val) tn.nodeValue = nv;
+        }
+
+        // Also localize Chart.js dataset labels if Chart instance is attached to modal canvas
+        var cvs = md.querySelector("canvas");
+        if (cvs && typeof window.Chart !== "undefined") {
+          var chartInst = (typeof window.Chart.getChart === "function" ? window.Chart.getChart(cvs) : null) || cvs.__chartjs || window.__matchRadarChart || window.radarChart;
+          if (chartInst && chartInst.data && Array.isArray(chartInst.data.datasets)) {
+            var changedDs = false;
+            chartInst.data.datasets.forEach(function (ds) {
+              if (ds && ds.label && /[A-Za-z]/.test(ds.label)) {
+                var koLbl = localizeTeamKoContextualV4629(String(ds.label).trim(), lgCtx);
+                if (koLbl !== ds.label) {
+                  ds.label = koLbl;
+                  changedDs = true;
+                }
+              }
+            });
+            if (changedDs && typeof chartInst.update === "function") {
+              try { chartInst.update("none"); } catch (eCu) {}
+            }
+          }
+        }
+      }
+
+      if (!window.__sqChartModalClickHookV4630) {
+        window.__sqChartModalClickHookV4630 = true;
+        window.addEventListener("click", function (ev) {
+          var btn = ev.target && ev.target.closest ? ev.target.closest("button, [onclick]") : null;
+          if (!btn) return;
+          var btx = String(btn.textContent || "") + " " + String(btn.getAttribute("onclick") || "");
+          if (/지표\s*비교|Chart\.js|openMatchChart|Radar/i.test(btx)) {
+            setTimeout(polishChartComparisonModalsV4630, 0);
+            setTimeout(polishChartComparisonModalsV4630, 60);
+            setTimeout(polishChartComparisonModalsV4630, 180);
+          }
+        }, false);
+      }
+    } finally {
+      _inChartModalPolishGuardV4630 = false;
+    }
+  }
+
+  function installShortsPanelObserverV4630(shortsSec) {
+    if (!shortsSec || shortsSec.__sqShortsObsV4630 || typeof MutationObserver === "undefined") return;
+    shortsSec.__sqShortsObsV4630 = new MutationObserver(function () {
+      if (_inShortsPolishGuardV4630) return;
+      _inShortsPolishGuardV4630 = true;
+      try {
+        var qBox = shortsSec.querySelector("[data-sq-v43-shorts-panel='quiz']");
+        var vBox = shortsSec.querySelector("[data-sq-v43-shorts-panel='var']");
+        var cBox = shortsSec.querySelector("[data-sq-v43-shorts-panel='comment']");
+        var tBar = document.getElementById("sqShortsInteractiveTabsV43");
+        if (tBar) tBar.style.display = "flex";
+        if (qBox && vBox && cBox) {
+          qBox.style.display = (_v43ShortsActiveWidget === "quiz") ? "" : "none";
+          vBox.style.display = (_v43ShortsActiveWidget === "var") ? "" : "none";
+          cBox.style.display = (_v43ShortsActiveWidget === "comment") ? "" : "none";
+        }
+      } finally {
+        _inShortsPolishGuardV4630 = false;
+      }
+    });
+    shortsSec.__sqShortsObsV4630.observe(shortsSec, { childList: true, subtree: true });
+  }
+
+  function syncScheduleShortsAndChartModalV4630() {
+    try { polishScheduleSectionDomV4630(); } catch (eSc) {}
+    try { polishChartComparisonModalsV4630(); } catch (eCm) {}
+  }
+
 
 
   var _v44HubActiveTab = "attend";
@@ -13485,6 +13800,7 @@ _FRONTEND_V22_JS = r'''
     safeRunStepV4610(stabilizeHofLaunchCardV29);
     safeRunStepV4610(dedupLabKellyMonitorV36);
     safeRunStepV4610(syncAllLabEnhancementsV4629);
+    safeRunStepV4610(syncScheduleShortsAndChartModalV4630);
     safeRunStepV4610(installMatchInsightModalV30);
     safeRunStepV4610(refreshScoreboardSuiteV30);
     safeRunStepV4610(handleDeepLinkPostOnBootV29);
@@ -15468,7 +15784,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46290_{int(time.time())}"
+_BOOT_VER_V30 = f"46300_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -25819,6 +26135,7 @@ _install_overseas_precision_classifier_and_repair_db_v4627()
 @router.get("/api/member/live-sources-diag-v4627")
 @router.get("/api/member/live-sources-diag-v4628")
 @router.get("/api/member/live-sources-diag-v4629")
+@router.get("/api/member/live-sources-diag-v4630")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -25828,7 +26145,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     ov_counts = {k: sum(1 for x in ov_items if x.get("sport_ko") == k) for k in ("축구", "야구", "농구", "하키", "NFL", "UFC", "F1", "종합")}
     return {
         "ok": True,
-        "version": "v4.6.29",
+        "version": "v4.6.30",
         "overseas_counts": ov_counts,
         "apisports_bridge": _get_apisports_diag_snapshot_v4623(),
         "date_offset": off_i,
