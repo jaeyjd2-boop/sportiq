@@ -257,8 +257,55 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
         "</div>"
       ].join("");
     }
+    var stBriefs = Array.isArray(d.standings_brief) ? d.standings_brief : [];
+    var stBriefHtml = "";
+    if (stBriefs.length) {
+      var colsStyle = stBriefs.length > 1
+        ? "display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:9px;"
+        : "display:grid;gap:8px;";
+      var tablesHtml = stBriefs.map(function (tb) {
+        var rowsArr = Array.isArray(tb.rows) ? tb.rows : [];
+        var rHtml = rowsArr.map(function (r) {
+          var isHi = Boolean(r.highlight);
+          var rowBg = isHi ? "background:rgba(14,165,233,.2);border:1px solid rgba(56,189,248,.55);" : "background:rgba(2,6,23,.55);border:1px solid rgba(51,65,85,.5);";
+          return (
+            "<div style='display:flex;justify-content:space-between;align-items:center;gap:6px;padding:4.5px 8px;border-radius:7px;font-size:11.8px;" + rowBg + "'>" +
+            "  <div style='display:flex;align-items:center;gap:6px;min-width:0;'>" +
+            "    <span style='font-weight:900;color:" + (r.rank <= 3 ? "#fde68a" : "#94a3b8") + ";min-width:22px;'>#" + esc(r.rank) + "</span>" +
+            "    <strong style='color:" + (isHi ? "#7dd3fc" : "#f8fafc") + ";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" + esc(r.team) + "</strong>" +
+            "    <span style='color:#94a3b8;font-size:11px;white-space:nowrap;'>" + esc(r.record) + "</span>" +
+            "  </div>" +
+            "  <div style='display:flex;align-items:center;gap:6px;white-space:nowrap;'>" +
+            (r.sub ? "<span style='color:#cbd5e1;font-size:10.5px;'>" + esc(r.sub) + "</span>" : "") +
+            "    <strong style='color:#38bdf8;font-size:12px;'>" + esc(r.metric) + "</strong>" +
+            "  </div>" +
+            "</div>"
+          );
+        }).join("");
+        return (
+          "<div style='background:rgba(15,23,42,.92);border:1px solid rgba(148,163,184,.25);border-radius:11px;padding:10px 11px;'>" +
+          "  <div style='display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap;'>" +
+          "    <span style='font-weight:900;color:#f8fafc;font-size:12.5px;'>" + esc(tb.emoji || "🏆") + " " + esc(tb.league_name) + "</span>" +
+          "    <button type='button' data-ai-jump-dc='standings' data-ai-jump-dc-lg='" + esc(tb.league_code || "") + "' style='background:rgba(37,99,235,.22);border:1px solid rgba(59,130,246,.55);color:#93c5fd;border-radius:6px;padding:2px 8px;font-size:10.8px;font-weight:800;cursor:pointer;'>🔢 순위표 이동 ↗</button>" +
+          "  </div>" +
+          "  <div style='display:grid;gap:4px;'>" + rHtml + "</div>" +
+          "</div>"
+        );
+      }).join("");
+      stBriefHtml = (
+        "<div data-sq-ai-standings-card='1' style='background:linear-gradient(145deg,rgba(59,130,246,.14),rgba(15,23,42,.97));border:1px solid rgba(96,165,250,.45);border-radius:14px;padding:12px 14px;margin-bottom:10px;'>" +
+        "  <div style='display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;'>" +
+        "    <span style='font-weight:900;color:#93c5fd;font-size:13px;'>📊 2026-2027 시즌 실시간 리그 순위 브리핑</span>" +
+        "    <span style='font-size:10.5px;color:#94a3b8;'>공식 경기 결과 실시간 반영</span>" +
+        "  </div>" +
+        "  <div style='" + colsStyle + "'>" + tablesHtml + "</div>" +
+        "</div>"
+      );
+    }
+
     var out = [
       qaCardHtml,
+      stBriefHtml,
       "<div style='background:linear-gradient(145deg,rgba(6,182,212,.15),rgba(15,23,42,.97));border:1px solid rgba(34,211,238,.48);border-radius:14px;padding:14px 15px;margin-bottom:10px;'>",
       "  <div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;'>",
       "    <div style='display:flex;align-items:center;gap:7px;flex-wrap:wrap;'>",
@@ -307,18 +354,18 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
       return "<span style='font-size:10.5px;font-weight:800;color:" + col + ";background:rgba(15,23,42,.9);border:1px solid rgba(148,163,184,.25);border-radius:6px;padding:1px 6px;'>정확도 " + v + "%</span>";
     }
 
-    // 1. SportIQ Live Match & Odds Cards (Clickable -> Scrolls to Live Score / Schedule)
+    // 1. SportIQ Live Match & Odds Cards (Clickable -> Opens 5-Tab Match Detail Modal!)
     if (games.length) {
       out.push("<div data-ai-sec='matches'><div style='font-weight:800;color:#4ade80;font-size:12.5px;margin:10px 0 6px;'>📊 SportIQ 실시간 매치 · AI 승률 · 배당 (" + games.length + "건)</div>");
-      games.forEach(function (g) {
+      games.forEach(function (g, gIdx) {
         out.push(
-          "<div class='sq-ai-iq-card' data-ai-jump-match='" + esc(g.matchup || "") + "' style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;' title='클릭 시 실시간 경기 화면으로 이동'>" +
+          "<div class='sq-ai-iq-card' data-ai-match-idx='" + gIdx + "' data-ai-jump-match='" + esc(g.matchup || "") + "' style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;' title='클릭 시 5탭 경기 상세 모달 열기'>" +
           "  <div>" +
           "    <span style='background:#1e293b;color:#38bdf8;border-radius:6px;padding:2px 6px;font-size:10.5px;font-weight:800;margin-right:6px;'>" + esc(g.league) + "</span>" +
           "    <strong style='color:#f8fafc;font-size:13px;'>" + esc(g.matchup) + "</strong> " + pctBadge(g.match_pct) +
           "    <div style='font-size:11.5px;color:#94a3b8;margin-top:3px;'>📅 " + esc(g.dt_kst) + " · 스코어 <strong style='color:#e2e8f0;'>" + esc(g.score || "0 : 0") + "</strong> · 🎯 " + esc(g.ai_prob) + (g.drop_badge ? " · <span style='color:#fbbf24;font-weight:800;'>" + esc(g.drop_badge) + "</span>" : "") + "</div>" +
           "  </div>" +
-          "  <span style='font-size:11.5px;font-weight:800;color:#e2e8f0;background:#020617;border:1px solid #334155;border-radius:8px;padding:4px 9px;'>" + esc(g.status) + " ↗</span>" +
+          "  <button type='button' data-ai-match-idx='" + gIdx + "' style='font-size:11.5px;font-weight:800;color:#38bdf8;background:rgba(14,165,233,.14);border:1px solid rgba(56,189,248,.5);border-radius:8px;padding:4px 9px;cursor:pointer;white-space:nowrap;'>" + esc(g.status || "경기 상세") + " · 상세 ↗</button>" +
           "</div>"
         );
       });
@@ -331,7 +378,7 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
       insights.forEach(function (ins) {
         var tagOpen = ins.url
           ? "<a href='" + esc(ins.url) + "' target='_blank' rel='noopener noreferrer' class='sq-ai-iq-card' style='display:block;text-decoration:none;'>"
-          : "<div class='sq-ai-iq-card' data-ai-jump-dc='" + esc(ins.dc_tab || "standings") + "' style='cursor:pointer;'>";
+          : "<div class='sq-ai-iq-card' data-ai-jump-dc='" + esc(ins.dc_tab || "standings") + "' data-ai-jump-dc-lg='" + esc(ins.dc_league || "") + "' style='cursor:pointer;'>";
         var tagClose = ins.url ? "</a>" : "</div>";
         out.push(
           tagOpen +
@@ -468,22 +515,31 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
       };
     });
     box.querySelectorAll("[data-ai-jump-match]").forEach(function (mc, mIdx) {
-      mc.onclick = function () {
-        if (games[mIdx] && games[mIdx].home && typeof window.__openMatchModalFromAiSearchV37 === "function") {
+      mc.onclick = function (ev) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        if (games[mIdx] && (games[mIdx].home || games[mIdx].matchup) && typeof window.__openMatchModalFromAiSearchV37 === "function") {
           window.__openMatchModalFromAiSearchV37(games[mIdx]);
           return;
         }
-        var modal = document.getElementById("sqAiIqModal");
-        if (modal) modal.style.display = "none";
+        if (typeof window.__closeAiSearchModalCompletelyV372 === "function") window.__closeAiSearchModalCompletelyV372();
         var liveBar = document.getElementById("proLiveTickerBar");
         if (liveBar && liveBar.scrollIntoView) liveBar.scrollIntoView({ behavior: "smooth", block: "center" });
       };
     });
     box.querySelectorAll("[data-ai-jump-dc]").forEach(function (dcEl) {
-      dcEl.onclick = function () {
+      dcEl.onclick = function (ev) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
         var tabName = dcEl.getAttribute("data-ai-jump-dc") || "standings";
-        var modal = document.getElementById("sqAiIqModal");
-        if (modal) modal.style.display = "none";
+        var dcLg = dcEl.getAttribute("data-ai-jump-dc-lg") || "";
+        if (typeof window.__closeAiSearchModalCompletelyV372 === "function") window.__closeAiSearchModalCompletelyV372();
+        else {
+          var modal = document.getElementById("sqAiIqModal");
+          if (modal) modal.style.display = "none";
+        }
+        if (dcLg && tabName === "standings" && typeof window.__jumpToLeagueStandingsFromAiV4628 === "function") {
+          window.__jumpToLeagueStandingsFromAiV4628(dcLg);
+          return;
+        }
         var hubBody = document.getElementById("dcHubBody");
         if (hubBody) hubBody.style.display = "block";
         var card = document.querySelector("[data-tab='" + tabName + "']");
@@ -11125,6 +11181,41 @@ _FRONTEND_V22_JS = r'''
         return;
       }
 
+      var matchCard = t.closest("[data-ai-match-idx], [data-ai-jump-match]");
+      if (matchCard) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+        var mList = window.__lastAiSearchMatchesV37 || [];
+        var mIdxAttr = matchCard.getAttribute("data-ai-match-idx");
+        var targetGame = (mIdxAttr != null && mIdxAttr !== "") ? mList[parseInt(mIdxAttr, 10)] : null;
+        if (!targetGame) {
+          var mup = matchCard.getAttribute("data-ai-jump-match") || "";
+          targetGame = mList.find(function (x) { return x && x.matchup === mup; }) || null;
+        }
+        if (targetGame && typeof window.__openMatchModalFromAiSearchV37 === "function") {
+          window.__openMatchModalFromAiSearchV37(targetGame);
+        }
+        return;
+      }
+
+      var dcJumpEl = t.closest("[data-ai-jump-dc-lg]");
+      if (dcJumpEl && dcJumpEl.getAttribute("data-ai-jump-dc-lg")) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+        var targetLg = dcJumpEl.getAttribute("data-ai-jump-dc-lg") || "";
+        var targetTab = dcJumpEl.getAttribute("data-ai-jump-dc") || "standings";
+        closeAiSearchModalCompletelyV372();
+        if (targetTab === "standings") {
+          jumpToLeagueStandingsV345(targetLg);
+        } else {
+          ensureDcHubExpandedForStandingsV344();
+          triggerDomesticDcStandingsV341(targetLg, targetTab);
+        }
+        return;
+      }
+
       var modalEl = findAiSearchModalContainerV372();
       var inAiModal = t.closest("#sqAiIqResultArea") || (modalEl && modalEl.contains(t));
       if (!inAiModal) {
@@ -11148,23 +11239,59 @@ _FRONTEND_V22_JS = r'''
   }
   installAiSearchModalBridgeV372();
 
+  window.__closeAiSearchModalCompletelyV372 = closeAiSearchModalCompletelyV372;
+  window.__jumpToLeagueStandingsFromAiV4628 = jumpToLeagueStandingsV345;
+
   window.__openMatchModalFromAiSearchV37 = function (rawItem) {
     if (!rawItem) return;
     closeAiSearchModalCompletelyV372();
-    var norm = normalizeScoreItemV30(rawItem, 0);
-    if (!norm && rawItem.matchup && rawItem.matchup.indexOf(" vs ") !== -1) {
-      var mp = String(rawItem.matchup).split(" vs ");
+    var hGuess = String(rawItem.home || "").trim();
+    var aGuess = String(rawItem.away || "").trim();
+    if ((!hGuess || !aGuess) && rawItem.matchup && String(rawItem.matchup).indexOf(" vs ") !== -1) {
+      var mp0 = String(rawItem.matchup).split(" vs ");
+      hGuess = mp0[0].trim();
+      aGuess = mp0[1].trim();
+    }
+    // Check if an identical live scoreboard item already exists in v30ScoreState for full venue/period fidelity!
+    var livePool = (v30ScoreState && Array.isArray(v30ScoreState.rawAllItems)) ? v30ScoreState.rawAllItems : [];
+    var matchedLive = null;
+    if (hGuess && aGuess && livePool.length) {
+      matchedLive = livePool.find(function (x) {
+        return x && String(x.home || "").trim() === hGuess && String(x.away || "").trim() === aGuess;
+      }) || null;
+    }
+    var norm = matchedLive || normalizeScoreItemV30(rawItem, 0);
+    if (!norm && hGuess && aGuess) {
+      var lgRaw = String(rawItem.league_code || rawItem.league || "").trim();
+      var probeAll = lgRaw + " " + hGuess + " " + aGuess;
+      var resolvedLc = String(rawItem.league_code || "").toUpperCase();
+      var resolvedSp = String(rawItem.sport || "").toLowerCase();
+      if (!resolvedLc || resolvedLc === "VLEAGUE" || !/^[A-Z0-9_]+$/.test(resolvedLc)) {
+        if (/여자부|흥국생명|GS칼텍스|현대건설|IBK기업은행|한국도로공사|SOOP|페퍼저축은행/.test(probeAll)) {
+          resolvedLc = "VLEAGUE_W"; resolvedSp = "volleyball";
+        } else if (/남자부|현대캐피탈|한국전력|대한항공|우리카드|삼성화재|OK저축은행|KB손해보험/.test(probeAll)) {
+          resolvedLc = "VLEAGUE_M"; resolvedSp = "volleyball";
+        } else if (/WKBL|삼성생명|신한은행|우리은행|BNK썸|하나은행|KB스타즈/i.test(probeAll)) {
+          resolvedLc = "WKBL"; resolvedSp = "basketball";
+        } else if (/KBL|서울\s*삼성|안양\s*정관장|서울\s*SK|원주\s*DB|부산\s*KCC|창원\s*LG|고양\s*소노|한국가스공사|수원\s*KT|현대모비스/i.test(probeAll)) {
+          resolvedLc = "KBL"; resolvedSp = "basketball";
+        } else {
+          resolvedLc = lgRaw.toUpperCase() || "EPL";
+        }
+      }
+      var scParts = String(rawItem.score || "").match(/(\d+)\s*:\s*(\d+)/);
       norm = normalizeScoreItemV30({
-        id: rawItem.id || (String(rawItem.league || "SPORT") + "::" + mp[0] + "::" + mp[1]),
-        sport: rawItem.sport || "",
-        league: rawItem.league || "SPORT",
-        league_code: rawItem.league_code || rawItem.league || "NBA",
+        id: rawItem.id || (resolvedLc + "::" + hGuess + "::" + aGuess),
+        sport: resolvedSp || rawItem.sport || "",
+        league: rawItem.league || resolvedLc,
+        league_code: resolvedLc,
+        venue: rawItem.venue || "",
         status_badge: rawItem.status || rawItem.status_badge || "예정",
         match_dt_kst: rawItem.dt_kst || rawItem.match_dt_kst || "",
-        home: mp[0].trim(),
-        away: mp[1].trim(),
-        home_score: rawItem.home_score || 0,
-        away_score: rawItem.away_score || 0
+        home: hGuess,
+        away: aGuess,
+        home_score: rawItem.home_score != null ? rawItem.home_score : (scParts ? parseInt(scParts[1], 10) : 0),
+        away_score: rawItem.away_score != null ? rawItem.away_score : (scParts ? parseInt(scParts[2], 10) : 0)
       }, 0);
     }
     if (norm) {
@@ -17936,6 +18063,8 @@ def _parse_schedule_intent_v37(raw_q: str) -> Dict[str, Any]:
         (("nba", "엔비에이", "미국농구", "느바"), ["NBA"], "basketball", "NBA", "🏀"),
         (("wkbl", "여자농구", "여농", "국내여자농구"), ["WKBL"], "basketball", "WKBL", "🏀"),
         (("kbl", "남자농구", "남농", "국내농구", "프로농구"), ["KBL"], "basketball", "KBL", "🏀"),
+        (("여자배구", "여배", "v리그 여자", "v-리그 여자", "여자부 배구", "여자 v리그", "여자 v-리그", "wkovo"), ["VLEAGUE_W"], "volleyball", "V-리그 여자부", "🏐"),
+        (("남자배구", "남배", "v리그 남자", "v-리그 남자", "남자부 배구", "남자 v리그", "남자 v-리그"), ["VLEAGUE_M"], "volleyball", "V-리그 남자부", "🏐"),
         (("v리그", "v-리그", "배구", "프로배구", "코보", "kovo"), ["VLEAGUE_M", "VLEAGUE_W"], "volleyball", "배구(V-리그)", "🏐"),
         (("epl", "프리미어리그", "이피엘", "잉글랜드 프리미어"), ["EPL"], "soccer", "EPL", "⚽"),
         (("라리가", "laliga", "la liga"), ["LALIGA"], "soccer", "라리가", "⚽"),
@@ -18131,13 +18260,26 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
                 except Exception:
                     continue
 
-    # 2. Domestic KBL / WKBL & V-League exact-date schedule builders
-    if not sport_filter or sport_filter == "basketball":
-        for dbg in _build_domestic_bball_games_v34(target_k):
-            _add_item(dbg)
-    if not sport_filter or sport_filter == "volleyball":
-        for vlg in _build_vleague_games_v35(target_k):
-            _add_item(vlg)
+    # 2. Official 2026-2027 KOVO / WKBL / KBL Registry + Real-Time Live Promoter (v4.6.28)
+    if not sport_filter or sport_filter in ("basketball", "volleyball"):
+        try:
+            off_kr_list = _fetch_official_kr_season_registry_v4622(target_k, off)
+            if off == 0 and off_kr_list:
+                _enhance_kr_live_vleague_v4618(off_kr_list, target_k)
+            for kr_it in off_kr_list:
+                _add_item(kr_it)
+        except Exception:
+            pass
+        if (-5 <= off <= 5):
+            try:
+                sb_dom = api_member_scoreboard_v30(date_offset=off)
+                for sbi in (sb_dom.get("items") or []):
+                    if str(sbi.get("league_code") or "") in ("VLEAGUE_M", "VLEAGUE_W", "WKBL", "KBL"):
+                        dt_s = str(sbi.get("match_dt_kst") or "")
+                        if not dt_s or target_mmdd in dt_s or off == 0:
+                            _add_item(sbi)
+            except Exception:
+                pass
 
     # 3. Fallback / supplement from scoreboard_v30 (-5 <= off <= 5) only if needed (never block ESPN hits on cold-boot!)
     all_espn_or_dom = bool(league_codes) and all(
@@ -18181,6 +18323,229 @@ def _is_clean_recent_sports_news_v37(item: Dict[str, Any], now_ts: float) -> boo
     if any(gs in src_low for gs in _ENTERTAINMENT_GOSSIP_SOURCES_V37):
         return False
     return True
+
+
+# --- v4.6.28 Club-Specific Match Filtering & Direct Live Standings Briefing for AI IQ Search ---
+_CLUB_SEARCH_DIRECTORY_V4628: Tuple[Tuple[str, str, str, Tuple[str, ...]], ...] = (
+    # V-League Men (7 clubs)
+    ("현대캐피탈", "VLEAGUE_M", "volleyball", ("현대캐피탈", "스카이워커스", "천안 현대캐피탈", "천안현대")),
+    ("한국전력", "VLEAGUE_M", "volleyball", ("한국전력", "빅스톰", "한전", "수원 한국전력")),
+    ("대한항공", "VLEAGUE_M", "volleyball", ("대한항공", "점보스", "인천 대한항공")),
+    ("우리카드", "VLEAGUE_M", "volleyball", ("우리카드", "우리원", "서울 우리카드")),
+    ("삼성화재", "VLEAGUE_M", "volleyball", ("삼성화재", "블루팡스", "대전 삼성화재")),
+    ("OK저축은행", "VLEAGUE_M", "volleyball", ("ok저축은행", "읏맨", "안산 ok")),
+    ("KB손해보험", "VLEAGUE_M", "volleyball", ("kb손해보험", "kb손보", "스타즈배구")),
+    # V-League Women (7 clubs)
+    ("IBK기업은행", "VLEAGUE_W", "volleyball", ("ibk기업은행", "기업은행", "알토스", "화성 ibk")),
+    ("한국도로공사", "VLEAGUE_W", "volleyball", ("한국도로공사", "도로공사", "하이패스", "김천 도로공사")),
+    ("GS칼텍스", "VLEAGUE_W", "volleyball", ("gs칼텍스", "서울kixx", "kixx")),
+    ("흥국생명", "VLEAGUE_W", "volleyball", ("흥국생명", "핑크스파이더스", "김연경", "인천 흥국생명")),
+    ("현대건설", "VLEAGUE_W", "volleyball", ("현대건설", "힐스테이트", "수원 현대건설")),
+    ("정관장", "VLEAGUE_W", "volleyball", ("대전 정관장", "레드스파크스")),
+    ("SOOP 수퍼스", "VLEAGUE_W", "volleyball", ("soop 수퍼스", "soop수퍼스", "페퍼저축은행", "ai페퍼스")),
+    # WKBL Women's Basketball (6 clubs)
+    ("삼성생명", "WKBL", "basketball", ("삼성생명", "블루밍스", "용인 삼성생명")),
+    ("신한은행", "WKBL", "basketball", ("신한은행", "에스버드", "인천 신한은행")),
+    ("우리은행", "WKBL", "basketball", ("우리은행", "우리won", "아산 우리은행")),
+    ("BNK썸", "WKBL", "basketball", ("bnk썸", "bnk 썸", "부산 bnk")),
+    ("하나은행", "WKBL", "basketball", ("하나은행", "하나원큐", "부천 하나은행")),
+    ("KB스타즈", "WKBL", "basketball", ("kb스타즈", "청주 kb", "청주 kb스타즈")),
+    # KBL Men's Basketball (10 clubs)
+    ("서울 삼성", "KBL", "basketball", ("서울 삼성", "서울삼성", "썬더스")),
+    ("안양 정관장", "KBL", "basketball", ("안양 정관장", "안양정관장", "레드부스터스")),
+    ("서울 SK", "KBL", "basketball", ("서울 sk", "서울sk", "sk나이츠", "나이츠")),
+    ("원주 DB", "KBL", "basketball", ("원주 db", "원주db", "프로미")),
+    ("부산 KCC", "KBL", "basketball", ("부산 kcc", "부산kcc", "이지스")),
+    ("창원 LG", "KBL", "basketball", ("창원 lg", "창원lg", "세이커스")),
+    ("고양 소노", "KBL", "basketball", ("고양 소노", "고양소노", "스카이거너스")),
+    ("대구 한국가스공사", "KBL", "basketball", ("한국가스공사", "가스공사", "페가수스")),
+    ("수원 KT", "KBL", "basketball", ("수원 kt", "수원kt", "소닉붐")),
+    ("울산 현대모비스", "KBL", "basketball", ("현대모비스", "울산 현대모비스", "피버스")),
+    # Major Global Soccer & NBA Clubs for single-club filtering
+    ("리버풀", "EPL", "soccer", ("리버풀", "liverpool")),
+    ("맨체스터 유나이티드", "EPL", "soccer", ("맨체스터 유나이티드", "맨유", "man utd", "manchester united")),
+    ("맨체스터 시티", "EPL", "soccer", ("맨체스터 시티", "맨시티", "man city", "manchester city")),
+    ("아스널", "EPL", "soccer", ("아스널", "아스날", "arsenal")),
+    ("토트넘", "EPL", "soccer", ("토트넘", "손흥민", "tottenham")),
+    ("첼시", "EPL", "soccer", ("첼시", "chelsea")),
+    ("레알 마드리드", "LALIGA", "soccer", ("레알 마드리드", "레알마드리드", "real madrid")),
+    ("FC 바르셀로나", "LALIGA", "soccer", ("바르셀로나", "바르사", "barcelona")),
+    ("바이에른 뮌헨", "BUNDESLIGA", "soccer", ("바이에른 뮌헨", "바이에른", "김민재", "bayern")),
+    ("파리 생제르맹", "LIGUE1", "soccer", ("파리 생제르맹", "psg", "이강인")),
+    ("LA 레이커스", "NBA", "basketball", ("레이커스", "lakers", "르브론")),
+    ("보스턴 셀틱스", "NBA", "basketball", ("보스턴 셀틱스", "셀틱스", "celtics")),
+    ("골든스테이트 워리어스", "NBA", "basketball", ("골든스테이트", "워리어스", "커리", "warriors")),
+    ("댈러스 매버릭스", "NBA", "basketball", ("댈러스 매버릭스", "매버릭스", "돈치치", "mavericks")),
+)
+
+
+def _detect_queried_clubs_v4628(raw_q: str, league_codes: List[str], sport_filter: str) -> List[Tuple[str, str, str, Tuple[str, ...]]]:
+    ql = re.sub(r"\s+", " ", (raw_q or "").strip().lower())
+    ql_nospace = ql.replace(" ", "")
+    hits: List[Tuple[str, str, str, Tuple[str, ...]]] = []
+    for c_team, c_lg, c_sp, aliases in _CLUB_SEARCH_DIRECTORY_V4628:
+        if sport_filter and c_sp != sport_filter:
+            continue
+        if league_codes and c_lg not in league_codes:
+            continue
+        matched = False
+        for al in aliases:
+            al_l = al.lower()
+            al_ns = al_l.replace(" ", "")
+            if al_l in ql or (len(al_ns) >= 3 and al_ns in ql_nospace):
+                matched = True
+                break
+        if matched:
+            hits.append((c_team, c_lg, c_sp, aliases))
+    # Ambiguous bare '정관장' without 안양/대전 or basketball/volleyball context
+    if "정관장" in ql and not any(x[0] in ("정관장", "안양 정관장") for x in hits):
+        if sport_filter == "volleyball" or any(k in ql for k in ("배구", "여자", "v리그", "v-리그")):
+            hits.append(("정관장", "VLEAGUE_W", "volleyball", ("정관장", "레드스파크스")))
+        elif sport_filter == "basketball" or any(k in ql for k in ("농구", "남자", "kbl")):
+            hits.append(("안양 정관장", "KBL", "basketball", ("안양 정관장", "정관장", "레드부스터스")))
+        else:
+            hits.append(("정관장", "VLEAGUE_W", "volleyball", ("정관장",)))
+            hits.append(("안양 정관장", "KBL", "basketball", ("안양 정관장", "정관장")))
+    return hits
+
+
+def _build_ai_search_standings_brief_v4628(
+    raw_q: str,
+    sched_intent: Dict[str, Any],
+    matched_clubs: List[Tuple[str, str, str, Tuple[str, ...]]],
+    q_meta: Dict[str, Any],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str]]:
+    ql = (raw_q or "").strip().lower()
+    target_lgs: List[str] = []
+    highlight_teams: Set[str] = {c[0] for c in matched_clubs}
+
+    for lcode in (sched_intent.get("league_codes") or []):
+        if lcode in ("VLEAGUE_M", "VLEAGUE_W", "WKBL", "KBL") and lcode not in target_lgs:
+            target_lgs.append(lcode)
+    for c_team, c_lg, _csp, _cals in matched_clubs:
+        if c_lg and c_lg not in target_lgs:
+            target_lgs.append(c_lg)
+
+    wants_standings_kw = any(k in ql for k in ("순위", "승점", "승률", "선두", "1위", "몇위", "성적", "테이블", "standings"))
+    if not target_lgs and wants_standings_kw and q_meta.get("league_hint"):
+        target_lgs.append(str(q_meta["league_hint"]))
+    if not target_lgs and sched_intent.get("league_codes") and len(sched_intent["league_codes"]) == 1:
+        lc0 = sched_intent["league_codes"][0]
+        if lc0 in ("EPL", "LALIGA", "BUNDESLIGA", "SERIEA", "LIGUE1", "NBA", "KBO", "MLB", "NHL", "KLEAGUE", "LCK") and (wants_standings_kw or not sched_intent.get("has_explicit_date")):
+            target_lgs.append(lc0)
+
+    brief_tables: List[Dict[str, Any]] = []
+    insight_cards: List[Dict[str, Any]] = []
+    summary_lines: List[str] = []
+
+    for lg in target_lgs[:2]:
+        if lg in ("VLEAGUE_M", "VLEAGUE_W", "WKBL", "KBL"):
+            st_obj = _build_domestic_bball_standings_v341(lg)
+            rows_raw = st_obj.get("standings") or []
+            if not rows_raw:
+                continue
+            is_vb = lg in ("VLEAGUE_M", "VLEAGUE_W")
+            lg_name = str(st_obj.get("league_name") or lg)
+            emj = "🏐" if is_vb else "🏀"
+            formatted_rows = []
+            for r in rows_raw[:10]:
+                t_nm = str(r.get("team") or "")
+                is_hi = (t_nm in highlight_teams) or any(ht in t_nm or t_nm in ht for ht in highlight_teams if len(ht) >= 2)
+                rec = f"{r.get('gp', 0)}G {r.get('w', 0)}승 {r.get('l', 0)}패"
+                sub_s = f"세트득실 {r.get('set_ratio')}" if (is_vb and r.get("set_ratio")) else (str(r.get("streak") or ""))
+                metric_s = f"승점 {r.get('pts')}" if is_vb else f"승률 {r.get('pts_label')}"
+                formatted_rows.append({
+                    "rank": int(r.get("rank") or 1),
+                    "team": t_nm,
+                    "record": rec,
+                    "sub": sub_s,
+                    "metric": metric_s,
+                    "highlight": is_hi,
+                })
+                if is_hi or (not highlight_teams and int(r.get("rank") or 99) <= 3):
+                    insight_cards.append({
+                        "kind": "standings",
+                        "dc_tab": "standings",
+                        "dc_league": lg,
+                        "badge": f"{emj} {lg_name} 실시간 순위",
+                        "title": f"#{r.get('rank')} {t_nm} — {r.get('gp', 0)}경기 {r.get('w', 0)}승 {r.get('l', 0)}패 ({metric_s})",
+                        "detail": (f"{sub_s} · " if sub_s else "") + f"클릭 시 데이터센터 {lg_name} 전체 순위표로 이동",
+                        "url": "",
+                        "match_pct": 99 if is_hi else 95,
+                    })
+            brief_tables.append({
+                "league_code": lg,
+                "league_name": lg_name,
+                "emoji": emj,
+                "rows": formatted_rows,
+            })
+            if highlight_teams:
+                hi_rows = [fr for fr in formatted_rows if fr["highlight"]]
+                if hi_rows:
+                    hr = hi_rows[0]
+                    summary_lines.append(
+                        f"{emj} [{lg_name} 현재 성적] #{hr['rank']} {hr['team']} ({hr['record']} · {hr['metric']}"
+                        + (f" · {hr['sub']}" if hr["sub"] else "")
+                        + ")"
+                    )
+                    continue
+            top3 = " · ".join([f"#{fr['rank']} {fr['team']}({fr['metric']})" for fr in formatted_rows[:3]])
+            if top3:
+                summary_lines.append(f"{emj} [{lg_name} 실시간 TOP 3] {top3}")
+        else:
+            try:
+                from app import sportiq_datacenter as _dc_mod
+                get_st_fn = getattr(_dc_mod, "get_standings", None)
+                if callable(get_st_fn):
+                    st_ext = get_st_fn(lg)
+                    ext_rows = (st_ext.get("standings") or []) if isinstance(st_ext, dict) else []
+                    if ext_rows:
+                        lg_nm_ext = str(st_ext.get("league_name") or lg)
+                        # Show top 5 + any highlighted club!
+                        formatted_ext = []
+                        for idx_r, r in enumerate(ext_rows):
+                            t_nm = _localize_team_ko_v37(str(r.get("team") or ""), "")
+                            is_hi = (t_nm in highlight_teams) or any(ht in t_nm or t_nm in ht for ht in highlight_teams if len(ht) >= 2)
+                            if idx_r < 5 or is_hi:
+                                rec = f"{r.get('gp', 0)}G {r.get('w', 0)}승" + (f" {r.get('d', 0)}무" if r.get("d") else "") + f" {r.get('l', 0)}패"
+                                metric_s = str(r.get("pts_label") or f"{r.get('pts', 0)}점")
+                                formatted_ext.append({
+                                    "rank": int(r.get("rank") or (idx_r + 1)),
+                                    "team": t_nm,
+                                    "record": rec,
+                                    "sub": f"득실 {r.get('gd', 0)}",
+                                    "metric": metric_s,
+                                    "highlight": is_hi,
+                                })
+                                if is_hi or (not highlight_teams and idx_r < 3):
+                                    insight_cards.append({
+                                        "kind": "standings",
+                                        "dc_tab": "standings",
+                                        "dc_league": lg,
+                                        "badge": f"📊 {lg_nm_ext} 실시간 순위",
+                                        "title": f"#{r.get('rank', idx_r + 1)} {t_nm} — {rec} ({metric_s})",
+                                        "detail": f"득실 {r.get('gd', 0)} · 클릭 시 데이터센터 순위표 이동",
+                                        "url": "",
+                                        "match_pct": 98 if is_hi else 93,
+                                    })
+                        if formatted_ext:
+                            brief_tables.append({
+                                "league_code": lg,
+                                "league_name": lg_nm_ext,
+                                "emoji": "🏆",
+                                "rows": formatted_ext[:7],
+                            })
+                            hi_ext = [fr for fr in formatted_ext if fr["highlight"]]
+                            if hi_ext:
+                                hr = hi_ext[0]
+                                summary_lines.append(f"🏆 [{lg_nm_ext} 현재 성적] #{hr['rank']} {hr['team']} ({hr['record']} · {hr['metric']})")
+                            else:
+                                top3_e = " · ".join([f"#{fr['rank']} {fr['team']}({fr['metric']})" for fr in formatted_ext[:3]])
+                                summary_lines.append(f"🏆 [{lg_nm_ext} 실시간 TOP 3] {top3_e}")
+            except Exception:
+                pass
+
+    return brief_tables, insight_cards, summary_lines
 
 
 # Replace base /api/ai-iq/search route cleanly with v3.7 Precision Engine
@@ -18281,11 +18646,45 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
                 except Exception:
                     continue
 
-        # If user searched a specific team name (e.g. "레이커스 금요일" or "보스턴 셀틱스 일정"), filter schedule_matches to that team if any match!
-        if schedule_matches and not sched_intent["league_codes"] and q_meta.get("entity_groups"):
+        # v4.6.28: Detect exact domestic/global clubs in query for strict single-club match filtering & standings highlight!
+        matched_clubs_v4628 = _detect_queried_clubs_v4628(q, sched_intent["league_codes"], sched_intent["sport_filter"])
+        primary_off = sched_intent["date_offsets"][0] if sched_intent["date_offsets"] else 0
+
+        if matched_clubs_v4628:
+            def _matches_any_club_v4628(m_obj: Dict[str, Any]) -> bool:
+                hm = str(m_obj.get("home") or "").strip()
+                aw = str(m_obj.get("away") or "").strip()
+                mup = str(m_obj.get("matchup") or "")
+                lc_m = str(m_obj.get("league_code") or m_obj.get("league") or "").upper()
+                for c_team, c_lg, _c_sp, c_aliases in matched_clubs_v4628:
+                    if c_lg in ("VLEAGUE_M", "VLEAGUE_W", "WKBL", "KBL") and lc_m in ("VLEAGUE_M", "VLEAGUE_W", "WKBL", "KBL") and lc_m != c_lg:
+                        continue
+                    if hm == c_team or aw == c_team or c_team in mup:
+                        return True
+                    if any(al in f"{hm} {aw} {mup}".lower() for al in c_aliases if len(al) >= 2):
+                        return True
+                return False
+
+            club_today = [sm for sm in schedule_matches if _matches_any_club_v4628(sm)]
+            if club_today or sched_intent["has_explicit_date"]:
+                schedule_matches = club_today
+            else:
+                # No game today and user didn't force a specific date -> find nearest recent/upcoming match (-1, +1, +2, -2)!
+                found_near: List[Dict[str, Any]] = []
+                for near_off in (1, -1, 2, -2, 3):
+                    club_lgs = list(dict.fromkeys([c[1] for c in matched_clubs_v4628 if c[1]]))
+                    club_sp = matched_clubs_v4628[0][2] if len({c[2] for c in matched_clubs_v4628}) == 1 else ""
+                    cand_near = _collect_matches_for_offset_v37(near_off, club_lgs, club_sp)
+                    hits_near = [sm for sm in cand_near if _matches_any_club_v4628(sm)]
+                    if hits_near:
+                        primary_off = near_off
+                        found_near = hits_near
+                        break
+                schedule_matches = found_near
+        elif schedule_matches and not sched_intent["league_codes"] and q_meta.get("entity_groups"):
             team_filtered = []
             for sm in schedule_matches:
-                blob = f"{sm['home']} {sm['away']} {sm.get('home_en','')} {sm.get('away_en','')} {sm['league']}".lower()
+                blob = f"{sm['home']} {sm['away']} {sm.get('home_en','')} {sm.get('away_en','')}".lower()
                 if any(any(alias in blob for alias in cg if len(alias) >= 2) for cg in q_meta["entity_groups"]):
                     team_filtered.append(sm)
             if team_filtered or not sched_intent["sport_filter"]:
@@ -18293,7 +18692,6 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
 
         # Build 스코비-Surpassing Top Schedule Q&A Payload (`schedule_qa`)
         schedule_qa: Optional[Dict[str, Any]] = None
-        primary_off = sched_intent["date_offsets"][0] if sched_intent["date_offsets"] else 0
         target_dt0 = now_k + timedelta(days=primary_off)
         wd_names_full = ("월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일")
         wd_short = ("월", "화", "수", "목", "금", "토", "일")
@@ -18302,7 +18700,16 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
             if len(sched_intent["date_offsets"]) == 1
             else f"주말({target_dt0.month:02d}/{target_dt0.day:02d}~)"
         )
-        subj_lbl = sched_intent["league_label"] or clean_entity_q
+        subj_lbl = (
+            matched_clubs_v4628[0][0]
+            if len(matched_clubs_v4628) == 1 and not sched_intent["league_codes"]
+            else (sched_intent["league_label"] or clean_entity_q)
+        )
+        subj_emoji = matched_clubs_v4628[0][3][0] if False else (
+            ("🏐" if matched_clubs_v4628[0][2] == "volleyball" else ("🏀" if matched_clubs_v4628[0][2] == "basketball" else "⚽"))
+            if matched_clubs_v4628 and sched_intent["sport_emoji"] == "🏟️"
+            else sched_intent["sport_emoji"]
+        )
         prev_dt = target_dt0 - timedelta(days=1)
         next_dt = target_dt0 + timedelta(days=1)
         prev_q = f"{prev_dt.month:02d}/{prev_dt.day:02d} {subj_lbl}".strip()
@@ -18314,7 +18721,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
                 qa_items = schedule_matches[:18]
                 if qa_items or sched_intent["is_schedule_qa"]:
                     schedule_qa = {
-                        "emoji": sched_intent["sport_emoji"],
+                        "emoji": subj_emoji,
                         "headline": f"{disp_date_hdr} {subj_lbl} 경기",
                         "date_offset": primary_off,
                         "total_games": len(schedule_matches),
@@ -18326,20 +18733,30 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
                         "items": qa_items,
                     }
 
-        # Merge exact schedule_matches at the top of sportiq_matches so category tabs also match 100%!
+        # Merge exact schedule_matches at the top of sportiq_matches (filtered to club when a specific club was queried!)
         merged_games: List[Dict[str, Any]] = list(schedule_matches[:16])
         seen_mg = {f"{g['league']}|{g['matchup'].lower()}" for g in merged_games}
         for ig in (internal_ctx.get("games") or []):
-            # Localize English team names in internal_ctx games too
             sp_guess = "basketball" if str(ig.get("league") or "").upper() in ("NBA", "WNBA") else ""
             parts_v = str(ig.get("matchup") or "").split(" vs ")
             if len(parts_v) == 2:
                 ig["matchup"] = f"{_localize_team_ko_v37(parts_v[0], sp_guess)} vs {_localize_team_ko_v37(parts_v[1], sp_guess)}"
+            if matched_clubs_v4628 and not _matches_any_club_v4628(ig):
+                continue
             gk = f"{ig.get('league','')}|{str(ig.get('matchup','')).lower()}"
             if gk not in seen_mg and not sched_intent["has_explicit_date"]:
                 seen_mg.add(gk)
                 merged_games.append(ig)
         internal_ctx["games"] = merged_games[:16]
+
+        # Build Direct Live Standings Brief (`standings_brief`) + Standings Insights + Summary Lines!
+        standings_brief, st_insight_cards, st_summary_lines = _build_ai_search_standings_brief_v4628(
+            q, sched_intent, matched_clubs_v4628, q_meta
+        )
+        if st_insight_cards:
+            existing_ins = list(internal_ctx.get("insights") or [])
+            seen_ins_t = {str(x.get("title") or "") for x in st_insight_cards}
+            internal_ctx["insights"] = (st_insight_cards + [x for x in existing_ins if str(x.get("title") or "") not in seen_ins_t])[:12]
 
         # Purify & rank news (strict 35d age cutoff + anti-gossip filter!)
         now_ts = time.time()
@@ -18368,7 +18785,8 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
                 if len(knowledge_cards) >= 3:
                     break
 
-        # Build crisp Data-First AI Summary when schedule_qa is active!
+        # Build crisp Data-First AI Summary (with live Standings Brief integrated!)
+        st_summary_block = ("\n\n" + "\n".join(st_summary_lines)) if st_summary_lines else ""
         if schedule_qa and schedule_qa["items"]:
             top_lines = []
             for m_it in schedule_qa["items"][:6]:
@@ -18385,17 +18803,24 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
                 f"📅 {schedule_qa['headline']} (한국시간 KST 기준 총 {len(schedule_matches)}경기)\n"
                 + "\n".join(top_lines)
                 + more_note
-                + "\n\n💡 각 경기 우측의 '경기 상세'를 누르면 5탭 전용 전술판·순위·팬 승부투표(+5P) 모달이 바로 열립니다."
+                + st_summary_block
+                + "\n\n💡 각 경기 카드나 '경기 상세'를 누르면 5탭 전용 전술판·순위·맞대결·팬 승부투표(+5P) 모달이 바로 열립니다."
             )
         elif schedule_qa and not schedule_qa["items"]:
             summary_text = (
                 f"📅 {schedule_qa['headline']} 조회 결과, 해당 일자({disp_date_hdr})에는 공식 편성된 경기가 없습니다. "
-                f"상단 날짜 이동 버튼({schedule_qa['prev_label']} / {schedule_qa['next_label']})으로 인접 일자 대진을 바로 확인해 보세요."
+                f"상단 날짜 이동 버튼({schedule_qa['prev_label']} / {schedule_qa['next_label']})으로 인접 일자 대진을 확인해 보세요."
+                + st_summary_block
             )
         else:
-            summary_text = _build_hyper_briefing_summary(q, q_meta, ranked_news, knowledge_cards, internal_ctx)
+            base_sum = _build_hyper_briefing_summary(q, q_meta, ranked_news, knowledge_cards, internal_ctx)
+            summary_text = (st_summary_block.strip() + "\n\n" + base_sum) if st_summary_lines else base_sum
 
-        base_entity = sched_intent["league_label"] or (q_meta["stems"][0] if q_meta["stems"] else clean_entity_q)
+        base_entity = (
+            matched_clubs_v4628[0][0]
+            if len(matched_clubs_v4628) == 1 and not sched_intent["league_codes"]
+            else (sched_intent["league_label"] or (q_meta["stems"][0] if q_meta["stems"] else clean_entity_q))
+        )
         related_queries = [
             f"오늘 {base_entity} 일정",
             f"내일 {base_entity} 경기",
@@ -18419,6 +18844,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
             "expanded_terms": q_meta["expanded_terms"],
             "total_count": total_matched,
             "schedule_qa": schedule_qa,
+            "standings_brief": standings_brief,
             "knowledge": knowledge_cards,
             "web_news": ranked_news,
             "sportiq_matches": internal_ctx.get("games", []),
@@ -24203,6 +24629,7 @@ _install_overseas_precision_classifier_and_repair_db_v4627()
 @router.get("/api/member/live-sources-diag-v4625")
 @router.get("/api/member/live-sources-diag-v4626")
 @router.get("/api/member/live-sources-diag-v4627")
+@router.get("/api/member/live-sources-diag-v4628")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -24212,7 +24639,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     ov_counts = {k: sum(1 for x in ov_items if x.get("sport_ko") == k) for k in ("축구", "야구", "농구", "하키", "NFL", "UFC", "F1", "종합")}
     return {
         "ok": True,
-        "version": "v4.6.27",
+        "version": "v4.6.28",
         "overseas_counts": ov_counts,
         "apisports_bridge": _get_apisports_diag_snapshot_v4623(),
         "date_offset": off_i,
