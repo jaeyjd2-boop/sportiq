@@ -1237,14 +1237,59 @@ _FRONTEND_V22_JS = r'''
       "  display: none;",
       "  flex-wrap: wrap;",
       "  align-items: center;",
-      "  gap: 6px;",
-      "  padding: 7px 10px;",
-      "  margin-bottom: 8px;",
-      "  background: rgba(2, 6, 23, 0.62);",
-      "  border: 1px dashed rgba(71, 85, 105, 0.65);",
-      "  border-radius: 10px;",
+      "  justify-content: flex-start !important;",
+      "  gap: 7px !important;",
+      "  padding: 8px 11px !important;",
+      "  margin-top: 4px !important;",
+      "  margin-bottom: 8px !important;",
+      "  background: rgba(9, 15, 31, 0.92) !important;",
+      "  border: 1px dashed rgba(56, 189, 248, 0.45) !important;",
+      "  border-radius: 11px !important;",
+      "  min-height: 44px !important;",
+      "  max-height: none !important;",
+      "  overflow: visible !important;",
+      "  box-sizing: border-box !important;",
       "}",
       "#sqV39AlertDrawer.is-open { display: flex !important; }",
+      "#sqV39AlertDrawer > button, #sqV39AlertDrawer button {",
+      "  position: static !important;",
+      "  margin: 0 !important;",
+      "  flex: 0 0 auto !important;",
+      "  height: 30px !important;",
+      "  min-height: 30px !important;",
+      "  max-height: 30px !important;",
+      "  padding: 0 11px !important;",
+      "  border-radius: 999px !important;",
+      "  font-size: 11.5px !important;",
+      "  font-weight: 800 !important;",
+      "  line-height: 1 !important;",
+      "  display: inline-flex !important;",
+      "  align-items: center !important;",
+      "  justify-content: center !important;",
+      "  white-space: nowrap !important;",
+      "  cursor: pointer !important;",
+      "  box-sizing: border-box !important;",
+      "}",
+      "@media (max-width: 680px) {",
+      "  #sqV39AlertDrawer.is-open {",
+      "    flex-wrap: nowrap !important;",
+      "    overflow-x: auto !important;",
+      "    -webkit-overflow-scrolling: touch;",
+      "    scrollbar-width: none;",
+      "  }",
+      "  #sqV39AlertDrawer::-webkit-scrollbar { display: none; }",
+      "}",
+      "#dcToastWrap, #dcGoalToastHost {",
+      "  top: auto !important;",
+      "  bottom: 118px !important;",
+      "  right: 16px !important;",
+      "  z-index: 99975 !important;",
+      "  pointer-events: none !important;",
+      "  max-width: min(340px, calc(100vw - 28px)) !important;",
+      "}",
+      "#dcToastWrap > *, #dcGoalToastHost > * {",
+      "  pointer-events: auto !important;",
+      "}",
       "body.sq-v39-cards-ready #dcLiveTickerTrack > :not(.sq-v39-card):not([data-sq-v31-empty]) { display: none !important; }",
       ".sq-v39-sf-group, .sq-v39-vm-group { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }",
       ".sq-v39-sf-group .sq-v30-fbtn, .sq-v39-vm-group .sq-v30-fbtn {",
@@ -8208,22 +8253,24 @@ _FRONTEND_V22_JS = r'''
         });
 
         var drawer = document.getElementById("sqV39AlertDrawer");
-        if (secondaryBtns.length > 0) {
-          if (!drawer) {
-            drawer = document.createElement("div");
-            drawer.id = "sqV39AlertDrawer";
-            if (spRow && spRow.parentElement === hubBox) {
-              spRow.insertAdjacentElement("beforebegin", drawer);
-            } else {
-              ctrlRow.insertAdjacentElement("afterend", drawer);
-            }
+        if (!drawer) {
+          drawer = document.createElement("div");
+          drawer.id = "sqV39AlertDrawer";
+          if (spRow && spRow.parentElement === hubBox) {
+            spRow.insertAdjacentElement("beforebegin", drawer);
           } else {
-            drawer.innerHTML = "";
+            ctrlRow.insertAdjacentElement("afterend", drawer);
           }
-          secondaryBtns.forEach(function (sb) {
-            drawer.appendChild(sb);
-          });
         }
+        // Append newly discovered buttons WITHOUT wiping existing buttons (`drawer.innerHTML = ""` bug removed!)
+        secondaryBtns.forEach(function (sb) {
+          if (sb && sb.parentElement !== drawer) {
+            sb.style.removeProperty("display");
+            sb.style.margin = "0";
+            drawer.appendChild(sb);
+          }
+        });
+        try { ensureAlertDrawerFourControlsV4631(drawer, hubBox); } catch (eDrw) {}
 
         if (drawer) {
           var togBtn = document.getElementById("sqV39AlertToggleBtn");
@@ -8237,6 +8284,7 @@ _FRONTEND_V22_JS = r'''
               var dr = document.getElementById("sqV39AlertDrawer");
               if (!dr) return;
               var openNow = !dr.classList.contains("is-open");
+              if (openNow) { try { ensureAlertDrawerFourControlsV4631(dr, hubBox); } catch (eOpenDr) {} }
               dr.classList.toggle("is-open", openNow);
               togBtn.textContent = openNow ? "🔔 알림 · 마이팀 접기 ▴" : "🔔 알림 · 마이팀 설정 ▾";
               togBtn.style.borderColor = openNow ? "#38bdf8" : "#334155";
@@ -10526,6 +10574,666 @@ _FRONTEND_V22_JS = r'''
     try { polishChartComparisonModalsV4630(); } catch (eCm) {}
   }
 
+  /* =========================================================================
+   * v4.6.31: Top Scoreboard 4-Button Alert/MyTeam Drawer Recovery,
+   *          Dedicated MyTeam Weekly Briefing & Alert Inbox Modal,
+   *          Bottom-Right Non-Blocking Drop-Odds Toast Guard &
+   *          Partner Inquiry Modal Universal Close (`닫기` / `닫기 ×` / `Esc`)
+   * ========================================================================= */
+  var _v4631CapturedAlertFeed = [];
+
+  function isGoalAlertOnV4631() {
+    try { return localStorage.getItem("dc_goal_alert") !== "off"; } catch (e) { return true; }
+  }
+  function isDropOddsAlertOnV4631() {
+    try { return localStorage.getItem("sq_drop_odds_alert") !== "off"; } catch (e) { return true; }
+  }
+
+  function styleTogglePillStateV4631(btn, isOn, onLabel, offLabel, accentColor, accentBorder, accentBg) {
+    if (!btn) return;
+    btn.textContent = isOn ? onLabel : offLabel;
+    btn.setAttribute("aria-pressed", isOn ? "true" : "false");
+    btn.style.background = isOn ? accentBg : "rgba(15, 23, 42, 0.92)";
+    btn.style.border = "1px solid " + (isOn ? accentBorder : "#475569");
+    btn.style.color = isOn ? accentColor : "#94a3b8";
+  }
+
+  function collectLiveAlertInboxItemsV4631() {
+    var list = [];
+    var seen = {};
+    function pushEntry(idKey, badge, league, matchup, detail, matchObj) {
+      if (!matchup || seen[idKey]) return;
+      seen[idKey] = true;
+      list.push({
+        key: idKey,
+        badge: badge,
+        league: league,
+        matchup: matchup,
+        detail: detail,
+        matchObj: matchObj || null
+      });
+    }
+
+    var favMap = (typeof v30ScoreState === "object" && v30ScoreState && v30ScoreState.favMap) ? v30ScoreState.favMap : {};
+    var pool = (typeof v30ScoreState === "object" && v30ScoreState && Array.isArray(v30ScoreState.rawAllItems) && v30ScoreState.rawAllItems.length)
+      ? v30ScoreState.rawAllItems
+      : ((typeof v30ScoreState === "object" && v30ScoreState && Array.isArray(v30ScoreState.items)) ? v30ScoreState.items : []);
+
+    // 1) User's favorited matches first
+    pool.forEach(function (it) {
+      if (!it || !it.home || !it.away) return;
+      var fk = matchFavKeyV30(it);
+      if (favMap[fk]) {
+        var hKo = localizeTeamKoContextualV4629(it.home, it.league_code || it.league);
+        var aKo = localizeTeamKoContextualV4629(it.away, it.league_code || it.league);
+        pushEntry(
+          "fav_" + fk,
+          "★ 관심매치",
+          it.league || it.league_code || "MATCH",
+          hKo + " vs " + aKo,
+          (it.match_dt_kst || it.status_badge || "일정 대기") + (it.venue ? " · " + translateInlineVsAndClubPrefixV42(it.venue) : ""),
+          it
+        );
+      }
+    });
+
+    // 2) Live score alerts from server
+    if (typeof v30ScoreState === "object" && v30ScoreState && Array.isArray(v30ScoreState.scoreAlerts)) {
+      v30ScoreState.scoreAlerts.forEach(function (sa, idx) {
+        if (!sa || !sa.text) return;
+        pushEntry("sa_" + (sa.id || idx), "🔔 실시간 득점", sa.league || "LIVE", translateInlineVsAndClubPrefixV42(sa.text), sa.ts_kst || "방금 전", null);
+      });
+    }
+
+    // 3) Captured toast history (`[드롭오즈 경보]` etc.)
+    _v4631CapturedAlertFeed.forEach(function (cf, idx) {
+      pushEntry("toast_" + idx + "_" + cf.title, "📉 드롭오즈", cf.league || "배당급변", cf.title, cf.detail || "실시간 배당 변동 감지", null);
+    });
+
+    // 4) Live drop-odds / live / domestic prime-time matches from pool
+    pool.forEach(function (it) {
+      if (!it || !it.home || !it.away || list.length >= 24) return;
+      var lgC = String(it.league_code || it.league || "").toUpperCase();
+      var isDom = (lgC === "VLEAGUE_M" || lgC === "VLEAGUE_W" || lgC === "WKBL" || lgC === "KBL");
+      if (!it.drop_badge && it.state !== "in" && !isDom) return;
+      var hKo = localizeTeamKoContextualV4629(it.home, lgC);
+      var aKo = localizeTeamKoContextualV4629(it.away, lgC);
+      var bLbl = it.state === "in" ? "🔴 LIVE" : (it.drop_badge ? ("📉 " + it.drop_badge) : "📅 주요일정");
+      var oddsTxt = (it.ai && it.ai.odds && it.ai.odds.home) ? ("배당 " + it.ai.odds.home + (it.ai.odds.draw ? "/" + it.ai.odds.draw : "") + "/" + (it.ai.odds.away || "-")) : "";
+      pushEntry(
+        "pool_" + (it.id || (lgC + "_" + hKo + "_" + aKo)),
+        bLbl,
+        it.league || lgC,
+        hKo + " vs " + aKo,
+        [(it.match_dt_kst || it.status_badge || ""), oddsTxt].filter(Boolean).join(" · "),
+        it
+      );
+    });
+
+    return list;
+  }
+
+  function openMyTeamAlertModalV4631(initialTab) {
+    var activeTab = (initialTab === "briefing") ? "briefing" : "inbox";
+    var modal = document.getElementById("sqMyTeamAlertModalV4631");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "sqMyTeamAlertModalV4631";
+      modal.style.cssText = "position:fixed;inset:0;z-index:120045;background:rgba(2,6,23,0.84);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;";
+      modal.addEventListener("click", function (ev) {
+        if (ev.target === modal) closeSingleOverlayModalV461(modal);
+      });
+      document.body.appendChild(modal);
+    }
+
+    function renderModalContent() {
+      var goalOn = isGoalAlertOnV4631();
+      var dropOn = isDropOddsAlertOnV4631();
+      var favMap = (typeof v30ScoreState === "object" && v30ScoreState && v30ScoreState.favMap) ? v30ScoreState.favMap : {};
+      var favCount = Object.keys(favMap).filter(function (k) { return Boolean(favMap[k]); }).length;
+      var pool = (typeof v30ScoreState === "object" && v30ScoreState && Array.isArray(v30ScoreState.rawAllItems) && v30ScoreState.rawAllItems.length)
+        ? v30ScoreState.rawAllItems
+        : ((typeof v30ScoreState === "object" && v30ScoreState && Array.isArray(v30ScoreState.items)) ? v30ScoreState.items : []);
+
+      var inboxItems = collectLiveAlertInboxItemsV4631();
+
+      // Build Weekly Briefing matches (favorited matches + domestic V-League/WKBL + top global matches)
+      var briefMatches = [];
+      var seenBrief = {};
+      function addBrief(it, tag) {
+        if (!it || !it.home || !it.away || briefMatches.length >= 10) return;
+        var hKo = localizeTeamKoContextualV4629(it.home, it.league_code || it.league);
+        var aKo = localizeTeamKoContextualV4629(it.away, it.league_code || it.league);
+        var k = hKo + "::" + aKo;
+        if (seenBrief[k]) return;
+        seenBrief[k] = true;
+        briefMatches.push({ it: it, hKo: hKo, aKo: aKo, tag: tag });
+      }
+      pool.forEach(function (it) {
+        if (it && favMap[matchFavKeyV30(it)]) addBrief(it, "★ 내 관심경기");
+      });
+      pool.forEach(function (it) {
+        var lc = String((it && (it.league_code || it.league)) || "").toUpperCase();
+        if (lc === "VLEAGUE_M" || lc === "VLEAGUE_W" || lc === "WKBL" || lc === "KBL") addBrief(it, "🇰🇷 국내 주요경기");
+      });
+      pool.forEach(function (it) {
+        if (it && it.ai && Number(it.ai.home_pct || 0) >= 48) addBrief(it, "🔥 글로벌 주목매치");
+      });
+
+      var bodyHtml = "";
+      if (activeTab === "briefing") {
+        bodyHtml = [
+          "<div style='background:rgba(16,185,129,0.09);border:1px solid rgba(52,211,153,0.32);border-radius:11px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#e2e8f0;line-height:1.5;'>",
+          "  <div style='font-weight:900;color:#6ee7b7;margin-bottom:3px;'>📅 마이팀 · 주요 매치 주간 일정 & AI 전력 브리핑</div>",
+          "  <div>등록된 내 관심 경기 <strong style='color:#fde047;'>" + favCount + "건</strong> · 스코어보드 카드의 <strong>☆</strong> 버튼을 누르면 마이팀 주간브리핑 최상단에 고정됩니다.</div>",
+          "</div>",
+          (briefMatches.length ? briefMatches.map(function (bm, bIdx) {
+            var m = bm.it;
+            var hp = (m.ai && m.ai.home_pct) ? m.ai.home_pct : 50;
+            var ap = (m.ai && m.ai.away_pct) ? m.ai.away_pct : 50;
+            var dtTxt = m.match_dt_full_kst || m.match_dt_kst || m.status_badge || "예정";
+            var vnTxt = m.venue ? (" · " + translateInlineVsAndClubPrefixV42(m.venue)) : "";
+            return "<div data-sq-mt-open-idx='" + bIdx + "' data-sq-mt-src='brief' style='background:#020617;border:1px solid #1e293b;border-radius:11px;padding:10px 12px;margin-bottom:7px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;'>" +
+              "<div style='min-width:0;'>" +
+                "<div style='font-size:11px;color:#93c5fd;font-weight:800;margin-bottom:2px;'>[" + uxEsc(m.league || m.league_code || "MATCH") + "] <span style='color:#34d399;'>" + uxEsc(bm.tag) + "</span></div>" +
+                "<div style='font-size:13px;font-weight:900;color:#f8fafc;word-break:keep-all;'>" + uxEsc(bm.hKo) + " vs " + uxEsc(bm.aKo) + "</div>" +
+                "<div style='font-size:11px;color:#94a3b8;margin-top:2px;'>🕒 " + uxEsc(dtTxt + vnTxt) + "</div>" +
+              "</div>" +
+              "<div style='text-align:right;flex-shrink:0;'>" +
+                "<div style='font-size:11px;font-weight:800;color:#fde68a;'>AI " + hp + "% : " + ap + "%</div>" +
+                "<span style='display:inline-block;margin-top:3px;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:800;color:#7dd3fc;background:rgba(14,165,233,0.15);border:1px solid rgba(56,189,248,0.4);'>상세 ↗</span>" +
+              "</div>" +
+            "</div>";
+          }).join("") : "<div style='padding:18px;text-align:center;color:#94a3b8;font-size:12.5px;'>현재 불러온 경기 일정이 없습니다. 잠시 후 다시 확인해 주세요.</div>")
+        ].join("");
+        modal.__briefMatchesV4631 = briefMatches.map(function (x) { return x.it; });
+      } else {
+        bodyHtml = [
+          "<div style='display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px;background:#020617;border:1px solid #1e293b;border-radius:11px;padding:9px 12px;margin-bottom:10px;font-size:11.6px;'>",
+          "  <span style='color:#cbd5e1;font-weight:700;'>실시간 알림 수신 상태</span>",
+          "  <div style='display:flex;gap:6px;flex-wrap:wrap;'>",
+          "    <button type='button' id='sqModalGoalTogV4631' style='padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;cursor:pointer;border:1px solid " + (goalOn ? "#f59e0b" : "#475569") + ";background:" + (goalOn ? "rgba(245,158,11,0.16)" : "#0f172a") + ";color:" + (goalOn ? "#fde68a" : "#94a3b8") + ";'>" + (goalOn ? "🔔 득점알림 ON" : "🔕 득점알림 OFF") + "</button>",
+          "    <button type='button' id='sqModalDropTogV4631' style='padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;cursor:pointer;border:1px solid " + (dropOn ? "#34d399" : "#475569") + ";background:" + (dropOn ? "rgba(16,185,129,0.16)" : "#0f172a") + ";color:" + (dropOn ? "#6ee7b7" : "#94a3b8") + ";'>" + (dropOn ? "📉 배당급변 알림 ON" : "🔕 배당급변 알림 OFF") + "</button>",
+          "  </div>",
+          "</div>",
+          (inboxItems.length ? inboxItems.map(function (al, aIdx) {
+            return "<div " + (al.matchObj ? "data-sq-mt-open-idx='" + aIdx + "' data-sq-mt-src='inbox'" : "") + " style='background:#020617;border:1px solid #1e293b;border-radius:11px;padding:9px 12px;margin-bottom:7px;" + (al.matchObj ? "cursor:pointer;" : "") + "display:flex;justify-content:space-between;align-items:center;gap:8px;'>" +
+              "<div style='min-width:0;'>" +
+                "<div style='font-size:10.8px;font-weight:800;color:#38bdf8;margin-bottom:2px;'>" + uxEsc(al.badge) + " · " + uxEsc(al.league) + "</div>" +
+                "<div style='font-size:12.8px;font-weight:800;color:#f8fafc;word-break:keep-all;'>" + uxEsc(al.matchup) + "</div>" +
+                (al.detail ? "<div style='font-size:11px;color:#94a3b8;margin-top:2px;'>" + uxEsc(al.detail) + "</div>" : "") +
+              "</div>" +
+              (al.matchObj ? "<span style='flex-shrink:0;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:800;color:#7dd3fc;background:rgba(14,165,233,0.15);border:1px solid rgba(56,189,248,0.4);'>상세 ↗</span>" : "") +
+            "</div>";
+          }).join("") : "<div style='padding:18px;text-align:center;color:#94a3b8;font-size:12.5px;'>수신된 실시간 득점·드롭오즈 알림이 없습니다.</div>")
+        ].join("");
+        modal.__inboxItemsV4631 = inboxItems;
+      }
+
+      modal.innerHTML = [
+        "<div style='background:#0f172a;border:1px solid #334155;border-radius:18px;max-width:540px;width:100%;max-height:86vh;display:flex;flex-direction:column;color:#f8fafc;box-shadow:0 24px 55px rgba(0,0,0,0.68);overflow:hidden;box-sizing:border-box;'>",
+        "  <div style='padding:13px 16px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;gap:8px;'>",
+        "    <strong style='font-size:15px;font-weight:900;color:#f8fafc;'>⭐ 마이팀 주간브리핑 · 실시간 알림함</strong>",
+        "    <button type='button' id='sqCloseMyTeamModalV4631' style='background:#1e293b;border:1px solid #475569;color:#e2e8f0;border-radius:8px;padding:4px 10px;font-size:11.8px;font-weight:800;cursor:pointer;white-space:nowrap;'>✕ 닫기</button>",
+        "  </div>",
+        "  <div style='display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 15px 0;'>",
+        "    <button type='button' data-sq-mt-tab='briefing' style='padding:8px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;border:1px solid " + (activeTab === "briefing" ? "#38bdf8" : "#1e293b") + ";background:" + (activeTab === "briefing" ? "rgba(37,99,235,0.25)" : "#020617") + ";color:" + (activeTab === "briefing" ? "#f8fafc" : "#94a3b8") + ";'>📅 마이팀 주간브리핑</button>",
+        "    <button type='button' data-sq-mt-tab='inbox' style='padding:8px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;border:1px solid " + (activeTab === "inbox" ? "#34d399" : "#1e293b") + ";background:" + (activeTab === "inbox" ? "rgba(16,185,129,0.22)" : "#020617") + ";color:" + (activeTab === "inbox" ? "#f8fafc" : "#94a3b8") + ";'>⭐ 마이팀 알림함 (" + inboxItems.length + ")</button>",
+        "  </div>",
+        "  <div style='padding:12px 15px;overflow-y:auto;flex:1;'>" + bodyHtml + "</div>",
+        "</div>"
+      ].join("");
+
+      var cBtn = document.getElementById("sqCloseMyTeamModalV4631");
+      if (cBtn) cBtn.onclick = function () { closeSingleOverlayModalV461(modal); };
+
+      modal.querySelectorAll("[data-sq-mt-tab]").forEach(function (tb) {
+        tb.onclick = function () {
+          activeTab = tb.getAttribute("data-sq-mt-tab") || "inbox";
+          renderModalContent();
+        };
+      });
+
+      var mGoal = document.getElementById("sqModalGoalTogV4631");
+      if (mGoal) {
+        mGoal.onclick = function () {
+          toggleGoalAlertMasterV4631();
+          renderModalContent();
+        };
+      }
+      var mDrop = document.getElementById("sqModalDropTogV4631");
+      if (mDrop) {
+        mDrop.onclick = function () {
+          toggleDropOddsAlertMasterV4631();
+          renderModalContent();
+        };
+      }
+
+      modal.querySelectorAll("[data-sq-mt-open-idx]").forEach(function (rowEl) {
+        rowEl.onclick = function () {
+          var idx = parseInt(rowEl.getAttribute("data-sq-mt-open-idx") || "0", 10);
+          var srcKind = rowEl.getAttribute("data-sq-mt-src");
+          var targetIt = null;
+          if (srcKind === "brief" && modal.__briefMatchesV4631) targetIt = modal.__briefMatchesV4631[idx];
+          else if (srcKind === "inbox" && modal.__inboxItemsV4631 && modal.__inboxItemsV4631[idx]) targetIt = modal.__inboxItemsV4631[idx].matchObj;
+          if (targetIt) {
+            closeSingleOverlayModalV461(modal);
+            openMatchInsightModalByItemV30(targetIt);
+          }
+        };
+      });
+    }
+
+    renderModalContent();
+    modal.classList.remove("hidden");
+    modal.style.removeProperty("display");
+    modal.style.display = "flex";
+  }
+  window.__openMyTeamAlertModalV4631 = openMyTeamAlertModalV4631;
+
+  function toggleGoalAlertMasterV4631() {
+    // Called from external controls (e.g., `#sqModalGoalTogV4631` or synthetic `#sqGoalAlertBtnV4631`)
+    var nativeGoalBtn = document.getElementById("dcGoalToggleBtn");
+    if (nativeGoalBtn && nativeGoalBtn.__sqNativeGoalSyncedV4631) {
+      try { nativeGoalBtn.click(); } catch (eG) {}
+    } else {
+      var nextOn = !isGoalAlertOnV4631();
+      try { localStorage.setItem("dc_goal_alert", nextOn ? "on" : "off"); } catch (eS) {}
+      if (typeof showToast === "function") {
+        showToast(nextOn ? "🔔 실시간 골·득점 알림이 ON으로 켜졌습니다." : "🔕 실시간 골·득점 알림이 OFF로 꺼졌습니다.");
+      }
+    }
+    syncDrawerButtonsVisualStateV4631();
+  }
+
+  function toggleDropOddsAlertMasterV4631() {
+    var nextOn = !isDropOddsAlertOnV4631();
+    try { localStorage.setItem("sq_drop_odds_alert", nextOn ? "on" : "off"); } catch (eS) {}
+    if (!nextOn) {
+      var tw = document.getElementById("dcToastWrap");
+      if (tw) {
+        Array.prototype.slice.call(tw.children || []).forEach(function (c) {
+          if (/드롭오즈|배당/.test(c.textContent || "")) {
+            if (c.parentNode) c.parentNode.removeChild(c);
+          }
+        });
+      }
+    }
+    syncDrawerButtonsVisualStateV4631();
+    if (typeof showToast === "function") {
+      showToast(nextOn ? "📉 배당급변(드롭오즈) 실시간 알림이 ON으로 켜졌습니다." : "🔕 배당급변(드롭오즈) 자동 알림이 OFF로 꺼졌습니다.");
+    }
+  }
+
+  function syncDrawerButtonsVisualStateV4631() {
+    var drawer = document.getElementById("sqV39AlertDrawer");
+    if (!drawer) return;
+    var goalOn = isGoalAlertOnV4631();
+    var dropOn = isDropOddsAlertOnV4631();
+    var inboxCnt = collectLiveAlertInboxItemsV4631().length;
+
+    Array.prototype.forEach.call(drawer.querySelectorAll("button"), function (b) {
+      var role = b.getAttribute("data-sq-drawer-role");
+      if (role === "goal") {
+        styleTogglePillStateV4631(b, goalOn, "🔔 득점알림 ON", "🔕 득점알림 OFF", "#fde68a", "#f59e0b", "rgba(245, 158, 11, 0.16)");
+      } else if (role === "drop") {
+        styleTogglePillStateV4631(b, dropOn, "📉 배당급변 알림 ON", "🔕 배당급변 알림 OFF", "#6ee7b7", "#34d399", "rgba(16, 185, 129, 0.16)");
+      } else if (role === "briefing") {
+        b.textContent = "📅 마이팀 주간브리핑";
+        b.style.background = "rgba(37, 99, 235, 0.16)";
+        b.style.border = "1px solid rgba(56, 189, 248, 0.52)";
+        b.style.color = "#93c5fd";
+      } else if (role === "inbox") {
+        var mOrig = String(b.getAttribute("data-sq-orig-cnt") || "");
+        var dispCnt = inboxCnt > 0 ? inboxCnt : (mOrig || "0");
+        b.textContent = "⭐ 마이팀 알림함 (" + dispCnt + ")";
+        b.style.background = "rgba(245, 158, 11, 0.14)";
+        b.style.border = "1px solid rgba(251, 191, 36, 0.52)";
+        b.style.color = "#fde68a";
+      }
+    });
+  }
+
+  function ensureAlertDrawerFourControlsV4631(drawer, hubBox) {
+    if (!drawer) return;
+
+    // Rescue any stray buttons anywhere inside `hubBox` (outside `#dcLiveTickerTrack`, `#sqV30ScoreToolbar`, `#dcSportPills`)
+    if (hubBox) {
+      Array.prototype.forEach.call(hubBox.querySelectorAll("button"), function (b) {
+        if (b.id === "sqV39AlertToggleBtn" || b.closest("#sqV39AlertDrawer") || b.closest("#dcSportPills") || b.closest("#sqV4618SportTabs") || b.closest("#sqV31DateCalendarBar") || b.closest("#sqV30ScoreToolbar") || b.closest("#dcLiveTickerTrack")) {
+          return;
+        }
+        var bt = String(b.textContent || "").replace(/\s+/g, " ").trim();
+        if (/득점알림|배당급변|마이팀\s*알림함|마이팀\s*주간브리핑/.test(bt)) {
+          b.style.removeProperty("display");
+          drawer.appendChild(b);
+        }
+      });
+    }
+
+    var roleMap = { goal: null, drop: null, briefing: null, inbox: null };
+    Array.prototype.slice.call(drawer.querySelectorAll("button")).forEach(function (b) {
+      var r = b.getAttribute("data-sq-drawer-role") || "";
+      var bt = String(b.textContent || "").replace(/\s+/g, " ").trim();
+      if (!r) {
+        if (b.id === "dcGoalToggleBtn" || /득점알림/.test(bt)) r = "goal";
+        else if (/배당급변/.test(bt)) r = "drop";
+        else if (/주간브리핑/.test(bt)) r = "briefing";
+        else if (/마이팀\s*알림함/.test(bt)) r = "inbox";
+      }
+      if (!r) return;
+      var isSyntheticCur = Boolean(roleMap[r] && /^sq.*V4631$/.test(roleMap[r].id || ""));
+      var isRealIncoming = !/^sq.*V4631$/.test(b.id || "");
+      if (roleMap[r] && roleMap[r] !== b) {
+        if (isSyntheticCur && isRealIncoming) {
+          var prevSyn = roleMap[r];
+          if (r === "inbox" && !b.getAttribute("data-sq-orig-cnt")) {
+            var mcPrev = bt.match(/\((\d+)\)/);
+            if (mcPrev) b.setAttribute("data-sq-orig-cnt", mcPrev[1]);
+          }
+          if (prevSyn.parentNode) prevSyn.parentNode.removeChild(prevSyn);
+          b.setAttribute("data-sq-drawer-role", r);
+          roleMap[r] = b;
+          return;
+        }
+        if (b.parentNode) b.parentNode.removeChild(b);
+        return;
+      }
+      if (r === "inbox" && !b.getAttribute("data-sq-orig-cnt")) {
+        var mc = bt.match(/\((\d+)\)/);
+        if (mc) b.setAttribute("data-sq-orig-cnt", mc[1]);
+      }
+      b.setAttribute("data-sq-drawer-role", r);
+      roleMap[r] = b;
+    });
+
+    // Guarantee all 4 controls exist even if `UPGRADE_JS` or `dc_ui.js` ran earlier/later
+    if (!roleMap.goal) {
+      var gBtn = document.createElement("button");
+      gBtn.type = "button";
+      gBtn.id = "sqGoalAlertBtnV4631";
+      gBtn.setAttribute("data-sq-drawer-role", "goal");
+      drawer.appendChild(gBtn);
+      roleMap.goal = gBtn;
+    }
+    if (roleMap.goal && roleMap.goal.id === "dcGoalToggleBtn") {
+      roleMap.goal.__sqNativeGoalSyncedV4631 = true;
+    }
+
+    if (!roleMap.drop) {
+      var dBtn = document.createElement("button");
+      dBtn.type = "button";
+      dBtn.id = "sqDropOddsAlertBtnV4631";
+      dBtn.setAttribute("data-sq-drawer-role", "drop");
+      drawer.appendChild(dBtn);
+      roleMap.drop = dBtn;
+    }
+
+    if (!roleMap.briefing) {
+      var brBtn = document.createElement("button");
+      brBtn.type = "button";
+      brBtn.id = "sqMyTeamBriefBtnV4631";
+      brBtn.setAttribute("data-sq-drawer-role", "briefing");
+      drawer.appendChild(brBtn);
+      roleMap.briefing = brBtn;
+    }
+
+    if (!roleMap.inbox) {
+      var inBtn = document.createElement("button");
+      inBtn.type = "button";
+      inBtn.id = "sqMyTeamInboxBtnV4631";
+      inBtn.setAttribute("data-sq-drawer-role", "inbox");
+      drawer.appendChild(inBtn);
+      roleMap.inbox = inBtn;
+    }
+
+    // Enforce consistent left-to-right order: 1) 득점알림 -> 2) 배당급변 알림 -> 3) 마이팀 주간브리핑 -> 4) 마이팀 알림함
+    ["goal", "drop", "briefing", "inbox"].forEach(function (rk) {
+      var btn = roleMap[rk];
+      if (!btn) return;
+      drawer.appendChild(btn);
+      if (!btn.__sqDrawerBoundV4631) {
+        btn.__sqDrawerBoundV4631 = true;
+        if (rk === "goal" && btn.id === "dcGoalToggleBtn") {
+          // Let `sportiq_datacenter_ui.js`'s native bubble listener run FIRST (updating `dcState.goalAlertOn` + `localStorage`),
+          // then immediately restyle pill colors in our subsequent bubble listener (avoiding WHATWG `click in progress` no-op!).
+          btn.addEventListener("click", function () {
+            syncDrawerButtonsVisualStateV4631();
+            if (!isGoalAlertOnV4631() && typeof showToast === "function") {
+              showToast("🔕 실시간 골·득점 알림이 OFF로 꺼졌습니다.");
+            }
+          }, false);
+        } else {
+          btn.addEventListener("click", function (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+            if (rk === "goal") {
+              toggleGoalAlertMasterV4631();
+            } else if (rk === "drop") {
+              toggleDropOddsAlertMasterV4631();
+            } else if (rk === "briefing") {
+              openMyTeamAlertModalV4631("briefing");
+            } else if (rk === "inbox") {
+              openMyTeamAlertModalV4631("inbox");
+            }
+          }, true);
+        }
+      }
+    });
+
+    syncDrawerButtonsVisualStateV4631();
+  }
+
+  function ensureTopAlertDrawerMountedV4631() {
+    var rootBar = document.getElementById("proLiveTickerBar");
+    var dcTrack = document.getElementById("dcLiveTickerTrack");
+    var hubBox = (dcTrack && dcTrack.parentElement) || rootBar;
+    if (!hubBox) return;
+
+    var autoRefreshHost = null;
+    Array.prototype.forEach.call(hubBox.querySelectorAll("label, span, div"), function (el) {
+      if (autoRefreshHost) return;
+      var tx = String(el.textContent || "").trim();
+      if (/자동갱신/.test(tx) && tx.length <= 28) {
+        var candHost = (el.tagName === "INPUT" && el.parentElement && el.parentElement.parentElement)
+          ? el.parentElement.parentElement
+          : el.parentElement;
+        if (candHost && candHost !== hubBox) autoRefreshHost = candHost;
+      }
+    });
+
+    var ctrlRow = document.getElementById("dcTickerControls");
+    var spRow = document.getElementById("dcSportPills") || document.getElementById("sqV4618SportTabs");
+    var drawer = document.getElementById("sqV39AlertDrawer");
+    if (!drawer && (ctrlRow || autoRefreshHost)) {
+      drawer = document.createElement("div");
+      drawer.id = "sqV39AlertDrawer";
+      if (spRow && spRow.parentElement === hubBox) {
+        spRow.insertAdjacentElement("beforebegin", drawer);
+      } else if (ctrlRow && ctrlRow.parentElement) {
+        ctrlRow.insertAdjacentElement("afterend", drawer);
+      } else if (hubBox.firstElementChild) {
+        hubBox.firstElementChild.insertAdjacentElement("afterend", drawer);
+      } else {
+        hubBox.appendChild(drawer);
+      }
+    }
+
+    if (drawer) {
+      var togBtn = document.getElementById("sqV39AlertToggleBtn");
+      var togHost = autoRefreshHost || ctrlRow;
+      if (!togBtn && togHost) {
+        togBtn = document.createElement("button");
+        togBtn.id = "sqV39AlertToggleBtn";
+        togBtn.type = "button";
+        togBtn.style.cssText = "background:rgba(15,23,42,0.92);border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:3px 10px;font-size:11.2px;font-weight:700;cursor:pointer;white-space:nowrap;";
+        togBtn.textContent = "🔔 알림 · 마이팀 설정 ▾";
+        togBtn.addEventListener("click", function () {
+          var dr = document.getElementById("sqV39AlertDrawer");
+          if (!dr) return;
+          var openNow = !dr.classList.contains("is-open");
+          if (openNow) { try { ensureAlertDrawerFourControlsV4631(dr, hubBox); } catch (eOpenDr) {} }
+          dr.classList.toggle("is-open", openNow);
+          togBtn.textContent = openNow ? "🔔 알림 · 마이팀 접기 ▴" : "🔔 알림 · 마이팀 설정 ▾";
+          togBtn.style.borderColor = openNow ? "#38bdf8" : "#334155";
+          togBtn.style.color = openNow ? "#7dd3fc" : "#cbd5e1";
+        });
+        togHost.appendChild(togBtn);
+      } else if (togBtn && autoRefreshHost && togBtn.parentElement !== autoRefreshHost) {
+        autoRefreshHost.appendChild(togBtn);
+      }
+      ensureAlertDrawerFourControlsV4631(drawer, hubBox);
+    }
+  }
+
+  function installToastNonOverlapAndPartnerCloseFixV4631() {
+    try { ensureTopAlertDrawerMountedV4631(); } catch (eMountDr) {}
+
+    // Watch `#proLiveTickerBar` once so any delayed second-wave button injection into `#dcTickerControls` is absorbed immediately!
+    var tickerRoot = document.getElementById("proLiveTickerBar");
+    if (tickerRoot && !tickerRoot.__sqDrawerWaveObsV4631 && typeof MutationObserver !== "undefined") {
+      tickerRoot.__sqDrawerWaveObsV4631 = true;
+      var wavePending = false;
+      var wObs = new MutationObserver(function (muts) {
+        if (wavePending) return;
+        var hasNewBtn = muts.some(function (m) {
+          return m.addedNodes && m.addedNodes.length > 0 && (!m.target || m.target.id !== "sqV39AlertDrawer");
+        });
+        if (!hasNewBtn) return;
+        wavePending = true;
+        setTimeout(function () {
+          wavePending = false;
+          try { declutterScoreboardHubV39(document.getElementById("sqV30LeagueSlot")); } catch (eD) {}
+          try { ensureTopAlertDrawerMountedV4631(); } catch (eE) {}
+        }, 40);
+      });
+      wObs.observe(tickerRoot, { childList: true, subtree: true });
+    }
+
+    // 1) Observe `#dcToastWrap` so `[드롭오즈 경보]` is captured into MyTeam Alert Inbox, never covers top header, and respects OFF toggle!
+    var toastWrap = document.getElementById("dcToastWrap");
+    if (toastWrap && !toastWrap.__sqToastGuardV4631 && typeof MutationObserver !== "undefined") {
+      toastWrap.__sqToastGuardV4631 = true;
+      toastWrap.style.setProperty("top", "auto", "important");
+      toastWrap.style.setProperty("bottom", "118px", "important");
+      toastWrap.style.setProperty("right", "16px", "important");
+      var tObs = new MutationObserver(function () {
+        Array.prototype.slice.call(toastWrap.children || []).forEach(function (tc) {
+          var ttx = String(tc.textContent || "").replace(/✕/g, "").trim();
+          if (/드롭오즈|배당/.test(ttx)) {
+            if (!tc.__sqCapturedV4631) {
+              tc.__sqCapturedV4631 = true;
+              _v4631CapturedAlertFeed.unshift({
+                league: "실시간 경보",
+                title: translateInlineVsAndClubPrefixV42(ttx),
+                detail: "20초 자동수집 감지"
+              });
+              if (_v4631CapturedAlertFeed.length > 20) _v4631CapturedAlertFeed.pop();
+              syncDrawerButtonsVisualStateV4631();
+            }
+            if (!isDropOddsAlertOnV4631()) {
+              if (tc.parentNode) tc.parentNode.removeChild(tc);
+            }
+          }
+        });
+      });
+      tObs.observe(toastWrap, { childList: true });
+    }
+
+    // 2) Wrap `window.closeModal` & `window.openModal` so inline `display: flex !important` NEVER traps `#partnerModal` or `#writeModal`!
+    if (typeof window.closeModal === "function" && !window.closeModal.__sqWrappedV4631) {
+      var origCloseModal = window.closeModal;
+      var wrappedClose = function (id) {
+        try { origCloseModal.apply(this, arguments); } catch (eC) {}
+        var el = typeof id === "string" ? document.getElementById(id) : id;
+        if (el && el.style) {
+          el.style.removeProperty("display");
+          if (el.classList) el.classList.add("hidden");
+          el.style.display = "none";
+        }
+      };
+      wrappedClose.__sqWrappedV4631 = true;
+      window.closeModal = wrappedClose;
+    }
+
+    if (typeof window.openModal === "function" && !window.openModal.__sqWrappedV4631) {
+      var origOpenModal = window.openModal;
+      var wrappedOpen = function (id) {
+        var el = typeof id === "string" ? document.getElementById(id) : id;
+        if (el && el.style) {
+          el.style.removeProperty("display");
+          if (el.classList) el.classList.remove("hidden");
+        }
+        return origOpenModal.apply(this, arguments);
+      };
+      wrappedOpen.__sqWrappedV4631 = true;
+      window.openModal = wrappedOpen;
+    }
+
+    // 3) Universal delegated capture listener for Partner Inquiry Modal & All Modal Close Buttons (`닫기`, `닫기 ×`, `✕ 닫기`, `취소`) + Backdrop!
+    if (!window.__sqPartnerAndModalCloseCaptureV4631) {
+      window.__sqPartnerAndModalCloseCaptureV4631 = true;
+
+      function findPartnerModalForElement(el) {
+        var cur = el;
+        while (cur && cur !== document.body && cur !== document.documentElement) {
+          if (
+            cur.id === "partnerModal" ||
+            cur.id === "partner-inquiry-modal" ||
+            cur.id === "sqPartnerInquiryModalV46" ||
+            cur.id === "sqMyTeamAlertModalV4631"
+          ) {
+            return cur;
+          }
+          var cs = window.getComputedStyle ? window.getComputedStyle(cur) : null;
+          if (cs && cs.position === "fixed") {
+            var tx = String(cur.textContent || "");
+            if (tx.indexOf("파트너 입점") !== -1 || tx.indexOf("제휴 문의") !== -1) {
+              return cur;
+            }
+          }
+          cur = cur.parentElement;
+        }
+        return null;
+      }
+
+      document.addEventListener("click", function (ev) {
+        var t = ev.target;
+        if (!t) return;
+
+        // Backdrop click directly on fixed partner / myteam modal overlay
+        if (t.nodeType === 1) {
+          var csT = window.getComputedStyle ? window.getComputedStyle(t) : null;
+          if (
+            t.id === "partnerModal" ||
+            t.id === "partner-inquiry-modal" ||
+            t.id === "sqPartnerInquiryModalV46" ||
+            t.id === "sqMyTeamAlertModalV4631" ||
+            (csT && csT.position === "fixed" && /파트너\s*입점|제휴\s*문의/.test(String(t.textContent || "").slice(0, 160)) && !t.querySelector("#feedList"))
+          ) {
+            closeSingleOverlayModalV461(t);
+            return;
+          }
+        }
+
+        var btn = t.closest ? t.closest("button, [role='button']") : null;
+        if (!btn) return;
+        var btx = String(btn.textContent || "").replace(/\s+/g, " ").trim();
+        var isCloseLabel = /^(?:닫기(?:\s*[×✕✖])?|[×✕✖](?:\s*닫기)?|취소)$/.test(btx) || /닫기\s*\(Esc\)/i.test(btx);
+        if (!isCloseLabel) return;
+
+        var hostPm = findPartnerModalForElement(btn);
+        if (hostPm) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          closeSingleOverlayModalV461(hostPm);
+        }
+      }, true);
+    }
+  }
+
+
 
 
   var _v44HubActiveTab = "attend";
@@ -11148,7 +11856,8 @@ _FRONTEND_V22_JS = r'''
     if (nativePm) {
       polishNativePartnerModalV46(nativePm);
       nativePm.classList.remove("hidden");
-      nativePm.style.setProperty("display", "flex", "important");
+      nativePm.style.removeProperty("display");
+      nativePm.style.display = "flex";
       nativePm.style.setProperty("z-index", "100065", "important");
       return;
     }
@@ -11593,14 +12302,20 @@ _FRONTEND_V22_JS = r'''
       dcMatchModal: 1,
       dcMatchDetailModal: 1
     };
-    if (directHideIds[el.id]) {
+    if (directHideIds[el.id] || el.id === "sqMyTeamAlertModalV4631") {
+      el.style.removeProperty("display");
+      if (el.classList) el.classList.add("hidden");
       el.style.display = "none";
       return;
     }
+    el.style.removeProperty("display");
     if (typeof window.closeModal === "function" && el.id) {
       try { window.closeModal(el.id); } catch (eC) {}
     }
-    if (el.classList) el.classList.add("hidden");
+    if (el.classList) {
+      el.classList.remove("open", "active", "show");
+      el.classList.add("hidden");
+    }
     el.style.display = "none";
   }
 
@@ -11610,10 +12325,25 @@ _FRONTEND_V22_JS = r'''
 
     window.addEventListener("keydown", function (ev) {
       if (ev.key !== "Escape" && ev.key !== "Esc" && ev.keyCode !== 27) return;
+      var dynamicPartnerFixed = null;
+      if (document.body) {
+        var fDivs = document.body.querySelectorAll("div, section");
+        for (var pfi = 0; pfi < fDivs.length; pfi++) {
+          var fd = fDivs[pfi];
+          if (fd.id || !isOverlayModalVisibleV461(fd)) continue;
+          var fcs = window.getComputedStyle ? window.getComputedStyle(fd) : null;
+          if (fcs && fcs.position === "fixed" && /파트너\s*입점|제휴\s*문의/.test(String(fd.textContent || "").slice(0, 180))) {
+            dynamicPartnerFixed = fd;
+            break;
+          }
+        }
+      }
       var candidates = [
         document.getElementById("sqDeleteAuthModalV4612"),
         document.getElementById("dcQuickMatchModal"),
+        document.getElementById("sqMyTeamAlertModalV4631"),
         document.getElementById("sqPartnerInquiryModalV46"),
+        dynamicPartnerFixed,
         document.getElementById("sqLegalPolicyModal"),
         findAiSearchModalContainerV372(),
         document.getElementById("sqAdminRaffleModal"),
@@ -11704,6 +12434,7 @@ _FRONTEND_V22_JS = r'''
     try { enforceSingleLineMainTabBar(); } catch (eV4610) {}
     try { organizeScheduleAndShortsTabsV43(); } catch (eV43) {}
     try { if (window.__organizeModalsAndMemberHubV44) window.__organizeModalsAndMemberHubV44(); } catch (eV44) {}
+    try { installToastNonOverlapAndPartnerCloseFixV4631(); syncDrawerButtonsVisualStateV4631(); } catch (eV4631) {}
   }
 
   function getSportTacticalViewV33(it, hp, ap) {
@@ -13801,6 +14532,7 @@ _FRONTEND_V22_JS = r'''
     safeRunStepV4610(dedupLabKellyMonitorV36);
     safeRunStepV4610(syncAllLabEnhancementsV4629);
     safeRunStepV4610(syncScheduleShortsAndChartModalV4630);
+    safeRunStepV4610(installToastNonOverlapAndPartnerCloseFixV4631);
     safeRunStepV4610(installMatchInsightModalV30);
     safeRunStepV4610(refreshScoreboardSuiteV30);
     safeRunStepV4610(handleDeepLinkPostOnBootV29);
@@ -15784,7 +16516,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46300_{int(time.time())}"
+_BOOT_VER_V30 = f"46310_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -26136,6 +26868,7 @@ _install_overseas_precision_classifier_and_repair_db_v4627()
 @router.get("/api/member/live-sources-diag-v4628")
 @router.get("/api/member/live-sources-diag-v4629")
 @router.get("/api/member/live-sources-diag-v4630")
+@router.get("/api/member/live-sources-diag-v4631")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -26145,7 +26878,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     ov_counts = {k: sum(1 for x in ov_items if x.get("sport_ko") == k) for k in ("축구", "야구", "농구", "하키", "NFL", "UFC", "F1", "종합")}
     return {
         "ok": True,
-        "version": "v4.6.30",
+        "version": "v4.6.31",
         "overseas_counts": ov_counts,
         "apisports_bridge": _get_apisports_diag_snapshot_v4623(),
         "date_offset": off_i,
