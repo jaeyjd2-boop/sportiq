@@ -5942,7 +5942,156 @@ _FRONTEND_V22_JS = r'''
     "ipswich": "입스위치 타운", "ipswich town": "입스위치 타운", "southampton": "사우샘프턴",
     "sunderland": "선덜랜드", "leeds": "리즈 유나이티드", "leeds united": "리즈 유나이티드", "burnley": "번리",
     "coventry": "코번트리 시티", "coventry city": "코번트리 시티", "hull": "헐 시티", "hull city": "헐 시티",
-    "sheff utd": "셰필드 유나이티드", "sheffield united": "셰필드 유나이티드", "middlesbrough": "미들즈브러", "west brom": "웨스트 브로미치"
+    "sheff utd": "셰필드 유나이티드", "sheffield united": "셰필드 유나이티드", "middlesbrough": "미들즈브러", "west brom": "웨스트 브로미치",
+    "rep ireland": "아일랜드",
+    // European Leagues (LaLiga, Serie A, Bundesliga, Ligue 1, UCL, Eredivisie, Liga Portugal)
+    "barcelona": "FC 바르셀로나", "fc barcelona": "FC 바르셀로나", "real madrid": "레알 마드리드",
+    "atletico madrid": "아틀레티코 마드리드", "atletico": "아틀레티코 마드리드", "villarreal": "비야레알",
+    "athletic": "아틀레틱 빌바오", "athletic club": "아틀레틱 빌바오", "athletic bilbao": "아틀레틱 빌바오",
+    "real sociedad": "레알 소시에다드", "sociedad": "레알 소시에다드", "betis": "레알 베티스", "real betis": "레알 베티스",
+    "celta vigo": "셀타 비고", "celta": "셀타 비고", "espanyol": "에스파뇰", "sevilla": "세비야",
+    "valencia": "발렌시아", "girona": "지로나", "osasuna": "오사수나", "mallorca": "마요르카",
+    "getafe": "헤타페", "rayo vallecano": "라요 바예카노", "alaves": "알라베스", "las palmas": "라스팔마스", "leganes": "레가네스", "valladolid": "바야돌리드",
+    "bayern": "바이에른 뮌헨", "bayern munich": "바이에른 뮌헨", "dortmund": "보루시아 도르트문트", "borussia dortmund": "보루시아 도르트문트",
+    "leverkusen": "레버쿠젠", "bayer leverkusen": "레버쿠젠", "rb leipzig": "RB 라이프치히", "leipzig": "RB 라이프치히",
+    "frankfurt": "프랑크푸르트", "eintracht frankfurt": "프랑크푸르트", "stuttgart": "슈투트가르트", "vfb stuttgart": "슈투트가르트",
+    "freiburg": "프라이부르크", "wolfsburg": "볼프스부르크", "mainz": "마인츠 05", "mainz 05": "마인츠 05",
+    "gladbach": "묀헨글라트바흐", "monchengladbach": "묀헨글라트바흐", "werder bremen": "베르더 브레멘", "bremen": "베르더 브레멘",
+    "augsburg": "아우크스부르크", "union berlin": "우니온 베를린", "hoffenheim": "호펜하임", "heidenheim": "하이덴하임",
+    "st. pauli": "장크트파울리", "st pauli": "장크트파울리", "cologne": "FC 쾰른", "fc koln": "FC 쾰른", "koln": "FC 쾰른", "bochum": "보훔", "holstein kiel": "홀슈타인 킬",
+    "inter": "인터 밀란", "inter milan": "인터 밀란", "internazionale": "인터 밀란", "ac milan": "AC 밀란", "milan": "AC 밀란",
+    "juventus": "유벤투스", "napoli": "나폴리", "atalanta": "아탈란타", "as roma": "AS 로마", "roma": "AS 로마",
+    "lazio": "라치오", "fiorentina": "피오렌티나", "bologna": "볼로냐", "torino": "토리노", "udinese": "우디네세",
+    "como": "코모 1907", "cagliari": "칼리아리", "parma": "파르마", "lecce": "레체", "genoa": "제노아",
+    "hellas verona": "엘라스 베로나", "verona": "엘라스 베로나", "empoli": "엠폴리", "monza": "몬차", "venezia": "베네치아",
+    "psg": "파리 생제르맹", "paris saint-germain": "파리 생제르맹", "paris sg": "파리 생제르맹",
+    "marseille": "마르세유", "olympique marseille": "마르세유", "monaco": "AS 모나코", "as monaco": "AS 모나코",
+    "lille": "릴 OSC", "losc lille": "릴 OSC", "lyon": "올랭피크 리옹", "nice": "OGC 니스", "ogc nice": "OGC 니스",
+    "lens": "RC 랑스", "rc lens": "RC 랑스", "rennes": "스타드 렌", "stade rennais": "스타드 렌", "brest": "스타드 브레스트",
+    "strasbourg": "스트라스부르", "reims": "스타드 랭스", "toulouse": "툴루즈", "nantes": "FC 낭트",
+    "auxerre": "오세르", "angers": "앙제", "le havre": "르아브르 AC", "le havre ac": "르아브르 AC", "troyes": "트루아", "saint-etienne": "생테티엔",
+    "bodo/glimt": "보되/글림트", "bodø/glimt": "보되/글림트", "lask linz": "LASK 린츠", "lask": "LASK 린츠",
+    "galatasaray": "갈라타사라이", "fenerbahce": "페네르바체", "besiktas": "베식타스",
+    "aek athens": "AEK 아테네", "olympiacos": "올림피아코스", "panathinaikos": "파나티나이코스",
+    "feyenoord": "페예노르트", "psv": "PSV 에인트호번", "psv eindhoven": "PSV 에인트호번", "ajax": "아약스",
+    "fc porto": "FC 포르투", "porto": "FC 포르투", "benfica": "벤피카", "sporting cp": "스포르팅 CP", "sporting": "스포르팅 CP",
+    "s bratislava": "슬로반 브라티슬라바", "slovan bratislava": "슬로반 브라티슬라바", "celtic": "셀틱", "club brugge": "클뤼프 브뤼허",
+    "salzburg": "잘츠부르크", "rb salzburg": "잘츠부르크", "shakhtar": "샤흐타르", "shakhtar donetsk": "샤흐타르",
+    // MLS & J-League
+    "orlando": "올랜도 시티", "orlando city": "올랜도 시티", "cincinnati": "FC 신시내티", "fc cincinnati": "FC 신시내티",
+    "seattle": "시애틀 사운더스", "seattle sounders": "시애틀 사운더스", "salt lake": "레알 솔트레이크", "real salt lake": "레알 솔트레이크",
+    "inter miami": "인터 마이애미", "la galaxy": "LA 갤럭시", "lafc": "LAFC",
+    "kashima": "가시마 앤틀러스", "kashima antlers": "가시마 앤틀러스", "shimizu": "시미즈 에스펄스", "shimizu s-pulse": "시미즈 에스펄스",
+    "kashiwa": "가시와 레이솔", "kashiwa reysol": "가시와 레이솔", "jef utd chiba": "제프 유나이티드 지바",
+    "vissel kobe": "비셀 고베", "mito hollyhock": "미토 홀리호크",
+    // NFL 32 Franchises
+    "texans": "휴스턴 텍산스", "houston texans": "휴스턴 텍산스",
+    "colts": "인디애나폴리스 콜츠", "indianapolis colts": "인디애나폴리스 콜츠",
+    "chiefs": "캔자스시티 치프스", "kansas city chiefs": "캔자스시티 치프스",
+    "bills": "버펄로 빌스", "buffalo bills": "버펄로 빌스",
+    "ravens": "볼티모어 레이븐스", "baltimore ravens": "볼티모어 레이븐스",
+    "lions": "디트로이트 라이온스", "detroit lions": "디트로이트 라이온스",
+    "eagles": "필라델피아 이글스", "philadelphia eagles": "필라델피아 이글스",
+    "49ers": "샌프란시스코 49ers", "san francisco 49ers": "샌프란시스코 49ers",
+    "cowboys": "댈러스 카우보이스", "dallas cowboys": "댈러스 카우보이스",
+    "packers": "그린베이 패커스", "green bay packers": "그린베이 패커스",
+    "steelers": "피츠버그 스틸러스", "pittsburgh steelers": "피츠버그 스틸러스",
+    "bengals": "신시내티 벵골스", "cincinnati bengals": "신시내티 벵골스",
+    "vikings": "미네소타 바이킹스", "minnesota vikings": "미네소타 바이킹스",
+    "chargers": "LA 차저스", "la chargers": "LA 차저스", "los angeles chargers": "LA 차저스",
+    "broncos": "덴버 브롱코스", "denver broncos": "덴버 브롱코스",
+    "seahawks": "시애틀 시호크스", "seattle seahawks": "시애틀 시호크스",
+    "rams": "LA 램스", "la rams": "LA 램스", "los angeles rams": "LA 램스",
+    "buccaneers": "탬파베이 버커니어스", "tampa bay buccaneers": "탬파베이 버커니어스",
+    "falcons": "애틀랜타 팰컨스", "atlanta falcons": "애틀랜타 팰컨스",
+    "saints": "뉴올리언스 세인츠", "new orleans saints": "뉴올리언스 세인츠",
+    "bears": "시카고 베어스", "chicago bears": "시카고 베어스",
+    "commanders": "워싱턴 커맨더스", "washington commanders": "워싱턴 커맨더스",
+    "dolphins": "마이애미 돌핀스", "miami dolphins": "마이애미 돌핀스",
+    "patriots": "뉴잉글랜드 패트리어츠", "new england patriots": "뉴잉글랜드 패트리어츠",
+    "jaguars": "잭슨빌 재규어스", "jacksonville jaguars": "잭슨빌 재규어스",
+    "titans": "테네시 타이탄스", "tennessee titans": "테네시 타이탄스",
+    "browns": "클리블랜드 브라운스", "cleveland browns": "클리블랜드 브라운스",
+    "raiders": "라스베이거스 레이더스", "las vegas raiders": "라스베이거스 레이더스",
+    "new york giants": "뉴욕 자이언츠", "ny giants": "뉴욕 자이언츠",
+    "new york jets": "뉴욕 제츠", "ny jets": "뉴욕 제츠",
+    "carolina panthers": "캐롤라이나 팬서스", "arizona cardinals": "애리조나 카디널스",
+    // NBA 30 Franchises
+    "lakers": "LA 레이커스", "la lakers": "LA 레이커스", "los angeles lakers": "LA 레이커스",
+    "clippers": "LA 클리퍼스", "la clippers": "LA 클리퍼스", "los angeles clippers": "LA 클리퍼스",
+    "warriors": "골든스테이트 워리어스", "golden state warriors": "골든스테이트 워리어스",
+    "celtics": "보스턴 셀틱스", "boston celtics": "보스턴 셀틱스",
+    "knicks": "뉴욕 닉스", "new york knicks": "뉴욕 닉스",
+    "raptors": "토론토 랩터스", "toronto raptors": "토론토 랩터스",
+    "timberwolves": "미네소타 팀버울브스", "minnesota timberwolves": "미네소타 팀버울브스",
+    "trail blazers": "포틀랜드 트레일블레이저스", "blazers": "포틀랜드 트레일블레이저스", "portland trail blazers": "포틀랜드 트레일블레이저스",
+    "pistons": "디트로이트 피스톤스", "detroit pistons": "디트로이트 피스톤스",
+    "jazz": "유타 재즈", "utah jazz": "유타 재즈",
+    "hornets": "샬럿 호네츠", "charlotte hornets": "샬럿 호네츠",
+    "bucks": "밀워키 벅스", "milwaukee bucks": "밀워키 벅스",
+    "nuggets": "덴버 너기츠", "denver nuggets": "덴버 너기츠",
+    "suns": "피닉스 선즈", "phoenix suns": "피닉스 선즈",
+    "mavericks": "댈러스 매버릭스", "dallas mavericks": "댈러스 매버릭스",
+    "thunder": "오클라호마시티 썬더", "okc thunder": "오클라호마시티 썬더", "oklahoma city thunder": "오클라호마시티 썬더",
+    "cavaliers": "클리블랜드 캐벌리어스", "cleveland cavaliers": "클리블랜드 캐벌리어스",
+    "heat": "마이애미 히트", "miami heat": "마이애미 히트",
+    "76ers": "필라델피아 76ers", "sixers": "필라델피아 76ers", "philadelphia 76ers": "필라델피아 76ers",
+    "magic": "올랜도 매직", "orlando magic": "올랜도 매직",
+    "pacers": "인디애나 페이서스", "indiana pacers": "인디애나 페이서스",
+    "hawks": "애틀랜타 호크스", "atlanta hawks": "애틀랜타 호크스",
+    "bulls": "시카고 불스", "chicago bulls": "시카고 불스",
+    "nets": "브루클린 네츠", "brooklyn nets": "브루클린 네츠",
+    "pelicans": "뉴올리언스 펠리컨스", "new orleans pelicans": "뉴올리언스 펠리컨스",
+    "grizzlies": "멤피스 그리즐리스", "memphis grizzlies": "멤피스 그리즐리스",
+    "rockets": "휴스턴 로키츠", "houston rockets": "휴스턴 로키츠",
+    "wizards": "워싱턴 위저즈", "washington wizards": "워싱턴 위저즈",
+    "san antonio spurs": "샌안토니오 스퍼스", "sacramento kings": "새크라멘토 킹스",
+    // NHL 32 Franchises
+    "maple leafs": "토론토 메이플리프스", "toronto maple leafs": "토론토 메이플리프스",
+    "rangers": "뉴욕 레인저스", "ny rangers": "뉴욕 레인저스", "new york rangers": "뉴욕 레인저스",
+    "golden knights": "베가스 골든나이츠", "vegas golden knights": "베가스 골든나이츠",
+    "stars": "댈러스 스타스", "dallas stars": "댈러스 스타스",
+    "sharks": "산호세 샤크스", "san jose sharks": "산호세 샤크스",
+    "flames": "캘거리 플레임스", "calgary flames": "캘거리 플레임스",
+    "blues": "세인트루이스 블루스", "st. louis blues": "세인트루이스 블루스",
+    "ducks": "애너하임 덕스", "anaheim ducks": "애너하임 덕스",
+    "wild": "미네소타 와일드", "minnesota wild": "미네소타 와일드",
+    "predators": "내슈빌 프레데터스", "nashville predators": "내슈빌 프레데터스",
+    "lightning": "탬파베이 라이트닝", "tampa bay lightning": "탬파베이 라이트닝",
+    "capitals": "워싱턴 캐피털스", "washington capitals": "워싱턴 캐피털스",
+    "blackhawks": "시카고 블랙호크스", "chicago blackhawks": "시카고 블랙호크스",
+    "bruins": "보스턴 브루인스", "boston bruins": "보스턴 브루인스",
+    "kings": "LA 킹스", "la kings": "LA 킹스", "los angeles kings": "LA 킹스",
+    "panthers": "플로리다 팬서스", "florida panthers": "플로리다 팬서스",
+    "oilers": "에드먼턴 오일러스", "edmonton oilers": "에드먼턴 오일러스",
+    "islanders": "뉴욕 아일랜더스", "ny islanders": "뉴욕 아일랜더스", "new york islanders": "뉴욕 아일랜더스",
+    "blue jackets": "콜럼버스 블루재키츠", "columbus blue jackets": "콜럼버스 블루재키츠",
+    "flyers": "필라델피아 플라이어스", "philadelphia flyers": "필라델피아 플라이어스",
+    "sabres": "버펄로 세이버스", "buffalo sabres": "버펄로 세이버스",
+    "senators": "오타와 세너터스", "ottawa senators": "오타와 세너터스",
+    "canadiens": "몬트리올 캐네디언스", "montreal canadiens": "몬트리올 캐네디언스",
+    "devils": "뉴저지 데블스", "new jersey devils": "뉴저지 데블스",
+    "hurricanes": "캐롤라이나 허리케인스", "carolina hurricanes": "캐롤라이나 허리케인스",
+    "penguins": "피츠버그 펭귄스", "pittsburgh penguins": "피츠버그 펭귄스",
+    "red wings": "디트로이트 레드윙스", "detroit red wings": "디트로이트 레드윙스",
+    "avalanche": "콜로라도 애벌랜치", "colorado avalanche": "콜로라도 애벌랜치",
+    "canucks": "밴쿠버 캐넉스", "vancouver canucks": "밴쿠버 캐넉스",
+    "kraken": "시애틀 크라켄", "seattle kraken": "시애틀 크라켄",
+    "jets": "위니펙 제츠", "winnipeg jets": "위니펙 제츠",
+    "utah hc": "유타 하키클럽",
+    // MLB & ABL Baseball
+    "dodgers": "LA 다저스", "la dodgers": "LA 다저스", "yankees": "뉴욕 양키스", "ny yankees": "뉴욕 양키스",
+    "mets": "뉴욕 메츠", "padres": "샌디에이고 파드리스", "phillies": "필라델피아 필리스",
+    "braves": "애틀랜타 브레이브스", "astros": "휴스턴 애스트로스", "orioles": "볼티모어 오리올스",
+    "red sox": "보스턴 레드삭스", "cubs": "시카고 컵스", "white sox": "시카고 화이트삭스",
+    "brewers": "밀워키 브루어스", "rays": "탬파베이 레이스", "guardians": "클리블랜드 가디언스",
+    "twins": "미네소타 트윈스", "tigers": "디트로이트 타이거스", "royals": "캔자스시티 로열스",
+    "mariners": "시애틀 매리너스", "texas rangers": "텍사스 레인저스", "angels": "LA 에인절스",
+    "diamondbacks": "애리조나 다이아몬드백스", "rockies": "콜로라도 로키스", "pirates": "피츠버그 파이리츠",
+    "reds": "신시내티 레즈", "marlins": "마이애미 말린스", "nationals": "워싱턴 내셔널스",
+    "blue jays": "토론토 블루제이스", "cardinals": "세인트루이스 카디널스", "giants": "샌프란시스코 자이언츠",
+    "perth heat": "퍼스 히트", "sydney blue sox": "시드니 블루삭스",
+    "adelaide giants": "애들레이드 자이언츠", "brisbane bandits": "브리즈번 밴디츠",
   };
 
   function localizeTeamKoJsV381(rawName) {
@@ -8601,13 +8750,18 @@ _FRONTEND_V22_JS = r'''
   var _v42InjuryShowAll = false;
 
   function translateInlineVsAndClubPrefixV42(text) {
-    if (!text || !/[A-Za-z]/.test(text)) return text;
-    var out = String(text);
-    out = out.replace(/((?:EPL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|UCL|UNL|NBA|NHL|MLB|KBO|ABL)\s*\|\s*)?([A-Za-z][A-Za-z0-9\.\-'\s]{1,22}?)\s+vs\s+([A-Za-z][A-Za-z0-9\.\-'\s]{1,22})(?=$|\s|·|\||@|\()/g, function (full, pre, t1, t2) {
+    if (!text) return text;
+    var out = String(text)
+      .replace(/\+\s*-\s*(\d)/g, "-$1")
+      .replace(/-\s*\+\s*(\d)/g, "-$1")
+      .replace(/\+\s*\+\s*(\d)/g, "+$1")
+      .replace(/--\s*(\d)/g, "-$1");
+    if (!/[A-Za-z]/.test(out)) return out;
+    out = out.replace(/((?:EPL|PL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|UCL|UEL|UNL|MLS|JLEAGUE|KLEAGUE|NBA|WNBA|NHL|NFL|MLB|KBO|NPB|ABL|KBL|WKBL)\s*\|\s*)?([A-Za-z0-9][A-Za-z0-9\.\-'\/\s&]{1,28}?)\s+vs\s+([A-Za-z0-9][A-Za-z0-9\.\-'\/\s&]{1,28})(?=$|\s|·|\||@|\()/g, function (full, pre, t1, t2) {
       var cleanPre = pre || "";
       var raw1 = t1.trim();
       var leadLg = "";
-      var mLg = raw1.match(/^(EPL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|UCL|UNL|NBA|NHL|MLB|KBO|ABL)\s*(.+)$/i);
+      var mLg = raw1.match(/^(EPL|PL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|UCL|UEL|UNL|MLS|JLEAGUE|KLEAGUE|NBA|WNBA|NHL|NFL|MLB|KBO|NPB|ABL|KBL|WKBL)\s*(.+)$/i);
       if (mLg && localizeTeamKoJsV381(mLg[2]) !== mLg[2]) {
         leadLg = mLg[1] + " ";
         raw1 = mLg[2].trim();
@@ -8652,7 +8806,7 @@ _FRONTEND_V22_JS = r'''
       var node;
       while ((node = walker.nextNode())) {
         var val = node.nodeValue;
-        if (!val || !/[A-Za-z]/.test(val)) continue;
+        if (!val || (!/[A-Za-z]/.test(val) && !/[+\-]\s*[+\-]\s*\d/.test(val))) continue;
         var nextVal = translateInlineVsAndClubPrefixV42(val);
         if (nextVal !== val) node.nodeValue = nextVal;
       }
@@ -8875,7 +9029,999 @@ _FRONTEND_V22_JS = r'''
         });
       }
     }
+    try { syncAllLabEnhancementsV4629(); } catch (eV4629) {}
   }
+
+  /* =========================================================================
+   * v4.6.29: AI Lab Kelly Value Monitor (Filter Korean Retention, +- Sign Fix,
+   *          Card -> 5-Tab Match Detail Modal) & Lineup Tactical Board
+   *          (Volleyball 6-Player + Libero Court & Dedicated Reset Button)
+   * ========================================================================= */
+  var _v4629KellyActiveFilter = "all";
+  var _inLabPolishGuardV4629 = false;
+  var _inInternalResetClickV4629 = false;
+  var _v4629LastOrigPresetBtn = null;
+
+  var _v4629VolleyDefaults = [
+    { role: "OH1", label: "OH1", zone: "4번(전위좌)", rx: 0.36, ry: 0.23, color: "#10b981", darkText: true },
+    { role: "MB1", label: "MB1", zone: "3번(전위중)", rx: 0.39, ry: 0.50, color: "#fde047", darkText: true },
+    { role: "OP",  label: "OP",  zone: "2번(전위우)", rx: 0.36, ry: 0.77, color: "#10b981", darkText: true },
+    { role: "MB2", label: "MB2", zone: "5번(후위좌)", rx: 0.19, ry: 0.23, color: "#34d399", darkText: true },
+    { role: "OH2", label: "OH2", zone: "6번(후위중)", rx: 0.17, ry: 0.50, color: "#10b981", darkText: true },
+    { role: "S",   label: "S",   zone: "1번(세터·서브)", rx: 0.19, ry: 0.77, color: "#38bdf8", darkText: true },
+    { role: "L",   label: "L",   zone: "리베로(수비)", rx: 0.07, ry: 0.50, color: "#c084fc", darkText: true }
+  ];
+
+  var _v4629VolleyState = {
+    active: false,
+    selectedIdx: -1,
+    draggingIdx: -1,
+    matchTitle: "",
+    tokens: _v4629VolleyDefaults.map(function (t) { return Object.assign({}, t); })
+  };
+  window.__sqVolleyTacticStateV4629 = _v4629VolleyState;
+
+  function localizeTeamKoContextualV4629(rawName, lgHint) {
+    var s = String(rawName || "").trim();
+    if (!s || /[가-힣]/.test(s)) return s;
+    var low = s.toLowerCase().replace(/\s+/g, " ").replace(/’/g, "'").trim();
+    var lg = String(lgHint || "").toUpperCase();
+    if (/\bNBA\b|\bWNBA\b|농구/.test(lg)) {
+      if (low === "spurs" || low === "san antonio" || low === "san antonio spurs") return "샌안토니오 스퍼스";
+      if (low === "kings" || low === "sacramento" || low === "sacramento kings") return "새크라멘토 킹스";
+    } else if (/\bNFL\b|미식축구|NCAAF/.test(lg)) {
+      if (low === "jets" || low === "ny jets" || low === "new york jets") return "뉴욕 제츠";
+      if (low === "giants" || low === "ny giants" || low === "new york giants") return "뉴욕 자이언츠";
+      if (low === "cardinals" || low === "arizona" || low === "arizona cardinals") return "애리조나 카디널스";
+      if (low === "panthers" || low === "carolina" || low === "carolina panthers") return "캐롤라이나 팬서스";
+    } else if (/\bNHL\b|하키/.test(lg)) {
+      if (low === "jets" || low === "winnipeg" || low === "winnipeg jets") return "위니펙 제츠";
+      if (low === "panthers" || low === "florida" || low === "florida panthers") return "플로리다 팬서스";
+      if (low === "kings" || low === "la kings" || low === "los angeles kings") return "LA 킹스";
+      if (low === "rangers" || low === "ny rangers" || low === "new york rangers") return "뉴욕 레인저스";
+    } else if (/\bMLB\b|\bABL\b|\bKBO\b|야구/.test(lg)) {
+      if (low === "cardinals" || low === "st. louis cardinals") return "세인트루이스 카디널스";
+      if (low === "giants" || low === "sf giants" || low === "san francisco giants") return "샌프란시스코 자이언츠";
+      if (low === "rangers" || low === "texas rangers") return "텍사스 레인저스";
+    }
+    return localizeTeamKoJsV381(s);
+  }
+
+  function fixMalformedSignedNumbersV4629(str) {
+    if (!str) return str;
+    return String(str)
+      .replace(/\+\s*-\s*(\d)/g, "-$1")
+      .replace(/-\s*\+\s*(\d)/g, "-$1")
+      .replace(/\+\s*\+\s*(\d)/g, "+$1")
+      .replace(/--\s*(\d)/g, "-$1")
+      .replace(/밸류\s*\+0(?:\.0+)?%p/g, "밸류 0.0%p");
+  }
+
+  function detectCardLeagueHintV4629(el) {
+    var cur = el;
+    var depth = 0;
+    while (cur && cur.nodeType === 1 && depth < 5) {
+      if (cur.id === "tab-lab" || cur.id === "tab-schedule" || cur.id === "tab-matches") break;
+      var tx = String(cur.textContent || "").slice(0, 120);
+      var m = tx.match(/\b(NFL|NBA|WNBA|NHL|MLB|ABL|KBO|NPB|EPL|UCL|UEL|UNL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|MLS|JLEAGUE|KLEAGUE|VLEAGUE_M|VLEAGUE_W|WKBL|KBL|UFC|F1)\b/i);
+      if (m) return m[1].toUpperCase();
+      if (/챔피언스리그|프리미어리그|라리가|세리에|분데스리가/.test(tx)) return "EPL";
+      cur = cur.parentElement;
+      depth++;
+    }
+    return "";
+  }
+
+  function translateTextWithLeagueContextV4629(val, lgHint) {
+    if (!val) return val;
+    var out = fixMalformedSignedNumbersV4629(String(val));
+    if (!/[A-Za-z]/.test(out)) return out;
+    out = out.replace(
+      /((?:EPL|PL|LALIGA|LA\s*LIGA|SERIEA|SERIE\s*A|BUNDESLIGA|LIGUE1|LIGUE\s*1|UCL|UEL|UNL|MLS|JLEAGUE|KLEAGUE|NBA|WNBA|NHL|NFL|MLB|KBO|NPB|ABL|KBL|WKBL|UFC)\s*(?:\|\s*|·\s*)?)?([A-Za-z0-9][A-Za-z0-9\.\-'\/\s&]{1,28}?)\s+vs\s+([A-Za-z0-9][A-Za-z0-9\.\-'\/\s&]{1,28})(?=$|\s|·|\||@|\()/gi,
+      function (full, pre, t1, t2) {
+        var cleanPre = pre || "";
+        var raw1 = t1.trim();
+        var raw2 = t2.trim();
+        var leadLg = "";
+        var mLg = raw1.match(/^(EPL|PL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|UCL|UEL|UNL|MLS|JLEAGUE|KLEAGUE|NBA|WNBA|NHL|NFL|MLB|KBO|NPB|ABL|KBL|WKBL|UFC)\s+(.+)$/i);
+        var effLg = lgHint || (cleanPre ? cleanPre.replace(/[^A-Za-z0-9_]/g, "").toUpperCase() : "");
+        if (mLg && localizeTeamKoContextualV4629(mLg[2].trim(), mLg[1]) !== mLg[2].trim()) {
+          leadLg = mLg[1].toUpperCase() + " ";
+          effLg = mLg[1].toUpperCase();
+          raw1 = mLg[2].trim();
+        }
+        var k1 = localizeTeamKoContextualV4629(raw1, effLg);
+        var k2 = localizeTeamKoContextualV4629(raw2, effLg);
+        if (k1 === raw1 && k2 === raw2) return full;
+        return cleanPre + leadLg + k1 + " vs " + k2;
+      }
+    );
+    return translateInlineVsAndClubPrefixV42(out);
+  }
+
+  function parseKellyCardMetaV4629(cardEl) {
+    if (!cardEl || cardEl.nodeType !== 1) return null;
+    var clone = cardEl.cloneNode(true);
+    Array.prototype.forEach.call(clone.querySelectorAll("[data-sq-kelly-modal-pill]"), function (b) {
+      if (b.parentNode) b.parentNode.removeChild(b);
+    });
+    var fullTx = fixMalformedSignedNumbersV4629(String(clone.textContent || "").replace(/\s+/g, " ").trim());
+    if (!/\s+vs\s+/i.test(fullTx)) return null;
+
+    var lgMatch = fullTx.match(/\b(NFL|NBA|WNBA|NHL|MLB|ABL|KBO|NPB|EPL|UCL|UEL|UNL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|MLS|JLEAGUE|KLEAGUE|VLEAGUE_M|VLEAGUE_W|WKBL|KBL|UFC|F1)\b/i);
+    var lgCode = lgMatch ? lgMatch[1].toUpperCase() : "";
+    if (!lgCode) {
+      if (/챔피언스리그/.test(fullTx)) lgCode = "UCL";
+      else if (/라리가/.test(fullTx)) lgCode = "LALIGA";
+      else if (/세리에/.test(fullTx)) lgCode = "SERIEA";
+      else if (/분데스리가/.test(fullTx)) lgCode = "BUNDESLIGA";
+      else if (/V-?리그|현대캐피탈|한국전력|대한항공|흥국생명|한국도로공사|IBK기업은행/.test(fullTx)) lgCode = "VLEAGUE_M";
+      else if (/WKBL|하나은행|삼성생명|우리은행|신한은행|BNK썸|KB스타즈/.test(fullTx)) lgCode = "WKBL";
+      else lgCode = "EPL";
+    }
+
+    var bestVs = fullTx;
+    var subEls = clone.querySelectorAll("strong, b, h4, h5, span, div, p");
+    for (var i = 0; i < subEls.length; i++) {
+      var stx = String(subEls[i].textContent || "").replace(/\s+/g, " ").trim();
+      if (/\s+vs\s+/i.test(stx) && stx.length < bestVs.length && stx.length >= 5) {
+        bestVs = stx;
+      }
+    }
+
+    var cleanVs = bestVs
+      .replace(/^(?:[^\w가-힣]*\s*)?(?:EPL|PL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|UCL|UEL|UNL|MLS|JLEAGUE|KLEAGUE|NBA|WNBA|NHL|NFL|MLB|KBO|NPB|ABL|KBL|WKBL|UFC|F1)(?:\s*[·|\-:]\s*|\s+)/i, "")
+      .replace(/\s*(?:@\s*[\d.]+|배당\s*[\d.]+|밸류|켈리|안정|공격|중립|추천|상세).*$/i, "")
+      .trim();
+    var parts = cleanVs.split(/\s+vs\s+/i);
+    if (parts.length < 2) return null;
+
+    var homeRaw = parts[0].replace(/^(?:EPL|LALIGA|SERIEA|BUNDESLIGA|LIGUE1|UCL|NBA|NHL|NFL|MLB|KBO|ABL|KBL|WKBL)\s*/i, "").trim();
+    var awayRaw = parts[1].replace(/\s*(?:@|밸류|켈리|안정|공격|중립|상세).*$/i, "").trim();
+    var homeKo = localizeTeamKoContextualV4629(homeRaw, lgCode);
+    var awayKo = localizeTeamKoContextualV4629(awayRaw, lgCode);
+    if (!homeKo || !awayKo) return null;
+
+    var mOdds = fullTx.match(/@\s*(\d+(?:\.\d+)?)/);
+    var mEdge = fullTx.match(/밸류\s*([+\-]?\d+(?:\.\d+)?)%p/);
+    var mKelly = fullTx.match(/켈리\s*(\d+(?:\.\d+)?)%/);
+
+    return {
+      league_code: lgCode,
+      home: homeKo,
+      away: awayKo,
+      odds: mOdds ? parseFloat(mOdds[1]) : 1.85,
+      edge: mEdge ? parseFloat(mEdge[1]) : 0.0,
+      kelly: mKelly ? parseFloat(mKelly[1]) : 0.0
+    };
+  }
+
+  function openMatchInsightFromKellyCardV4629(meta) {
+    if (!meta || !meta.home || !meta.away) return;
+    var kHome = canonicalKellyTeamKeyV36(meta.home);
+    var kAway = canonicalKellyTeamKeyV36(meta.away);
+    var pool = [];
+    if (typeof v30ScoreState === "object" && v30ScoreState) {
+      if (Array.isArray(v30ScoreState.rawAllItems)) pool = pool.concat(v30ScoreState.rawAllItems);
+      if (Array.isArray(v30ScoreState.items)) pool = pool.concat(v30ScoreState.items);
+    }
+    if (Array.isArray(window.__dcLatestScoreItems)) pool = pool.concat(window.__dcLatestScoreItems);
+
+    var matched = null;
+    for (var i = 0; i < pool.length; i++) {
+      var cand = pool[i];
+      if (!cand || !cand.home || !cand.away) continue;
+      var cH = canonicalKellyTeamKeyV36(cand.home);
+      var cA = canonicalKellyTeamKeyV36(cand.away);
+      if ((cH === kHome && cA === kAway) || (cH === kAway && cA === kHome)) {
+        matched = Object.assign({}, cand);
+        break;
+      }
+    }
+
+    var lgUp = String(meta.league_code || "EPL").toUpperCase();
+    var sport = canonicalSportKeyV304("", lgUp + " " + meta.home + " " + meta.away);
+    var hasDraw = (sport === "soccer" && lgUp !== "NFL");
+    var oddsHome = (meta.odds && meta.odds > 1.01) ? Number(meta.odds) : 1.85;
+    var mktHome = Math.max(14, Math.min(86, Math.round((95 / oddsHome) * 10) / 10));
+    var hp = Math.max(8, Math.min(90, Math.round(mktHome + (Number(meta.edge) || 0))));
+    var dp = hasDraw ? Math.max(12, Math.min(30, Math.round((100 - hp) * 0.42))) : 0;
+    var ap = Math.max(5, 100 - hp - dp);
+    var mktDraw = hasDraw ? dp : 0;
+    var mktAway = Math.max(8, Math.round((100 - mktHome - mktDraw) * 10) / 10);
+    var oddsDraw = hasDraw && mktDraw > 0 ? (95 / mktDraw).toFixed(2) : "";
+    var oddsAway = mktAway > 0 ? (95 / mktAway).toFixed(2) : "2.15";
+
+    var lgKoNames = {
+      NFL: "NFL 미식축구", NBA: "NBA 미국프로농구", NHL: "NHL 북미아이스하키",
+      ABL: "ABL 호주프로야구", MLB: "MLB 메이저리그", EPL: "잉글랜드 프리미어리그",
+      UCL: "UEFA 챔피언스리그", LALIGA: "스페인 라리가", SERIEA: "이탈리아 세리에A",
+      BUNDESLIGA: "독일 분데스리가", LIGUE1: "프랑스 리그1", VLEAGUE_M: "도드람 V-리그 남자부",
+      VLEAGUE_W: "도드람 V-리그 여자부", WKBL: "WKBL 여자프로농구", KBL: "KBL 남자프로농구"
+    };
+
+    var itemToOpen = matched || {
+      id: "kelly_" + lgUp + "_" + kHome + "_" + kAway,
+      verified_official: true,
+      sport: sport,
+      league: lgUp,
+      league_code: lgUp,
+      league_full: lgKoNames[lgUp] || lgUp,
+      state: "pre",
+      status_badge: "배당·켈리 분석",
+      drop_badge: (meta.edge >= 5 ? ("💎 밸류 +" + meta.edge.toFixed(1) + "%p") : (meta.kelly > 0 ? ("켈리 " + meta.kelly + "%") : "")),
+      match_dt_kst: "실시간 배당·켈리 밸류 모니터 연동",
+      match_dt_full_kst: "실시간 배당·켈리 밸류 모니터 연동 (권장 켈리 " + (meta.kelly || 0) + "%)",
+      home: meta.home,
+      away: meta.away,
+      home_score: 0,
+      away_score: 0,
+      period_scores: "",
+      venue: "",
+      ai: {
+        home_pct: hp,
+        draw_pct: dp,
+        away_pct: ap,
+        odds: {
+          home: oddsHome.toFixed(2),
+          draw: oddsDraw,
+          away: oddsAway
+        }
+      }
+    };
+
+    if (matched) {
+      itemToOpen.home = localizeTeamKoContextualV4629(itemToOpen.home, lgUp);
+      itemToOpen.away = localizeTeamKoContextualV4629(itemToOpen.away, lgUp);
+      if (!itemToOpen.ai || !itemToOpen.ai.odds || !itemToOpen.ai.odds.home || itemToOpen.ai.odds.home === "-") {
+        itemToOpen.ai = {
+          home_pct: hp,
+          draw_pct: dp,
+          away_pct: ap,
+          odds: { home: oddsHome.toFixed(2), draw: oddsDraw, away: oddsAway }
+        };
+      }
+    }
+
+    openMatchInsightModalByItemV30(itemToOpen);
+  }
+  window.__openMatchInsightFromKellyCardV4629 = openMatchInsightFromKellyCardV4629;
+
+  function polishKellyMonitorDomAndFiltersV4629() {
+    var labSec = document.getElementById("tab-lab");
+    if (!labSec || _inLabPolishGuardV4629) return;
+    _inLabPolishGuardV4629 = true;
+    try {
+      // 0) First deduplicate raw EN/KO pairs so originally-Korean authoritative cards (e.g. `@ 1.57 밸류 +7.8%p`) win over English duplicates!
+      try { dedupLabKellyMonitorV36(); } catch (eD0) {}
+      // 1) Contextual team localization + malformed `+-` sign normalization across ALL text nodes in #tab-lab
+      var walker = document.createTreeWalker(labSec, NodeFilter.SHOW_TEXT, null);
+      var tNode;
+      while ((tNode = walker.nextNode())) {
+        var rawV = tNode.nodeValue;
+        if (!rawV) continue;
+        var parentEl = tNode.parentElement;
+        if (parentEl && (parentEl.tagName === "SCRIPT" || parentEl.tagName === "STYLE")) continue;
+        var lgCtx = detectCardLeagueHintV4629(parentEl);
+        var fixedV = translateTextWithLeagueContextV4629(rawV, lgCtx);
+        if (fixedV !== rawV) {
+          tNode.nodeValue = fixedV;
+        }
+      }
+
+      // Also handle mashed `EPLMan City vs Fulham` where `<span>EPL</span>` and `Man City vs Fulham` are separate or single text
+      var kellyBlk = labSec.querySelector("[data-sq-lab-kind='kelly']");
+      if (!kellyBlk) {
+        var cands = labSec.querySelectorAll("div, section");
+        for (var bi = 0; bi < cands.length; bi++) {
+          var btx = String(cands[bi].textContent || "");
+          if ((btx.indexOf("켈리") !== -1 || btx.indexOf("배당 흐름") !== -1) && btx.indexOf("계산기 3종") === -1) {
+            kellyBlk = cands[bi];
+            break;
+          }
+        }
+      }
+
+      if (kellyBlk) {
+        // Bind filter buttons (`전체`, `배당하락`, `+5%p 밸류`) for instant zero-flicker Korean sync
+        var fBtns = Array.prototype.slice.call(kellyBlk.querySelectorAll("button")).filter(function (b) {
+          var bt = String(b.textContent || "").trim();
+          return bt === "전체" || bt === "배당하락" || bt.indexOf("밸류") !== -1 && bt.indexOf("전체 보기") === -1 && bt.indexOf("간략히") === -1;
+        });
+        fBtns.forEach(function (fb) {
+          var fbTxt = String(fb.textContent || "").trim();
+          var fKey = (fbTxt === "배당하락") ? "drop" : (fbTxt.indexOf("5%p") !== -1 ? "val5" : "all");
+          fb.setAttribute("data-sq-kelly-fbtn", fKey);
+          var isAct = (_v4629KellyActiveFilter === fKey);
+          if (isAct) {
+            fb.style.borderColor = "#38bdf8";
+            fb.style.background = "rgba(37,99,235,0.28)";
+            fb.style.color = "#f8fafc";
+            fb.style.fontWeight = "800";
+          } else {
+            fb.style.borderColor = "#334155";
+            fb.style.background = "";
+            fb.style.color = "";
+          }
+          if (!fb.__sqKellyFilterBoundV4629) {
+            fb.__sqKellyFilterBoundV4629 = true;
+            fb.addEventListener("click", function () {
+              _v4629KellyActiveFilter = fKey;
+              if (fKey === "all") _v42KellyShowAll = false;
+              setTimeout(function () {
+                polishKellyMonitorDomAndFiltersV4629();
+              }, 0);
+              if (typeof requestAnimationFrame === "function") {
+                requestAnimationFrame(function () { polishKellyMonitorDomAndFiltersV4629(); });
+              }
+            }, false);
+          }
+        });
+
+        // Deduplicate EN/KO pairs immediately after Korean translation
+        try { dedupLabKellyMonitorV36(); } catch (eD) {}
+
+        // Find the Kelly card list container
+        var kellyList = null;
+        var kDivs = kellyBlk.querySelectorAll("div");
+        for (var ki = 0; ki < kDivs.length; ki++) {
+          var kd = kDivs[ki];
+          if (!kd.children || kd.children.length < 1) continue;
+          if (kd.id === "sqLabKellyMoreWrapV42") continue;
+          var vsHits = 0;
+          for (var vc = 0; vc < kd.children.length; vc++) {
+            var chTx = String(kd.children[vc].textContent || "");
+            if (/\s+vs\s+/i.test(chTx) && (chTx.indexOf("@") !== -1 || chTx.indexOf("밸류") !== -1 || chTx.indexOf("켈리") !== -1)) {
+              vsHits++;
+            }
+          }
+          if (vsHits >= 1 && (!kellyList || vsHits > kellyList.__vsHits)) {
+            kd.__vsHits = vsHits;
+            kellyList = kd;
+          }
+        }
+
+        if (kellyList) {
+          kellyList.classList.add("sq-v42-lab-grid2");
+          Array.prototype.forEach.call(kellyList.children, function (card) {
+            if (!card || card.nodeType !== 1 || card.getAttribute("data-sq-kelly-dup") === "1") return;
+            var meta = parseKellyCardMetaV4629(card);
+            if (!meta) return;
+            card.setAttribute("data-sq-kelly-card", "1");
+            card.setAttribute("data-sq-kelly-meta", JSON.stringify(meta));
+            card.style.cursor = "pointer";
+            if (!card.getAttribute("title")) {
+              card.setAttribute("title", meta.home + " vs " + meta.away + " 경기 상세 모달 열기");
+            }
+            if (!card.querySelector("[data-sq-kelly-modal-pill='1']")) {
+              var pill = document.createElement("span");
+              pill.setAttribute("data-sq-kelly-modal-pill", "1");
+              pill.textContent = "상세 ↗";
+              pill.style.cssText = "display:inline-flex;align-items:center;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:800;color:#7dd3fc;background:rgba(14,165,233,0.14);border:1px solid rgba(56,189,248,0.38);vertical-align:middle;white-space:nowrap;";
+              card.appendChild(pill);
+            }
+          });
+
+          var forceExpanded = (_v42LabActiveTool === "kelly") || (_v4629KellyActiveFilter !== "all") || _v42KellyShowAll;
+          applyCompactListCapV42(
+            kellyList, 4, forceExpanded, "sqLabKellyMoreWrapV42",
+            function (tot, rem) { return "📉 배당·켈리 밸류 모니터 전체 보기 (+" + rem + "경기 더보기 ▼)"; },
+            "▲ 상위 4경기만 간략히 보기",
+            "rgba(52,211,153,0.55)", "#6ee7b7",
+            function () { _v42KellyShowAll = !_v42KellyShowAll; polishKellyMonitorDomAndFiltersV4629(); }
+          );
+        }
+      }
+
+      if (!labSec.__sqLabKellyObserverV4629 && typeof MutationObserver !== "undefined") {
+        labSec.__sqLabKellyObserverV4629 = new MutationObserver(function () {
+          if (_inLabPolishGuardV4629) return;
+          polishKellyMonitorDomAndFiltersV4629();
+        });
+        labSec.__sqLabKellyObserverV4629.observe(labSec, { childList: true, subtree: true });
+      }
+
+      if (!labSec.__sqKellyCardClickBoundV4629) {
+        labSec.__sqKellyCardClickBoundV4629 = true;
+        labSec.addEventListener("click", function (ev) {
+          var t = ev.target;
+          if (!t || !t.closest) return;
+          if (t.closest("button:not([data-sq-kelly-card]), a, input, select")) return;
+          var kCard = t.closest("[data-sq-kelly-card='1']");
+          if (!kCard) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          var rawMeta = kCard.getAttribute("data-sq-kelly-meta");
+          var metaObj = null;
+          try { metaObj = rawMeta ? JSON.parse(rawMeta) : null; } catch (eM) {}
+          if (!metaObj) metaObj = parseKellyCardMetaV4629(kCard);
+          if (metaObj) openMatchInsightFromKellyCardV4629(metaObj);
+        }, true);
+      }
+    } finally {
+      _inLabPolishGuardV4629 = false;
+    }
+  }
+
+  /* ---- Interactive Lineup Tactical Board: Volleyball 6-Player Court + Reset Button ---- */
+  function findTacticBlockV4629() {
+    var labSec = document.getElementById("tab-lab");
+    if (!labSec) return null;
+    var byAttr = labSec.querySelector("[data-sq-lab-kind='tactic']");
+    if (byAttr) return byAttr;
+    var divs = labSec.querySelectorAll("div, section");
+    for (var i = 0; i < divs.length; i++) {
+      var tx = String(divs[i].textContent || "");
+      if ((tx.indexOf("인터랙티브 라인업 전술판") !== -1 || tx.indexOf("농구 5-Out") !== -1) && tx.indexOf("승률 시뮬레이터") === -1) {
+        return divs[i];
+      }
+    }
+    return null;
+  }
+
+  function findTacticPlayerNameInputsV4629(tacticBlk) {
+    if (!tacticBlk) return [];
+    var allInps = Array.prototype.slice.call(tacticBlk.querySelectorAll("input")).filter(function (inp) {
+      var tp = String(inp.type || "text").toLowerCase();
+      return tp === "text" || tp === "search" || tp === "";
+    });
+    var matched = allInps.filter(function (inp) {
+      var probe = [
+        inp.placeholder || "",
+        inp.id || "",
+        inp.name || "",
+        inp.getAttribute("aria-label") || "",
+        (inp.previousElementSibling && inp.previousElementSibling.textContent) || "",
+        (inp.parentElement && inp.parentElement.textContent) || ""
+      ].join(" ");
+      return /선수|이름|포지션|토큰|player|name/i.test(probe) && !/닉네임|제보자/.test(probe);
+    });
+    if (matched.length) return matched;
+    return allInps.filter(function (inp) {
+      var ph = String(inp.placeholder || "");
+      return !/제목|닉네임|검색/.test(ph);
+    });
+  }
+
+  function drawVolleyballTacticCanvasV4629() {
+    var cvs = document.getElementById("sqVolleyTacticCanvasV4629");
+    if (!cvs || !cvs.getContext) return;
+    var rect = cvs.getBoundingClientRect();
+    var cssW = (rect && rect.width > 80) ? Math.round(rect.width) : 640;
+    var cssH = Math.max(230, Math.min(370, Math.round(cssW * 0.52)));
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cvs.width !== Math.round(cssW * dpr) || cvs.height !== Math.round(cssH * dpr)) {
+      cvs.width = Math.round(cssW * dpr);
+      cvs.height = Math.round(cssH * dpr);
+    }
+    var ctx = cvs.getContext("2d");
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    // Outer free zone (#0c3547)
+    ctx.fillStyle = "#0c3547";
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    var padX = Math.round(cssW * 0.055);
+    var padY = Math.round(cssH * 0.13);
+    var courtW = cssW - padX * 2;
+    var courtH = cssH - padY * 2;
+    var midX = padX + courtW / 2;
+    var atkOffset = courtW * 0.167; // 3m attack line on 18m court
+
+    // Inner playable court (V-League warm terracotta orange)
+    ctx.fillStyle = "rgba(234, 88, 12, 0.34)";
+    ctx.fillRect(padX, padY, courtW, courtH);
+
+    // Court boundary lines
+    ctx.strokeStyle = "rgba(248, 250, 252, 0.92)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(padX, padY, courtW, courtH);
+
+    // 3m Attack lines (left & right)
+    ctx.save();
+    ctx.setLineDash([6, 5]);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.62)";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(midX - atkOffset, padY);
+    ctx.lineTo(midX - atkOffset, padY + courtH);
+    ctx.moveTo(midX + atkOffset, padY);
+    ctx.lineTo(midX + atkOffset, padY + courtH);
+    ctx.stroke();
+    ctx.restore();
+
+    // Center Net line
+    ctx.strokeStyle = "#fde047";
+    ctx.lineWidth = 3.4;
+    ctx.beginPath();
+    ctx.moveTo(midX, padY - 6);
+    ctx.lineTo(midX, padY + courtH + 6);
+    ctx.stroke();
+
+    // Header labels
+    ctx.font = "800 12px 'Pretendard', 'Noto Sans KR', sans-serif";
+    ctx.fillStyle = "#a7f3d0";
+    ctx.textAlign = "left";
+    var titleLeft = _v4629VolleyState.matchTitle
+      ? ("🏐 " + _v4629VolleyState.matchTitle + " · 6인 로테이션 배치")
+      : "🏐 우리 팀 6인 로테이션 (전위 4·3·2 / 후위 5·6·1 + 리베로 L)";
+    ctx.fillText(titleLeft, padX, Math.max(16, padY - 10));
+
+    ctx.fillStyle = "#bae6fd";
+    ctx.textAlign = "right";
+    ctx.fillText("네트 · 상대 블로킹/수비 진영", padX + courtW, Math.max(16, padY - 10));
+
+    // Subtle rotation zone watermarks on left court
+    var zoneHints = [
+      { z: "④ 전위좌", rx: 0.36, ry: 0.23 },
+      { z: "③ 전위중", rx: 0.39, ry: 0.50 },
+      { z: "② 전위우", rx: 0.36, ry: 0.77 },
+      { z: "⑤ 후위좌", rx: 0.19, ry: 0.23 },
+      { z: "⑥ 후위중", rx: 0.17, ry: 0.50 },
+      { z: "① 서브존", rx: 0.19, ry: 0.77 }
+    ];
+    ctx.font = "700 10px 'Pretendard', 'Noto Sans KR', sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.textAlign = "center";
+    zoneHints.forEach(function (zh) {
+      ctx.fillText(zh.z, zh.rx * cssW, zh.ry * cssH + 26);
+    });
+
+    // Opponent reference formation on right side (subtle non-intrusive markers)
+    var oppMarkers = [
+      { lbl: "MB", rx: 0.58, ry: 0.50 },
+      { lbl: "OP", rx: 0.59, ry: 0.25 },
+      { lbl: "OH", rx: 0.59, ry: 0.75 },
+      { lbl: "L",  rx: 0.80, ry: 0.50 },
+      { lbl: "S",  rx: 0.78, ry: 0.26 },
+      { lbl: "OH", rx: 0.78, ry: 0.74 }
+    ];
+    oppMarkers.forEach(function (om) {
+      var ox = om.rx * cssW;
+      var oy = om.ry * cssH;
+      ctx.beginPath();
+      ctx.arc(ox, oy, 12, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(56, 189, 248, 0.22)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(125, 211, 252, 0.55)";
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      ctx.fillStyle = "#bae6fd";
+      ctx.font = "800 9.5px 'Pretendard', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(om.lbl, ox, oy);
+    });
+
+    // Interactive draggable home team volleyball tokens (7 tokens: 6 starters + Libero)
+    var tokR = Math.max(14, Math.min(18, Math.round(cssW * 0.028)));
+    _v4629VolleyState.tokens.forEach(function (tk, idx) {
+      var tx = tk.rx * cssW;
+      var ty = tk.ry * cssH;
+      var isSel = (_v4629VolleyState.selectedIdx === idx);
+
+      if (isSel) {
+        ctx.beginPath();
+        ctx.arc(tx, ty, tokR + 5, 0, Math.PI * 2);
+        ctx.strokeStyle = "#f97316";
+        ctx.lineWidth = 3.5;
+        ctx.stroke();
+      }
+
+      ctx.beginPath();
+      ctx.arc(tx, ty, tokR, 0, Math.PI * 2);
+      ctx.fillStyle = isSel ? "#fb923c" : tk.color;
+      ctx.fill();
+      ctx.strokeStyle = isSel ? "#fff7ed" : "#022c22";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "900 10.5px 'Pretendard', 'Noto Sans KR', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      var disp = String(tk.label || tk.role);
+      if (disp.length > 5) {
+        ctx.fillText(tk.role, tx, ty);
+        ctx.fillStyle = "#fef08a";
+        ctx.font = "800 10.5px 'Pretendard', 'Noto Sans KR', sans-serif";
+        ctx.fillText(disp, tx, ty - tokR - 8);
+      } else {
+        ctx.fillText(disp, tx, ty);
+      }
+    });
+
+    ctx.restore();
+  }
+
+  function setVolleyballModeV4629(enable, presetBtnEl, allOrigBtns) {
+    var tacticBlk = findTacticBlockV4629();
+    if (!tacticBlk) return;
+    _v4629VolleyState.active = Boolean(enable);
+
+    var stageWrap = document.getElementById("sqVolleyTacticStageV4629");
+    var origCanvas = tacticBlk.querySelector("canvas:not(#sqVolleyTacticCanvasV4629)");
+    var origBoardStage = origCanvas;
+    if (!origBoardStage) {
+      var stageCands = tacticBlk.querySelectorAll("[id*='tactic' i], [id*='pitch' i], [id*='board' i]");
+      for (var si = 0; si < stageCands.length; si++) {
+        if (stageCands[si].id !== "sqVolleyTacticStageV4629" && stageCands[si].id !== "sqPresetVolleyV4629" && stageCands[si].id !== "sqTacticResetBtnV4629" && stageCands[si].tagName !== "BUTTON" && stageCands[si].tagName !== "INPUT") {
+          origBoardStage = stageCands[si];
+          break;
+        }
+      }
+    }
+
+    if (enable) {
+      if (origBoardStage) origBoardStage.style.display = "none";
+      if (stageWrap) stageWrap.style.display = "block";
+      if (presetBtnEl) {
+        presetBtnEl.classList.add("active");
+        presetBtnEl.style.background = "linear-gradient(135deg,#2563eb,#1d4ed8)";
+        presetBtnEl.style.borderColor = "#60a5fa";
+        presetBtnEl.style.color = "#ffffff";
+        presetBtnEl.style.fontWeight = "800";
+      }
+      (allOrigBtns || []).forEach(function (ob) {
+        ob.classList.remove("active");
+        ob.setAttribute("data-sq-orig-inactive-v4629", "1");
+        ob.style.opacity = "0.78";
+      });
+      setTimeout(drawVolleyballTacticCanvasV4629, 0);
+    } else {
+      if (stageWrap) stageWrap.style.display = "none";
+      if (origBoardStage) origBoardStage.style.display = "";
+      if (presetBtnEl) {
+        presetBtnEl.classList.remove("active");
+        presetBtnEl.style.background = "";
+        presetBtnEl.style.borderColor = "";
+        presetBtnEl.style.color = "";
+      }
+      (allOrigBtns || []).forEach(function (ob) {
+        ob.removeAttribute("data-sq-orig-inactive-v4629");
+        ob.style.opacity = "";
+      });
+    }
+  }
+
+  function resetActiveTacticalBoardV4629() {
+    var tacticBlk = findTacticBlockV4629();
+    if (!tacticBlk) return;
+
+    if (_v4629VolleyState.active) {
+      _v4629VolleyState.tokens = _v4629VolleyDefaults.map(function (t) { return Object.assign({}, t); });
+      _v4629VolleyState.selectedIdx = -1;
+      _v4629VolleyState.draggingIdx = -1;
+      drawVolleyballTacticCanvasV4629();
+    } else {
+      var targetOrigBtn = _v4629LastOrigPresetBtn;
+      if (!targetOrigBtn || !document.body.contains(targetOrigBtn)) {
+        var origBtns = Array.prototype.slice.call(tacticBlk.querySelectorAll("button")).filter(function (b) {
+          var bt = String(b.textContent || "");
+          return /축구|야구|농구|4-3-3|4-2-3-1|3-4-2-1|5-Out|다이아몬드/.test(bt);
+        });
+        for (var i = 0; i < origBtns.length; i++) {
+          var bg = String((origBtns[i].style && origBtns[i].style.background) || "");
+          if (origBtns[i].classList.contains("active") || /2563eb|1d4ed8|3b82f6|10b981/.test(bg)) {
+            targetOrigBtn = origBtns[i];
+            break;
+          }
+        }
+        if (!targetOrigBtn && origBtns.length) targetOrigBtn = origBtns[0];
+      }
+      if (targetOrigBtn) {
+        _inInternalResetClickV4629 = true;
+        try { targetOrigBtn.click(); } catch (eClk) {} finally { _inInternalResetClickV4629 = false; }
+      }
+    }
+
+    // Clear ALL player-name edit inputs so residual text like `커리` never lingers after reset!
+    var nameInps = findTacticPlayerNameInputsV4629(tacticBlk);
+    nameInps.forEach(function (inp) {
+      inp.value = "";
+      try { inp.blur(); } catch (eB) {}
+    });
+
+    if (typeof showToast === "function") {
+      showToast("🔄 전술판 포지션 배치와 선수 이름이 기본값으로 초기화되었습니다.");
+    }
+  }
+  window.__resetActiveTacticalBoardV4629 = resetActiveTacticalBoardV4629;
+
+  function installLabTacticalVolleyballAndResetV4629() {
+    var tacticBlk = findTacticBlockV4629();
+    if (!tacticBlk) return;
+
+    // Locate the formation preset button strip (`축구 4-3-3`, `축구 4-2-3-1`, ..., `농구 5-Out`)
+    var presetBar = null;
+    var subDivs = tacticBlk.querySelectorAll("div");
+    for (var i = 0; i < subDivs.length; i++) {
+      var d = subDivs[i];
+      if (!d.children || d.children.length < 3 || d.children.length > 10) continue;
+      var dtx = String(d.textContent || "");
+      if ((dtx.indexOf("4-3-3") !== -1 || dtx.indexOf("5-Out") !== -1) && Array.prototype.every.call(d.children, function (c) { return c.tagName === "BUTTON"; })) {
+        presetBar = d;
+        break;
+      }
+    }
+    if (!presetBar) return;
+    presetBar.classList.add("sq-v42-mob-swipe");
+
+    var origPresetBtns = Array.prototype.slice.call(presetBar.querySelectorAll("button")).filter(function (b) {
+      return b.id !== "sqPresetVolleyV4629" && b.id !== "sqTacticResetBtnV4629";
+    });
+    if (!_v4629LastOrigPresetBtn && origPresetBtns.length) {
+      _v4629LastOrigPresetBtn = origPresetBtns[0];
+    }
+
+    var refBtn = origPresetBtns[origPresetBtns.length - 1] || origPresetBtns[0];
+    var volleyBtn = document.getElementById("sqPresetVolleyV4629");
+    if (!volleyBtn) {
+      volleyBtn = document.createElement("button");
+      volleyBtn.type = "button";
+      volleyBtn.id = "sqPresetVolleyV4629";
+      if (refBtn && refBtn.className) {
+        volleyBtn.className = refBtn.className.replace(/\bactive\b/g, "").trim();
+      } else {
+        volleyBtn.className = "sq-v40-fold-btn";
+      }
+      if (refBtn && refBtn.getAttribute("style")) {
+        volleyBtn.setAttribute("style", refBtn.getAttribute("style"));
+        volleyBtn.style.background = "";
+      }
+      volleyBtn.textContent = "🏐 배구 6인 코트";
+      presetBar.appendChild(volleyBtn);
+    }
+
+    var resetBtn = document.getElementById("sqTacticResetBtnV4629");
+    if (!resetBtn) {
+      resetBtn = document.createElement("button");
+      resetBtn.type = "button";
+      resetBtn.id = "sqTacticResetBtnV4629";
+      resetBtn.className = (refBtn && refBtn.className) ? refBtn.className.replace(/\bactive\b/g, "").trim() : "sq-v40-fold-btn";
+      resetBtn.style.cssText = "padding:6px 11px;border-radius:9px;border:1px solid rgba(251,191,36,0.55);background:rgba(245,158,11,0.14);color:#fde68a;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;";
+      resetBtn.textContent = "🔄 초기화";
+      presetBar.appendChild(resetBtn);
+    }
+
+    // Mount Volleyball interactive stage right after original canvas (or right after presetBar if no canvas in standalone DOM)
+    var stageWrap = document.getElementById("sqVolleyTacticStageV4629");
+    if (!stageWrap) {
+      stageWrap = document.createElement("div");
+      stageWrap.id = "sqVolleyTacticStageV4629";
+      stageWrap.style.cssText = "display:none;margin-top:10px;width:100%;max-width:100%;box-sizing:border-box;";
+      stageWrap.innerHTML = [
+        "<canvas id='sqVolleyTacticCanvasV4629' width='640' height='332' style='width:100%;max-width:100%;height:auto;display:block;border-radius:12px;border:1px solid #334155;touch-action:none;cursor:grab;box-sizing:border-box;'></canvas>",
+        "<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:11.2px;color:#94a3b8;'>",
+        "  <span>💡 포지션 토큰(OH·MB·OP·S·L)을 드래그해 배치하고 아래 선수 이름 입력창에서 실명으로 편집하세요.</span>",
+        "  <button type='button' id='sqVolleyRotateClockwiseV4629' style='background:#0f172a;border:1px solid #334155;color:#7dd3fc;border-radius:7px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;'>↻ 시계방향 1로테이션 회전</button>",
+        "</div>"
+      ].join("");
+
+      var origCvs = tacticBlk.querySelector("canvas:not(#sqVolleyTacticCanvasV4629)");
+      if (origCvs && origCvs.parentNode) {
+        origCvs.insertAdjacentElement("afterend", stageWrap);
+      } else {
+        presetBar.insertAdjacentElement("afterend", stageWrap);
+      }
+
+      // If standalone test DOM has no player-name input yet, provide a compact edit input inside stageWrap
+      if (findTacticPlayerNameInputsV4629(tacticBlk).length === 0) {
+        var fbInpWrap = document.createElement("div");
+        fbInpWrap.id = "sqVolleyFallbackInputRowV4629";
+        fbInpWrap.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:8px;";
+        fbInpWrap.innerHTML = "<label style='font-size:11.5px;color:#cbd5e1;font-weight:700;white-space:nowrap;'>선택 선수 이름 수정</label><input type='text' id='sqVolleyFallbackPlayerInpV4629' placeholder='선택 선수 이름 수정 (예: 허수봉, 김연경)' style='flex:1;min-width:0;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px 10px;color:#f8fafc;font-size:12px;' />";
+        stageWrap.appendChild(fbInpWrap);
+      }
+    }
+
+    // Bind preset clicks & reset click idempotently
+    origPresetBtns.forEach(function (ob) {
+      if (ob.__sqOrigPresetBoundV4629) return;
+      ob.__sqOrigPresetBoundV4629 = true;
+      ob.addEventListener("click", function () {
+        if (!_inInternalResetClickV4629) {
+          _v4629LastOrigPresetBtn = ob;
+        }
+        if (_v4629VolleyState.active) {
+          setVolleyballModeV4629(false, volleyBtn, origPresetBtns);
+        }
+      }, false);
+    });
+
+    if (!volleyBtn.__sqVolleyBtnBoundV4629) {
+      volleyBtn.__sqVolleyBtnBoundV4629 = true;
+      volleyBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (_v4629VolleyState.active) {
+          // Matching the exact behavior of the other 5 buttons: re-clicking resets tokens + clears input!
+          resetActiveTacticalBoardV4629();
+        } else {
+          setVolleyballModeV4629(true, volleyBtn, origPresetBtns);
+        }
+      }, false);
+    }
+
+    if (!resetBtn.__sqResetBtnBoundV4629) {
+      resetBtn.__sqResetBtnBoundV4629 = true;
+      resetBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        resetActiveTacticalBoardV4629();
+      }, false);
+    }
+
+    var rotBtn = document.getElementById("sqVolleyRotateClockwiseV4629");
+    if (rotBtn && !rotBtn.__sqRotBoundV4629) {
+      rotBtn.__sqRotBoundV4629 = true;
+      rotBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        // Standard volleyball clockwise rotation across the 6 court starters (indices 0..5: 4->3->2->1->6->5->4)
+        var order = [0, 1, 2, 5, 4, 3]; // 4번, 3번, 2번, 1번, 6번, 5번
+        var coords = order.map(function (i) { return { rx: _v4629VolleyState.tokens[i].rx, ry: _v4629VolleyState.tokens[i].ry }; });
+        for (var k = 0; k < order.length; k++) {
+          var nextC = coords[(k + 1) % order.length];
+          _v4629VolleyState.tokens[order[k]].rx = nextC.rx;
+          _v4629VolleyState.tokens[order[k]].ry = nextC.ry;
+        }
+        drawVolleyballTacticCanvasV4629();
+      }, false);
+    }
+
+    // Bind pointer/mouse/touch drag & selection on #sqVolleyTacticCanvasV4629
+    var vCanvas = document.getElementById("sqVolleyTacticCanvasV4629");
+    if (vCanvas && !vCanvas.__sqDragBoundV4629) {
+      vCanvas.__sqDragBoundV4629 = true;
+      function getRelCoords(evt) {
+        var r = vCanvas.getBoundingClientRect();
+        var clientX = (evt.touches && evt.touches.length) ? evt.touches[0].clientX : evt.clientX;
+        var clientY = (evt.touches && evt.touches.length) ? evt.touches[0].clientY : evt.clientY;
+        var w = Math.max(1, r.width);
+        var h = Math.max(1, r.height);
+        return {
+          rx: Math.max(0.04, Math.min(0.95, (clientX - r.left) / w)),
+          ry: Math.max(0.14, Math.min(0.90, (clientY - r.top) / h)),
+          px: clientX - r.left,
+          py: clientY - r.top,
+          w: w,
+          h: h
+        };
+      }
+      function onDown(evt) {
+        var pt = getRelCoords(evt);
+        var bestIdx = -1;
+        var bestDist = 30;
+        _v4629VolleyState.tokens.forEach(function (tk, idx) {
+          var dx = tk.rx * pt.w - pt.px;
+          var dy = tk.ry * pt.h - pt.py;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist <= bestDist) {
+            bestDist = dist;
+            bestIdx = idx;
+          }
+        });
+        if (bestIdx !== -1) {
+          if (evt.cancelable) evt.preventDefault();
+          _v4629VolleyState.selectedIdx = bestIdx;
+          _v4629VolleyState.draggingIdx = bestIdx;
+          vCanvas.style.cursor = "grabbing";
+          var inps = findTacticPlayerNameInputsV4629(tacticBlk);
+          if (inps.length) {
+            inps[0].value = _v4629VolleyState.tokens[bestIdx].label;
+          }
+          drawVolleyballTacticCanvasV4629();
+        }
+      }
+      function onMove(evt) {
+        if (_v4629VolleyState.draggingIdx === -1) return;
+        if (evt.cancelable) evt.preventDefault();
+        var pt = getRelCoords(evt);
+        var tk = _v4629VolleyState.tokens[_v4629VolleyState.draggingIdx];
+        if (tk) {
+          tk.rx = Math.round(pt.rx * 1000) / 1000;
+          tk.ry = Math.round(pt.ry * 1000) / 1000;
+          drawVolleyballTacticCanvasV4629();
+        }
+      }
+      function onUp() {
+        if (_v4629VolleyState.draggingIdx !== -1) {
+          _v4629VolleyState.draggingIdx = -1;
+          vCanvas.style.cursor = "grab";
+          drawVolleyballTacticCanvasV4629();
+        }
+      }
+      vCanvas.addEventListener("mousedown", onDown, false);
+      window.addEventListener("mousemove", onMove, false);
+      window.addEventListener("mouseup", onUp, false);
+      vCanvas.addEventListener("touchstart", onDown, { passive: false });
+      vCanvas.addEventListener("touchmove", onMove, { passive: false });
+      window.addEventListener("touchend", onUp, false);
+      window.addEventListener("resize", function () {
+        if (_v4629VolleyState.active) drawVolleyballTacticCanvasV4629();
+      }, false);
+    }
+
+    // Bind player-name <input> in capture phase so typing updates selected Volleyball token seamlessly
+    if (!tacticBlk.__sqVolleyNameInpBoundV4629) {
+      tacticBlk.__sqVolleyNameInpBoundV4629 = true;
+      tacticBlk.addEventListener("input", function (ev) {
+        if (!_v4629VolleyState.active) return;
+        var t = ev.target;
+        if (!t || t.tagName !== "INPUT") return;
+        var inps = findTacticPlayerNameInputsV4629(tacticBlk);
+        if (inps.indexOf(t) === -1) return;
+        ev.stopPropagation();
+        var idx = _v4629VolleyState.selectedIdx >= 0 ? _v4629VolleyState.selectedIdx : 0;
+        _v4629VolleyState.selectedIdx = idx;
+        var nextLbl = String(t.value || "").trim();
+        _v4629VolleyState.tokens[idx].label = nextLbl || _v4629VolleyState.tokens[idx].role;
+        drawVolleyballTacticCanvasV4629();
+      }, true);
+
+      // Intercept PNG download button when Volleyball mode is active so it exports the Volleyball canvas!
+      tacticBlk.addEventListener("click", function (ev) {
+        if (!_v4629VolleyState.active) return;
+        var btn = ev.target && ev.target.closest ? ev.target.closest("button, a") : null;
+        if (!btn) return;
+        var btx = String(btn.textContent || "");
+        if (/PNG|이미지\s*다운로드|이미지\s*저장/i.test(btx)) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+          var cvs = document.getElementById("sqVolleyTacticCanvasV4629");
+          if (cvs && cvs.toDataURL) {
+            var a = document.createElement("a");
+            a.href = cvs.toDataURL("image/png");
+            a.download = "sportiq-volleyball-tactics.png";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            if (typeof showToast === "function") showToast("🖼️ 배구 6인 코트 전술판 PNG 이미지가 저장되었습니다.");
+          }
+        }
+      }, true);
+    }
+
+    // Wrap window.fetch once so DB share (`POST /api/...tactic...`) while in Volleyball mode saves Volleyball 6-player payload!
+    if (!window.__sqVolleyFetchTapV4629 && typeof window.fetch === "function") {
+      window.__sqVolleyFetchTapV4629 = true;
+      var _origFetchV4629 = window.fetch;
+      window.fetch = function (input, init) {
+        try {
+          var urlStr = typeof input === "string" ? input : (input && input.url ? input.url : "");
+          if (_v4629VolleyState.active && init && String(init.method || "GET").toUpperCase() === "POST" && /tactic/i.test(urlStr) && typeof init.body === "string") {
+            var bodyObj = JSON.parse(init.body);
+            if (bodyObj && typeof bodyObj === "object") {
+              if ("sport" in bodyObj) bodyObj.sport = "volleyball";
+              if ("formation" in bodyObj) bodyObj.formation = "배구 6인 코트";
+              if ("preset" in bodyObj) bodyObj.preset = "배구 6인 코트";
+              if (Array.isArray(bodyObj.players)) {
+                bodyObj.players = _v4629VolleyState.tokens.map(function (tk) {
+                  return { role: tk.role, name: tk.label, label: tk.label, x: Math.round(tk.rx * 640), y: Math.round(tk.ry * 332), rx: tk.rx, ry: tk.ry };
+                });
+              }
+              if (Array.isArray(bodyObj.positions)) {
+                bodyObj.positions = _v4629VolleyState.tokens.map(function (tk) {
+                  return { role: tk.role, name: tk.label, label: tk.label, x: Math.round(tk.rx * 640), y: Math.round(tk.ry * 332), rx: tk.rx, ry: tk.ry };
+                });
+              }
+              init = Object.assign({}, init, { body: JSON.stringify(bodyObj) });
+            }
+          }
+        } catch (eFT) {}
+        return _origFetchV4629.call(this, input, init);
+      };
+    }
+  }
+
+  function syncAllLabEnhancementsV4629() {
+    try { polishKellyMonitorDomAndFiltersV4629(); } catch (eK) {}
+    try { installLabTacticalVolleyballAndResetV4629(); } catch (eT) {}
+  }
+
 
 
   var _v43MatchesShowAll = false;
@@ -10250,6 +11396,43 @@ _FRONTEND_V22_JS = r'''
     var h = uxEsc((it && it.home) || "홈팀");
     var a = uxEsc((it && it.away) || "원정팀");
 
+    var lgUpTactic = String((it && (it.league_code || it.league)) || "").toUpperCase();
+    if (lgUpTactic === "NFL" || /미식축구|NCAAF/.test(lgUpTactic)) {
+      return {
+        tabLabel: "🏈 패스·러싱 전술",
+        hdrTitle: "🏈 NFL 스크리미지 라인 · 패스 프로텍션 vs 블리츠 대형",
+        hdrSub: "오펜스 " + h + " (샷건 11 퍼스널) vs 디펜스 " + a + " (니켈 커버 2)",
+        statLabel: "레드존 득점 효율 · 쿼터백 패서레이팅 우위",
+        expTitle: "모델 예상 최종 득점치 (PTS)",
+        expHome: Math.round(17 + (hp * 0.14)) + "점",
+        expAway: Math.round(17 + (ap * 0.14)) + "점",
+        labPresetKw: "",
+        footNote: "3rd 다운 컨버전 성공률과 플레이액션 패스·패스러시 압박 강도가 승부를 가릅니다.",
+        svgHtml: [
+          "<svg viewBox='0 0 460 190' width='100%' style='max-height:195px;height:auto;background:#14532d;border:2px solid rgba(255,255,255,.32);border-radius:10px;display:block;'>",
+          "  <rect x='0' y='0' width='44' height='190' fill='rgba(16,185,129,.28)'/><rect x='416' y='0' width='44' height='190' fill='rgba(56,189,248,.28)'/>",
+          "  <line x1='44' y1='0' x2='44' y2='190' stroke='#fff' stroke-width='2'/><line x1='416' y1='0' x2='416' y2='190' stroke='#fff' stroke-width='2'/>",
+          "  <line x1='137' y1='0' x2='137' y2='190' stroke='rgba(255,255,255,.28)' stroke-width='1.2'/><line x1='230' y1='0' x2='230' y2='190' stroke='#fde047' stroke-width='2.4' stroke-dasharray='6,4'/><line x1='323' y1='0' x2='323' y2='190' stroke='rgba(255,255,255,.28)' stroke-width='1.2'/>",
+          "  <circle cx='148' cy='95' r='10' fill='#fde68a'/><text x='148' y='98.5' text-anchor='middle' fill='#0f172a' font-size='8' font-weight='900'>QB</text>",
+          "  <circle cx='122' cy='124' r='9' fill='#34d399'/><text x='122' y='127.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>RB</text>",
+          "  <circle cx='212' cy='34' r='9' fill='#10b981'/><text x='212' y='37.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>WR</text>",
+          "  <circle cx='212' cy='158' r='9' fill='#10b981'/><text x='212' y='161.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>WR</text>",
+          "  <circle cx='212' cy='68' r='9' fill='#10b981'/><text x='212' y='71.5' text-anchor='middle' fill='#022c22' font-size='8' font-weight='900'>TE</text>",
+          "  <circle cx='248' cy='78' r='8.5' fill='#38bdf8'/><circle cx='248' cy='112' r='8.5' fill='#38bdf8'/>",
+          "  <circle cx='286' cy='66' r='9' fill='#38bdf8'/><text x='286' y='69.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>LB</text>",
+          "  <circle cx='286' cy='124' r='9' fill='#38bdf8'/><text x='286' y='127.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>LB</text>",
+          "  <circle cx='268' cy='34' r='9' fill='#7dd3fc'/><text x='268' y='37.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>CB</text>",
+          "  <circle cx='268' cy='158' r='9' fill='#7dd3fc'/><text x='268' y='161.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>CB</text>",
+          "  <circle cx='348' cy='64' r='9' fill='#bae6fd'/><text x='348' y='67.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>FS</text>",
+          "  <circle cx='348' cy='126' r='9' fill='#bae6fd'/><text x='348' y='129.5' text-anchor='middle' fill='#082f49' font-size='8' font-weight='900'>SS</text>",
+          "  <text x='52' y='20' fill='#fde68a' font-size='11' font-weight='800'>🏈 " + h + "</text>",
+          "  <text x='408' y='20' text-anchor='end' fill='#bae6fd' font-size='11' font-weight='800'>" + a + " 🏈</text>",
+          "</svg>"
+        ].join("")
+      };
+    }
+
+
     if (sp === "baseball") {
       return {
         tabLabel: "⚾ 수비시프트 · 타순",
@@ -10378,8 +11561,8 @@ _FRONTEND_V22_JS = r'''
         expTitle: "모델 예상 세트 획득 기대치",
         expHome: (1.2 + (hp * 0.026)).toFixed(1) + "세트",
         expAway: (1.2 + (ap * 0.026)).toFixed(1) + "세트",
-        labPresetKw: "",
-        footNote: "사이드아웃 성공률과 중앙 속공·블로킹 벽 높이가 세트 후반 승부처를 결정합니다.",
+        labPresetKw: "배구",
+        footNote: "하단 <strong>🧪 전술판</strong> 버튼을 누르면 <strong>🏐 배구 6인 코트</strong> 인터랙티브 전술판으로 즉시 이동합니다.",
         svgHtml: [
           "<svg viewBox='0 0 460 190' width='100%' style='max-height:195px;height:auto;background:#0f3d56;border:2px solid rgba(255,255,255,.32);border-radius:10px;display:block;'>",
           "  <rect x='24' y='18' width='412' height='154' fill='rgba(234,88,12,.22)' stroke='#f8fafc' stroke-width='1.8'/>",
@@ -11037,8 +12220,12 @@ _FRONTEND_V22_JS = r'''
       if (typeof window.switchTab === "function") window.switchTab("lab");
       setTimeout(function () {
         var labSec = document.getElementById("tab-lab") || document.body;
-        var tacSubBtn = document.querySelector("#sqLabSubNavV42 [data-sq-lab-tab='tactics']");
+        var tacSubBtn = document.querySelector("#sqLabSubNavV42 [data-sq-lab-pick='tactic'], #sqLabSubNavV42 [data-sq-lab-tab='tactics']");
         if (tacSubBtn) { try { tacSubBtn.click(); } catch (eSub) {} }
+        try { syncAllLabEnhancementsV4629(); } catch (eLabSync) {}
+        if (tacMeta.labPresetKw === "배구" && window.__sqVolleyTacticStateV4629) {
+          window.__sqVolleyTacticStateV4629.matchTitle = it.home + " vs " + it.away;
+        }
         if (tacMeta.labPresetKw) {
           var pBtns = labSec.querySelectorAll("button");
           for (var i = 0; i < pBtns.length; i++) {
@@ -12297,6 +13484,7 @@ _FRONTEND_V22_JS = r'''
     safeRunStepV4610(polishModalsAndCloseIconsV29);
     safeRunStepV4610(stabilizeHofLaunchCardV29);
     safeRunStepV4610(dedupLabKellyMonitorV36);
+    safeRunStepV4610(syncAllLabEnhancementsV4629);
     safeRunStepV4610(installMatchInsightModalV30);
     safeRunStepV4610(refreshScoreboardSuiteV30);
     safeRunStepV4610(handleDeepLinkPostOnBootV29);
@@ -14280,7 +15468,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46170_{int(time.time())}"
+_BOOT_VER_V30 = f"46290_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -24630,6 +25818,7 @@ _install_overseas_precision_classifier_and_repair_db_v4627()
 @router.get("/api/member/live-sources-diag-v4626")
 @router.get("/api/member/live-sources-diag-v4627")
 @router.get("/api/member/live-sources-diag-v4628")
+@router.get("/api/member/live-sources-diag-v4629")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -24639,7 +25828,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     ov_counts = {k: sum(1 for x in ov_items if x.get("sport_ko") == k) for k in ("축구", "야구", "농구", "하키", "NFL", "UFC", "F1", "종합")}
     return {
         "ok": True,
-        "version": "v4.6.28",
+        "version": "v4.6.29",
         "overseas_counts": ov_counts,
         "apisports_bridge": _get_apisports_diag_snapshot_v4623(),
         "date_offset": off_i,
