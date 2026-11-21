@@ -3429,9 +3429,21 @@ _FRONTEND_V22_JS = r'''
       minBtn.addEventListener("click", function (ev) {
         ev.preventDefault();
         ev.stopPropagation();
+        var scrollSlimNow = Boolean(document.body && document.body.getAttribute("data-sq-scroll-slim-dock") === "1" && !window.__sqDockUserToggledV4637);
+        if (scrollSlimNow) {
+          window.__sqDockUserToggledV4637 = true;
+          document.body.removeAttribute("data-sq-scroll-slim-dock");
+          try { localStorage.setItem("sportiq_dock_minimized_v382", "0"); } catch (e0) {}
+          harmonizeMobileFloatingOverlaysV26();
+          return;
+        }
         var curMin = false;
         try { curMin = (localStorage.getItem("sportiq_dock_minimized_v382") === "1"); } catch (e) {}
         var nextMin = !curMin;
+        window.__sqDockUserToggledV4637 = !nextMin;
+        if (nextMin && document.body) {
+          document.body.removeAttribute("data-sq-scroll-slim-dock");
+        }
         try { localStorage.setItem("sportiq_dock_minimized_v382", nextMin ? "1" : "0"); } catch (e) {}
         harmonizeMobileFloatingOverlaysV26();
       });
@@ -3440,11 +3452,23 @@ _FRONTEND_V22_JS = r'''
 
     var isMin = false;
     try { isMin = (localStorage.getItem("sportiq_dock_minimized_v382") === "1"); } catch (e) {}
+    var isScrollSlim = Boolean(document.body && document.body.getAttribute("data-sq-scroll-slim-dock") === "1" && !window.__sqDockUserToggledV4637);
 
-    if (isMin) {
+    if (isMin || isScrollSlim) {
       targets.forEach(function (t) {
         t.setAttribute("data-sq-dock-min-hidden", "1");
         t.style.setProperty("display", "none", "important");
+      });
+      Array.prototype.forEach.call(document.body.querySelectorAll("button, a, div"), function (candEl) {
+        if (!candEl || candEl === minBtn || candEl.id === "sqFloatingDockMinBtnV382") return;
+        var csC = window.getComputedStyle ? window.getComputedStyle(candEl) : null;
+        if (!csC || csC.position !== "fixed") return;
+        if ((candEl.offsetWidth || 0) > 340 || (candEl.offsetHeight || 0) > 260) return;
+        var txC = String(candEl.textContent || "");
+        if (txC.indexOf("IQ중계") !== -1 || txC.indexOf("AI 아이큐") !== -1) {
+          candEl.setAttribute("data-sq-dock-min-hidden", "1");
+          candEl.style.setProperty("display", "none", "important");
+        }
       });
       var bannerVis = Boolean(banner && window.getComputedStyle(banner).display !== "none" && banner.offsetHeight > 0);
       var bH = bannerVis ? (banner.offsetHeight || 54) : 0;
@@ -3480,11 +3504,9 @@ _FRONTEND_V22_JS = r'''
         "white-space:nowrap"
       ].join(";");
     } else {
-      targets.forEach(function (t) {
-        if (t.getAttribute("data-sq-dock-min-hidden") === "1") {
-          t.removeAttribute("data-sq-dock-min-hidden");
-          t.style.removeProperty("display");
-        }
+      Array.prototype.forEach.call(document.querySelectorAll("[data-sq-dock-min-hidden='1']"), function (t) {
+        t.removeAttribute("data-sq-dock-min-hidden");
+        t.style.removeProperty("display");
       });
       var minTop = Infinity;
       var maxRight = 0;
@@ -13076,15 +13098,39 @@ _FRONTEND_V22_JS = r'''
       el.style.display = "none";
       return;
     }
-    el.style.removeProperty("display");
-    if (typeof window.closeModal === "function" && el.id) {
-      try { window.closeModal(el.id); } catch (eC) {}
+    window.__sqClosingModalInternallyV4638 = true;
+    try {
+      var nativeClsBtn = el.querySelector(
+        "#close-post-modal, #close-write-modal, #close-report-modal, #close-news-write-modal, #close-policy-modal, #close-abuse-report-modal, #close-partner-modal-btn, [data-close-modal], [aria-label*='닫기']"
+      );
+      if (!nativeClsBtn) {
+        var btns = el.querySelectorAll("button");
+        for (var bi = 0; bi < btns.length; bi++) {
+          var b = btns[bi];
+          var bt = String(b.textContent || "").replace(/\s+/g, " ").trim();
+          if (bt === "✕" || bt === "×" || bt === "닫기" || bt === "닫기 (Esc)" || b.querySelector("svg[data-sq-x-svg='1']")) {
+            nativeClsBtn = b;
+            break;
+          }
+        }
+      }
+      if (nativeClsBtn && typeof nativeClsBtn.click === "function") {
+        try { nativeClsBtn.click(); } catch (eClk) {}
+      }
+      if (typeof window.closeModal === "function" && el.id) {
+        try { window.closeModal(el.id); } catch (eC) {}
+      }
+      if (isOverlayModalVisibleV461(el)) {
+        el.style.removeProperty("display");
+        if (el.classList) {
+          el.classList.remove("open", "active", "show");
+          el.classList.add("hidden");
+        }
+        el.style.setProperty("display", "none", "important");
+      }
+    } finally {
+      window.__sqClosingModalInternallyV4638 = false;
     }
-    if (el.classList) {
-      el.classList.remove("open", "active", "show");
-      el.classList.add("hidden");
-    }
-    el.style.display = "none";
   }
 
   function installUniversalLifoEscapeV461() {
@@ -13093,58 +13139,8 @@ _FRONTEND_V22_JS = r'''
 
     window.addEventListener("keydown", function (ev) {
       if (ev.key !== "Escape" && ev.key !== "Esc" && ev.keyCode !== 27) return;
-      var dynamicPartnerFixed = null;
-      if (document.body) {
-        var fDivs = document.body.querySelectorAll("div, section");
-        for (var pfi = 0; pfi < fDivs.length; pfi++) {
-          var fd = fDivs[pfi];
-          if (fd.id || !isOverlayModalVisibleV461(fd)) continue;
-          var fcs = window.getComputedStyle ? window.getComputedStyle(fd) : null;
-          if (fcs && fcs.position === "fixed" && /파트너\s*입점|제휴\s*문의/.test(String(fd.textContent || "").slice(0, 180))) {
-            dynamicPartnerFixed = fd;
-            break;
-          }
-        }
-      }
-      var candidates = [
-        document.getElementById("sqDeleteAuthModalV4612"),
-        document.getElementById("dcQuickMatchModal"),
-        document.getElementById("sqMyTeamAlertModalV4631"),
-        document.getElementById("sqPartnerInquiryModalV46"),
-        dynamicPartnerFixed,
-        document.getElementById("sqLegalPolicyModal"),
-        findAiSearchModalContainerV372(),
-        document.getElementById("sqAdminRaffleModal"),
-        document.getElementById("sqPwaIosModal"),
-        document.getElementById("sqMemberHubModal"),
-        document.getElementById("partner-inquiry-modal"),
-        document.getElementById("partnerModal"),
-        document.getElementById("commentModal"),
-        document.getElementById("post-modal"),
-        document.getElementById("writeModal"),
-        document.getElementById("write-modal"),
-        document.getElementById("news-write-modal"),
-        document.getElementById("match-report-modal"),
-        document.getElementById("dcMatchModal"),
-        document.getElementById("dcMatchDetailModal")
-      ];
-      var openList = [];
-      var seen = [];
-      for (var i = 0; i < candidates.length; i++) {
-        var m = candidates[i];
-        if (!m || seen.indexOf(m) !== -1) continue;
-        seen.push(m);
-        if (isOverlayModalVisibleV461(m)) {
-          var z = 0;
-          try { z = parseInt((window.getComputedStyle(m).zIndex || "0"), 10) || 0; } catch (eZ) {}
-          openList.push({ el: m, z: z, order: i });
-        }
-      }
+      var openList = collectOpenOverlayModalsV4637();
       if (!openList.length) return;
-      openList.sort(function (a, b) {
-        if (b.z !== a.z) return b.z - a.z;
-        return a.order - b.order;
-      });
       ev.preventDefault();
       ev.stopPropagation();
       if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
@@ -15449,26 +15445,33 @@ _FRONTEND_V22_JS = r'''
   safeRunStepV4610(installLiveScoresFetchTapV30);
   safeRunStepV4610(installTopControlCaptureSyncV304);
   safeRunStepV4610(installGlobalCardClickCaptureV30);
+  function isPersistentNonModalChromeV4638(el) {
+    if (!el || !el.tagName) return true;
+    var tag = el.tagName.toUpperCase();
+    if (tag === "HEADER" || tag === "FOOTER" || tag === "NAV") return true;
+    var skipIds = {
+      proLiveTickerBar: 1,
+      dcMainHubSection: 1,
+      sqDesktopMainTabStrip: 1,
+      "mobile-nav": 1,
+      liveFloatingDock: 1,
+      sqFloatingDockMinBtnV382: 1,
+      sqOfficialLegalFooter: 1,
+      "toast-container": 1
+    };
+    if (el.id && skipIds[el.id]) return true;
+    if (el.hasAttribute("data-sq-floating-dock") || el.hasAttribute("data-sq-floating-item") || el.hasAttribute("data-sq-pwa-close")) return true;
+    if (el.classList && (el.classList.contains("sq-mobile-bottom-nav-bar") || el.classList.contains("dc-hub-wrap"))) return true;
+    if (el.closest && el.closest("#proLiveTickerBar, #dcMainHubSection, #sqDesktopMainTabStrip, #mobile-nav, #liveFloatingDock, #sqOfficialLegalFooter")) return true;
+    return false;
+  }
+
   function collectOpenOverlayModalsV4637() {
-    var dynamicPartnerFixed = null;
-    if (document.body) {
-      var fDivs = document.body.querySelectorAll("div, section");
-      for (var pfi = 0; pfi < fDivs.length; pfi++) {
-        var fd = fDivs[pfi];
-        if (fd.id || !isOverlayModalVisibleV461(fd)) continue;
-        var fcs = window.getComputedStyle ? window.getComputedStyle(fd) : null;
-        if (fcs && fcs.position === "fixed" && /파트너\s*입점|제휴\s*문의/.test(String(fd.textContent || "").slice(0, 180))) {
-          dynamicPartnerFixed = fd;
-          break;
-        }
-      }
-    }
     var candidates = [
       document.getElementById("sqDeleteAuthModalV4612"),
       document.getElementById("dcQuickMatchModal"),
       document.getElementById("sqMyTeamAlertModalV4631"),
       document.getElementById("sqPartnerInquiryModalV46"),
-      dynamicPartnerFixed,
       document.getElementById("sqLegalPolicyModal"),
       findAiSearchModalContainerV372(),
       document.getElementById("sqAdminRaffleModal"),
@@ -15476,16 +15479,63 @@ _FRONTEND_V22_JS = r'''
       document.getElementById("sqMemberHubModal"),
       document.getElementById("partner-inquiry-modal"),
       document.getElementById("partnerModal"),
+      document.getElementById("partner-admin-modal"),
       document.getElementById("commentModal"),
       document.getElementById("post-modal"),
       document.getElementById("writeModal"),
       document.getElementById("write-modal"),
       document.getElementById("news-write-modal"),
       document.getElementById("match-report-modal"),
+      document.getElementById("policy-modal"),
+      document.getElementById("abuse-report-modal"),
       document.getElementById("dcMatchModal"),
       document.getElementById("dcMatchDetailModal")
     ];
-    var openList = [];
+
+    // Universal scan for ANY visible `position: fixed` modal/drawer/dialog (`실시간 알림 센터`, dynamic post/alert modals, etc.)
+    if (document.body) {
+      var fixedCandNodes = document.body.querySelectorAll("div, section, aside, [role='dialog']");
+      var vw = window.innerWidth || 1280;
+      var vh = window.innerHeight || 800;
+      for (var fi = 0; fi < fixedCandNodes.length; fi++) {
+        var node = fixedCandNodes[fi];
+        if (!node || isPersistentNonModalChromeV4638(node) || !isOverlayModalVisibleV461(node)) continue;
+        var csN = window.getComputedStyle ? window.getComputedStyle(node) : null;
+        if (!csN || csN.position !== "fixed") continue;
+        // Climb to outermost visible `position: fixed` container so backdrop + dialog close together
+        var rootFixed = node;
+        while (rootFixed.parentElement && rootFixed.parentElement !== document.body) {
+          var pEl = rootFixed.parentElement;
+          if (isPersistentNonModalChromeV4638(pEl) || !isOverlayModalVisibleV461(pEl)) break;
+          var pcs = window.getComputedStyle ? window.getComputedStyle(pEl) : null;
+          if (pcs && pcs.position === "fixed") rootFixed = pEl;
+          else break;
+        }
+        if (candidates.indexOf(rootFixed) !== -1) continue;
+        var rect = rootFixed.getBoundingClientRect ? rootFixed.getBoundingClientRect() : { width: rootFixed.offsetWidth || 0, height: rootFixed.offsetHeight || 0 };
+        var zVal = parseInt(csN.zIndex || "0", 10) || 0;
+        if (rootFixed !== node && window.getComputedStyle) {
+          zVal = Math.max(zVal, parseInt(window.getComputedStyle(rootFixed).zIndex || "0", 10) || 0);
+        }
+        var sampleTxt = String(rootFixed.textContent || "").slice(0, 260);
+        // Ignore small passive toasts (`height < 120` unless explicitly an alert center/modal)
+        if (rect.height < 120 && rect.width < 460 && !/실시간\s*알림\s*센터|마이팀\s*알림함/.test(sampleTxt)) continue;
+
+        var isFullBackdrop = (rect.width >= vw * 0.70 && rect.height >= vh * 0.55 && zVal >= 20);
+        var hasModalTitleOrRole = (
+          rect.width >= 240 && rect.height >= 140 && zVal >= 30 && (
+            rootFixed.getAttribute("role") === "dialog" ||
+            /(modal|notif|drawer|popup)/i.test(rootFixed.id || "") ||
+            /실시간\s*알림\s*센터|마이팀\s*알림함|분석글|댓글|인사이트|파트너\s*입점|제휴\s*문의|이용약관|개인정보|운영정책|출석|칭호\s*상점/.test(sampleTxt)
+          )
+        );
+        if (isFullBackdrop || hasModalTitleOrRole) {
+          candidates.push(rootFixed);
+        }
+      }
+    }
+
+    var rawOpen = [];
     var seen = [];
     for (var i = 0; i < candidates.length; i++) {
       var m = candidates[i];
@@ -15494,9 +15544,18 @@ _FRONTEND_V22_JS = r'''
       if (isOverlayModalVisibleV461(m)) {
         var z = 0;
         try { z = parseInt((window.getComputedStyle(m).zIndex || "0"), 10) || 0; } catch (eZ) {}
-        openList.push({ el: m, z: z, order: i });
+        rawOpen.push({ el: m, z: z, order: i });
       }
     }
+    // Filter out any inner element contained inside an already-collected outer modal wrapper
+    var openList = rawOpen.filter(function (item) {
+      for (var k = 0; k < rawOpen.length; k++) {
+        if (rawOpen[k].el !== item.el && rawOpen[k].el.contains && rawOpen[k].el.contains(item.el)) {
+          return false;
+        }
+      }
+      return true;
+    });
     openList.sort(function (a, b) {
       if (b.z !== a.z) return b.z - a.z;
       return a.order - b.order;
@@ -15511,22 +15570,47 @@ _FRONTEND_V22_JS = r'''
     var guardPushed = false;
     var suppressNextPop = false;
 
+    function buildModalGuardUrlV4638() {
+      var h = window.location.hash || "";
+      if (h.indexOf("modal=open") !== -1) return window.location.href;
+      var base = window.location.pathname + window.location.search;
+      if (!h || h === "#") return base + "#modal=open";
+      return base + h + "&modal=open";
+    }
+
+    function stripModalHashCleanlyV4638() {
+      var h = window.location.hash || "";
+      if (h.indexOf("modal=open") === -1) return;
+      var cleaned = h.replace(/&modal=open/g, "").replace(/#modal=open/g, "");
+      if (cleaned === "#") cleaned = "";
+      try {
+        window.history.replaceState(window.history.state || null, "", window.location.pathname + window.location.search + cleaned);
+      } catch (eRep) {}
+    }
+
+    // If page booted with lingering `#modal=open` in URL and no modal open, clean it up cleanly
+    if ((window.location.hash || "").indexOf("modal=open") !== -1 && collectOpenOverlayModalsV4637().length === 0) {
+      stripModalHashCleanlyV4638();
+    }
+
     function syncModalHistoryGuardState() {
+      if (window.__sqClosingModalInternallyV4638) return;
       var openCount = collectOpenOverlayModalsV4637().length;
       if (openCount > 0 && !guardPushed) {
         try {
-          window.history.pushState({ sqModalGuardV4637: 1 }, "", window.location.href);
+          window.history.pushState({ sqModalGuardV4638: 1 }, "", buildModalGuardUrlV4638());
           guardPushed = true;
         } catch (ePush) {}
       } else if (openCount === 0 && guardPushed) {
         guardPushed = false;
         try {
-          if (window.history.state && window.history.state.sqModalGuardV4637 === 1) {
+          if ((window.history.state && window.history.state.sqModalGuardV4638 === 1) || (window.location.hash || "").indexOf("modal=open") !== -1) {
             suppressNextPop = true;
             window.history.back();
           }
         } catch (eBack) {
           suppressNextPop = false;
+          stripModalHashCleanlyV4638();
         }
       }
     }
@@ -15534,6 +15618,7 @@ _FRONTEND_V22_JS = r'''
     window.addEventListener("popstate", function () {
       if (suppressNextPop) {
         suppressNextPop = false;
+        stripModalHashCleanlyV4638();
         return;
       }
       var openList = collectOpenOverlayModalsV4637();
@@ -15543,24 +15628,37 @@ _FRONTEND_V22_JS = r'''
         var remaining = collectOpenOverlayModalsV4637().length;
         if (remaining > 0) {
           try {
-            window.history.pushState({ sqModalGuardV4637: 1 }, "", window.location.href);
+            window.history.pushState({ sqModalGuardV4638: 1 }, "", buildModalGuardUrlV4638());
             guardPushed = true;
           } catch (eRePush) {}
+        } else {
+          stripModalHashCleanlyV4638();
         }
       } else {
         guardPushed = false;
+        stripModalHashCleanlyV4638();
       }
     });
 
-    function scheduleSync() {
-      setTimeout(syncModalHistoryGuardState, 35);
-    }
-    document.addEventListener("click", scheduleSync, true);
-    window.addEventListener("keydown", scheduleSync, true);
+    // CRITICAL: Run SYNCHRONOUSLY in bubble `click` phase (preserving Chrome trusted user activation for real UI Back button!)
+    window.addEventListener("click", function () {
+      syncModalHistoryGuardState();
+      if (typeof Promise !== "undefined") {
+        Promise.resolve().then(syncModalHistoryGuardState);
+      }
+      setTimeout(syncModalHistoryGuardState, 28);
+    }, false);
+
+    window.addEventListener("keydown", function () {
+      setTimeout(syncModalHistoryGuardState, 20);
+    }, false);
+
     if (typeof MutationObserver !== "undefined") {
       var bindObs = function () {
         if (!document.body || window.__sqModalBackObsV4637) return;
-        window.__sqModalBackObsV4637 = new MutationObserver(scheduleSync);
+        window.__sqModalBackObsV4637 = new MutationObserver(function () {
+          syncModalHistoryGuardState();
+        });
         window.__sqModalBackObsV4637.observe(document.body, {
           childList: true,
           subtree: true,
@@ -15573,25 +15671,48 @@ _FRONTEND_V22_JS = r'''
     }
   }
 
+  function syncTop20FoldButtonLabelV4638(top20Box) {
+    if (!top20Box) return;
+    var firstHdr = top20Box.firstElementChild;
+    if (!firstHdr || !firstHdr.querySelectorAll) return;
+    var hdrFoldBtn = document.getElementById("sqTop20HdrFoldBtn");
+    if (!hdrFoldBtn) {
+      var btns = firstHdr.querySelectorAll("button");
+      for (var i = 0; i < btns.length; i++) {
+        var bt = String(btns[i].textContent || "").trim();
+        if (/접기|펼치기/.test(bt)) {
+          hdrFoldBtn = btns[i];
+          break;
+        }
+      }
+    }
+    if (!hdrFoldBtn) return;
+    var isFolded = top20Box.getAttribute("data-sq-top20-folded") === "1";
+    var wantTxt = isFolded ? "TOP 20 펼치기 ▼" : "접기 ▲";
+    if (hdrFoldBtn.textContent !== wantTxt) {
+      hdrFoldBtn.textContent = wantTxt;
+    }
+  }
+
   function injectPolishCssAndUxUpgradesV4637() {
     if (!document.getElementById("sqPolishUxCssV4637") && document.head) {
       var st = document.createElement("style");
       st.id = "sqPolishUxCssV4637";
       st.textContent = [
-        "html, body, #sqMyTeamAlertModalV4631, #dcQuickMatchModal, #commentModal, #sqMemberHubModal, #sqLegalPolicyModal, #sqPartnerInquiryModalV46, [role='dialog'] {",
+        "html, body, #sqMyTeamAlertModalV4631, #dcQuickMatchModal, #commentModal, #post-modal, #sqMemberHubModal, #sqLegalPolicyModal, #sqPartnerInquiryModalV46, [role='dialog'] {",
         "  color-scheme: dark !important;",
         "}",
-        "#sqMyTeamAlertModalV4631 *, #dcQuickMatchModal *, #commentModal *, #sqMemberHubModal *, [role='dialog'] * {",
+        "#sqMyTeamAlertModalV4631 *, #dcQuickMatchModal *, #commentModal *, #post-modal *, #sqMemberHubModal *, [role='dialog'] * {",
         "  scrollbar-width: thin;",
         "  scrollbar-color: #334155 #0b1120;",
         "}",
-        "#sqMyTeamAlertModalV4631 *::-webkit-scrollbar, #dcQuickMatchModal *::-webkit-scrollbar, #commentModal *::-webkit-scrollbar, #sqMemberHubModal *::-webkit-scrollbar {",
+        "#sqMyTeamAlertModalV4631 *::-webkit-scrollbar, #dcQuickMatchModal *::-webkit-scrollbar, #commentModal *::-webkit-scrollbar, #post-modal *::-webkit-scrollbar, #sqMemberHubModal *::-webkit-scrollbar {",
         "  width: 6px; height: 6px;",
         "}",
-        "#sqMyTeamAlertModalV4631 *::-webkit-scrollbar-track, #dcQuickMatchModal *::-webkit-scrollbar-track, #commentModal *::-webkit-scrollbar-track {",
+        "#sqMyTeamAlertModalV4631 *::-webkit-scrollbar-track, #dcQuickMatchModal *::-webkit-scrollbar-track, #commentModal *::-webkit-scrollbar-track, #post-modal *::-webkit-scrollbar-track {",
         "  background: #0b1120;",
         "}",
-        "#sqMyTeamAlertModalV4631 *::-webkit-scrollbar-thumb, #dcQuickMatchModal *::-webkit-scrollbar-thumb, #commentModal *::-webkit-scrollbar-thumb {",
+        "#sqMyTeamAlertModalV4631 *::-webkit-scrollbar-thumb, #dcQuickMatchModal *::-webkit-scrollbar-thumb, #commentModal *::-webkit-scrollbar-thumb, #post-modal *::-webkit-scrollbar-thumb {",
         "  background: #334155; border-radius: 9999px;",
         "}",
         "#clear-tag-btn, button[id*='reset'], button[id*='clear'], .sq-nowrap-btn-v4637 {",
@@ -15628,13 +15749,14 @@ _FRONTEND_V22_JS = r'''
         }
       });
 
-      // 2) Default `#sqTop20BoxV40` (`화제성 TOP 20`) to compact 1-line folded bar on initial boot so feed reaches Above-the-Fold
+      // 2) Default `#sqTop20BoxV40` (`화제성 TOP 20`) to compact 1-line folded bar AND keep button label (`TOP 20 펼치기 ▼` / `접기 ▲`) 100% synced!
       var top20Box = document.getElementById("sqTop20BoxV40");
-      if (top20Box && !top20Box.hasAttribute("data-sq-v4637-init-folded")) {
-        top20Box.setAttribute("data-sq-v4637-init-folded", "1");
-        top20Box.setAttribute("data-sq-top20-folded", "1");
-        var foldBtn = document.getElementById("sqTop20HdrFoldBtn");
-        if (foldBtn) foldBtn.textContent = "TOP 20 펼치기 ▼";
+      if (top20Box) {
+        if (!top20Box.hasAttribute("data-sq-v4637-init-folded")) {
+          top20Box.setAttribute("data-sq-v4637-init-folded", "1");
+          top20Box.setAttribute("data-sq-top20-folded", "1");
+        }
+        syncTop20FoldButtonLabelV4638(top20Box);
       }
 
       // 3) Trim excess hero vertical padding slightly while keeping all badges/buttons intact
@@ -15648,19 +15770,11 @@ _FRONTEND_V22_JS = r'''
       }
     }
 
-    // 4) Scroll-smart floating dock: auto-collapse into compact `⚡ IQ ▴` pill when scrolling down > 220px
+    // 4) Scroll-smart floating dock: auto-collapse BOTH `IQ중계티비` and `AI 아이큐` into compact `⚡ IQ ▴` pill when scrolling down > 220px
     if (!window.__sqScrollSmartDockInstalledV4637) {
       window.__sqScrollSmartDockInstalledV4637 = true;
       var syncScrollDock = function () {
         if (!document.body) return;
-        var minBtn = document.getElementById("sqFloatingDockMinBtnV382");
-        if (minBtn && !minBtn.hasAttribute("data-sq-pin-bound-v4637")) {
-          minBtn.setAttribute("data-sq-pin-bound-v4637", "1");
-          minBtn.addEventListener("click", function () {
-            window.__sqDockUserToggledV4637 = true;
-            document.body.removeAttribute("data-sq-scroll-slim-dock");
-          });
-        }
         if (window.__sqDockUserToggledV4637) return;
         var y = window.pageYOffset || document.documentElement.scrollTop || 0;
         var userSavedMin = false;
@@ -15670,16 +15784,12 @@ _FRONTEND_V22_JS = r'''
         if (y > 220) {
           if (document.body.getAttribute("data-sq-scroll-slim-dock") !== "1") {
             document.body.setAttribute("data-sq-scroll-slim-dock", "1");
-            if (minBtn) {
-              minBtn.setAttribute("data-sq-mode", "min");
-              minBtn.textContent = "⚡ IQ ▴";
-              minBtn.title = "IQ중계티비 · AI 아이큐 검색 펼치기";
-            }
+            try { harmonizeMobileFloatingOverlaysV26(); } catch (eHm1) {}
           }
         } else if (y < 120) {
           if (document.body.getAttribute("data-sq-scroll-slim-dock") === "1") {
             document.body.removeAttribute("data-sq-scroll-slim-dock");
-            try { harmonizeMobileFloatingOverlaysV26(); } catch (eHm) {}
+            try { harmonizeMobileFloatingOverlaysV26(); } catch (eHm2) {}
           }
         }
       };
@@ -17547,7 +17657,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46370_{int(time.time())}"
+_BOOT_VER_V30 = f"46380_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -28560,6 +28670,7 @@ def get_single_post_detail_v4637(post_id: str):
 @router.get("/api/member/live-sources-diag-v4635")
 @router.get("/api/member/live-sources-diag-v4636")
 @router.get("/api/member/live-sources-diag-v4637")
+@router.get("/api/member/live-sources-diag-v4638")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -28572,7 +28683,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.37",
+        "version": "v4.6.38",
         "ux_pwa_v4637": {
             "post_detail_api": True,
             "mobile_popstate_guard": True,
