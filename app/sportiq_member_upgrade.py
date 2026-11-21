@@ -5742,6 +5742,9 @@ def _award_ai_search_bonus_if_eligible(nickname: str, pin: str, query: str) -> T
         return 0, None
 
 
+_AI_IQ_TRENDING_PII_RE = re.compile(r"@|https?://|www\.|\d{3,}[-\s.]?\d{3,}|\d{6,}")
+
+
 @upgrade_router.get("/api/ai-iq/trending")
 def get_ai_iq_trending():
     def _op() -> List[str]:
@@ -5750,13 +5753,19 @@ def get_ai_iq_trending():
                 """
                 SELECT MIN(query) AS q, COUNT(*) AS cnt, MAX(created_at) AS last_ts
                 FROM ai_iq_search_logs
-                WHERE length(norm_query) >= 2
+                WHERE length(norm_query) >= 2 AND length(norm_query) <= 30
                 GROUP BY norm_query
+                HAVING COUNT(*) >= 3 AND MAX(result_count) > 0
                 ORDER BY cnt DESC, last_ts DESC
                 LIMIT 8
                 """
             ).fetchall()
-            popular = [r["q"] for r in rows if r["q"]]
+            # 공개 추천어에는 여러 번 검색되고 결과가 있었던 검색어만 노출한다.
+            # 한 사람이 입력한 원문(이메일·전화번호 등)이 그대로 공개되지 않도록 한다.
+            popular = [
+                r["q"] for r in rows
+                if r["q"] and not _AI_IQ_TRENDING_PII_RE.search(r["q"])
+            ]
             for st in _AI_IQ_STARTER_TRENDS:
                 if len(popular) >= 8:
                     break
