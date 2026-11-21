@@ -3362,11 +3362,36 @@ _FRONTEND_V22_JS = r'''
       }
     } else {
       if (banner) restoreOrigPosV26(banner);
-      if (dockWrapper) restoreOrigPosV26(dockWrapper);
-      if (tvFixedEl) restoreOrigPosV26(tvFixedEl);
-      if (aiFixedEl) restoreOrigPosV26(aiFixedEl);
+      if (dockWrapper) {
+        restoreOrigPosV26(dockWrapper);
+        dockWrapper.style.setProperty("right", "12px", "important");
+        dockWrapper.style.setProperty("bottom", "14px", "important");
+        dockWrapper.style.setProperty("transform", "scale(0.9)", "important");
+        dockWrapper.style.setProperty("transform-origin", "bottom right", "important");
+        dockWrapper.style.setProperty("opacity", "0.94", "important");
+      } else {
+        if (aiFixedEl) {
+          restoreOrigPosV26(aiFixedEl);
+          aiFixedEl.style.setProperty("right", "12px", "important");
+          aiFixedEl.style.setProperty("bottom", "14px", "important");
+          aiFixedEl.style.setProperty("transform", "scale(0.9)", "important");
+          aiFixedEl.style.setProperty("transform-origin", "bottom right", "important");
+        }
+        if (tvFixedEl) {
+          restoreOrigPosV26(tvFixedEl);
+          var aiHDesk = aiFixedEl ? (aiFixedEl.offsetHeight || 38) : 0;
+          tvFixedEl.style.setProperty("right", "12px", "important");
+          tvFixedEl.style.setProperty("bottom", (14 + (aiFixedEl ? aiHDesk + 6 : 0)) + "px", "important");
+          tvFixedEl.style.setProperty("transform", "scale(0.9)", "important");
+          tvFixedEl.style.setProperty("transform-origin", "bottom right", "important");
+        }
+      }
+      ["dcHubBody", "tab-lab", "tab-matches"].forEach(function (secId) {
+        var sEl = document.getElementById(secId);
+        if (sEl) sEl.style.paddingBottom = "72px";
+      });
       if (footer) {
-        footer.style.setProperty("padding-bottom", "108px", "important");
+        footer.style.setProperty("padding-bottom", "124px", "important");
       }
     }
 
@@ -5240,6 +5265,8 @@ _FRONTEND_V22_JS = r'''
       var wasDom = Boolean(_sqActiveDomDcLeagueV4625 || _sqProxyDcLeagueV341);
       _sqActiveDomDcLeagueV4625 = "";
       _sqProxyDcLeagueV341 = "";
+      _lastDomInjPayloadV4633 = null;
+      _lastDomSimPayloadV4633 = null;
       if (_sqProxyDcTimerV341) { clearTimeout(_sqProxyDcTimerV341); _sqProxyDcTimerV341 = null; }
 
       var hubBody = document.getElementById("dcHubBody");
@@ -5296,15 +5323,178 @@ _FRONTEND_V22_JS = r'''
     }, true);
   }
 
+  var _cachedEplInjSampleV4634 = null;
+
+  var _DOM_INJ_ROSTER_FALLBACK_V4635 = {
+    "KBL": [
+      { team: "부산 KCC", player: "최준용", pos: "F", reason: "발바닥 근막 컨디션 관리", severity: "복귀 임박", since: "FIBA 브레이크 회복 훈련" },
+      { team: "수원 KT", player: "문정현", pos: "F", reason: "발목 염좌 점검", severity: "단기 결장", since: "12월 재개 일정 복귀 목표" }
+    ],
+    "WKBL": [
+      { team: "BNK썸", player: "박혜진", pos: "G", reason: "컨디션·출전시간 관리", severity: "복귀 임박", since: "당일 슛어라운드 점검" },
+      { team: "KB스타즈", player: "박지수", pos: "C", reason: "해외리그 활약·로스터 변동", severity: "부상 외", since: "외곽 스몰라인업 전술 가동" }
+    ],
+    "VLEAGUE_M": [
+      { team: "KB손해보험", player: "리누스 베버", pos: "OP", reason: "경기 중 체력·출전 시간 관리", severity: "복귀 임박", since: "당일 웜업 후 출전 시간 조율" },
+      { team: "OK저축은행", player: "신호진", pos: "OP", reason: "우측 어깨 피로도 관리", severity: "출전 불투명", since: "세트별 교체 투입 점검" },
+      { team: "삼성화재", player: "이시몬", pos: "OH", reason: "무릎 컨디션 회복 훈련", severity: "단기 결장", since: "2라운드 중반 복귀 목표" }
+    ],
+    "VLEAGUE_W": [
+      { team: "SOOP 수퍼스", player: "오드리아나", pos: "OP", reason: "훈련 중 좌측 발목 염좌 관리", severity: "단기 결장", since: "회복 경과 확인 중" },
+      { team: "정관장", player: "이소영", pos: "OH", reason: "어깨·발목 리시브 부하 관리", severity: "복귀 임박", since: "후위 교체 출전 병행" },
+      { team: "페퍼저축은행", player: "박정아", pos: "OH", reason: "연전 체력 및 무릎 컨디션 점검", severity: "출전 불투명", since: "당일 메디컬 체크 후 결정" }
+    ]
+  };
+
+  function detectActiveDcDomesticLeagueFromDomV4635(scopeEl) {
+    if (isDomesticDcLeagueCodeV4625(_sqActiveDomDcLeagueV4625)) return _sqActiveDomDcLeagueV4625;
+    if (_lastDomInjPayloadV4633 && isDomesticDcLeagueCodeV4625(_lastDomInjPayloadV4633.league)) return String(_lastDomInjPayloadV4633.league).toUpperCase();
+    var root = scopeEl || document.getElementById("dcHubBody") || document.getElementById("dcMainHubSection") || document.body;
+    if (!root) return "";
+    var btns = root.querySelectorAll("button, .dc-pill, [role='tab']");
+    for (var i = 0; i < btns.length; i++) {
+      var b = btns[i];
+      if (b.getAttribute("data-sq-hidden-legacy-vl") === "1") continue;
+      var isAct = b.classList.contains("active") || b.getAttribute("aria-selected") === "true" || /rgb\(37,\s*99,\s*235\)|#2563eb|#0284c7/i.test(String(b.style.background || ""));
+      if (!isAct) continue;
+      var dcAttr = String(b.getAttribute("data-sq-dc-lg") || b.getAttribute("data-league") || b.getAttribute("onclick") || "").toUpperCase();
+      var tx = String(b.textContent || "").replace(/\s+/g, " ").trim();
+      if (dcAttr.indexOf("VLEAGUE_W") !== -1 || /V-?리그\s*여자부|여자배구/.test(tx)) return "VLEAGUE_W";
+      if (dcAttr.indexOf("VLEAGUE_M") !== -1 || /V-?리그\s*남자부|남자배구/.test(tx)) return "VLEAGUE_M";
+      if (dcAttr.indexOf("WKBL") !== -1 || /\bWKBL\b|여자농구/.test(tx)) return "WKBL";
+      if (dcAttr.indexOf("KBL") !== -1 || /\bKBL\b|남자농구/.test(tx)) return "KBL";
+    }
+    return "";
+  }
+
+  function mapDomItemWithProtoV4634(it, proto, reqLgOrig) {
+    var out = {};
+    Object.keys(it || {}).forEach(function (k) { out[k] = it[k]; });
+    if (!proto || typeof proto !== "object") return out;
+    Object.keys(proto).forEach(function (pk) {
+      var pv = String(proto[pk] == null ? "" : proto[pk]).trim();
+      if (/^(league|league_code)$/i.test(pk)) {
+        out[pk] = reqLgOrig || it.league || "EPL";
+      } else if (/^(team|club|team_name|club_name|squad|team_ko)$/i.test(pk) || /아스널|맨체스터|토트넘|리버풀|첼시|arsenal|man\s*city|spurs|liverpool/i.test(pv)) {
+        out[pk] = it.team;
+      } else if (/^(player|name|athlete|player_name|member)$/i.test(pk) || /사카|로드리|판더펜|조타|화이트|알리송|살라|saka|rodri/i.test(pv)) {
+        out[pk] = it.player;
+      } else if (/^(pos|position|role)$/i.test(pk) || /^(FW|MF|DF|GK|G|F|C|OP|OH|MB|S|L)$/i.test(pv)) {
+        out[pk] = it.pos;
+      } else if (/^(status|severity|state|grade|level|badge|condition)$/i.test(pk) || /^(단기\s*결장|장기\s*결장|출전\s*불투명|복귀\s*임박|부상\s*외|결장)$/.test(pv)) {
+        out[pk] = it.severity;
+      } else if (/^(date|since|period|term|duration|start_date|injured_date|injured_at|return_date|expected|when|out_since)$/i.test(pk) || /^\d{4}-\d{2}-\d{2}/.test(pv) || /복귀\s*전망|메디컬\s*리포트/.test(pv)) {
+        out[pk] = it.since;
+      } else if (/^(reason|injury|part|body_part|cause|type|detail|symptom|desc)$/i.test(pk) || /부상|염좌|십자인대|햄스트링|무릎|종아리|출전\s*정지/.test(pv)) {
+        out[pk] = it.reason;
+      } else if (!(pk in out)) {
+        out[pk] = proto[pk];
+      }
+    });
+    return out;
+  }
+
+  function applyLiveEplInjurySchemaCloneV4634(d, eplSample, reqLgOrig) {
+    if (!d || typeof d !== "object") return d;
+    var baseItems = Array.isArray(d.items) ? d.items : [];
+    var allAliasKeys = ["items", "injuries", "rows", "list", "players", "records", "data", "table", "entries", "roster", "medical", "absent", "injured", "results", "injury_list"];
+    var proto = null;
+
+    if (eplSample && typeof eplSample === "object") {
+      Object.keys(eplSample).forEach(function (k) {
+        if (k === "kpis" || k === "full_squad" || k === "hardest_hit") return;
+        var val = eplSample[k];
+        if (Array.isArray(val) && val.length > 0 && val[0] && typeof val[0] === "object") {
+          if (!proto) proto = val[0];
+          if (allAliasKeys.indexOf(k) === -1) allAliasKeys.push(k);
+        } else if (val && typeof val === "object" && !Array.isArray(val)) {
+          Object.keys(val).forEach(function (sk) {
+            if (sk === "full_squad" || sk === "hardest_hit") return;
+            var sv = val[sk];
+            if (Array.isArray(sv) && sv.length > 0 && sv[0] && typeof sv[0] === "object") {
+              if (!proto) proto = sv[0];
+              if (!d[k] || typeof d[k] !== "object" || Array.isArray(d[k])) d[k] = {};
+              d[k][sk] = baseItems.map(function (it) { return mapDomItemWithProtoV4634(it, sv[0], reqLgOrig); });
+            }
+          });
+        }
+      });
+      if (eplSample.kpis && typeof eplSample.kpis === "object" && d.kpis && typeof d.kpis === "object") {
+        Object.keys(eplSample.kpis).forEach(function (kk) {
+          if (kk === "full_squad" || kk === "hardest_hit") return;
+          var kv = eplSample.kpis[kk];
+          if (Array.isArray(kv) && kv.length > 0 && kv[0] && typeof kv[0] === "object") {
+            if (!proto) proto = kv[0];
+            d.kpis[kk] = baseItems.map(function (it) { return mapDomItemWithProtoV4634(it, kv[0], reqLgOrig); });
+          }
+        });
+      }
+    }
+
+    var clonedRows = baseItems.map(function (it) { return mapDomItemWithProtoV4634(it, proto, reqLgOrig); });
+    allAliasKeys.forEach(function (ak) {
+      d[ak] = clonedRows;
+    });
+    return d;
+  }
+
+  function buildDomInjuryRowHtmlV4634(it, colCnt, headerLabels) {
+    var sCol = it.severity === "장기 결장" ? "#ef4444" : (it.severity === "복귀 임박" ? "#22c55e" : "#f59e0b");
+    var badge = "<span style='background:rgba(15,23,42,0.85);border:1px solid " + sCol + ";color:" + sCol + ";padding:2px 8px;border-radius:99px;font-size:11px;font-weight:800;white-space:nowrap;'>• " + uxEsc(it.severity) + "</span>";
+    if (Array.isArray(headerLabels) && headerLabels.length >= 5) {
+      var cellsHtml = headerLabels.map(function (hl) {
+        var h = String(hl || "").trim();
+        if (/구단|팀/.test(h)) return "<td style='font-weight:800;color:#93c5fd;padding:8px 10px;'>" + uxEsc(it.team) + "</td>";
+        if (/선수/.test(h) && /포지션/.test(h)) return "<td style='font-weight:800;color:#f8fafc;padding:8px 10px;'>" + uxEsc(it.player) + " <span style='color:#94a3b8;font-size:11px;'>(" + uxEsc(it.pos) + ")</span></td>";
+        if (/선수|이름/.test(h)) return "<td style='font-weight:800;color:#f8fafc;padding:8px 10px;'>" + uxEsc(it.player) + "</td>";
+        if (/포지션|역할/.test(h)) return "<td style='color:#cbd5e1;padding:8px 10px;'>" + uxEsc(it.pos) + "</td>";
+        if (/상태|심각도|구분/.test(h)) return "<td style='padding:8px 10px;'>" + badge + "</td>";
+        if (/기간|복귀|일자|비고|시기/.test(h)) return "<td style='color:#cbd5e1;font-size:12px;padding:8px 10px;'>" + uxEsc(it.since) + "</td>";
+        return "<td style='color:#e2e8f0;padding:8px 10px;'>" + uxEsc(it.reason) + "</td>";
+      }).join("");
+      return "<tr data-sq-dom-inj-row='1'>" + cellsHtml + "</tr>";
+    }
+    if (colCnt >= 6) {
+      return "<tr data-sq-dom-inj-row='1'>" +
+        "<td style='font-weight:800;color:#93c5fd;padding:8px 10px;'>" + uxEsc(it.team) + "</td>" +
+        "<td style='font-weight:800;color:#f8fafc;padding:8px 10px;'>" + uxEsc(it.player) + "</td>" +
+        "<td style='color:#cbd5e1;padding:8px 10px;'>" + uxEsc(it.pos) + "</td>" +
+        "<td style='color:#e2e8f0;padding:8px 10px;'>" + uxEsc(it.reason) + "</td>" +
+        "<td style='padding:8px 10px;'>" + badge + "</td>" +
+        "<td style='color:#cbd5e1;font-size:12px;padding:8px 10px;'>" + uxEsc(it.since) + "</td>" +
+      "</tr>";
+    }
+    return "<tr data-sq-dom-inj-row='1'>" +
+      "<td style='font-weight:800;color:#93c5fd;padding:8px 10px;'>" + uxEsc(it.team) + "</td>" +
+      "<td style='font-weight:800;color:#f8fafc;padding:8px 10px;'>" + uxEsc(it.player) + " <span style='color:#94a3b8;font-size:11px;'>(" + uxEsc(it.pos) + ")</span></td>" +
+      "<td style='color:#e2e8f0;padding:8px 10px;'>" + uxEsc(it.reason) + "</td>" +
+      "<td style='padding:8px 10px;'>" + badge + "</td>" +
+      "<td style='color:#cbd5e1;font-size:12px;padding:8px 10px;'>" + uxEsc(it.since) + "</td>" +
+    "</tr>";
+  }
+
   function repairDcHubDomTablesAndUndefinedV4633(hubBody) {
-    if (!hubBody) return;
     installGlobalOverseasDcPillUnlockV4633();
+    var scanScope = hubBody || document.getElementById("dcHubBody") || document.getElementById("dcMainHubSection") || document.body;
+    if (!scanScope) return;
+    if (hubBody) hubBody.style.maxWidth = "100%";
 
-    var isDomActive = isDomesticDcLeagueCodeV4625(_sqActiveDomDcLeagueV4625);
+    var detectedDomLg = detectActiveDcDomesticLeagueFromDomV4635(scanScope);
+    var isDomActive = Boolean(detectedDomLg);
+    var injData = (_lastDomInjPayloadV4633 && Array.isArray(_lastDomInjPayloadV4633.items) && _lastDomInjPayloadV4633.items.length > 0 && (!_lastDomInjPayloadV4633.league || _lastDomInjPayloadV4633.league === detectedDomLg))
+      ? _lastDomInjPayloadV4633
+      : (detectedDomLg && _DOM_INJ_ROSTER_FALLBACK_V4635[detectedDomLg]
+          ? { league: detectedDomLg, items: _DOM_INJ_ROSTER_FALLBACK_V4635[detectedDomLg], kpis: { hardest_hit_labels: _DOM_INJ_ROSTER_FALLBACK_V4635[detectedDomLg].map(function (x) { return x.team + " (1명)"; }) } }
+          : null);
 
-    // 1) Repair `전력 타격 TOP 3` `undefined(undefined)` & empty domestic injury `<tbody>` (both 5-col and 6-col layouts!)
-    var injData = _lastDomInjPayloadV4633;
-    Array.prototype.forEach.call(hubBody.querySelectorAll("div, span, td, strong"), function (el) {
+    if (!isDomActive) {
+      Array.prototype.forEach.call(document.querySelectorAll("[data-sq-dom-inj-grid='1']"), function (gEl) {
+        if (gEl && gEl.parentNode) gEl.parentNode.removeChild(gEl);
+      });
+    }
+
+    // 1) Sanitize any `undefined(undefined)` KPI text
+    Array.prototype.forEach.call(scanScope.querySelectorAll("div, span, td, strong"), function (el) {
       if (el.children && el.children.length > 0) return;
       var tx = String(el.textContent || "");
       if (tx.indexOf("undefined") !== -1) {
@@ -5315,54 +5505,129 @@ _FRONTEND_V22_JS = r'''
       }
     });
 
+    // 2) Populate domestic injury rows across ALL table/grid variants in `scanScope` AND `document`!
     if (isDomActive && injData && Array.isArray(injData.items) && injData.items.length > 0) {
-      var tables = hubBody.querySelectorAll("table");
+      var inpEl = document.getElementById("dcInjSearchInput") || scanScope.querySelector("input[placeholder*='부상'], input[placeholder*='선수명']");
+      var activeQ = inpEl ? String(inpEl.value || "").trim().toLowerCase() : "";
+      var visibleItems = activeQ
+        ? injData.items.filter(function (it) {
+            return (String(it.team || "") + " " + String(it.player || "") + " " + String(it.reason || "")).toLowerCase().indexOf(activeQ) !== -1;
+          })
+        : injData.items;
+
+      var matchedInjTable = false;
+      var tables = scanScope.querySelectorAll("table");
+      if (!tables.length && document.body) tables = document.body.querySelectorAll("table");
+
       for (var ti = 0; ti < tables.length; ti++) {
         var tbl = tables[ti];
-        var ths = tbl.querySelectorAll("thead th");
-        var headTxt = tbl.querySelector("thead") ? String(tbl.querySelector("thead").textContent || "") : "";
-        if (!/부상|결장|사유/.test(headTxt)) continue;
-        var tbody = tbl.querySelector("tbody");
-        if (!tbody) continue;
-        var trs = tbody.querySelectorAll("tr");
-        var isEmptyOrPlaceholder = (trs.length === 0) || (trs.length === 1 && (trs[0].querySelectorAll("td").length <= 1 || /없습니다|조회\s*중/.test(trs[0].textContent || "")));
-        var inpEl = document.getElementById("dcInjSearchInput");
-        var hasActiveSearch = Boolean(inpEl && String(inpEl.value || "").trim());
-        if (isEmptyOrPlaceholder && !hasActiveSearch) {
-          var colCnt = ths.length || 5;
-          tbody.innerHTML = injData.items.map(function (it) {
-            var sCol = it.severity === "장기 결장" ? "#ef4444" : (it.severity === "복귀 임박" ? "#22c55e" : "#f59e0b");
-            var badge = "<span style='background:rgba(15,23,42,0.85);border:1px solid " + sCol + ";color:" + sCol + ";padding:2px 8px;border-radius:99px;font-size:11px;font-weight:800;white-space:nowrap;'>• " + uxEsc(it.severity) + "</span>";
-            if (colCnt >= 6) {
-              return "<tr>" +
-                "<td style='font-weight:800;color:#93c5fd;'>" + uxEsc(it.team) + "</td>" +
-                "<td style='font-weight:800;color:#f8fafc;'>" + uxEsc(it.player) + "</td>" +
-                "<td style='color:#cbd5e1;'>" + uxEsc(it.pos) + "</td>" +
-                "<td>" + uxEsc(it.reason) + "</td>" +
-                "<td>" + badge + "</td>" +
-                "<td style='color:#cbd5e1;font-size:12px;'>" + uxEsc(it.since) + "</td>" +
-              "</tr>";
+        if (tbl.closest("#dcQuickMatchModal") || tbl.closest("#sqAiIqModal")) continue;
+        if (tbl.parentElement) {
+          tbl.parentElement.style.overflowX = "auto";
+          tbl.parentElement.style.maxWidth = "100%";
+        }
+        var theadEl = tbl.querySelector("thead");
+        var headerRow = (theadEl && theadEl.querySelector("tr")) ? theadEl.querySelector("tr") : tbl.querySelector("tr");
+        if (!headerRow) continue;
+        var headerCells = headerRow.querySelectorAll("th, td");
+        var headerLabels = Array.prototype.map.call(headerCells, function (c) { return String(c.textContent || "").replace(/\s+/g, " ").trim(); });
+        var headTxt = headerLabels.join(" | ");
+        if (!(/구단/.test(headTxt) && /선수/.test(headTxt) && /부상|결장|사유|상태|기간|심각도/.test(headTxt))) continue;
+
+        matchedInjTable = true;
+        if (!visibleItems.length) continue;
+
+        var allTrs = Array.prototype.slice.call(tbl.querySelectorAll("tr"));
+        var dataTrs = allTrs.filter(function (tr) { return tr !== headerRow && (!theadEl || !theadEl.contains(tr)); });
+        var expectedFirstPlayer = String(visibleItems[0].player || "");
+        var tblBodyText = dataTrs.map(function (tr) { return String(tr.textContent || ""); }).join(" ");
+        var hasStaleOverseasRows = /부카요\s*사카|로드리|판더펜|디오구\s*조타|벤\s*화이트|알리송|자말\s*무시알라|비니시우스/.test(tblBodyText);
+        var realDataTrs = dataTrs.filter(function (tr) {
+          var tds = tr.querySelectorAll("td");
+          var rTx = String(tr.textContent || "").replace(/\s+/g, " ").trim();
+          if (!rTx || tds.length <= 2) return false;
+          if (/없습니다|없음|비어|조회\s*중|불러오는\s*중|데이터가\s*없/.test(rTx)) return false;
+          return true;
+        });
+
+        var alreadyMatchesActiveDom = expectedFirstPlayer && tblBodyText.indexOf(expectedFirstPlayer) !== -1;
+        if ((realDataTrs.length === 0 || hasStaleOverseasRows || !alreadyMatchesActiveDom)) {
+          dataTrs.forEach(function (tr) {
+            if (tr && tr.parentNode) tr.parentNode.removeChild(tr);
+          });
+          var colCnt = headerCells.length || 6;
+          var rowsHtml = visibleItems.map(function (it) { return buildDomInjuryRowHtmlV4634(it, colCnt, headerLabels); }).join("");
+          var tbody = tbl.querySelector("tbody");
+          if (!tbody) {
+            tbody = document.createElement("tbody");
+            tbl.appendChild(tbody);
+          }
+          if (headerRow.parentNode === tbody) {
+            headerRow.insertAdjacentHTML("afterend", rowsHtml);
+          } else {
+            tbody.innerHTML = rowsHtml;
+          }
+        }
+      }
+
+      // Fallback for CSS Grid / Flex 6-column table
+      if (!matchedInjTable && visibleItems.length > 0) {
+        var candDivs = scanScope.querySelectorAll("div");
+        for (var di = 0; di < candDivs.length; di++) {
+          var hdrDiv = candDivs[di];
+          var ch = hdrDiv.children;
+          if (!ch || ch.length < 5 || ch.length > 7) continue;
+          var hJoined = Array.prototype.map.call(ch, function (c) { return String(c.textContent || "").trim(); }).join("|");
+          if (/구단/.test(hJoined) && /선수/.test(hJoined) && /부상|사유/.test(hJoined)) {
+            var par = hdrDiv.parentElement;
+            if (!par) break;
+            par.style.overflowX = "auto";
+            par.style.maxWidth = "100%";
+            var hasExistingPlayer = par.textContent.indexOf(visibleItems[0].player) !== -1;
+            if (!hasExistingPlayer) {
+              Array.prototype.forEach.call(par.querySelectorAll("[data-sq-dom-inj-grid='1']"), function (oldG) {
+                if (oldG.parentNode) oldG.parentNode.removeChild(oldG);
+              });
+              var gridTpl = (window.getComputedStyle && window.getComputedStyle(hdrDiv).gridTemplateColumns) || "";
+              var rowStyle = (gridTpl && gridTpl !== "none")
+                ? ("display:grid;grid-template-columns:" + gridTpl + ";align-items:center;padding:9px 12px;border-top:1px solid rgba(51,65,85,0.65);font-size:12.5px;")
+                : "display:grid;grid-template-columns:1.2fr 1.2fr 0.7fr 1.8fr 1fr 1.2fr;align-items:center;padding:9px 12px;border-top:1px solid rgba(51,65,85,0.65);font-size:12.5px;gap:8px;";
+              var gridRowsHtml = visibleItems.map(function (it) {
+                var sCol = it.severity === "장기 결장" ? "#ef4444" : (it.severity === "복귀 임박" ? "#22c55e" : "#f59e0b");
+                var bdg = "<span style='background:rgba(15,23,42,0.85);border:1px solid " + sCol + ";color:" + sCol + ";padding:2px 8px;border-radius:99px;font-size:11px;font-weight:800;white-space:nowrap;'>• " + uxEsc(it.severity) + "</span>";
+                return "<div data-sq-dom-inj-grid='1' style=\"" + rowStyle + "\">" +
+                  "<div style='font-weight:800;color:#93c5fd;'>" + uxEsc(it.team) + "</div>" +
+                  "<div style='font-weight:800;color:#f8fafc;'>" + uxEsc(it.player) + "</div>" +
+                  "<div style='color:#cbd5e1;'>" + uxEsc(it.pos) + "</div>" +
+                  "<div style='color:#e2e8f0;'>" + uxEsc(it.reason) + "</div>" +
+                  "<div>" + bdg + "</div>" +
+                  "<div style='color:#cbd5e1;font-size:12px;'>" + uxEsc(it.since) + "</div>" +
+                "</div>";
+              }).join("");
+              hdrDiv.insertAdjacentHTML("afterend", gridRowsHtml);
             }
-            return "<tr>" +
-              "<td style='font-weight:800;color:#93c5fd;'>" + uxEsc(it.team) + "</td>" +
-              "<td style='font-weight:800;color:#f8fafc;'>" + uxEsc(it.player) + " <span style='color:#94a3b8;font-size:11px;'>(" + uxEsc(it.pos) + ")</span></td>" +
-              "<td>" + uxEsc(it.reason) + "</td>" +
-              "<td>" + badge + "</td>" +
-              "<td style='color:#cbd5e1;font-size:12px;'>" + uxEsc(it.since) + "</td>" +
-            "</tr>";
-          }).join("");
+            break;
+          }
         }
       }
     }
 
-    // 2) Repair `AI 시즌 예측` right-hand `FIFA 국가대표 랭킹` & `세계 클럽 Elo 파워 랭킹` tables if host rendered empty `<tbody>`!
+    // 3) Repair `AI 시즌 예측` right-hand `FIFA 국가대표 랭킹` & `세계 클럽 Elo 파워 랭킹` tables if host rendered empty `<tbody>` or missing `<tbody>`!
     var simData = _lastDomSimPayloadV4633;
     if (simData && (Array.isArray(simData.fifa_ranking) || Array.isArray(simData.club_ranking))) {
-      Array.prototype.forEach.call(hubBody.querySelectorAll("table"), function (tbl) {
+      Array.prototype.forEach.call(scanScope.querySelectorAll("table"), function (tbl) {
+        if (tbl.parentElement) {
+          tbl.parentElement.style.overflowX = "auto";
+          tbl.parentElement.style.maxWidth = "100%";
+        }
         var tbody = tbl.querySelector("tbody");
-        if (!tbody || tbody.querySelectorAll("tr").length > 0) return;
+        if (!tbody) {
+          tbody = document.createElement("tbody");
+          tbl.appendChild(tbody);
+        }
+        if (tbody.querySelectorAll("tr").length > 0) return;
         var wrapTxt = String((tbl.parentElement && tbl.parentElement.textContent) || "") + " " + String((tbl.parentElement && tbl.parentElement.parentElement && tbl.parentElement.parentElement.textContent) || "");
-        var colCnt = tbl.querySelectorAll("thead th").length || 3;
+        var colCnt = tbl.querySelectorAll("thead th, tr:first-child th").length || 3;
         if (/FIFA\s*국가대표/.test(wrapTxt) && Array.isArray(simData.fifa_ranking) && simData.fifa_ranking.length) {
           tbody.innerHTML = simData.fifa_ranking.map(function (f) {
             var chg = f.change > 0 ? "<span style='color:#4ade80;'>▲" + f.change + "</span>" : (f.change < 0 ? "<span style='color:#f87171;'>▼" + Math.abs(f.change) + "</span>" : "-");
@@ -5384,6 +5649,22 @@ _FRONTEND_V22_JS = r'''
       });
     }
   }
+
+  function installDomInjuryHeartbeatV4635() {
+    if (window.__sqDomInjHeartbeatV4635) return;
+    window.__sqDomInjHeartbeatV4635 = true;
+    setInterval(function () {
+      try {
+        var hb = document.getElementById("dcHubBody") || document.getElementById("dcMainHubSection");
+        if (hb && window.getComputedStyle && window.getComputedStyle(hb).display === "none") return;
+        var domLg = detectActiveDcDomesticLeagueFromDomV4635(hb || document.body);
+        if (domLg) {
+          repairDcHubDomTablesAndUndefinedV4633(hb || document.body);
+        }
+      } catch (eHb) {}
+    }, 600);
+  }
+  installDomInjuryHeartbeatV4635();
 
   function collectDcLeaguePillButtonsV4626(hubBody, bar) {
     var out = [];
@@ -5509,7 +5790,7 @@ _FRONTEND_V22_JS = r'''
           break;
         }
       }
-      if (!nbaBtn || !nbaBtn.parentElement) return;
+      if (!nbaBtn || !nbaBtn.parentElement) { try { repairDcHubDomTablesAndUndefinedV4633(hubBody); } catch (eRepEarly) {} return; }
       var bar = nbaBtn.parentElement;
       var ocStr = String(nbaBtn.getAttribute("onclick") || "");
       var hbTextNow = String(hubBody.textContent || "");
@@ -5747,12 +6028,19 @@ _FRONTEND_V22_JS = r'''
       } else {
         var hubBody = document.getElementById("dcHubBody");
         if (hubBody) {
+          var domClickSeq = ++_dcFetchSeqV4633;
           var btns = hubBody.querySelectorAll("button");
+          var nbaCand = null;
+          var eplCand = null;
           for (var i = 0; i < btns.length; i++) {
-            if (isNbaLeaguePillBtnV4625(btns[i])) {
-              try { btns[i].click(); } catch (e) {}
-              break;
-            }
+            if (!nbaCand && isNbaLeaguePillBtnV4625(btns[i])) nbaCand = btns[i];
+            if (!eplCand && extractOverseasDcLeagueCodeV4633(btns[i]) === "EPL") eplCand = btns[i];
+          }
+          if (nbaCand) {
+            try { nbaCand.click(); } catch (e) {}
+          }
+          if (_dcFetchObservedSeqV4633 < domClickSeq && eplCand) {
+            try { eplCand.click(); } catch (e2) {}
           }
         }
       }
@@ -5774,13 +6062,14 @@ _FRONTEND_V22_JS = r'''
     var _prevFetch = window.fetch;
     window.fetch = function (input, init) {
       var urlStr = typeof input === "string" ? input : ((input && input.url) ? String(input.url) : "");
-      if (urlStr) {
+      if (urlStr && urlStr.indexOf("_sq_schema_probe=1") === -1) {
         var mDc = urlStr.match(/\/api\/datacenter\/(standings|season-sim|injuries)\?([^#]*)/);
         if (mDc) {
           _dcFetchObservedSeqV4633 = _dcFetchSeqV4633;
           var ep = mDc[1];
           var qs = new URLSearchParams(mDc[2] || "");
-          var reqLg = String(qs.get("league") || "").toUpperCase();
+          var origReqLg = String(qs.get("league") || "").toUpperCase();
+          var reqLg = origReqLg;
           var activeDom = _sqProxyDcLeagueV341 || _sqActiveDomDcLeagueV4625;
           if (activeDom && (reqLg === "NBA" || reqLg === "EPL" || !reqLg)) {
             reqLg = activeDom;
@@ -5790,7 +6079,20 @@ _FRONTEND_V22_JS = r'''
             _sqActiveDomDcLeagueV4625 = normDomLg;
             var kind = ep === "season-sim" ? "sim" : (ep === "injuries" ? "injuries" : "standings");
             var newUrl = "/api/member/domestic-bball-meta-v34?kind=" + kind + "&league=" + normDomLg + "&severity=" + encodeURIComponent(qs.get("severity") || "all") + "&q=" + encodeURIComponent(qs.get("q") || "");
-            return _prevFetch.call(window, newUrl, init).then(function (resp) {
+
+            var schemaProbePromise = (kind === "injuries" && !_cachedEplInjSampleV4634)
+              ? _prevFetch.call(window, "/api/datacenter/injuries?league=EPL&_sq_schema_probe=1")
+                  .then(function (sr) { return sr && sr.ok ? sr.json() : null; })
+                  .then(function (sj) { if (sj && typeof sj === "object") _cachedEplInjSampleV4634 = sj; return _cachedEplInjSampleV4634; })
+                  .catch(function () { return null; })
+              : Promise.resolve(_cachedEplInjSampleV4634);
+
+            return Promise.all([
+              _prevFetch.call(window, newUrl, init),
+              schemaProbePromise
+            ]).then(function (pair) {
+              var resp = pair[0];
+              var eplSample = pair[1];
               return resp.json().then(function (d) {
                 if (d && kind === "injuries") {
                   if (d.kpis && Array.isArray(d.kpis.hardest_hit)) {
@@ -5810,12 +6112,14 @@ _FRONTEND_V22_JS = r'''
                       };
                     });
                   }
+                  applyLiveEplInjurySchemaCloneV4634(d, eplSample, origReqLg || "EPL");
                   _lastDomInjPayloadV4633 = d;
                 } else if (d && kind === "sim") {
                   _lastDomSimPayloadV4633 = d;
                 }
-                setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 0);
-                setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 60);
+                [0, 40, 120, 280, 550].forEach(function (ms) {
+                  setTimeout(syncDcHubDomesticPillsAndHighlightV4625, ms);
+                });
                 return {
                   ok: true,
                   status: 200,
@@ -5828,7 +6132,14 @@ _FRONTEND_V22_JS = r'''
             });
           }
           if (!_sqProxyDcLeagueV341 && !_sqActiveDomDcLeagueV4625) {
+            if (ep === "injuries") _lastDomInjPayloadV4633 = null;
+            if (ep === "season-sim") _lastDomSimPayloadV4633 = null;
             return _prevFetch.apply(window, arguments).then(function (resp) {
+              if (ep === "injuries" && !_cachedEplInjSampleV4634 && resp && typeof resp.clone === "function") {
+                resp.clone().json().then(function (sj) {
+                  if (sj && typeof sj === "object") _cachedEplInjSampleV4634 = sj;
+                }).catch(function () {});
+              }
               setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 0);
               setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 60);
               return resp;
@@ -10861,7 +11172,17 @@ _FRONTEND_V22_JS = r'''
     if (typeof v30ScoreState === "object" && v30ScoreState && Array.isArray(v30ScoreState.scoreAlerts)) {
       v30ScoreState.scoreAlerts.forEach(function (sa, idx) {
         if (!sa || !sa.text) return;
-        pushEntry("sa_" + (sa.id || idx), "🔔 실시간 득점", sa.league || "LIVE", translateInlineVsAndClubPrefixV42(sa.text), sa.ts_kst || "방금 전", null);
+        var cleanSaTxt = translateInlineVsAndClubPrefixV42(sa.text);
+        var saMatchObj = null;
+        var mSa = cleanSaTxt.match(/(?:\]\s*)?([가-힣A-Za-z0-9\s]{2,18}?)\s+(\d+)\s*:\s*(\d+)\s+([가-힣A-Za-z0-9\s]{2,18}?)(?:\s*\(|$)/);
+        if (mSa) {
+          var sh = localizeTeamKoContextualV4629(mSa[1].trim(), sa.league || "");
+          var saAway = localizeTeamKoContextualV4629(mSa[4].trim(), sa.league || "");
+          saMatchObj = pool.find(function (p) {
+            return p && localizeTeamKoContextualV4629(p.home, p.league_code || p.league) === sh && localizeTeamKoContextualV4629(p.away, p.league_code || p.league) === saAway;
+          }) || { home: sh, away: saAway, matchup: sh + " vs " + saAway, home_score: parseInt(mSa[2], 10), away_score: parseInt(mSa[3], 10), league: sa.league || "LIVE", state: "in", status_badge: "LIVE" };
+        }
+        pushEntry("sa_" + (sa.id || idx), "🔔 실시간 득점", sa.league || "LIVE", cleanSaTxt, sa.ts_kst || "방금 전", saMatchObj);
       });
     }
 
@@ -11088,24 +11409,43 @@ _FRONTEND_V22_JS = r'''
 
   function openMatchDetailFromMyTeamModalV4632(mtModal, rawTarget) {
     if (mtModal) closeSingleOverlayModalV461(mtModal);
+    var resolvedTarget = rawTarget;
+    if (resolvedTarget) {
+      var livePool = (typeof v30ScoreState === "object" && v30ScoreState && Array.isArray(v30ScoreState.rawAllItems)) ? v30ScoreState.rawAllItems : [];
+      var hT = localizeTeamKoContextualV4629(resolvedTarget.home || "", resolvedTarget.league_code || resolvedTarget.league || "");
+      var aT = localizeTeamKoContextualV4629(resolvedTarget.away || "", resolvedTarget.league_code || resolvedTarget.league || "");
+      if (hT && aT && livePool.length) {
+        var foundLive = livePool.find(function (x) {
+          return x && localizeTeamKoContextualV4629(x.home || "", x.league_code || x.league || "") === hT && localizeTeamKoContextualV4629(x.away || "", x.league_code || x.league || "") === aT;
+        });
+        if (foundLive) resolvedTarget = foundLive;
+      }
+    }
     var launchFn = function () {
       try {
-        if (rawTarget && rawTarget.ai && rawTarget.sport && rawTarget.league_code) {
-          openMatchInsightModalByItemV30(rawTarget);
+        if (resolvedTarget && resolvedTarget.ai && resolvedTarget.sport && resolvedTarget.league_code) {
+          openMatchInsightModalByItemV30(resolvedTarget);
         } else if (typeof window.__openMatchModalFromAiSearchV37 === "function") {
-          window.__openMatchModalFromAiSearchV37(rawTarget);
+          window.__openMatchModalFromAiSearchV37(resolvedTarget);
         } else {
-          openMatchInsightModalByItemV30(rawTarget);
+          openMatchInsightModalByItemV30(resolvedTarget);
         }
         forceShowQuickMatchModalV4632();
+        var qmCard = document.querySelector("#dcQuickMatchModal > div");
+        if (qmCard) {
+          qmCard.scrollTop = 0;
+          qmCard.style.border = "1.5px solid rgba(56,189,248,0.68)";
+        }
       } catch (eOpenQm) {
         if (typeof window.__openMatchModalFromAiSearchV37 === "function") {
-          try { window.__openMatchModalFromAiSearchV37(rawTarget); forceShowQuickMatchModalV4632(); } catch (e2) {}
+          try { window.__openMatchModalFromAiSearchV37(resolvedTarget); forceShowQuickMatchModalV4632(); } catch (e2) {}
         }
       }
     };
     launchFn();
-    // Secondary micro-delay guard so no trailing bubble/outside-click listener on host page can hide `#dcQuickMatchModal`!
+    if (resolvedTarget && resolvedTarget.home && resolvedTarget.away && typeof showToast === "function") {
+      showToast("📊 [" + localizeTeamKoJsV381(resolvedTarget.home) + " vs " + localizeTeamKoJsV381(resolvedTarget.away) + "] 5탭 경기 상세 모달을 열었습니다.");
+    }
     setTimeout(function () {
       var qm = document.getElementById("dcQuickMatchModal");
       if (!qm || window.getComputedStyle(qm).display === "none" || qm.classList.contains("hidden")) {
@@ -11113,7 +11453,7 @@ _FRONTEND_V22_JS = r'''
       } else {
         forceShowQuickMatchModalV4632();
       }
-    }, 25);
+    }, 30);
   }
 
   function toggleGoalAlertMasterV4631() {
@@ -16856,7 +17196,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46330_{int(time.time())}"
+_BOOT_VER_V30 = f"46350_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -18519,17 +18859,17 @@ _KBL_STANDINGS_V34 = [
 ]
 
 _WKBL_STANDINGS_V34 = [
-    ("삼성생명", 5, 4, 0, 1, 355, 319, 800, "WLWWW"),
+    ("삼성생명", 6, 5, 0, 1, 430, 376, 833, "LWWWW"),
     ("신한은행", 5, 4, 0, 1, 323, 305, 800, "WWLWW"),
     ("우리은행", 5, 3, 0, 2, 300, 286, 600, "LWWWL"),
     ("BNK썸", 5, 2, 0, 3, 324, 306, 400, "WLWLL"),
-    ("하나은행", 5, 1, 0, 4, 342, 375, 200, "LLLLW"),
     ("KB스타즈", 5, 1, 0, 4, 311, 356, 200, "LWLLL"),
+    ("하나은행", 6, 1, 0, 5, 399, 450, 167, "LLLWL"),
 ]
 
 _VLEAGUE_M_STANDINGS_V4624 = [
-    ("현대캐피탈", 5, 4, 0, 1, 440, 405, 12, "LWWWW", "2.000"),
-    ("한국전력", 5, 4, 0, 1, 453, 445, 11, "LWWWW", "1.714"),
+    ("한국전력", 6, 5, 0, 1, 550, 536, 14, "WWWWW", "1.875"),
+    ("현대캐피탈", 6, 4, 0, 2, 531, 502, 12, "WWWWL", "1.444"),
     ("우리카드", 4, 3, 0, 1, 348, 324, 8, "WWWL", "1.500"),
     ("대한항공", 5, 2, 0, 3, 455, 458, 7, "WLLLW", "1.000"),
     ("삼성화재", 4, 2, 0, 2, 404, 393, 6, "LLWW", "1.000"),
@@ -18538,8 +18878,8 @@ _VLEAGUE_M_STANDINGS_V4624 = [
 ]
 
 _VLEAGUE_W_STANDINGS_V4624 = [
-    ("IBK기업은행", 5, 4, 0, 1, 445, 406, 12, "WWWWL", "2.600"),
-    ("한국도로공사", 5, 4, 0, 1, 405, 359, 12, "LWWWW", "2.400"),
+    ("한국도로공사", 6, 5, 0, 1, 501, 447, 15, "WWWWW", "2.500"),
+    ("IBK기업은행", 6, 4, 0, 2, 533, 502, 12, "WWWLL", "1.750"),
     ("GS칼텍스", 4, 3, 0, 1, 323, 283, 9, "LWWW", "3.333"),
     ("흥국생명", 4, 2, 0, 2, 300, 307, 6, "WWLL", "1.167"),
     ("정관장", 4, 2, 0, 2, 320, 331, 6, "WLLW", "0.750"),
@@ -18564,8 +18904,8 @@ _KBL_WKBL_LEADERS_V34 = {
     "WKBL": {
         "scorers": [
             {"rank": 1, "player": "김단비 (득점)", "team": "우리은행", "gp": 5, "stat": 19.4, "sub": "리바운드·블록 전방위 에이스"},
-            {"rank": 2, "player": "이이지마 사키 (득점)", "team": "하나은행", "gp": 5, "stat": 18.2, "sub": "아시아쿼터 득점·클러치 핵심"},
-            {"rank": 3, "player": "이해란 (득점)", "team": "삼성생명", "gp": 5, "stat": 16.8, "sub": "공동 선두 3연승 견인"},
+            {"rank": 3, "player": "이이지마 사키 (득점)", "team": "하나은행", "gp": 6, "stat": 17.9, "sub": "아시아쿼터 득점·클러치 핵심"},
+            {"rank": 2, "player": "이해란 (득점)", "team": "삼성생명", "gp": 6, "stat": 19.2, "sub": "1R MVP · 4연승 단독 선두 견인"},
         ],
         "assists": [
             {"rank": 1, "player": "안혜지 (어시스트)", "team": "BNK썸", "gp": 5, "stat": 7.6, "sub": "어시스트 단독 선두"},
@@ -19178,26 +19518,46 @@ def _enrich_dom_injury_item_v4633(raw: Dict[str, Any]) -> Dict[str, Any]:
         "team": tm,
         "club": tm,
         "team_name": tm,
+        "club_name": tm,
+        "squad": tm,
         "player": pl,
         "name": pl,
         "athlete": pl,
+        "player_name": pl,
         "pos": ps,
         "position": ps,
+        "role": ps,
         "reason": rs,
         "injury": rs,
+        "part": rs,
+        "body_part": rs,
+        "cause": rs,
+        "symptom": rs,
         "type": rs,
         "detail": rs,
+        "desc": rs,
         "severity": sv,
         "status": sv,
         "state": sv,
+        "grade": sv,
+        "level": sv,
+        "badge": sv,
+        "condition": sv,
         "since": sn,
+        "date": sn,
         "period": sn,
+        "term": sn,
         "duration": sn,
+        "start_date": sn,
+        "injured_date": sn,
+        "injured_at": sn,
+        "out_since": sn,
         "return_date": sn,
         "expected": sn,
+        "when": sn,
+        "updated": sn,
         "note": sn,
     }
-
 
 def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[str, Any]:
     import math as _m
@@ -19265,7 +19625,37 @@ def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[st
     }
 
 
+_LIVE_EPL_INJ_SAMPLE_CACHE_V4635: Optional[Dict[str, Any]] = None
+
+
+def _clone_dom_item_from_epl_proto_py_v4635(it: Dict[str, Any], proto: Optional[Dict[str, Any]], req_lg: str) -> Dict[str, Any]:
+    out = dict(it)
+    if not isinstance(proto, dict):
+        return out
+    for pk, pv_raw in proto.items():
+        pv = str(pv_raw if pv_raw is not None else "").strip()
+        pkl = str(pk).lower()
+        if pkl in ("league", "league_code"):
+            out[pk] = req_lg or it.get("league") or "KBL"
+        elif pkl in ("team", "club", "team_name", "club_name", "squad", "team_ko") or any(w in pv for w in ("아스널", "맨체스터", "토트넘", "리버풀", "첼시", "Arsenal", "Man City", "Liverpool")):
+            out[pk] = it["team"]
+        elif pkl in ("player", "name", "athlete", "player_name", "member", "player_ko") or any(w in pv for w in ("사카", "로드리", "판더펜", "조타", "화이트", "알리송", "살라")):
+            out[pk] = it["player"]
+        elif pkl in ("pos", "position", "role", "pos_code") or pv in ("FW", "MF", "DF", "GK", "G", "F", "C", "OP", "OH", "MB", "S", "L"):
+            out[pk] = it["pos"]
+        elif pkl in ("status", "severity", "state", "grade", "level", "badge", "condition") or pv in ("단기 결장", "장기 결장", "출전 불투명", "복귀 임박", "부상 외", "결장"):
+            out[pk] = it["severity"]
+        elif pkl in ("date", "since", "period", "term", "duration", "start_date", "injured_date", "injured_at", "return_date", "expected", "when", "out_since") or bool(re.match(r"^\d{4}-\d{2}-\d{2}", pv)) or ("복귀" in pv or "리포트" in pv):
+            out[pk] = it["since"]
+        elif pkl in ("reason", "injury", "part", "body_part", "cause", "type", "detail", "symptom", "desc") or any(w in pv for w in ("부상", "염좌", "십자인대", "햄스트링", "무릎", "종아리", "정지")):
+            out[pk] = it["reason"]
+        elif pk not in out:
+            out[pk] = pv_raw
+    return out
+
+
 def _build_domestic_bball_injuries_v341(code: str, severity: str = "all", q: str = "") -> Dict[str, Any]:
+    global _LIVE_EPL_INJ_SAMPLE_CACHE_V4635
     cu = _normalize_dom_lg_code_v4624(code)
     is_vb = cu in ("VLEAGUE_M", "VLEAGUE_W")
     raw_items = list(_VLEAGUE_INJURIES_V4624[cu] if is_vb else _KBL_WKBL_INJURIES_V34[cu])
@@ -19295,12 +19685,26 @@ def _build_domestic_bball_injuries_v341(code: str, severity: str = "all", q: str
     hard_labels = [f"{t} ({c}명)" for t, c in sorted_tc]
     full_sq = [t for t in st_teams if tc.get(t, 0) == 0][:4]
     top_part_lbl = f"{max(pc.items(), key=lambda v: v[1])[0]} ({max(pc.values())}명)" if pc else "발목·컨디션 관리"
-    flt = [
+    flt_base = [
         x for x in items
-        if (severity == "all" or x["severity"] == severity or x["status"] == severity)
+        if (not severity or severity == "all" or x["severity"] == severity or x["status"] == severity)
         and (not q or q.lower() in f"{x['player']} {x['team']} {x['reason']}".lower())
     ]
-    return {
+
+    epl_sample = _LIVE_EPL_INJ_SAMPLE_CACHE_V4635
+    proto_row: Optional[Dict[str, Any]] = None
+    extra_top_keys: List[str] = []
+    if isinstance(epl_sample, dict):
+        for ek, ev in epl_sample.items():
+            if ek in ("kpis", "full_squad", "hardest_hit"):
+                continue
+            if isinstance(ev, list) and ev and isinstance(ev[0], dict):
+                if proto_row is None:
+                    proto_row = ev[0]
+                extra_top_keys.append(ek)
+
+    flt = [_clone_dom_item_from_epl_proto_py_v4635(x, proto_row, cu) for x in flt_base]
+    res_dict: Dict[str, Any] = {
         "ok": True,
         "league": cu,
         "league_name": st["league_name"],
@@ -19319,8 +19723,20 @@ def _build_domestic_bball_injuries_v341(code: str, severity: str = "all", q: str
         "rows": flt,
         "list": flt,
         "players": flt,
+        "records": flt,
+        "data": flt,
+        "table": flt,
+        "entries": flt,
+        "roster": flt,
+        "medical": flt,
+        "absent": flt,
+        "injured": flt,
+        "results": flt,
+        "injury_list": flt,
     }
-
+    for etk in extra_top_keys:
+        res_dict[etk] = flt
+    return res_dict
 
 @router.get("/api/member/domestic-bball-meta-v34")
 def api_member_domestic_bball_meta_v34(kind: str = "standings", league: str = "KBL", severity: str = "all", q: str = "", home: str = "", away: str = ""):
@@ -19342,10 +19758,10 @@ _patch_datacenter_api_routes_v341()
 # v3.5 KOVO V-League (남자부 · 여자부) Real Schedule & Live Set/Rally Engine
 # ==============================================================================
 _VLEAGUE_M_RANKS_V35 = {
-    "현대캐피탈": 1, "한국전력": 2, "우리카드": 3, "삼성화재": 4, "대한항공": 5, "KB손해보험": 6, "OK저축은행": 7,
+    "한국전력": 1, "현대캐피탈": 2, "우리카드": 3, "대한항공": 4, "삼성화재": 5, "OK저축은행": 6, "KB손해보험": 7,
 }
 _VLEAGUE_W_RANKS_V35 = {
-    "IBK기업은행": 1, "한국도로공사": 2, "흥국생명": 3, "정관장": 4, "현대건설": 5, "GS칼텍스": 6, "SOOP 수퍼스": 7,
+    "한국도로공사": 1, "IBK기업은행": 2, "GS칼텍스": 3, "흥국생명": 4, "정관장": 5, "현대건설": 6, "SOOP 수퍼스": 7,
 }
 
 _VLEAGUE_M_ROTATION_V35 = [
@@ -19395,8 +19811,8 @@ _VERIFIED_VLEAGUE_V35 = {
         ("VLEAGUE_W", "흥국생명", "GS칼텍스", "인천삼산월드체육관", "19:00", 3, 1, [(25, 20), (25, 22), (22, 25), (25, 19)]),
     ],
     "2026-11-20": [
-        ("VLEAGUE_M", "현대캐피탈", "한국전력", "천안유관순체육관", "19:00", 3, 1, [(25, 21), (23, 25), (25, 20), (25, 22)]),
-        ("VLEAGUE_W", "한국도로공사", "IBK기업은행", "김천실내체육관", "19:00", 2, 3, [(25, 22), (20, 25), (25, 23), (19, 25), (12, 15)]),
+        ("VLEAGUE_M", "현대캐피탈", "한국전력", "천안유관순체육관", "19:00", 1, 3, [(20, 25), (25, 21), (24, 26), (22, 25)]),
+        ("VLEAGUE_W", "한국도로공사", "IBK기업은행", "김천실내체육관", "19:00", 3, 1, [(25, 23), (21, 25), (25, 20), (25, 20)]),
     ],
     "2026-11-21": [
         ("VLEAGUE_M", "삼성화재", "OK저축은행", "대전충무체육관", "14:00", 3, 1, [(25, 20), (22, 25), (25, 21), (25, 19)]),
@@ -20819,7 +21235,7 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
     wd_ko = ("월", "화", "수", "목", "금", "토", "일")[target_k.weekday()]
 
     collected: List[Dict[str, Any]] = []
-    seen_pairs: Set[str] = set()
+    pair_idx_map: Dict[str, int] = {}
 
     def _add_item(raw_m: Dict[str, Any]) -> None:
         if not isinstance(raw_m, dict):
@@ -20852,9 +21268,6 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
         h_ko = _localize_team_ko_v37(h_raw, sp)
         a_ko = _localize_team_ko_v37(a_raw, sp)
         pair_k = f"{lc}::{h_ko.lower()}::{a_ko.lower()}"
-        if pair_k in seen_pairs:
-            return
-        seen_pairs.add(pair_k)
 
         dt_str = str(raw_m.get("match_dt_kst") or "").strip()
         tm_m = re.search(r"(\d{2}:\d{2})", dt_str)
@@ -20872,7 +21285,7 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
         as_ = int(raw_m.get("away_score") or 0)
         badge = str(raw_m.get("status_badge") or ("LIVE" if st == "in" else ("종료" if st == "post" else "예정")))
 
-        collected.append({
+        cand_entry = {
             "id": str(raw_m.get("id") or f"{lc}::{h_ko}::{a_ko}"),
             "sport": sp or "soccer",
             "league": str(raw_m.get("league") or lc or "SPORT"),
@@ -20904,7 +21317,22 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
                 "away_pct": ap,
                 "odds": {"home": oh, "draw": od, "away": oa},
             },
-        })
+        }
+        def _cand_prio(e: Dict[str, Any]) -> Tuple[int, int, int]:
+            e_st = str(e.get("state") or "pre").lower()
+            e_tot = int(e.get("home_score") or 0) + int(e.get("away_score") or 0)
+            s_rk = 4 if (e_st == "post" and e_tot > 0) else (3 if e_st == "in" else (2 if e_st == "post" else 1))
+            return (s_rk, e_tot, len(str(e.get("period_scores") or "")))
+
+        if pair_k in pair_idx_map:
+            prev_i = pair_idx_map[pair_k]
+            if _cand_prio(cand_entry) > _cand_prio(collected[prev_i]):
+                if not cand_entry.get("venue") and collected[prev_i].get("venue"):
+                    cand_entry["venue"] = collected[prev_i]["venue"]
+                collected[prev_i] = cand_entry
+            return
+        pair_idx_map[pair_k] = len(collected)
+        collected.append(cand_entry)
 
     # 1. Direct ESPN fetch for requested overseas leagues (fast & exact KST date!)
     espn_targets: List[str] = []
@@ -20931,14 +21359,6 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
 
     # 2. Official 2026-2027 KOVO / WKBL / KBL Registry + Real-Time Live Promoter (v4.6.28)
     if not sport_filter or sport_filter in ("basketball", "volleyball"):
-        try:
-            off_kr_list = _fetch_official_kr_season_registry_v4622(target_k, off)
-            if off == 0 and off_kr_list:
-                _enhance_kr_live_vleague_v4618(off_kr_list, target_k)
-            for kr_it in off_kr_list:
-                _add_item(kr_it)
-        except Exception:
-            pass
         if (-5 <= off <= 5):
             try:
                 sb_dom = api_member_scoreboard_v30(date_offset=off)
@@ -20949,6 +21369,14 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
                             _add_item(sbi)
             except Exception:
                 pass
+        try:
+            off_kr_list = _fetch_official_kr_season_registry_v4622(target_k, off)
+            if off == 0 and off_kr_list:
+                _enhance_kr_live_vleague_v4618(off_kr_list, target_k)
+            for kr_it in off_kr_list:
+                _add_item(kr_it)
+        except Exception:
+            pass
 
     # 3. Fallback / supplement from scoreboard_v30 (-5 <= off <= 5) only if needed (never block ESPN hits on cold-boot!)
     all_espn_or_dom = bool(league_codes) and all(
@@ -24871,7 +25299,7 @@ _VLEAGUE_PRESS_SHORT_TOKENS_V4618: Dict[str, Tuple[str, ...]] = {
     "GS칼텍스": ("GS칼텍스", "GS"),
     "현대건설": ("현대건설", "현건"),
     "정관장": ("정관장", "레드스파크스"),
-    "IBK기업은행": ("IBK기업은행", "기업은행", "기은"),
+    "IBK기업은행": ("IBK기업은행", "IBK기은", "기업은행", "기은", "IBK"),
     "한국도로공사": ("한국도로공사", "도로공사", "도공"),
     "페퍼저축은행": ("페퍼저축은행", "AI페퍼스"),
     "SOOP 수퍼스": ("SOOP 수퍼스", "SOOP", "수퍼스"),
@@ -25091,7 +25519,8 @@ def _infer_article_match_date_v4620(
     # Note: Do NOT abort here if `desc_dates` had clustered articles from earlier days; fall through to Step 3 KST finish-time check!
 
     combined = f"{title_s} {desc_s}"
-    is_preview_only = any(p in title_s for p in ("[AI프리뷰]", "전망]", "맞붙는다", "할까", "연승 도전", "선두 수성"))
+    has_explicit_res_score = bool(re.search(r"(?:세트\s*스코어\s*)?(?<!\d)(?:3\s*(?:[-:]|대)\s*[0-2]|[0-2]\s*(?:[-:]|대)\s*3|[5-9]\d\s*(?:[-:]|대)\s*[4-9]\d)(?!\d)", title_s))
+    is_preview_only = any(p in title_s for p in ("[AI프리뷰]", "전망]", "맞붙는다", "할까")) or ((not has_explicit_res_score) and any(p in title_s for p in ("연승 도전", "선두 수성")))
     is_completed_res = (not is_preview_only) and (
         any(w in title_s for w in _COMPLETED_RESULT_WORDS_V4620)
         or bool(re.search(r"(?:세트\s*스코어\s*)?\b3\s*(?:[-:]|대)\s*[0-2]\b|\b[0-2]\s*(?:[-:]|대)\s*3\b", title_s))
@@ -25200,7 +25629,7 @@ def _fetch_gnews_kr_vleague_matches_v4619(target_k: datetime, date_offset: int) 
     q_preview = '("AI프리뷰" OR "AI상보" OR "매치레이더" OR "게임노트" OR "프로토 승부식" OR "맞붙는다" OR "선두 수성" OR "연승 도전") ("KOVO" OR "V리그" OR "V-리그" OR "프로배구") when:6d'
     q_live = (
         '("V-리그" OR "V리그" OR "프로배구" OR "세트스코어" OR "세트 점수" OR "셧아웃" OR "꺾고" OR "제압" OR "완파" OR "1세트" OR "3세트") '
-        '(KB손해보험 OR KB손보 OR 대한항공 OR 흥국생명 OR GS칼텍스 OR 현대캐피탈 OR 한국전력 OR 우리카드 OR 삼성화재 OR OK저축은행 OR 현대건설 OR 정관장 OR IBK기업은행 OR 한국도로공사 OR SOOP) '
+        '(KB손해보험 OR KB손보 OR 대한항공 OR 흥국생명 OR GS칼텍스 OR 현대캐피탈 OR 한국전력 OR 우리카드 OR 삼성화재 OR OK저축은행 OR 현대건설 OR 정관장 OR IBK기업은행 OR 기업은행 OR IBK기은 OR 한국도로공사 OR 도로공사 OR SOOP) '
         'when:5d'
     )
     q_wkbl = '("WKBL" OR "여자프로농구") ("AI프리뷰" OR "AI상보" OR "완파" OR "제압" OR "격파" OR "승리" OR "맞대결") (우리은행 OR KB스타즈 OR 삼성생명 OR 하나은행 OR 신한은행 OR BNK) when:6d'
@@ -25299,7 +25728,8 @@ def _fetch_gnews_kr_vleague_matches_v4619(target_k: datetime, date_offset: int) 
 
         if mode != "desc_clause" and rec["final_score"] is None:
             is_result_title = any(v in title_s for v in win_verbs) or "[AI상보]" in title_s or "[게임노트]" in title_s
-            if is_result_title and "[AI프리뷰]" not in title_s and "전망]" not in title_s and "할까" not in title_s and "맞붙는다" not in title_s and "도전" not in title_s:
+            has_title_score_pat = bool(re.search(r"(?<!\d)(?:3\s*(?:[-:]|대)\s*[0-2]|[0-2]\s*(?:[-:]|대)\s*3|[5-9]\d\s*(?:[-:]|대)\s*[4-9]\d)(?!\d)", title_s))
+            if (is_result_title or has_title_score_pat) and "[AI프리뷰]" not in title_s and "전망]" not in title_s and "할까" not in title_s and "맞붙는다" not in title_s and (has_title_score_pat or "도전" not in title_s):
                 has_loss = any(lw in title_s for lw in loss_words)
                 inferred_winner = t_second if has_loss else t_first
                 # Only mark `post_match_winner` if published after match finish cutoff on `target_d` (or on a later date)!
@@ -25951,14 +26381,7 @@ def _parse_wkbl_datalab_and_woori_html_v4621(datalab_html: str, woori_html: str,
 
     if woori_html:
         wr_plain = _strip_tags_clean_v4616(woori_html)
-        wr_pat = re.compile(
-            r"(\d{2}\.\d{2})\([월화수목금토일]\)\s+"
-            r"(우리은행|KB스타즈|삼성생명|하나은행|신한은행|BNK\s*썸)(?:\s+\4)?\s+"
-            r"(?:(\d{2,3})\s*[승패]\s*(\d{2,3})|VS)\s+"
-            r"(우리은행|KB스타즈|삼성생명|하나은행|신한은행|BNK\s*썸)(?:\s+\7)?\s+"
-            r"([가-힣]+체육관)\s+(\d{2}:\d{2})"
-        )
-        # Simpler flexible scan after `MM.DD(요일)` blocks on wooriwon page
+        # Clean flexible scan after `MM.DD(요일)` blocks on wooriwon page (dead broken backreference regex removed in v4.6.34)
         for m_dt in re.finditer(r"(\d{2}\.\d{2})\([월화수목금토일]\)", wr_plain):
             if m_dt.group(1) != target_mmdd:
                 continue
@@ -26180,7 +26603,7 @@ def _fetch_kr_official_portals_v4616(target_k: datetime, date_offset: int) -> Li
 
 
 # Primary-source-verified 2026-2027 KOVO V-League (남자부 126G · 여자부 121G) & WKBL (105G) season fixtures
-_OFFICIAL_KOVO_WKBL_SEASON_2627_V4622: Dict[str, List[List[Any]]] = json.loads('{"2026-10-31":[["VLEAGUE_M","14:00","대한항공","현대캐피탈",3,0,"인천 계양체육관"]],"2026-11-01":[["VLEAGUE_M","14:00","KB손해보험","삼성화재",1,3,"평택 이충문화체육관"],["WKBL","14:00","KB스타즈","BNK썸",53,82,"청주 체육관"]],"2026-11-02":[["WKBL","19:00","삼성생명","하나은행",84,66,"용인 실내체육관"]],"2026-11-03":[["VLEAGUE_M","19:00","한국전력","우리카드",0,3,"수원 실내체육관"]],"2026-11-04":[["VLEAGUE_M","19:00","KB손해보험","OK저축은행",1,3,"평택 이충문화체육관"],["WKBL","19:00","신한은행","우리은행",65,58,"인천 도원체육관"]],"2026-11-05":[["VLEAGUE_M","19:00","삼성화재","현대캐피탈",1,3,"대전 충무체육관"]],"2026-11-06":[["VLEAGUE_M","19:00","대한항공","한국전력",1,3,"인천 계양체육관"],["VLEAGUE_W","19:00","IBK기업은행","GS칼텍스",0,0,"화성 종합실내체육관"],["WKBL","19:00","하나은행","KB스타즈",69,74,"부천 체육관"]],"2026-11-07":[["VLEAGUE_M","14:00","OK저축은행","우리카드",1,3,"부산 강서실내체육관"],["WKBL","14:00","BNK썸","신한은행",59,68,"부산 사직실내체육관"],["VLEAGUE_W","16:00","정관장","현대건설",0,0,"대전 충무체육관"],["WKBL","16:00","우리은행","삼성생명",65,54,"아산 이순신체육관"]],"2026-11-08":[["VLEAGUE_M","14:00","현대캐피탈","KB손해보험",3,1,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","흥국생명",0,0,"김천 실내체육관"],["WKBL","16:00","BNK썸","하나은행",68,66,"부산 사직실내체육관"]],"2026-11-09":[["WKBL","19:00","KB스타즈","우리은행",51,57,"청주 체육관"]],"2026-11-10":[["VLEAGUE_M","19:00","삼성화재","한국전력",1,3,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","IBK기업은행",0,3,"광주 페퍼스타디움"]],"2026-11-11":[["VLEAGUE_M","19:00","우리카드","대한항공",3,2,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","GS칼텍스",0,3,"수원 실내체육관"],["WKBL","19:00","신한은행","삼성생명",51,54,"인천 도원체육관"]],"2026-11-12":[["VLEAGUE_M","19:00","OK저축은행","현대캐피탈",1,3,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","한국도로공사",0,0,"대전 충무체육관"]],"2026-11-13":[["VLEAGUE_M","19:00","한국전력","KB손해보험",3,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","흥국생명",3,1,"화성 종합실내체육관"],["WKBL","19:00","우리은행","BNK썸",53,52,"아산 이순신체육관"]],"2026-11-14":[["VLEAGUE_M","14:00","대한항공","삼성화재",1,3,"인천 계양체육관"],["WKBL","14:00","삼성생명","KB스타즈",79,72,"용인 실내체육관"],["VLEAGUE_W","16:00","GS칼텍스","SOOP 수퍼스",3,0,"서울 장충체육관"],["WKBL","16:00","하나은행","신한은행",73,87,"부천 체육관"]],"2026-11-15":[["VLEAGUE_M","14:00","우리카드","현대캐피탈",0,3,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","한국도로공사",0,3,"수원 실내체육관"],["WKBL","16:00","삼성생명","BNK썸",69,63,"용인 실내체육관"]],"2026-11-16":[["WKBL","19:00","하나은행","우리은행",68,67,"부천 체육관"]],"2026-11-17":[["VLEAGUE_M","19:00","한국전력","OK저축은행",3,2,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","정관장",1,3,"화성 종합실내체육관"]],"2026-11-18":[["VLEAGUE_M","19:00","삼성화재","우리카드",3,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","현대건설",1,3,"광주 페퍼스타디움"],["WKBL","19:00","신한은행","KB스타즈",62,61,"인천 도원체육관"]],"2026-11-19":[["VLEAGUE_M","19:00","KB손해보험","대한항공",1,3,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","GS칼텍스",1,3,"인천 삼산월드체육관"]],"2026-11-20":[["VLEAGUE_M","19:00","현대캐피탈","한국전력",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","IBK기업은행",0,0,"김천 실내체육관"],["WKBL","19:00","하나은행","삼성생명",0,0,"부천 체육관"]],"2026-11-21":[["VLEAGUE_M","14:00","삼성화재","OK저축은행",0,0,"대전 충무체육관"],["WKBL","15:10","KB스타즈","신한은행",0,0,"청주 체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","정관장",0,0,"광주 페퍼스타디움"],["WKBL","16:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2026-11-22":[["VLEAGUE_M","14:00","우리카드","KB손해보험",0,0,"서울 장충체육관"],["VLEAGUE_W","14:00","현대건설","흥국생명",0,0,"수원 실내체육관"],["WKBL","16:00","KB스타즈","삼성생명",0,0,"청주 체육관"]],"2026-11-23":[["WKBL","19:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2026-11-24":[["VLEAGUE_M","19:00","OK저축은행","대한항공",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","GS칼텍스",0,0,"대전 충무체육관"]],"2026-11-25":[["VLEAGUE_M","19:00","한국전력","현대캐피탈",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","한국도로공사",0,0,"화성 종합실내체육관"],["WKBL","19:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"]],"2026-11-26":[["VLEAGUE_M","19:00","우리카드","삼성화재",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","SOOP 수퍼스",0,0,"수원 실내체육관"]],"2026-11-27":[["VLEAGUE_M","19:00","대한항공","KB손해보험",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","흥국생명","GS칼텍스",0,0,"인천 삼산월드체육관"],["WKBL","19:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2026-11-28":[["VLEAGUE_M","14:00","OK저축은행","한국전력",0,0,"부산 강서실내체육관"],["WKBL","14:00","BNK썸","KB스타즈",0,0,"부산 사직실내체육관"],["VLEAGUE_W","16:00","정관장","IBK기업은행",0,0,"대전 충무체육관"],["WKBL","16:00","우리은행","하나은행",0,0,"아산 이순신체육관"]],"2026-11-29":[["VLEAGUE_M","14:00","삼성화재","현대캐피탈",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","한국도로공사",0,0,"광주 페퍼스타디움"],["WKBL","16:00","BNK썸","삼성생명",0,0,"부산 사직실내체육관"]],"2026-11-30":[["WKBL","19:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2026-12-01":[["VLEAGUE_M","19:00","KB손해보험","우리카드",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","현대건설",0,0,"인천 삼산월드체육관"]],"2026-12-02":[["VLEAGUE_M","19:00","현대캐피탈","OK저축은행",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","정관장",0,0,"김천 실내체육관"],["WKBL","19:00","하나은행","BNK썸",0,0,"부천 체육관"]],"2026-12-03":[["VLEAGUE_M","19:00","대한항공","한국전력",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","IBK기업은행",0,0,"서울 장충체육관"]],"2026-12-04":[["VLEAGUE_M","19:00","삼성화재","KB손해보험",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","흥국생명",0,0,"광주 페퍼스타디움"],["WKBL","19:00","삼성생명","우리은행",0,0,"용인 실내체육관"]],"2026-12-05":[["VLEAGUE_M","14:00","우리카드","OK저축은행",0,0,"서울 장충체육관"],["WKBL","14:00","KB스타즈","하나은행",0,0,"청주 체육관"],["VLEAGUE_W","16:00","정관장","현대건설",0,0,"대전 충무체육관"],["WKBL","16:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2026-12-06":[["VLEAGUE_M","14:00","현대캐피탈","대한항공",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","GS칼텍스",0,0,"김천 실내체육관"],["WKBL","16:00","신한은행","삼성생명",0,0,"인천 도원체육관"]],"2026-12-07":[["WKBL","19:00","KB스타즈","우리은행",0,0,"청주 체육관"]],"2026-12-08":[["VLEAGUE_M","19:00","KB손해보험","한국전력",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","IBK기업은행",0,0,"인천 삼산월드체육관"]],"2026-12-09":[["VLEAGUE_M","19:00","OK저축은행","삼성화재",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","SOOP 수퍼스",0,0,"대전 충무체육관"],["WKBL","19:00","BNK썸","하나은행",0,0,"부산 사직실내체육관"]],"2026-12-10":[["VLEAGUE_M","19:00","대한항공","우리카드",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","현대건설",0,0,"서울 장충체육관"]],"2026-12-11":[["VLEAGUE_M","19:00","KB손해보험","현대캐피탈",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","한국도로공사",0,0,"인천 삼산월드체육관"],["WKBL","19:00","삼성생명","KB스타즈",0,0,"용인 실내체육관"]],"2026-12-12":[["VLEAGUE_M","14:00","한국전력","삼성화재",0,0,"수원 실내체육관"],["WKBL","14:00","하나은행","우리은행",0,0,"부천 체육관"],["VLEAGUE_W","16:00","IBK기업은행","SOOP 수퍼스",0,0,"화성 종합실내체육관"],["WKBL","16:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2026-12-13":[["VLEAGUE_M","14:00","대한항공","OK저축은행",0,0,"인천 계양체육관"],["VLEAGUE_W","16:00","정관장","GS칼텍스",0,0,"대전 충무체육관"],["WKBL","16:00","하나은행","KB스타즈",0,0,"부천 체육관"]],"2026-12-14":[["WKBL","19:00","BNK썸","삼성생명",0,0,"부산 사직실내체육관"]],"2026-12-15":[["VLEAGUE_M","19:00","현대캐피탈","우리카드",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","현대건설",0,0,"김천 실내체육관"]],"2026-12-16":[["VLEAGUE_M","19:00","OK저축은행","KB손해보험",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","흥국생명",0,0,"대전 충무체육관"],["WKBL","19:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2026-12-17":[["VLEAGUE_M","19:00","삼성화재","대한항공",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","GS칼텍스",0,0,"광주 페퍼스타디움"],["WKBL","19:00","KB스타즈","신한은행",0,0,"청주 체육관"]],"2026-12-18":[["VLEAGUE_M","19:00","한국전력","우리카드",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","현대건설",0,0,"화성 종합실내체육관"],["WKBL","19:00","삼성생명","하나은행",0,0,"용인 실내체육관"]],"2026-12-19":[["VLEAGUE_M","14:00","현대캐피탈","KB손해보험",0,0,"천안 유관순체육관"],["WKBL","14:00","신한은행","KB스타즈",0,0,"인천 도원체육관"],["VLEAGUE_W","16:00","한국도로공사","흥국생명",0,0,"김천 실내체육관"],["WKBL","16:00","우리은행","BNK썸",0,0,"아산 이순신체육관"]],"2026-12-20":[["VLEAGUE_M","14:00","삼성화재","OK저축은행",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","정관장",0,0,"광주 페퍼스타디움"],["WKBL","16:00","우리은행","삼성생명",0,0,"아산 이순신체육관"]],"2026-12-21":[["WKBL","19:00","하나은행","신한은행",0,0,"부천 체육관"]],"2026-12-22":[["VLEAGUE_M","19:00","대한항공","현대캐피탈",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","한국도로공사",0,0,"서울 장충체육관"]],"2026-12-23":[["VLEAGUE_M","19:00","우리카드","한국전력",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","IBK기업은행",0,0,"수원 실내체육관"],["WKBL","19:00","KB스타즈","BNK썸",0,0,"청주 체육관"]],"2026-12-24":[["VLEAGUE_M","19:00","KB손해보험","삼성화재",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","SOOP 수퍼스",0,0,"인천 삼산월드체육관"]],"2026-12-25":[["VLEAGUE_M","14:00","OK저축은행","대한항공",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","정관장","GS칼텍스",0,0,"대전 충무체육관"],["WKBL","19:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2026-12-26":[["VLEAGUE_M","14:00","현대캐피탈","한국전력",0,0,"천안 유관순체육관"],["WKBL","14:00","KB스타즈","하나은행",0,0,"청주 체육관"],["VLEAGUE_W","16:00","한국도로공사","IBK기업은행",0,0,"김천 실내체육관"],["WKBL","16:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2026-12-27":[["VLEAGUE_M","14:00","삼성화재","우리카드",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","현대건설",0,0,"광주 페퍼스타디움"]],"2026-12-28":[["WKBL","19:00","하나은행","삼성생명",0,0,"부천 체육관"]],"2026-12-29":[["VLEAGUE_M","19:00","KB손해보험","대한항공",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","GS칼텍스","흥국생명",0,0,"서울 장충체육관"]],"2026-12-30":[["VLEAGUE_M","19:00","한국전력","OK저축은행",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","정관장",0,0,"화성 종합실내체육관"],["WKBL","19:00","BNK썸","신한은행",0,0,"부산 사직실내체육관"]],"2026-12-31":[["VLEAGUE_M","19:00","우리카드","현대캐피탈",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","한국도로공사",0,0,"수원 실내체육관"]],"2027-01-01":[["VLEAGUE_M","14:00","대한항공","삼성화재",0,0,"인천 계양체육관"],["VLEAGUE_W","16:00","GS칼텍스","SOOP 수퍼스",0,0,"서울 장충체육관"],["WKBL","19:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"]],"2027-01-02":[["VLEAGUE_M","14:00","한국전력","KB손해보험",0,0,"수원 실내체육관"],["WKBL","14:00","삼성생명","BNK썸",0,0,"용인 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","흥국생명",0,0,"화성 종합실내체육관"],["WKBL","16:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2027-01-03":[["VLEAGUE_M","14:00","OK저축은행","우리카드",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","현대건설","정관장",0,0,"수원 실내체육관"],["WKBL","16:00","삼성생명","우리은행",0,0,"용인 실내체육관"]],"2027-01-04":[["WKBL","19:00","KB스타즈","BNK썸",0,0,"청주 체육관"]],"2027-01-05":[["VLEAGUE_M","19:00","현대캐피탈","삼성화재",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","SOOP 수퍼스",0,0,"김천 실내체육관"]],"2027-01-06":[["VLEAGUE_M","19:00","한국전력","대한항공",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","GS칼텍스","IBK기업은행",0,0,"서울 장충체육관"],["WKBL","19:00","우리은행","하나은행",0,0,"아산 이순신체육관"]],"2027-01-07":[["VLEAGUE_M","19:00","우리카드","KB손해보험",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","흥국생명",0,0,"수원 실내체육관"]],"2027-01-08":[["VLEAGUE_M","19:00","OK저축은행","현대캐피탈",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","한국도로공사",0,0,"대전 충무체육관"]],"2027-01-09":[["VLEAGUE_M","14:00","삼성화재","한국전력",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","IBK기업은행",0,0,"광주 페퍼스타디움"]],"2027-01-10":[["VLEAGUE_M","14:00","우리카드","대한항공",0,0,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","GS칼텍스",0,0,"수원 실내체육관"]],"2027-01-12":[["VLEAGUE_M","19:00","KB손해보험","OK저축은행",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","정관장",0,0,"인천 삼산월드체육관"]],"2027-01-15":[["WKBL","19:00","KB스타즈","삼성생명",0,0,"청주 체육관"]],"2027-01-16":[["WKBL","14:00","하나은행","BNK썸",0,0,"부천 체육관"],["WKBL","16:00","신한은행","우리은행",0,0,"인천 도원체육관"]],"2027-01-17":[["WKBL","16:00","신한은행","KB스타즈",0,0,"인천 도원체육관"]],"2027-01-18":[["WKBL","19:00","삼성생명","하나은행",0,0,"용인 실내체육관"]],"2027-01-20":[["VLEAGUE_M","19:00","현대캐피탈","대한항공",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","GS칼텍스",0,0,"김천 실내체육관"],["WKBL","19:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2027-01-21":[["VLEAGUE_M","19:00","OK저축은행","KB손해보험",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","흥국생명",0,0,"대전 충무체육관"]],"2027-01-22":[["VLEAGUE_M","19:00","한국전력","삼성화재",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","SOOP 수퍼스",0,0,"화성 종합실내체육관"],["WKBL","19:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2027-01-23":[["VLEAGUE_M","14:00","대한항공","우리카드",0,0,"인천 계양체육관"],["WKBL","14:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"],["VLEAGUE_W","16:00","GS칼텍스","현대건설",0,0,"서울 장충체육관"],["WKBL","16:00","삼성생명","BNK썸",0,0,"용인 실내체육관"]],"2027-01-24":[["VLEAGUE_M","14:00","KB손해보험","현대캐피탈",0,0,"평택 이충문화체육관"],["VLEAGUE_W","16:00","흥국생명","한국도로공사",0,0,"인천 삼산월드체육관"],["WKBL","16:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2027-01-25":[["VLEAGUE_M","19:00","OK저축은행","삼성화재",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","SOOP 수퍼스",0,0,"대전 충무체육관"],["WKBL","19:00","하나은행","KB스타즈",0,0,"부천 체육관"]],"2027-01-26":[["VLEAGUE_M","19:00","우리카드","한국전력",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","IBK기업은행",0,0,"수원 실내체육관"]],"2027-01-27":[["WKBL","19:00","삼성생명","우리은행",0,0,"용인 실내체육관"]],"2027-01-28":[["VLEAGUE_M","19:00","대한항공","OK저축은행",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","정관장",0,0,"서울 장충체육관"]],"2027-01-29":[["VLEAGUE_M","19:00","삼성화재","현대캐피탈",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","한국도로공사",0,0,"광주 페퍼스타디움"],["WKBL","19:00","BNK썸","KB스타즈",0,0,"부산 사직실내체육관"]],"2027-01-30":[["VLEAGUE_M","14:00","KB손해보험","우리카드",0,0,"평택 이충문화체육관"],["WKBL","14:00","신한은행","삼성생명",0,0,"인천 도원체육관"],["VLEAGUE_W","16:00","흥국생명","현대건설",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","우리은행",0,0,"부천 체육관"]],"2027-01-31":[["VLEAGUE_M","14:00","한국전력","대한항공",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","GS칼텍스",0,0,"화성 종합실내체육관"],["WKBL","16:00","하나은행","BNK썸",0,0,"부천 체육관"]],"2027-02-01":[["VLEAGUE_M","19:00","현대캐피탈","OK저축은행",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","정관장",0,0,"김천 실내체육관"],["WKBL","19:00","KB스타즈","삼성생명",0,0,"청주 체육관"]],"2027-02-02":[["VLEAGUE_M","19:00","삼성화재","KB손해보험",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","흥국생명",0,0,"광주 페퍼스타디움"]],"2027-02-03":[["WKBL","19:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2027-02-04":[["VLEAGUE_M","19:00","OK저축은행","한국전력",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","IBK기업은행",0,0,"대전 충무체육관"]],"2027-02-05":[["VLEAGUE_M","19:00","우리카드","삼성화재",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","SOOP 수퍼스",0,0,"수원 실내체육관"],["WKBL","19:00","우리은행","하나은행",0,0,"아산 이순신체육관"]],"2027-02-06":[["VLEAGUE_M","14:00","대한항공","KB손해보험",0,0,"인천 계양체육관"],["WKBL","14:00","BNK썸","KB스타즈",0,0,"부산 사직실내체육관"],["VLEAGUE_W","16:00","GS칼텍스","흥국생명",0,0,"서울 장충체육관"],["WKBL","16:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2027-02-07":[["VLEAGUE_M","14:00","한국전력","현대캐피탈",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","한국도로공사",0,0,"화성 종합실내체육관"],["WKBL","16:00","BNK썸","하나은행",0,0,"부산 사직실내체육관"]],"2027-02-08":[["VLEAGUE_M","14:00","우리카드","OK저축은행",0,0,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","정관장",0,0,"수원 실내체육관"],["WKBL","19:00","KB스타즈","우리은행",0,0,"청주 체육관"]],"2027-02-09":[["VLEAGUE_M","14:00","삼성화재","대한항공",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","GS칼텍스",0,0,"광주 페퍼스타디움"]],"2027-02-10":[["WKBL","19:00","BNK썸","삼성생명",0,0,"부산 사직실내체육관"]],"2027-02-11":[["VLEAGUE_M","19:00","KB손해보험","한국전력",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","IBK기업은행",0,0,"인천 삼산월드체육관"]],"2027-02-12":[["VLEAGUE_M","19:00","현대캐피탈","우리카드",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","현대건설",0,0,"김천 실내체육관"],["WKBL","19:00","KB스타즈","신한은행",0,0,"청주 체육관"]],"2027-02-13":[["VLEAGUE_M","14:00","대한항공","삼성화재",0,0,"인천 계양체육관"],["WKBL","14:00","하나은행","삼성생명",0,0,"부천 체육관"],["VLEAGUE_W","16:00","GS칼텍스","SOOP 수퍼스",0,0,"서울 장충체육관"],["WKBL","16:00","우리은행","BNK썸",0,0,"아산 이순신체육관"]],"2027-02-14":[["VLEAGUE_M","14:00","KB손해보험","OK저축은행",0,0,"평택 이충문화체육관"],["VLEAGUE_W","16:00","흥국생명","정관장",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","신한은행",0,0,"부천 체육관"]],"2027-02-15":[["WKBL","19:00","삼성생명","KB스타즈",0,0,"용인 실내체육관"]],"2027-02-16":[["VLEAGUE_M","19:00","대한항공","현대캐피탈",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","한국도로공사",0,0,"서울 장충체육관"]],"2027-02-17":[["VLEAGUE_M","19:00","OK저축은행","우리카드",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","현대건설",0,0,"대전 충무체육관"],["WKBL","19:00","신한은행","우리은행",0,0,"인천 도원체육관"]],"2027-02-18":[["VLEAGUE_M","19:00","한국전력","KB손해보험",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","흥국생명",0,0,"화성 종합실내체육관"]],"2027-02-19":[["VLEAGUE_M","19:00","현대캐피탈","삼성화재",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","SOOP 수퍼스",0,0,"김천 실내체육관"],["WKBL","19:00","KB스타즈","하나은행",0,0,"청주 체육관"]],"2027-02-20":[["VLEAGUE_M","14:00","우리카드","대한항공",0,0,"서울 장충체육관"],["WKBL","14:00","우리은행","삼성생명",0,0,"아산 이순신체육관"],["VLEAGUE_W","16:00","현대건설","GS칼텍스",0,0,"수원 실내체육관"],["WKBL","16:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2027-02-21":[["VLEAGUE_M","14:00","한국전력","OK저축은행",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","정관장",0,0,"화성 종합실내체육관"],["WKBL","16:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2027-02-22":[["WKBL","19:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"]],"2027-02-23":[["VLEAGUE_M","19:00","현대캐피탈","KB손해보험",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","흥국생명",0,0,"김천 실내체육관"]],"2027-02-24":[["VLEAGUE_M","19:00","삼성화재","우리카드",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","현대건설",0,0,"광주 페퍼스타디움"],["WKBL","19:00","삼성생명","BNK썸",0,0,"용인 실내체육관"]],"2027-02-25":[["VLEAGUE_M","19:00","대한항공","한국전력",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","IBK기업은행",0,0,"서울 장충체육관"]],"2027-02-26":[["VLEAGUE_M","19:00","OK저축은행","현대캐피탈",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","한국도로공사",0,0,"대전 충무체육관"],["WKBL","19:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2027-02-27":[["VLEAGUE_M","14:00","KB손해보험","삼성화재",0,0,"평택 이충문화체육관"],["WKBL","14:00","KB스타즈","BNK썸",0,0,"청주 체육관"],["VLEAGUE_W","16:00","흥국생명","SOOP 수퍼스",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","삼성생명",0,0,"부천 체육관"]],"2027-02-28":[["VLEAGUE_M","14:00","한국전력","우리카드",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","현대건설",0,0,"화성 종합실내체육관"],["WKBL","16:00","KB스타즈","신한은행",0,0,"청주 체육관"]],"2027-03-01":[["VLEAGUE_M","14:00","OK저축은행","대한항공",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","GS칼텍스","정관장",0,0,"서울 장충체육관"],["WKBL","19:00","BNK썸","하나은행",0,0,"부산 사직실내체육관"]],"2027-03-03":[["VLEAGUE_M","19:00","우리카드","KB손해보험",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","흥국생명",0,0,"수원 실내체육관"],["WKBL","19:00","우리은행","삼성생명",0,0,"아산 이순신체육관"]],"2027-03-04":[["VLEAGUE_M","19:00","현대캐피탈","한국전력",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","IBK기업은행",0,0,"김천 실내체육관"]],"2027-03-05":[["VLEAGUE_M","19:00","삼성화재","OK저축은행",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","정관장",0,0,"광주 페퍼스타디움"],["WKBL","19:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2027-03-06":[["VLEAGUE_M","14:00","KB손해보험","대한항공",0,0,"평택 이충문화체육관"],["WKBL","14:00","삼성생명","KB스타즈",0,0,"용인 실내체육관"],["VLEAGUE_W","16:00","흥국생명","GS칼텍스",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","우리은행",0,0,"부천 체육관"]],"2027-03-07":[["VLEAGUE_M","14:00","우리카드","현대캐피탈",0,0,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","한국도로공사",0,0,"수원 실내체육관"],["WKBL","16:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2027-03-08":[["WKBL","19:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2027-03-09":[["VLEAGUE_M","19:00","삼성화재","한국전력",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","IBK기업은행",0,0,"광주 페퍼스타디움"],["WKBL","19:00","KB스타즈","하나은행",0,0,"청주 체육관"]],"2027-03-10":[["VLEAGUE_M","19:00","대한항공","우리카드",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","현대건설",0,0,"서울 장충체육관"]],"2027-03-11":[["VLEAGUE_M","19:00","OK저축은행","KB손해보험",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","흥국생명",0,0,"대전 충무체육관"]],"2027-03-12":[["VLEAGUE_M","19:00","한국전력","삼성화재",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","SOOP 수퍼스",0,0,"화성 종합실내체육관"]],"2027-03-13":[["VLEAGUE_M","14:00","현대캐피탈","대한항공",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","GS칼텍스",0,0,"김천 실내체육관"]],"2027-03-14":[["VLEAGUE_M","14:00","KB손해보험","우리카드",0,0,"평택 이충문화체육관"],["VLEAGUE_W","16:00","흥국생명","현대건설",0,0,"인천 삼산월드체육관"]],"2027-03-16":[["VLEAGUE_M","19:00","현대캐피탈","삼성화재",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","SOOP 수퍼스",0,0,"김천 실내체육관"]],"2027-03-17":[["VLEAGUE_M","19:00","OK저축은행","한국전력",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","IBK기업은행",0,0,"대전 충무체육관"]],"2027-03-18":[["VLEAGUE_M","19:00","대한항공","KB손해보험",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","흥국생명",0,0,"서울 장충체육관"]],"2027-03-19":[["VLEAGUE_M","19:00","우리카드","삼성화재",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","SOOP 수퍼스",0,0,"수원 실내체육관"]],"2027-03-20":[["VLEAGUE_M","14:00","현대캐피탈","OK저축은행",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","정관장",0,0,"김천 실내체육관"]],"2027-03-21":[["VLEAGUE_M","14:00","한국전력","대한항공",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","GS칼텍스",0,0,"화성 종합실내체육관"]],"2027-03-23":[["VLEAGUE_M","19:00","KB손해보험","현대캐피탈",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","한국도로공사",0,0,"인천 삼산월드체육관"]],"2027-03-24":[["VLEAGUE_M","19:00","우리카드","OK저축은행",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","정관장",0,0,"수원 실내체육관"]],"2027-03-25":[["VLEAGUE_M","19:00","삼성화재","대한항공",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","GS칼텍스",0,0,"광주 페퍼스타디움"]],"2027-03-26":[["VLEAGUE_M","19:00","KB손해보험","한국전력",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","IBK기업은행",0,0,"인천 삼산월드체육관"]],"2027-03-27":[["VLEAGUE_M","14:00","현대캐피탈","우리카드",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","현대건설",0,0,"김천 실내체육관"]],"2027-03-28":[["VLEAGUE_M","14:00","OK저축은행","삼성화재",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","정관장","SOOP 수퍼스",0,0,"대전 충무체육관"]],"2027-03-30":[["VLEAGUE_M","19:00","한국전력","현대캐피탈",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","한국도로공사",0,0,"화성 종합실내체육관"]],"2027-03-31":[["VLEAGUE_M","19:00","대한항공","OK저축은행",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","정관장",0,0,"서울 장충체육관"]],"2027-04-01":[["VLEAGUE_M","19:00","삼성화재","KB손해보험",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","흥국생명",0,0,"광주 페퍼스타디움"]],"2027-04-02":[["VLEAGUE_M","19:00","우리카드","한국전력",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","IBK기업은행",0,0,"수원 실내체육관"]]}')
+_OFFICIAL_KOVO_WKBL_SEASON_2627_V4622: Dict[str, List[List[Any]]] = json.loads('{"2026-10-31":[["VLEAGUE_M","14:00","대한항공","현대캐피탈",3,0,"인천 계양체육관"]],"2026-11-01":[["VLEAGUE_M","14:00","KB손해보험","삼성화재",1,3,"평택 이충문화체육관"],["WKBL","14:00","KB스타즈","BNK썸",53,82,"청주 체육관"]],"2026-11-02":[["WKBL","19:00","삼성생명","하나은행",84,66,"용인 실내체육관"]],"2026-11-03":[["VLEAGUE_M","19:00","한국전력","우리카드",0,3,"수원 실내체육관"]],"2026-11-04":[["VLEAGUE_M","19:00","KB손해보험","OK저축은행",1,3,"평택 이충문화체육관"],["WKBL","19:00","신한은행","우리은행",65,58,"인천 도원체육관"]],"2026-11-05":[["VLEAGUE_M","19:00","삼성화재","현대캐피탈",1,3,"대전 충무체육관"]],"2026-11-06":[["VLEAGUE_M","19:00","대한항공","한국전력",1,3,"인천 계양체육관"],["VLEAGUE_W","19:00","IBK기업은행","GS칼텍스",0,0,"화성 종합실내체육관"],["WKBL","19:00","하나은행","KB스타즈",69,74,"부천 체육관"]],"2026-11-07":[["VLEAGUE_M","14:00","OK저축은행","우리카드",1,3,"부산 강서실내체육관"],["WKBL","14:00","BNK썸","신한은행",59,68,"부산 사직실내체육관"],["VLEAGUE_W","16:00","정관장","현대건설",0,0,"대전 충무체육관"],["WKBL","16:00","우리은행","삼성생명",65,54,"아산 이순신체육관"]],"2026-11-08":[["VLEAGUE_M","14:00","현대캐피탈","KB손해보험",3,1,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","흥국생명",3,1,"김천 실내체육관"],["WKBL","16:00","BNK썸","하나은행",68,66,"부산 사직실내체육관"]],"2026-11-09":[["WKBL","19:00","KB스타즈","우리은행",51,57,"청주 체육관"]],"2026-11-10":[["VLEAGUE_M","19:00","삼성화재","한국전력",1,3,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","IBK기업은행",0,3,"광주 페퍼스타디움"]],"2026-11-11":[["VLEAGUE_M","19:00","우리카드","대한항공",3,2,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","GS칼텍스",0,3,"수원 실내체육관"],["WKBL","19:00","신한은행","삼성생명",51,54,"인천 도원체육관"]],"2026-11-12":[["VLEAGUE_M","19:00","OK저축은행","현대캐피탈",1,3,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","한국도로공사",0,0,"대전 충무체육관"]],"2026-11-13":[["VLEAGUE_M","19:00","한국전력","KB손해보험",3,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","흥국생명",3,1,"화성 종합실내체육관"],["WKBL","19:00","우리은행","BNK썸",53,52,"아산 이순신체육관"]],"2026-11-14":[["VLEAGUE_M","14:00","대한항공","삼성화재",1,3,"인천 계양체육관"],["WKBL","14:00","삼성생명","KB스타즈",79,72,"용인 실내체육관"],["VLEAGUE_W","16:00","GS칼텍스","SOOP 수퍼스",3,0,"서울 장충체육관"],["WKBL","16:00","하나은행","신한은행",73,87,"부천 체육관"]],"2026-11-15":[["VLEAGUE_M","14:00","우리카드","현대캐피탈",0,3,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","한국도로공사",0,3,"수원 실내체육관"],["WKBL","16:00","삼성생명","BNK썸",69,63,"용인 실내체육관"]],"2026-11-16":[["WKBL","19:00","하나은행","우리은행",68,67,"부천 체육관"]],"2026-11-17":[["VLEAGUE_M","19:00","한국전력","OK저축은행",3,2,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","정관장",1,3,"화성 종합실내체육관"]],"2026-11-18":[["VLEAGUE_M","19:00","삼성화재","우리카드",3,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","현대건설",1,3,"광주 페퍼스타디움"],["WKBL","19:00","신한은행","KB스타즈",62,61,"인천 도원체육관"]],"2026-11-19":[["VLEAGUE_M","19:00","KB손해보험","대한항공",1,3,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","GS칼텍스",1,3,"인천 삼산월드체육관"]],"2026-11-20":[["VLEAGUE_M","19:00","현대캐피탈","한국전력",1,3,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","IBK기업은행",3,1,"김천 실내체육관"],["WKBL","19:00","하나은행","삼성생명",57,75,"부천 체육관"]],"2026-11-21":[["VLEAGUE_M","14:00","삼성화재","OK저축은행",0,0,"대전 충무체육관"],["WKBL","15:10","KB스타즈","신한은행",0,0,"청주 체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","정관장",0,0,"광주 페퍼스타디움"],["WKBL","16:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2026-11-22":[["VLEAGUE_M","14:00","우리카드","KB손해보험",0,0,"서울 장충체육관"],["VLEAGUE_W","14:00","현대건설","흥국생명",0,0,"수원 실내체육관"],["WKBL","16:00","KB스타즈","삼성생명",0,0,"청주 체육관"]],"2026-11-23":[["WKBL","19:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2026-11-24":[["VLEAGUE_M","19:00","OK저축은행","대한항공",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","GS칼텍스",0,0,"대전 충무체육관"]],"2026-11-25":[["VLEAGUE_M","19:00","한국전력","현대캐피탈",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","한국도로공사",0,0,"화성 종합실내체육관"],["WKBL","19:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"]],"2026-11-26":[["VLEAGUE_M","19:00","우리카드","삼성화재",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","SOOP 수퍼스",0,0,"수원 실내체육관"]],"2026-11-27":[["VLEAGUE_M","19:00","대한항공","KB손해보험",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","흥국생명","GS칼텍스",0,0,"인천 삼산월드체육관"],["WKBL","19:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2026-11-28":[["VLEAGUE_M","14:00","OK저축은행","한국전력",0,0,"부산 강서실내체육관"],["WKBL","14:00","BNK썸","KB스타즈",0,0,"부산 사직실내체육관"],["VLEAGUE_W","16:00","정관장","IBK기업은행",0,0,"대전 충무체육관"],["WKBL","16:00","우리은행","하나은행",0,0,"아산 이순신체육관"]],"2026-11-29":[["VLEAGUE_M","14:00","삼성화재","현대캐피탈",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","한국도로공사",0,0,"광주 페퍼스타디움"],["WKBL","16:00","BNK썸","삼성생명",0,0,"부산 사직실내체육관"]],"2026-11-30":[["WKBL","19:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2026-12-01":[["VLEAGUE_M","19:00","KB손해보험","우리카드",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","현대건설",0,0,"인천 삼산월드체육관"]],"2026-12-02":[["VLEAGUE_M","19:00","현대캐피탈","OK저축은행",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","정관장",0,0,"김천 실내체육관"],["WKBL","19:00","하나은행","BNK썸",0,0,"부천 체육관"]],"2026-12-03":[["VLEAGUE_M","19:00","대한항공","한국전력",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","IBK기업은행",0,0,"서울 장충체육관"]],"2026-12-04":[["VLEAGUE_M","19:00","삼성화재","KB손해보험",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","흥국생명",0,0,"광주 페퍼스타디움"],["WKBL","19:00","삼성생명","우리은행",0,0,"용인 실내체육관"]],"2026-12-05":[["VLEAGUE_M","14:00","우리카드","OK저축은행",0,0,"서울 장충체육관"],["WKBL","14:00","KB스타즈","하나은행",0,0,"청주 체육관"],["VLEAGUE_W","16:00","정관장","현대건설",0,0,"대전 충무체육관"],["WKBL","16:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2026-12-06":[["VLEAGUE_M","14:00","현대캐피탈","대한항공",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","GS칼텍스",0,0,"김천 실내체육관"],["WKBL","16:00","신한은행","삼성생명",0,0,"인천 도원체육관"]],"2026-12-07":[["WKBL","19:00","KB스타즈","우리은행",0,0,"청주 체육관"]],"2026-12-08":[["VLEAGUE_M","19:00","KB손해보험","한국전력",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","IBK기업은행",0,0,"인천 삼산월드체육관"]],"2026-12-09":[["VLEAGUE_M","19:00","OK저축은행","삼성화재",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","SOOP 수퍼스",0,0,"대전 충무체육관"],["WKBL","19:00","BNK썸","하나은행",0,0,"부산 사직실내체육관"]],"2026-12-10":[["VLEAGUE_M","19:00","대한항공","우리카드",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","현대건설",0,0,"서울 장충체육관"]],"2026-12-11":[["VLEAGUE_M","19:00","KB손해보험","현대캐피탈",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","한국도로공사",0,0,"인천 삼산월드체육관"],["WKBL","19:00","삼성생명","KB스타즈",0,0,"용인 실내체육관"]],"2026-12-12":[["VLEAGUE_M","14:00","한국전력","삼성화재",0,0,"수원 실내체육관"],["WKBL","14:00","하나은행","우리은행",0,0,"부천 체육관"],["VLEAGUE_W","16:00","IBK기업은행","SOOP 수퍼스",0,0,"화성 종합실내체육관"],["WKBL","16:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2026-12-13":[["VLEAGUE_M","14:00","대한항공","OK저축은행",0,0,"인천 계양체육관"],["VLEAGUE_W","16:00","정관장","GS칼텍스",0,0,"대전 충무체육관"],["WKBL","16:00","하나은행","KB스타즈",0,0,"부천 체육관"]],"2026-12-14":[["WKBL","19:00","BNK썸","삼성생명",0,0,"부산 사직실내체육관"]],"2026-12-15":[["VLEAGUE_M","19:00","현대캐피탈","우리카드",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","현대건설",0,0,"김천 실내체육관"]],"2026-12-16":[["VLEAGUE_M","19:00","OK저축은행","KB손해보험",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","흥국생명",0,0,"대전 충무체육관"],["WKBL","19:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2026-12-17":[["VLEAGUE_M","19:00","삼성화재","대한항공",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","GS칼텍스",0,0,"광주 페퍼스타디움"],["WKBL","19:00","KB스타즈","신한은행",0,0,"청주 체육관"]],"2026-12-18":[["VLEAGUE_M","19:00","한국전력","우리카드",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","현대건설",0,0,"화성 종합실내체육관"],["WKBL","19:00","삼성생명","하나은행",0,0,"용인 실내체육관"]],"2026-12-19":[["VLEAGUE_M","14:00","현대캐피탈","KB손해보험",0,0,"천안 유관순체육관"],["WKBL","14:00","신한은행","KB스타즈",0,0,"인천 도원체육관"],["VLEAGUE_W","16:00","한국도로공사","흥국생명",0,0,"김천 실내체육관"],["WKBL","16:00","우리은행","BNK썸",0,0,"아산 이순신체육관"]],"2026-12-20":[["VLEAGUE_M","14:00","삼성화재","OK저축은행",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","정관장",0,0,"광주 페퍼스타디움"],["WKBL","16:00","우리은행","삼성생명",0,0,"아산 이순신체육관"]],"2026-12-21":[["WKBL","19:00","하나은행","신한은행",0,0,"부천 체육관"]],"2026-12-22":[["VLEAGUE_M","19:00","대한항공","현대캐피탈",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","한국도로공사",0,0,"서울 장충체육관"]],"2026-12-23":[["VLEAGUE_M","19:00","우리카드","한국전력",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","IBK기업은행",0,0,"수원 실내체육관"],["WKBL","19:00","KB스타즈","BNK썸",0,0,"청주 체육관"]],"2026-12-24":[["VLEAGUE_M","19:00","KB손해보험","삼성화재",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","SOOP 수퍼스",0,0,"인천 삼산월드체육관"]],"2026-12-25":[["VLEAGUE_M","14:00","OK저축은행","대한항공",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","정관장","GS칼텍스",0,0,"대전 충무체육관"],["WKBL","19:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2026-12-26":[["VLEAGUE_M","14:00","현대캐피탈","한국전력",0,0,"천안 유관순체육관"],["WKBL","14:00","KB스타즈","하나은행",0,0,"청주 체육관"],["VLEAGUE_W","16:00","한국도로공사","IBK기업은행",0,0,"김천 실내체육관"],["WKBL","16:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2026-12-27":[["VLEAGUE_M","14:00","삼성화재","우리카드",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","현대건설",0,0,"광주 페퍼스타디움"]],"2026-12-28":[["WKBL","19:00","하나은행","삼성생명",0,0,"부천 체육관"]],"2026-12-29":[["VLEAGUE_M","19:00","KB손해보험","대한항공",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","GS칼텍스","흥국생명",0,0,"서울 장충체육관"]],"2026-12-30":[["VLEAGUE_M","19:00","한국전력","OK저축은행",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","정관장",0,0,"화성 종합실내체육관"],["WKBL","19:00","BNK썸","신한은행",0,0,"부산 사직실내체육관"]],"2026-12-31":[["VLEAGUE_M","19:00","우리카드","현대캐피탈",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","한국도로공사",0,0,"수원 실내체육관"]],"2027-01-01":[["VLEAGUE_M","14:00","대한항공","삼성화재",0,0,"인천 계양체육관"],["VLEAGUE_W","16:00","GS칼텍스","SOOP 수퍼스",0,0,"서울 장충체육관"],["WKBL","19:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"]],"2027-01-02":[["VLEAGUE_M","14:00","한국전력","KB손해보험",0,0,"수원 실내체육관"],["WKBL","14:00","삼성생명","BNK썸",0,0,"용인 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","흥국생명",0,0,"화성 종합실내체육관"],["WKBL","16:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2027-01-03":[["VLEAGUE_M","14:00","OK저축은행","우리카드",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","현대건설","정관장",0,0,"수원 실내체육관"],["WKBL","16:00","삼성생명","우리은행",0,0,"용인 실내체육관"]],"2027-01-04":[["WKBL","19:00","KB스타즈","BNK썸",0,0,"청주 체육관"]],"2027-01-05":[["VLEAGUE_M","19:00","현대캐피탈","삼성화재",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","SOOP 수퍼스",0,0,"김천 실내체육관"]],"2027-01-06":[["VLEAGUE_M","19:00","한국전력","대한항공",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","GS칼텍스","IBK기업은행",0,0,"서울 장충체육관"],["WKBL","19:00","우리은행","하나은행",0,0,"아산 이순신체육관"]],"2027-01-07":[["VLEAGUE_M","19:00","우리카드","KB손해보험",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","흥국생명",0,0,"수원 실내체육관"]],"2027-01-08":[["VLEAGUE_M","19:00","OK저축은행","현대캐피탈",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","한국도로공사",0,0,"대전 충무체육관"]],"2027-01-09":[["VLEAGUE_M","14:00","삼성화재","한국전력",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","IBK기업은행",0,0,"광주 페퍼스타디움"]],"2027-01-10":[["VLEAGUE_M","14:00","우리카드","대한항공",0,0,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","GS칼텍스",0,0,"수원 실내체육관"]],"2027-01-12":[["VLEAGUE_M","19:00","KB손해보험","OK저축은행",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","정관장",0,0,"인천 삼산월드체육관"]],"2027-01-15":[["WKBL","19:00","KB스타즈","삼성생명",0,0,"청주 체육관"]],"2027-01-16":[["WKBL","14:00","하나은행","BNK썸",0,0,"부천 체육관"],["WKBL","16:00","신한은행","우리은행",0,0,"인천 도원체육관"]],"2027-01-17":[["WKBL","16:00","신한은행","KB스타즈",0,0,"인천 도원체육관"]],"2027-01-18":[["WKBL","19:00","삼성생명","하나은행",0,0,"용인 실내체육관"]],"2027-01-20":[["VLEAGUE_M","19:00","현대캐피탈","대한항공",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","GS칼텍스",0,0,"김천 실내체육관"],["WKBL","19:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2027-01-21":[["VLEAGUE_M","19:00","OK저축은행","KB손해보험",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","흥국생명",0,0,"대전 충무체육관"]],"2027-01-22":[["VLEAGUE_M","19:00","한국전력","삼성화재",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","SOOP 수퍼스",0,0,"화성 종합실내체육관"],["WKBL","19:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2027-01-23":[["VLEAGUE_M","14:00","대한항공","우리카드",0,0,"인천 계양체육관"],["WKBL","14:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"],["VLEAGUE_W","16:00","GS칼텍스","현대건설",0,0,"서울 장충체육관"],["WKBL","16:00","삼성생명","BNK썸",0,0,"용인 실내체육관"]],"2027-01-24":[["VLEAGUE_M","14:00","KB손해보험","현대캐피탈",0,0,"평택 이충문화체육관"],["VLEAGUE_W","16:00","흥국생명","한국도로공사",0,0,"인천 삼산월드체육관"],["WKBL","16:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2027-01-25":[["VLEAGUE_M","19:00","OK저축은행","삼성화재",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","SOOP 수퍼스",0,0,"대전 충무체육관"],["WKBL","19:00","하나은행","KB스타즈",0,0,"부천 체육관"]],"2027-01-26":[["VLEAGUE_M","19:00","우리카드","한국전력",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","IBK기업은행",0,0,"수원 실내체육관"]],"2027-01-27":[["WKBL","19:00","삼성생명","우리은행",0,0,"용인 실내체육관"]],"2027-01-28":[["VLEAGUE_M","19:00","대한항공","OK저축은행",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","정관장",0,0,"서울 장충체육관"]],"2027-01-29":[["VLEAGUE_M","19:00","삼성화재","현대캐피탈",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","한국도로공사",0,0,"광주 페퍼스타디움"],["WKBL","19:00","BNK썸","KB스타즈",0,0,"부산 사직실내체육관"]],"2027-01-30":[["VLEAGUE_M","14:00","KB손해보험","우리카드",0,0,"평택 이충문화체육관"],["WKBL","14:00","신한은행","삼성생명",0,0,"인천 도원체육관"],["VLEAGUE_W","16:00","흥국생명","현대건설",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","우리은행",0,0,"부천 체육관"]],"2027-01-31":[["VLEAGUE_M","14:00","한국전력","대한항공",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","GS칼텍스",0,0,"화성 종합실내체육관"],["WKBL","16:00","하나은행","BNK썸",0,0,"부천 체육관"]],"2027-02-01":[["VLEAGUE_M","19:00","현대캐피탈","OK저축은행",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","정관장",0,0,"김천 실내체육관"],["WKBL","19:00","KB스타즈","삼성생명",0,0,"청주 체육관"]],"2027-02-02":[["VLEAGUE_M","19:00","삼성화재","KB손해보험",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","흥국생명",0,0,"광주 페퍼스타디움"]],"2027-02-03":[["WKBL","19:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2027-02-04":[["VLEAGUE_M","19:00","OK저축은행","한국전력",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","IBK기업은행",0,0,"대전 충무체육관"]],"2027-02-05":[["VLEAGUE_M","19:00","우리카드","삼성화재",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","SOOP 수퍼스",0,0,"수원 실내체육관"],["WKBL","19:00","우리은행","하나은행",0,0,"아산 이순신체육관"]],"2027-02-06":[["VLEAGUE_M","14:00","대한항공","KB손해보험",0,0,"인천 계양체육관"],["WKBL","14:00","BNK썸","KB스타즈",0,0,"부산 사직실내체육관"],["VLEAGUE_W","16:00","GS칼텍스","흥국생명",0,0,"서울 장충체육관"],["WKBL","16:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2027-02-07":[["VLEAGUE_M","14:00","한국전력","현대캐피탈",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","한국도로공사",0,0,"화성 종합실내체육관"],["WKBL","16:00","BNK썸","하나은행",0,0,"부산 사직실내체육관"]],"2027-02-08":[["VLEAGUE_M","14:00","우리카드","OK저축은행",0,0,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","정관장",0,0,"수원 실내체육관"],["WKBL","19:00","KB스타즈","우리은행",0,0,"청주 체육관"]],"2027-02-09":[["VLEAGUE_M","14:00","삼성화재","대한항공",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","GS칼텍스",0,0,"광주 페퍼스타디움"]],"2027-02-10":[["WKBL","19:00","BNK썸","삼성생명",0,0,"부산 사직실내체육관"]],"2027-02-11":[["VLEAGUE_M","19:00","KB손해보험","한국전력",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","IBK기업은행",0,0,"인천 삼산월드체육관"]],"2027-02-12":[["VLEAGUE_M","19:00","현대캐피탈","우리카드",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","현대건설",0,0,"김천 실내체육관"],["WKBL","19:00","KB스타즈","신한은행",0,0,"청주 체육관"]],"2027-02-13":[["VLEAGUE_M","14:00","대한항공","삼성화재",0,0,"인천 계양체육관"],["WKBL","14:00","하나은행","삼성생명",0,0,"부천 체육관"],["VLEAGUE_W","16:00","GS칼텍스","SOOP 수퍼스",0,0,"서울 장충체육관"],["WKBL","16:00","우리은행","BNK썸",0,0,"아산 이순신체육관"]],"2027-02-14":[["VLEAGUE_M","14:00","KB손해보험","OK저축은행",0,0,"평택 이충문화체육관"],["VLEAGUE_W","16:00","흥국생명","정관장",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","신한은행",0,0,"부천 체육관"]],"2027-02-15":[["WKBL","19:00","삼성생명","KB스타즈",0,0,"용인 실내체육관"]],"2027-02-16":[["VLEAGUE_M","19:00","대한항공","현대캐피탈",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","한국도로공사",0,0,"서울 장충체육관"]],"2027-02-17":[["VLEAGUE_M","19:00","OK저축은행","우리카드",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","현대건설",0,0,"대전 충무체육관"],["WKBL","19:00","신한은행","우리은행",0,0,"인천 도원체육관"]],"2027-02-18":[["VLEAGUE_M","19:00","한국전력","KB손해보험",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","흥국생명",0,0,"화성 종합실내체육관"]],"2027-02-19":[["VLEAGUE_M","19:00","현대캐피탈","삼성화재",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","SOOP 수퍼스",0,0,"김천 실내체육관"],["WKBL","19:00","KB스타즈","하나은행",0,0,"청주 체육관"]],"2027-02-20":[["VLEAGUE_M","14:00","우리카드","대한항공",0,0,"서울 장충체육관"],["WKBL","14:00","우리은행","삼성생명",0,0,"아산 이순신체육관"],["VLEAGUE_W","16:00","현대건설","GS칼텍스",0,0,"수원 실내체육관"],["WKBL","16:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2027-02-21":[["VLEAGUE_M","14:00","한국전력","OK저축은행",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","정관장",0,0,"화성 종합실내체육관"],["WKBL","16:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2027-02-22":[["WKBL","19:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"]],"2027-02-23":[["VLEAGUE_M","19:00","현대캐피탈","KB손해보험",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","흥국생명",0,0,"김천 실내체육관"]],"2027-02-24":[["VLEAGUE_M","19:00","삼성화재","우리카드",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","현대건설",0,0,"광주 페퍼스타디움"],["WKBL","19:00","삼성생명","BNK썸",0,0,"용인 실내체육관"]],"2027-02-25":[["VLEAGUE_M","19:00","대한항공","한국전력",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","IBK기업은행",0,0,"서울 장충체육관"]],"2027-02-26":[["VLEAGUE_M","19:00","OK저축은행","현대캐피탈",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","한국도로공사",0,0,"대전 충무체육관"],["WKBL","19:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2027-02-27":[["VLEAGUE_M","14:00","KB손해보험","삼성화재",0,0,"평택 이충문화체육관"],["WKBL","14:00","KB스타즈","BNK썸",0,0,"청주 체육관"],["VLEAGUE_W","16:00","흥국생명","SOOP 수퍼스",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","삼성생명",0,0,"부천 체육관"]],"2027-02-28":[["VLEAGUE_M","14:00","한국전력","우리카드",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","현대건설",0,0,"화성 종합실내체육관"],["WKBL","16:00","KB스타즈","신한은행",0,0,"청주 체육관"]],"2027-03-01":[["VLEAGUE_M","14:00","OK저축은행","대한항공",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","GS칼텍스","정관장",0,0,"서울 장충체육관"],["WKBL","19:00","BNK썸","하나은행",0,0,"부산 사직실내체육관"]],"2027-03-03":[["VLEAGUE_M","19:00","우리카드","KB손해보험",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","흥국생명",0,0,"수원 실내체육관"],["WKBL","19:00","우리은행","삼성생명",0,0,"아산 이순신체육관"]],"2027-03-04":[["VLEAGUE_M","19:00","현대캐피탈","한국전력",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","IBK기업은행",0,0,"김천 실내체육관"]],"2027-03-05":[["VLEAGUE_M","19:00","삼성화재","OK저축은행",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","정관장",0,0,"광주 페퍼스타디움"],["WKBL","19:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2027-03-06":[["VLEAGUE_M","14:00","KB손해보험","대한항공",0,0,"평택 이충문화체육관"],["WKBL","14:00","삼성생명","KB스타즈",0,0,"용인 실내체육관"],["VLEAGUE_W","16:00","흥국생명","GS칼텍스",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","우리은행",0,0,"부천 체육관"]],"2027-03-07":[["VLEAGUE_M","14:00","우리카드","현대캐피탈",0,0,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","한국도로공사",0,0,"수원 실내체육관"],["WKBL","16:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2027-03-08":[["WKBL","19:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2027-03-09":[["VLEAGUE_M","19:00","삼성화재","한국전력",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","IBK기업은행",0,0,"광주 페퍼스타디움"],["WKBL","19:00","KB스타즈","하나은행",0,0,"청주 체육관"]],"2027-03-10":[["VLEAGUE_M","19:00","대한항공","우리카드",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","현대건설",0,0,"서울 장충체육관"]],"2027-03-11":[["VLEAGUE_M","19:00","OK저축은행","KB손해보험",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","흥국생명",0,0,"대전 충무체육관"]],"2027-03-12":[["VLEAGUE_M","19:00","한국전력","삼성화재",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","SOOP 수퍼스",0,0,"화성 종합실내체육관"]],"2027-03-13":[["VLEAGUE_M","14:00","현대캐피탈","대한항공",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","GS칼텍스",0,0,"김천 실내체육관"]],"2027-03-14":[["VLEAGUE_M","14:00","KB손해보험","우리카드",0,0,"평택 이충문화체육관"],["VLEAGUE_W","16:00","흥국생명","현대건설",0,0,"인천 삼산월드체육관"]],"2027-03-16":[["VLEAGUE_M","19:00","현대캐피탈","삼성화재",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","SOOP 수퍼스",0,0,"김천 실내체육관"]],"2027-03-17":[["VLEAGUE_M","19:00","OK저축은행","한국전력",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","IBK기업은행",0,0,"대전 충무체육관"]],"2027-03-18":[["VLEAGUE_M","19:00","대한항공","KB손해보험",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","흥국생명",0,0,"서울 장충체육관"]],"2027-03-19":[["VLEAGUE_M","19:00","우리카드","삼성화재",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","SOOP 수퍼스",0,0,"수원 실내체육관"]],"2027-03-20":[["VLEAGUE_M","14:00","현대캐피탈","OK저축은행",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","정관장",0,0,"김천 실내체육관"]],"2027-03-21":[["VLEAGUE_M","14:00","한국전력","대한항공",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","GS칼텍스",0,0,"화성 종합실내체육관"]],"2027-03-23":[["VLEAGUE_M","19:00","KB손해보험","현대캐피탈",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","한국도로공사",0,0,"인천 삼산월드체육관"]],"2027-03-24":[["VLEAGUE_M","19:00","우리카드","OK저축은행",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","정관장",0,0,"수원 실내체육관"]],"2027-03-25":[["VLEAGUE_M","19:00","삼성화재","대한항공",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","GS칼텍스",0,0,"광주 페퍼스타디움"]],"2027-03-26":[["VLEAGUE_M","19:00","KB손해보험","한국전력",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","IBK기업은행",0,0,"인천 삼산월드체육관"]],"2027-03-27":[["VLEAGUE_M","14:00","현대캐피탈","우리카드",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","현대건설",0,0,"김천 실내체육관"]],"2027-03-28":[["VLEAGUE_M","14:00","OK저축은행","삼성화재",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","정관장","SOOP 수퍼스",0,0,"대전 충무체육관"]],"2027-03-30":[["VLEAGUE_M","19:00","한국전력","현대캐피탈",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","한국도로공사",0,0,"화성 종합실내체육관"]],"2027-03-31":[["VLEAGUE_M","19:00","대한항공","OK저축은행",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","정관장",0,0,"서울 장충체육관"]],"2027-04-01":[["VLEAGUE_M","19:00","삼성화재","KB손해보험",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","흥국생명",0,0,"광주 페퍼스타디움"]],"2027-04-02":[["VLEAGUE_M","19:00","우리카드","한국전력",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","IBK기업은행",0,0,"수원 실내체육관"]]}')
 _OFFTHEFIELD_CACHE_V4622: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
 _PER_OFFSET_DIAG_V4622: Dict[int, Dict[str, Any]] = {}
 _RT_TOP_POOL_V4622 = ThreadPoolExecutor(max_workers=16)
@@ -27208,6 +27631,54 @@ def _install_dc_ko_team_wrapper_v381(dc_mod: Any = None) -> bool:
 
         dc_mod.collect_live_scores = _ko_collect_ls
 
+    global _LIVE_EPL_INJ_SAMPLE_CACHE_V4635
+    orig_get_injuries = getattr(dc_mod, "get_injuries", None)
+    if callable(orig_get_injuries):
+        try:
+            _epl_probe = orig_get_injuries("EPL", "all", "")
+            if isinstance(_epl_probe, dict):
+                _LIVE_EPL_INJ_SAMPLE_CACHE_V4635 = dict(_epl_probe)
+        except Exception:
+            pass
+
+        def _ko_get_injuries_v4635(league: str = "EPL", severity: str = "all", q: str = "") -> Dict[str, Any]:
+            global _LIVE_EPL_INJ_SAMPLE_CACHE_V4635
+            lg_str = str(league or "EPL").strip()
+            lg_up = lg_str.upper()
+            if lg_up in ("KBL", "WKBL", "VLEAGUE_M", "VLEAGUE_W", "VLEAGUE", "VL", "WVL", "KOVO", "WKOVO") or ("V-리그" in lg_str or "V리그" in lg_str):
+                norm_c = "VLEAGUE_W" if ("여자" in lg_str or lg_up in ("VLEAGUE_W", "WVL", "WKOVO")) else ("VLEAGUE_M" if ("남자" in lg_str or lg_up in ("VLEAGUE_M", "VLEAGUE", "VL", "KOVO")) else lg_up)
+                return _build_domestic_bball_injuries_v341(norm_c, severity, q)
+            res_inj = orig_get_injuries(league, severity, q)
+            if lg_up == "EPL" and isinstance(res_inj, dict) and _LIVE_EPL_INJ_SAMPLE_CACHE_V4635 is None:
+                _LIVE_EPL_INJ_SAMPLE_CACHE_V4635 = dict(res_inj)
+            return res_inj
+
+        dc_mod.get_injuries = _ko_get_injuries_v4635
+
+    orig_get_standings = getattr(dc_mod, "get_standings", None)
+    if callable(orig_get_standings):
+        def _ko_get_standings_v4635(league: str = "EPL", *a, **kw) -> Dict[str, Any]:
+            lg_str = str(league or "EPL").strip()
+            lg_up = lg_str.upper()
+            if lg_up in ("KBL", "WKBL", "VLEAGUE_M", "VLEAGUE_W", "VLEAGUE", "VL", "WVL", "KOVO", "WKOVO") or ("V-리그" in lg_str or "V리그" in lg_str):
+                norm_c = "VLEAGUE_W" if ("여자" in lg_str or lg_up in ("VLEAGUE_W", "WVL", "WKOVO")) else ("VLEAGUE_M" if ("남자" in lg_str or lg_up in ("VLEAGUE_M", "VLEAGUE", "VL", "KOVO")) else lg_up)
+                return _build_domestic_bball_standings_v341(norm_c)
+            return orig_get_standings(league, *a, **kw)
+
+        dc_mod.get_standings = _ko_get_standings_v4635
+
+    orig_get_sim = getattr(dc_mod, "get_season_sim", None)
+    if callable(orig_get_sim):
+        def _ko_get_sim_v4635(league: str = "EPL", *a, **kw) -> Dict[str, Any]:
+            lg_str = str(league or "EPL").strip()
+            lg_up = lg_str.upper()
+            if lg_up in ("KBL", "WKBL", "VLEAGUE_M", "VLEAGUE_W", "VLEAGUE", "VL", "WVL", "KOVO", "WKOVO") or ("V-리그" in lg_str or "V리그" in lg_str):
+                norm_c = "VLEAGUE_W" if ("여자" in lg_str or lg_up in ("VLEAGUE_W", "WVL", "WKOVO")) else ("VLEAGUE_M" if ("남자" in lg_str or lg_up in ("VLEAGUE_M", "VLEAGUE", "VL", "KOVO")) else lg_up)
+                return _build_domestic_bball_sim_v341(norm_c, 5000)
+            return orig_get_sim(league, *a, **kw)
+
+        dc_mod.get_season_sim = _ko_get_sim_v4635
+
     dc_cache = getattr(dc_mod, "_CACHE", None)
     if isinstance(dc_cache, dict):
         for k_c in [k for k in list(dc_cache.keys()) if str(k).startswith("live_scores_")]:
@@ -27304,6 +27775,8 @@ _install_overseas_precision_classifier_and_repair_db_v4627()
 @router.get("/api/member/live-sources-diag-v4631")
 @router.get("/api/member/live-sources-diag-v4632")
 @router.get("/api/member/live-sources-diag-v4633")
+@router.get("/api/member/live-sources-diag-v4634")
+@router.get("/api/member/live-sources-diag-v4635")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -27313,7 +27786,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     ov_counts = {k: sum(1 for x in ov_items if x.get("sport_ko") == k) for k in ("축구", "야구", "농구", "하키", "NFL", "UFC", "F1", "종합")}
     return {
         "ok": True,
-        "version": "v4.6.33",
+        "version": "v4.6.35",
         "overseas_counts": ov_counts,
         "apisports_bridge": _get_apisports_diag_snapshot_v4623(),
         "date_offset": off_i,
