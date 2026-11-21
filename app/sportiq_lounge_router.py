@@ -7280,16 +7280,22 @@ _FRONTEND_V22_JS = r'''
     var targetOff = (typeof forceOffset === "number" && !isNaN(forceOffset))
       ? forceOffset
       : (v30ScoreState.selectedDateOffset || 0);
+    if (v30ScoreState.loadedDateOffset === targetOff && v30ScoreState.rawAllItems.length > 0) {
+      v30ScoreState.isLoadingDate = false;
+      return;
+    }
     window.__sqSbOffsetMemV4643 = window.__sqSbOffsetMemV4643 || {};
     var memEnt = window.__sqSbOffsetMemV4643[targetOff];
     var memTtl = (targetOff === 0) ? 25000 : 180000;
-    if (memEnt && Array.isArray(memEnt.items) && memEnt.items.length > 0 && (Date.now() - memEnt.ts) < memTtl) {
-      v30ScoreState.isLoadingDate = false;
-      v30ScoreState.loadedDateOffset = targetOff;
-      mergeRawScoreItemsV30(memEnt.items, true);
-      return;
-    }
-    if (v30ScoreState.loadedDateOffset === targetOff && v30ScoreState.rawAllItems.length > 0) {
+    if (!window.__sqInMemApplyV4644 && memEnt && Array.isArray(memEnt.items) && memEnt.items.length > 0 && (Date.now() - memEnt.ts) < memTtl) {
+      window.__sqInMemApplyV4644 = true;
+      try {
+        v30ScoreState.isLoadingDate = false;
+        v30ScoreState.loadedDateOffset = targetOff;
+        mergeRawScoreItemsV30(memEnt.items, true);
+      } finally {
+        window.__sqInMemApplyV4644 = false;
+      }
       return;
     }
     if (v30ScoreState.fetchingOffset === targetOff) return;
@@ -7345,6 +7351,8 @@ _FRONTEND_V22_JS = r'''
     }).catch(function () {
       v30ScoreState.fetchingOffset = null;
       v30ScoreState.isLoadingDate = false;
+      v30ScoreState.loadedDateOffset = targetOff;
+      refreshScoreboardSuiteV30();
     });
   }
 
@@ -30050,7 +30058,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.43",
+        "version": "v4.6.44",
         "zero_502_shared_pool_v4643": True,
         "flashscore_mobi_bridge_v4639": True,
         "kr_jp_soccer_bridge_v4640": True,
@@ -30627,6 +30635,7 @@ _ORIG_DIAG_V4619 = api_live_sources_diag_v4619
 
 @router.get("/api/member/live-sources-diag-v4642")
 @router.get("/api/member/live-sources-diag-v4643")
+@router.get("/api/member/live-sources-diag-v4644")
 def api_live_sources_diag_v4643(date_offset: int = 0):
     d = _ORIG_DIAG_V4619(date_offset=date_offset)
     if isinstance(d, dict):
