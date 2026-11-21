@@ -1536,7 +1536,7 @@ setRole(state.role); lockQuickChallengeUI();
         renderGlobalTop10();
         renderSidebarGlobalTop5();
       }
-      if (typeof showToast === 'function') showToast('🔥 관심 투표가 반영되었습니다!');
+      if (typeof showToast === 'function') showToast(data.already_voted ? '이미 이 경기에 투표하셨습니다.' : '🔥 관심 투표가 반영되었습니다!');
     } catch (e) {
     } finally {
       votingMatchId = null;

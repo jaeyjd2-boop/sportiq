@@ -17783,7 +17783,7 @@ def _build_comment_sig_v4612(post_id: str, user_label: str, comment_text: str) -
 
 @router.get("/api/posts")
 def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[str] = ""):
-    _ensure_tactical_posts_seeded_v22()
+    # 조회 요청에서는 예시 게시글을 시드하지 않는다(시드는 시작 시 테이블 초기화에서만).
     _primary, actor_keys = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
@@ -17890,6 +17890,8 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
                     "comments": comments_by_post.get(pid, []),
                     "isMemberServerPost": True,
                     "hasPin": bool(r["pin_hash"]),
+                    # 운영자가 넣은 예시 글(실제 회원 글 아님)
+                    "is_sample": str(pid).startswith("mp_seed_"),
                 }
             )
 
@@ -20719,7 +20721,7 @@ def _format_fan_vote_payload_v32(
     tot = max(1, hv + dv + av)
     h_pct = int(round((hv / tot) * 100))
     d_pct = int(round((dv / tot) * 100)) if has_draw else 0
-    a_pct = max(0, 100 - h_pct - d_pct)
+    a_pct = max(0, 100 - h_pct - d_pct) if (hv + dv + av) > 0 else 0
     out: Dict[str, Any] = {
         "ok": True,
         "match_key": match_key,
@@ -20736,6 +20738,8 @@ def _format_fan_vote_payload_v32(
         "draw_pct": d_pct,
         "away_pct": a_pct,
         "message": message,
+        # 예전 버전이 만든 집계 행에는 기본 시드 투표(24~56표)가 섞여 있을 수 있다.
+        "votes_include_seed_baseline": True,
     }
     if points is not None:
         out["points"] = int(points)
@@ -20761,18 +20765,14 @@ def get_match_fan_vote_v32(
     _, actor_candidates = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
-        now = time.time()
-        with _smu_db_session(write=True) as conn:
+        # 조회 전용: 집계가 없으면 0표로 응답하고 DB에 아무것도 쓰지 않는다(가짜 기본 투표 생성 제거).
+        with _smu_db_session(write=False) as conn:
             t_row = conn.execute(
                 "SELECT home_votes, draw_votes, away_votes FROM match_fan_vote_totals_v32 WHERE match_key = ?",
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, hp, dp, ap)
-                conn.execute(
-                    "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
-                    (mk, hv, dv, av, now),
-                )
+                hv, dv, av = 0, 0, 0
             else:
                 hv = int(t_row["home_votes"] or 0)
                 dv = int(t_row["draw_votes"] or 0) if hd else 0
@@ -20818,7 +20818,7 @@ def submit_match_fan_vote_v32(payload: MatchFanVoteIn):
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, int(payload.hp or 45), int(payload.dp or 25), int(payload.ap or 30))
+                hv, dv, av = 0, 0, 0  # 실제 투표만 집계한다(기본 시드 투표 없음).
                 conn.execute(
                     "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
                     (mk, hv, dv, av, now),
@@ -20962,10 +20962,7 @@ def _xml_safe_cdata_v4636(val: Any) -> str:
 
 
 def _collect_indexable_posts_v38(limit: int = 60) -> List[Dict[str, Any]]:
-    try:
-        _ensure_tactical_posts_seeded_v22()
-    except Exception:
-        pass
+    # sitemap/RSS 조회 중에는 DB에 쓰지 않는다.
     now_ts = time.time()
     items: List[Dict[str, Any]] = []
     seen_ids: Set[str] = set()
@@ -24272,16 +24269,46 @@ def get_global_matches():
                 for i, r in enumerate(rows)
             ]
 
-    return {"matches": run_with_db_retry(_op)}
+    # votes/buzz_score는 초기 시드 기준값에 실제 투표가 더해진 값이다(실측 팬 수가 아님).
+    return {"matches": run_with_db_retry(_op), "votes_include_seed_baseline": True}
+
+
+_GM_VOTE_DEDUPE_LOCK = threading.Lock()
+_GM_VOTE_DEDUPE: Dict[str, float] = {}
+_GM_VOTE_DEDUPE_TTL_SEC = 12 * 3600.0
+
+
+def _gm_vote_already_cast(request: Optional[Request], match_id: int) -> bool:
+    """같은 접속자(IP 해시)가 같은 경기에 12시간 안에 다시 투표하면 True. 원본 IP는 저장하지 않는다."""
+    ip_raw = _client_ip_v4615(request)
+    salt = os.environ.get("SPORTIQ_VOTE_HASH_SALT", "sportiq-gm-vote")
+    key = hashlib.sha256(f"{salt}:{ip_raw}:{match_id}".encode("utf-8", errors="ignore")).hexdigest()
+    now_ep = time.time()
+    with _GM_VOTE_DEDUPE_LOCK:
+        if len(_GM_VOTE_DEDUPE) > 20000:
+            for k in [k for k, ts in _GM_VOTE_DEDUPE.items() if (now_ep - ts) >= _GM_VOTE_DEDUPE_TTL_SEC]:
+                _GM_VOTE_DEDUPE.pop(k, None)
+        last = _GM_VOTE_DEDUPE.get(key)
+        if last is not None and (now_ep - last) < _GM_VOTE_DEDUPE_TTL_SEC:
+            return True
+        _GM_VOTE_DEDUPE[key] = now_ep
+        return False
 
 
 @router.post("/api/rankings/global-matches/{match_id}/vote")
-def vote_global_match(match_id: int):
+def vote_global_match(match_id: int, request: Request):
+    already_voted = _gm_vote_already_cast(request, match_id)
+
     def _op() -> tuple[Optional[dict], list[dict]]:
-        with _db_session(write=True) as conn:
-            cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
-            if cur.rowcount == 0:
-                raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
+        with _db_session(write=not already_voted) as conn:
+            if already_voted:
+                exists = conn.execute("SELECT 1 FROM global_match_rankings WHERE id = ?", (match_id,)).fetchone()
+                if not exists:
+                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
+            else:
+                cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
+                if cur.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
             rows = conn.execute(
                 "SELECT id, match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC"
             ).fetchall()
@@ -24305,12 +24332,19 @@ def vote_global_match(match_id: int):
             return voted, items
 
     voted, items = run_with_db_retry(_op)
-    try:
-        from app.sportiq_auto_analyst import _backup_tables_to_pg
-        _backup_tables_to_pg("global_match_rankings")
-    except Exception:
-        pass
-    return {"ok": True, "match": voted, "matches": items}
+    if not already_voted:
+        try:
+            from app.sportiq_auto_analyst import _backup_tables_to_pg
+            _backup_tables_to_pg("global_match_rankings")
+        except Exception:
+            pass
+    return {
+        "ok": True,
+        "already_voted": already_voted,
+        "votes_include_seed_baseline": True,
+        "match": voted,
+        "matches": items,
+    }
 
 
 _DC_KO_WRAPPER_INSTALLED_V381 = False

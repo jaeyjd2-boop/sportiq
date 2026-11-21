@@ -151,6 +151,23 @@ def _seed_hash(key: str) -> int:
     return int(digest[:8], 16)
 
 
+# 초기 시드로 넣은 예시 적중 기록(실제 예측 결과 아님). 응답에서 is_sample로 표시한다.
+_SEED_SCORECARD_KEYS = frozenset({
+    ('2026-11-15', '리버풀 vs 아스톤 빌라'),
+    ('2026-11-15', '바르셀로나 vs 바이에른 뮌헨'),
+    ('2026-11-14', '보스턴 셀틱스 vs 밀워키 벅스'),
+    ('2026-11-14', 'LA 레이커스 vs 피닉스 선즈'),
+    ('2026-11-13', 'LA 다저스 vs 뉴욕 양키스'),
+    ('2026-11-13', 'KIA 타이거즈 vs 삼성 라이온즈'),
+    ('2026-11-12', '에드먼턴 오일러스 vs 댈러스 스타즈'),
+    ('2026-11-12', '아스널 vs 첼시'),
+    ('2026-11-11', '덴버 너게츠 vs 오클라호마시티'),
+    ('2026-11-11', '플로리다 팬서스 vs 뉴욕 레인저스'),
+    ('2026-11-10', '레알 마드리드 vs AC 밀란'),
+    ('2026-11-10', '휴스턴 애스트로스 vs 텍사스 레인저스'),
+})
+
+
 def _init_pro_lab_db() -> None:
     global _DB_INITIALIZED
     if _DB_INITIALIZED:
@@ -661,12 +678,16 @@ def get_match_insights() -> Dict[str, Any]:
             "injury_note": model["injury_note"],
             "risk_note": model["risk_note"],
             "quick_stats": model["quick_stats"],
+            # AI·시장 확률과 부상·리스크 메모는 경기 키 해시로 만든 추정 예시값이다(실제 모델/시장 데이터 아님).
+            "is_sample": True,
         })
 
     return {
         "count": len(insights),
         "updated_at_kst": _now_kst_str(),
         "items": insights,
+        "is_sample": True,
+        "sample_note": "AI/시장 확률·부상 메모는 실제 데이터가 아닌 추정 예시값입니다.",
     }
 
 
@@ -688,6 +709,10 @@ def get_ai_scorecard() -> Dict[str, Any]:
         conn.close()
 
     records = [dict(r) for r in rows]
+    for r in records:
+        r["is_sample"] = (str(r.get("match_date") or ""), str(r.get("matchup") or "")) in _SEED_SCORECARD_KEYS
+    real_records = [r for r in records if not r["is_sample"]]
+    real_hits = sum(1 for r in real_records if int(r["hit"]) == 1)
     total = len(records)
     hits = sum(1 for r in records if int(r["hit"]) == 1)
     accuracy_pct = round((hits * 100.0 / total), 1) if total else 0.0
@@ -719,6 +744,12 @@ def get_ai_scorecard() -> Dict[str, Any]:
         "brier_note": f"평균 브라이어 오차 {avg_brier:.3f} (0.250 이하 양호 보정 구간)",
         "sport_summary": sport_summary,
         "records": records,
+        # 위 합계에는 예시(시드) 기록이 포함될 수 있다. 실제 채점 기록만의 수치는 real_* 키를 본다.
+        "includes_sample_records": any(r["is_sample"] for r in records),
+        "sample_records_count": sum(1 for r in records if r["is_sample"]),
+        "real_total_matches": len(real_records),
+        "real_hits": real_hits,
+        "real_accuracy_pct": round(real_hits * 100.0 / len(real_records), 1) if real_records else None,
     }
 
 
@@ -817,3 +848,9 @@ def create_tactic(payload: TacticCreateRequest) -> Dict[str, Any]:
         "items": items,
     }
 
+
+# 조회(GET) 요청이 처음 들어올 때 DB를 쓰지 않도록, 표 생성·시드를 모듈 로드 시 한 번 실행한다.
+try:
+    _init_pro_lab_db()
+except Exception:
+    pass

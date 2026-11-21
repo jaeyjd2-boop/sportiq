@@ -150,6 +150,9 @@ def _calc_ai_probs(seed_key, sport, home_score=0, away_score=0, state="pre"):
         "draw_pct": draw_p,
         "away_pct": away_p,
         "odds": {"home": odds_h, "draw": odds_d, "away": odds_a},
+        # 경기 ID 기반 난수로 만든 추정 예시값이다(실제 모델 확률·북메이커 배당 아님).
+        "is_estimate": True,
+        "is_sample": True,
     }
 
 
@@ -247,6 +250,8 @@ def _fetch_espn_scoreboard(league_code, date_offset=0):
                 "period_scores": _parse_period_scores(sport, home_c, away_c),
                 "venue": venue,
                 "ai": _calc_ai_probs(mid, sport, h_score, a_score, state),
+                "source": "ESPN",
+                "is_sample": False,
             })
         except Exception:
             continue
@@ -288,6 +293,9 @@ def _korean_schedule_matches(date_offset=0):
             "period_scores": ps_val,
             "venue": ven,
             "ai": _calc_ai_probs(mid, sp, h_val, a_val, state_default),
+            # 하드코딩된 예시 경기(실제 일정·스코어 아님)
+            "source": "sample",
+            "is_sample": True,
         })
     return out
 
@@ -373,6 +381,9 @@ def _extra_sports_matches(date_offset=0, existing=None):
                 "period_scores": ps_val,
                 "venue": ven,
                 "ai": _calc_ai_probs(mid, sp, h_val, a_val, state_default),
+                # 하드코딩된 예시 경기(실제 일정·스코어 아님)
+                "source": "sample",
+                "is_sample": True,
             })
     except Exception:
         pass
@@ -455,6 +466,7 @@ def get_live_scores(
                 "sport": it["sport"],
                 "league": it["league"],
                 "text": f"📉 [드롭오즈 경보] [{it['league']}] {it['home']} {it['target_pick'].replace(' 급락', '')} 배당 {it['open_odds']} → {it['curr_odds']} ({it['drop_pct']}% 급락!)",
+                "is_sample": True,
             }
             for it in odds_data.get("items", [])[:5]
         ]
@@ -464,6 +476,7 @@ def get_live_scores(
             "counts": counts,
             "score_alerts": list(_SCORE_ALERTS[:15]),
             "odds_alerts": odds_alerts,
+            "odds_alerts_is_sample": True,
             "matches": filtered,
         }
     except Exception as e:
@@ -586,6 +599,8 @@ def _build_dropping_odds(matches, sport="all", min_drop=5.0):
                 "grade": grade,
                 "reason": reason_opts[seed % len(reason_opts)],
                 "detected_kst": now_str,
+                # 배당·변동률·사유는 경기 ID 해시로 만든 예시값이다(실제 시장 데이터 아님).
+                "is_sample": True,
             })
         items.sort(key=lambda x: x["drop_pct"])
     except Exception:
@@ -622,6 +637,8 @@ def get_dropping_odds(sport: str = Query("all"), min_drop: float = Query(5.0)):
             "min_drop": min_drop,
             "kpis": res["kpis"],
             "items": res["items"],
+            "is_sample": True,
+            "sample_note": "배당 변동 데이터는 실제 시장 데이터가 아닌 예시값입니다.",
         }
     except Exception as e:
         return {
@@ -931,8 +948,8 @@ def _fetch_espn_standings(league_code):
             pts = int(stats_map.get("points", w * 3 + d) or 0)
             pct = stats_map.get("winPercent")
             pts_label = f"{pts}점" if sport in ("soccer", "hockey") else (f"{pct:.3f}" if isinstance(pct, (int, float)) else f"{w}승")
-            rng = random.Random(tname)
-            form = [rng.choice(["W", "W", "D", "L", "W"]) for _ in range(5)]
+            # 최근 5경기 폼은 ESPN 순위 응답에 없으므로 지어내지 않는다(예전: 팀명 시드 난수).
+            form = []
             rows.append({
                 "rank": idx,
                 "zone": _zone_label(sport, idx, len(entries)),
@@ -985,7 +1002,7 @@ def get_standings(league: str = Query("EPL")):
             }
             for idx, (team, gp, w, d, l, gf, ga, form) in enumerate(fb_m, start=1)
         ]
-        res_m = {"ok": True, "league": raw_lg, "league_full": lf_m, "sport": sp_m, "source": "SportiQ Verified Standings", "standings": rows_m, "leaders": _FALLBACK_LEADERS.get(raw_lg, {"scorers": [], "assists": []})}
+        res_m = {"ok": True, "league": raw_lg, "league_full": lf_m, "sport": sp_m, "source": "SportiQ 예시 데이터", "is_sample": True, "leaders_is_sample": True, "standings": rows_m, "leaders": _FALLBACK_LEADERS.get(raw_lg, {"scorers": [], "assists": []})}
         _cache_set(f"standings_{raw_lg}", res_m)
         return res_m
     if lg not in LEAGUE_CONFIG:
@@ -997,8 +1014,11 @@ def get_standings(league: str = Query("EPL")):
     sport, _, league_full = LEAGUE_CONFIG[lg]
     rows = _fetch_espn_standings(lg)
     source = "ESPN Live API"
+    is_sample = False
     if not rows:
-        source = "SportiQ Verified Standings"
+        # 실시간 연동 실패 시 하드코딩 예시 표. 검증된 데이터처럼 표시하지 않는다.
+        source = "SportiQ 예시 데이터 (실시간 연동 실패)"
+        is_sample = True
         fb = _FALLBACK_STANDINGS.get(lg) or _FALLBACK_STANDINGS["EPL"]
         rows = []
         for idx, (team, gp, w, d, l, gf, ga, form) in enumerate(fb, start=1):
@@ -1040,6 +1060,9 @@ def get_standings(league: str = Query("EPL")):
         "league_name": league_full,
         "sport": sport,
         "source": source,
+        "is_sample": is_sample,
+        # 득점·도움 리더는 하드코딩 또는 '팀명 에이스' 형태의 예시값이다.
+        "leaders_is_sample": True,
         "updated_at_kst": _fmt_kst(_now_kst()),
         "standings": rows,
         "leaders": leaders,
@@ -1198,12 +1221,8 @@ def _fetch_rss_transfers():
                     })
         except Exception:
             continue
-    seeds = [
-        {"cat": "오피셜", "league": "EPL", "source": "SportiQ Desk", "title": "리버풀·아스널, 여름 이적시장 핵심 공격수 영입전 본격화", "ai_brief": "AI 요약: 빅6 공격진 보강 및 재계약 협상 가속화", "url": "https://www.bbc.com/sport/football", "updated_kst": now_str},
-        {"cat": "임박·루머", "league": "LALIGA", "source": "SportiQ Desk", "title": "레알 마드리드, 측면 수비수 보강 타깃 최종 조율 중", "ai_brief": "AI 요약: 자유계약 및 바이아웃 조건 검토 단계", "url": "https://www.espn.com/soccer/", "updated_kst": now_str},
-        {"cat": "임대", "league": "BUNDESLIGA", "source": "SportiQ Desk", "title": "분데스리가 유망주 공격수, 1시즌 임대 이적 합의 근접", "ai_brief": "AI 요약: 출전 시간 확보를 위한 완전이적 옵션 포함 임대", "url": "https://www.espn.com/soccer/", "updated_kst": now_str},
-    ]
-    merged = items[:12] + seeds
+    # 예전에는 'SportIQ Desk' 이름의 지어낸 이적 기사 3건을 항상 덧붙였다. 실제 RSS 항목만 반환한다.
+    merged = items[:12]
     _cache_set("transfers_rss", merged)
     return merged
 
@@ -1229,6 +1248,9 @@ def get_transfers(category: str = Query("all"), filter_key: str = Query("all")):
             "updated_at_kst": _fmt_kst(_now_kst()),
             "feed": feed,
             "market_values": mvs,
+            # 시장가치 표와 하이라이트는 하드코딩된 예시값이다.
+            "market_values_is_sample": True,
+            "highlights_is_sample": True,
             "highlights": {
                 "top_rising": "콜 파머 (+40M EUR)",
                 "korean_rising": "김민재·이강인 (+5M EUR)",
@@ -1316,10 +1338,13 @@ def get_injuries(league: str = Query("EPL"), severity: str = Query("all"), q: st
                         kr_reason, sev = _map_injury_ko(raw_type, status_str)
                         since = (inj.get("date") or "")[:10] or _now_kst().strftime("%Y-%m-%d")
                         items.append({"team": tname, "player": pname, "pos": pos, "reason": kr_reason, "severity": sev, "since": since})
+        is_sample = False
         if not items:
-            source = "SportiQ Verified Injury Report"
-            items = list(_FALLBACK_INJURIES.get(lg) or _FALLBACK_INJURIES["EPL"])
-        base = {"items": items, "source": source}
+            # ESPN 실패 시 하드코딩 예시 목록. '검증된 보고서'로 표시하지 않는다.
+            source = "SportiQ 예시 데이터 (실시간 연동 실패)"
+            is_sample = True
+            items = [dict(it, is_sample=True) for it in (_FALLBACK_INJURIES.get(lg) or _FALLBACK_INJURIES["EPL"])]
+        base = {"items": items, "source": source, "is_sample": is_sample}
         _cache_set(cache_key, base)
     all_items = base["items"]
     filtered = all_items
@@ -1342,6 +1367,7 @@ def get_injuries(league: str = Query("EPL"), severity: str = Query("all"), q: st
         "league": lg,
         "league_name": league_full,
         "source": base["source"],
+        "is_sample": bool(base.get("is_sample", False)),
         "updated_at_kst": _fmt_kst(_now_kst()),
         "kpis": {
             "total_injured": len(all_items),

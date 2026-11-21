@@ -1,3 +1,4 @@
+import hashlib
 import os
 import sqlite3
 import threading
@@ -156,10 +157,14 @@ def _restore_snapshots_from_pg() -> None:
                         placeholders = ", ".join("?" for _ in cols)
                         col_sql = ", ".join(cols)
                         vals = [item[c] for c in cols]
-                        sconn.execute(
-                            f"INSERT OR REPLACE INTO {tname} ({col_sql}) VALUES ({placeholders})",
-                            vals,
-                        )
+                        try:
+                            sconn.execute(
+                                f"INSERT OR REPLACE INTO {tname} ({col_sql}) VALUES ({placeholders})",
+                                vals,
+                            )
+                        except sqlite3.Error:
+                            # 스키마가 다른 옛 스냅샷 행 하나 때문에 나머지 표 복원이 중단되지 않게 한다.
+                            continue
                 sconn.commit()
         finally:
             pg_conn.close()
@@ -556,7 +561,7 @@ def _build_posts_payload() -> Dict[str, Any]:
 
 @router.get("/api/auto-analyst/posts")
 def get_auto_analyst_posts() -> Dict[str, Any]:
-    start_auto_analyst_scheduler()
+    # 조회 요청은 DB를 바꾸지 않는다. 스케줄러는 모듈 로드 시 start_auto_analyst_scheduler()로 이미 시작된다.
     return _build_posts_payload()
 
 
@@ -604,31 +609,34 @@ def init_match_predictions_db() -> None:
     _restore_snapshots_from_pg()
 
 
+def _read_prediction_row(conn: sqlite3.Connection, match_key: str) -> Dict[str, int]:
+    """읽기 전용. 아직 투표가 없으면 0을 돌려준다(가짜 기본 투표를 만들지 않는다)."""
+    try:
+        row = conn.execute(
+            "SELECT home_votes, draw_votes, away_votes FROM match_predictions WHERE match_key = ?",
+            (str(match_key),),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        row = None
+    if not row:
+        return {"home_votes": 0, "draw_votes": 0, "away_votes": 0, "total_votes": 0}
+    h = int(row["home_votes"] or 0)
+    d = int(row["draw_votes"] or 0)
+    a = int(row["away_votes"] or 0)
+    return {"home_votes": h, "draw_votes": d, "away_votes": a, "total_votes": h + d + a}
+
+
 def _ensure_prediction_row(conn: sqlite3.Connection, match_row: Dict[str, Any]) -> Dict[str, int]:
+    # POST(투표) 경로에서만 호출한다. 새 행은 0표로 시작한다.
     match_key = str(match_row["match_key"])
+    conn.execute(
+        "INSERT OR IGNORE INTO match_predictions (match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, 0, 0, 0, ?)",
+        (match_key, time.time()),
+    )
     row = conn.execute(
         "SELECT home_votes, draw_votes, away_votes FROM match_predictions WHERE match_key = ?",
         (match_key,),
     ).fetchone()
-    if not row:
-        base = max(40, int(match_row.get("votes") or 100) // 10)
-        sport = str(match_row.get("sport") or "")
-        if sport in ("야구", "농구", "하키"):
-            h = max(12, int(base * 0.46))
-            d = max(4, int(base * 0.12))
-            a = max(10, base - h - d)
-        else:
-            h = max(12, int(base * 0.42))
-            d = max(8, int(base * 0.22))
-            a = max(10, base - h - d)
-        conn.execute(
-            "INSERT OR IGNORE INTO match_predictions (match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
-            (match_key, h, d, a, time.time()),
-        )
-        row = conn.execute(
-            "SELECT home_votes, draw_votes, away_votes FROM match_predictions WHERE match_key = ?",
-            (match_key,),
-        ).fetchone()
     h = int(row["home_votes"])
     d = int(row["draw_votes"])
     a = int(row["away_votes"])
@@ -637,12 +645,12 @@ def _ensure_prediction_row(conn: sqlite3.Connection, match_row: Dict[str, Any]) 
 
 @router.get("/api/matches/predictions")
 def get_match_predictions() -> Dict[str, Any]:
-    init_match_predictions_db()
+    # 조회 전용: 표 생성/복원은 모듈 로드 시 init_match_predictions_db()에서 한 번만 한다.
     with _get_conn() as conn:
         top_matches = _fetch_top_20_matches(conn)
         items: List[Dict[str, Any]] = []
         for idx, m in enumerate(top_matches, start=1):
-            pred = _ensure_prediction_row(conn, m)
+            pred = _read_prediction_row(conn, m["match_key"])
             items.append({
                 "rank": idx,
                 "match_key": m["match_key"],
@@ -659,8 +667,8 @@ def get_match_predictions() -> Dict[str, Any]:
                 "away_votes": pred["away_votes"],
                 "total_votes": pred["total_votes"],
             })
-        conn.commit()
-    return {"ok": True, "count": len(items), "matches": items}
+    # 예전 버전이 넣은 기본 투표(시드)가 기존 행에 남아 있을 수 있다.
+    return {"ok": True, "count": len(items), "matches": items, "votes_include_seed_baseline": True}
 
 
 @router.post("/api/matches/predictions/{match_key}/vote")
@@ -701,7 +709,11 @@ def vote_match_prediction(match_key: str, req: PredictionVoteRequest) -> Dict[st
     }
 
 
-start_auto_analyst_scheduler()    
+start_auto_analyst_scheduler()
+try:
+    init_match_predictions_db()
+except Exception:
+    pass
 
 # --- Shorts Hub API ---
 class ShortsInteractReq(BaseModel):
@@ -819,10 +831,18 @@ def init_shorts_hub_db():
     _restore_snapshots_from_pg()
     with _get_conn() as conn:
         if not {"clip_id", "action_group", "actor_key", "choice"}.issubset({r[1] for r in conn.execute("PRAGMA table_info(shorts_user_actions)").fetchall()}):
-            conn.execute("DROP TABLE IF EXISTS shorts_user_actions"); conn.execute("CREATE TABLE shorts_user_actions (clip_id TEXT NOT NULL, action_group TEXT NOT NULL, actor_key TEXT NOT NULL, choice TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(clip_id, action_group, actor_key))"); conn.commit()
+            # 표를 지우지 않고 옛 스키마 표를 이름만 바꿔 보존한다(시작 시에만 실행).
+            conn.execute(f"ALTER TABLE shorts_user_actions RENAME TO shorts_user_actions_legacy_{int(time.time())}"); conn.execute("CREATE TABLE shorts_user_actions (clip_id TEXT NOT NULL, action_group TEXT NOT NULL, actor_key TEXT NOT NULL, choice TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(clip_id, action_group, actor_key))"); conn.commit()
         conn.execute("UPDATE shorts_clip_stats SET likes=COALESCE(likes,120), react_fire=COALESCE(react_fire,30), react_legend=COALESCE(react_legend,31), react_genius=COALESCE(react_genius,25), react_chills=COALESCE(react_chills,19), react_clap=COALESCE(react_clap,28), opt_a_votes=COALESCE(opt_a_votes,50), opt_b_votes=COALESCE(opt_b_votes,50)")
         conn.commit()
     _backup_tables_to_pg("shorts_clip_stats")
+
+
+try:
+    init_shorts_hub_db()
+except Exception:
+    pass
+
 
 def _ensure_shorts_stat_row(conn: sqlite3.Connection, clip_id: str):
     conn.execute(
@@ -850,7 +870,7 @@ def _format_stat_row(row: sqlite3.Row) -> Dict[str, Any]:
 
 @router.get("/api/shorts/hub")
 def get_shorts_hub():
-    init_shorts_hub_db()
+    # 조회 전용: 표 생성·시드는 모듈 로드 시 init_shorts_hub_db()에서 한 번만 한다.
     with _get_conn() as conn:
         stat_rows = conn.execute("SELECT * FROM shorts_clip_stats").fetchall()
         stats = {r["clip_id"]: _format_stat_row(r) for r in stat_rows}
@@ -874,7 +894,15 @@ def get_shorts_hub():
             "SELECT id, clip_id, title, sport, youtube_url, point_note, nickname, created_at FROM shorts_custom_clips WHERE COALESCE(is_hidden, 0) = 0 ORDER BY id DESC"
         ).fetchall()
         custom_clips = [dict(r) for r in clip_rows]
-    return {"ok": True, "stats": stats, "comments": comments, "custom_clips": custom_clips, "persistent_db": bool(_PG_PERSISTENT_OK)}
+    return {
+        "ok": True,
+        "stats": stats,
+        "comments": comments,
+        "custom_clips": custom_clips,
+        "persistent_db": bool(_PG_PERSISTENT_OK),
+        # 기본 클립(clip_1~8)의 수치에는 초기 시드 기준값이 포함되어 있다.
+        "stats_include_seed_baseline": True,
+    }
 
 
 @router.post("/api/shorts/interact")
@@ -900,7 +928,10 @@ def post_shorts_interact(req: ShortsInteractReq, request: Request):
         col = col_map[action]
     else:
         raise HTTPException(status_code=400, detail="invalid action")
-    actor = (req.actor_key or "").strip() or (request.client.host if request.client else "unknown")
+    actor = (req.actor_key or "").strip()[:80]
+    if not actor:
+        ip_raw = request.client.host if request.client else "unknown"
+        actor = "ip:" + hashlib.sha256(ip_raw.encode("utf-8", errors="ignore")).hexdigest()[:24]
     with _get_conn() as conn:
         _ensure_shorts_stat_row(conn, cid)
         if action in ("like", "vote_a", "vote_b", "opt_a", "opt_b"):
@@ -909,7 +940,7 @@ def post_shorts_interact(req: ShortsInteractReq, request: Request):
             if existing:
                 row = conn.execute("SELECT * FROM shorts_clip_stats WHERE clip_id = ?", (cid,)).fetchone()
                 return {"ok": True, "already_participated": True, "clip_id": cid, "stats": _format_stat_row(row)}
-                conn.execute("INSERT INTO shorts_user_actions (clip_id, action_group, actor_key, choice, created_at) VALUES (?, ?, ?, ?, ?)", (cid, action_group, actor, action, _now_kst().isoformat()))
+            conn.execute("INSERT INTO shorts_user_actions (clip_id, action_group, actor_key, choice, created_at) VALUES (?, ?, ?, ?, ?)", (cid, action_group, actor, action, _now_kst().isoformat()))
         conn.execute(
         f"UPDATE shorts_clip_stats SET {col} = COALESCE({col} , 0)+ 1, updated_at = ? WHERE clip_id = ?",
         (time.time(), cid),

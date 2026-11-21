@@ -21,6 +21,7 @@ _ISSUE_RANKING_PG_TABLES = (
     "member_leaderboard",
     "daily_hashtags",
     "partner_inquiries",
+    "issue_vote_actions",
 )
 
 try:
@@ -82,6 +83,22 @@ def _ensure_cheers_columns(conn: sqlite3.Connection) -> set:
     return cols
 
 
+def _migrate_issue_votes_from_shared_table(conn: sqlite3.Connection) -> None:
+    """예전 shorts_user_actions(target_id 스키마)에 남은 이슈 투표 기록을 issue_vote_actions로 복사한다."""
+    try:
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(shorts_user_actions)").fetchall()}
+        if {"action_group", "target_id", "actor_key"}.issubset(cols):
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO issue_vote_actions (action_group, target_id, actor_key, choice, created_at)
+                SELECT action_group, target_id, actor_key, COALESCE(choice, ''), COALESCE(created_at, '')
+                FROM shorts_user_actions WHERE action_group = 'issue_vote'
+                """
+            )
+    except sqlite3.Error:
+        pass
+
+
 def init_issues_ranking_db() -> None:
     conn = _get_conn()
     try:
@@ -115,7 +132,9 @@ def init_issues_ranking_db() -> None:
                 updated_at TEXT
             );
 
-            CREATE TABLE IF NOT EXISTS shorts_user_actions (
+            -- 이슈 투표 중복 방지 기록. 쇼츠 허브(sportiq_auto_analyst)의 shorts_user_actions와
+            -- 같은 이름·다른 스키마로 충돌하던 문제를 피하려고 별도 표를 쓴다.
+            CREATE TABLE IF NOT EXISTS issue_vote_actions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 action_group TEXT NOT NULL,
                 target_id TEXT NOT NULL,
@@ -126,6 +145,7 @@ def init_issues_ranking_db() -> None:
             );
         """)
         _ensure_cheers_columns(conn)
+        _migrate_issue_votes_from_shared_table(conn)
         conn.commit()
     finally:
         conn.close()
@@ -217,7 +237,6 @@ def _fetch_live_cheers(conn: sqlite3.Connection, limit: int = 50) -> List[Dict[s
                    COALESCE(NULLIF(c.nickname, ''), NULLIF(c.author, ''), '익명') AS nickname,
                    COALESCE(c.team, 'ALL') AS team,
                    c.message,
-                   COALESCE(c.session_id, '') AS session_id,
                    c.created_at
             FROM cheers c
             WHERE c.id NOT IN (SELECT cheer_id FROM cheer_hidden)
@@ -233,7 +252,6 @@ def _fetch_live_cheers(conn: sqlite3.Connection, limit: int = 50) -> List[Dict[s
                    COALESCE(NULLIF(c.nickname, ''), '익명') AS nickname,
                    COALESCE(c.team, 'ALL') AS team,
                    c.message,
-                   COALESCE(c.session_id, '') AS session_id,
                    c.created_at
             FROM cheers c
             WHERE c.id NOT IN (SELECT cheer_id FROM cheer_hidden)
@@ -254,14 +272,18 @@ def _fetch_leaderboard_payload(conn: sqlite3.Connection, actor_key: str = "") ->
         LIMIT 15
         """
     ).fetchall()
+    clean_actor = (actor_key or "").strip()
     members = []
     for idx, row in enumerate(top_rows, start=1):
         item = dict(row)
+        # actor_key는 회원 식별 키이므로 공개 응답에 넣지 않는다. 프런트는 is_me로 본인 행을 표시한다.
+        row_actor = item.pop("actor_key", "") or ""
+        item["is_me"] = bool(clean_actor) and row_actor == clean_actor
+        item["is_sample"] = row_actor.startswith("seed-")
         item["rank"] = idx
         members.append(item)
 
     my_rank: Optional[int] = None
-    clean_actor = (actor_key or "").strip()
     if clean_actor:
         me = conn.execute(
             "SELECT points, predictions_count, updated_at FROM member_leaderboard WHERE actor_key = ?",
@@ -308,7 +330,8 @@ def get_issues_hub() -> Dict[str, Any]:
             }
             for row in rows
         }
-        return {"status": "ok", "issues": issues_map}
+        # 이슈별 투표 수에는 초기 시드 기준값이 포함되어 있다.
+        return {"status": "ok", "issues": issues_map, "votes_include_seed_baseline": True}
     finally:
         conn.close()
 
@@ -326,7 +349,7 @@ def vote_hot_issue(payload: IssueVoteRequest) -> Dict[str, Any]:
     try:
         existing = conn.execute(
             """
-            SELECT id, choice FROM shorts_user_actions
+            SELECT id, choice FROM issue_vote_actions
             WHERE action_group = 'issue_vote' AND target_id = ? AND actor_key = ?
             """,
             (issue_id, actor_key),
@@ -347,7 +370,7 @@ def vote_hot_issue(payload: IssueVoteRequest) -> Dict[str, Any]:
 
         conn.execute(
             """
-            INSERT INTO shorts_user_actions (action_group, target_id, actor_key, choice, created_at)
+            INSERT INTO issue_vote_actions (action_group, target_id, actor_key, choice, created_at)
             VALUES ('issue_vote', ?, ?, ?, ?)
             """,
             (issue_id, actor_key, choice, _now_kst_iso()),
@@ -372,7 +395,7 @@ def vote_hot_issue(payload: IssueVoteRequest) -> Dict[str, Any]:
             "SELECT opt_a_votes, opt_b_votes FROM hot_issue_votes WHERE issue_id = ?",
             (issue_id,),
         ).fetchone()
-        _backup_tables_to_pg("hot_issue_votes", "shorts_user_actions")
+        _backup_tables_to_pg("hot_issue_votes", "issue_vote_actions")
         return {
             "status": "ok",
             "already_participated": False,
