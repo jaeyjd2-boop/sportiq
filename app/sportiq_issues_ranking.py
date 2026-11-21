@@ -260,7 +260,29 @@ def _fetch_live_cheers(conn: sqlite3.Connection, limit: int = 50) -> List[Dict[s
             """,
             (limit,),
         ).fetchall()
-    return [dict(r) for r in rows]
+    return [_normalize_cheer_row(dict(r)) for r in rows]
+
+
+def _normalize_cheer_row(item: Dict[str, Any]) -> Dict[str, Any]:
+    """cheers 표는 라운지 POST /api/cheers(created_at=epoch 숫자)와 함께 쓰므로,
+    프런트가 기대하는 'YYYY-MM-DD HH:MM:SS'(KST) 문자열로 맞춘다."""
+    raw = item.get("created_at")
+    ts: Optional[float] = None
+    if isinstance(raw, (int, float)):
+        ts = float(raw)
+    elif isinstance(raw, str):
+        try:
+            ts = float(raw.strip())
+        except ValueError:
+            ts = None
+    if ts is not None:
+        if ts > 1e12:  # 밀리초 단위
+            ts /= 1000.0
+        try:
+            item["created_at"] = datetime.fromtimestamp(ts, tz=KST).strftime("%Y-%m-%d %H:%M:%S")
+        except (OverflowError, OSError, ValueError):
+            item["created_at"] = ""
+    return item
 
 
 def _fetch_leaderboard_payload(conn: sqlite3.Connection, actor_key: str = "") -> Dict[str, Any]:
