@@ -9081,6 +9081,14 @@ _FRONTEND_V22_JS = r'''
     var parentBox = track.parentElement;
     var items = v30ScoreState.items || [];
 
+    // 로딩 중 대체 track이 툴바·달력·표 래퍼 안쪽 요소로 잡히면 insertBefore가
+    // HierarchyRequestError(새 자식이 부모를 포함)를 던진다. 이번 회차는 건너뛰고 실제 track이 마운트되면 다시 배치한다.
+    var guardIds = ["sqV30ScoreToolbar", "sqV31DateCalendarBar", "sqV30ScoreboardTableWrap"];
+    for (var gi = 0; gi < guardIds.length; gi++) {
+      var gEl = document.getElementById(guardIds[gi]);
+      if (gEl && (gEl === track || gEl.contains(parentBox))) return;
+    }
+
     var bar = document.getElementById("sqV30ScoreToolbar");
     if (!bar) {
       bar = document.createElement("div");
@@ -12864,7 +12872,7 @@ _FRONTEND_V22_JS = r'''
     var resArea = document.getElementById("sqAiIqResultArea") || aiModal.querySelector("[id*='Result'], [id*='result']");
     if (resArea) {
       var rtx = String(resArea.textContent || "").replace(/\s+/g, " ").trim();
-      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
+      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|검색창에\s*입력|추천\s*키워드를\s*눌러|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
         return "dom::" + rtx.slice(0, 48);
       }
     }
@@ -13980,7 +13988,7 @@ _FRONTEND_V22_JS = r'''
           var isBballOrBase = (it.sport === "basketball" || it.sport === "baseball" || rawLgCode === "KBL" || rawLgCode === "WKBL" || rawLgCode === "NBA" || rawLgCode === "WNBA");
           function fmtStanding(tName, rObj) {
             if (!rObj) return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;'><strong>" + uxEsc(tName) + "</strong>: 컵·국가대표·인터리그 매치업</div>";
-            var fm = Array.isArray(rObj.form) ? rObj.form.join("·") : String(rObj.form || "-");
+            var fm = Array.isArray(rObj.form) ? (rObj.form.length ? rObj.form.join("·") : "-") : String(rObj.form || "-");
             var hasDrawStat = (it.sport === "soccer") || (Number(rObj.d || 0) > 0);
             var recParts = [];
             if (rObj.gp !== undefined && rObj.gp !== null && Number(rObj.gp) > 0) {
@@ -14043,9 +14051,15 @@ _FRONTEND_V22_JS = r'''
             ? teamInjs.map(function (x) {
                 return "<div style='font-size:11.5px;padding:4px 0;border-bottom:1px solid #1e293b;'>🏥 <strong>[" + uxEsc(localizeTeamKoJsV381(x.team)) + "] " + uxEsc(x.player) + "</strong> · " + uxEsc(x.reason) + " <span style='color:#fbbf24;'>(" + uxEsc(x.severity) + ")</span></div>";
               }).join("")
-            : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>";
+            : (injData.is_sample
+                ? "<div style='font-size:11.5px;color:#94a3b8;'>" + uxEsc(injData.sample_note || "부상자 데이터가 아직 연동되지 않았습니다.") + "</div>"
+                : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>");
+          // 하드코딩 예시 순위표(K리그·J리그 등)는 실제 데이터처럼 보이지 않도록 안내를 붙인다.
+          var stSampleHtml = stData.is_sample
+            ? "<div style='font-size:11px;color:#fbbf24;margin-bottom:6px;'>⚠️ " + uxEsc(stData.sample_note || "예시 데이터입니다(실시간 연동 아님).") + "</div>"
+            : "";
           box.innerHTML = (
-            "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 순위 & 최근 흐름</div>" +
+            "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 순위 & 최근 흐름</div>" + stSampleHtml +
             "<div style='display:grid;gap:6px;margin-bottom:10px;'>" + fmtStanding(it.home, hRow) + fmtStanding(it.away, aRow) + "</div>" +
             h2hBlockHtml +
             "<div style='font-weight:800;color:#fca5a5;margin-bottom:4px;'>🏥 양 팀 주요 결장 · 로스터 체크</div>" + injHtml
@@ -17864,7 +17878,7 @@ def _build_comment_sig_v4612(post_id: str, user_label: str, comment_text: str) -
 
 @router.get("/api/posts")
 def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[str] = ""):
-    _ensure_tactical_posts_seeded_v22()
+    # 조회 요청에서는 예시 게시글을 시드하지 않는다(시드는 시작 시 테이블 초기화에서만).
     _primary, actor_keys = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
@@ -17971,6 +17985,8 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
                     "comments": comments_by_post.get(pid, []),
                     "isMemberServerPost": True,
                     "hasPin": bool(r["pin_hash"]),
+                    # 운영자가 넣은 예시 글(실제 회원 글 아님)
+                    "is_sample": str(pid).startswith("mp_seed_"),
                 }
             )
 
@@ -20521,6 +20537,10 @@ def _build_kr_jp_soccer_meta_v4640(kind: str, lg_raw: str) -> Dict[str, Any]:
             "items": [],
             "total": 0,
             "summary": {"total": 0, "out": 0, "doubtful": 0},
+            # 실제 부상자 데이터 연동이 없다. 0명은 '부상자 없음'이 아니라 '데이터 없음'이다.
+            "source": "부상자 데이터 미연동",
+            "is_sample": True,
+            "sample_note": "K리그·J리그 부상자 데이터는 아직 연동되지 않았습니다.",
         }
     rows_out: List[Dict[str, Any]] = []
     for rk, (tm, gp, w, d, l, gf, ga, pts, fm) in enumerate(_KR_JP_SOCCER_STANDINGS_V4640[cu], start=1):
@@ -20544,7 +20564,10 @@ def _build_kr_jp_soccer_meta_v4640(kind: str, lg_raw: str) -> Dict[str, Any]:
         "ok": True,
         "league": cu,
         "league_name": lg_full_map[cu],
-        "source": "2026 시즌 공식 순위표",
+        # 하드코딩된 순위표(실시간 연동 아님)이므로 공식 순위처럼 표시하지 않는다.
+        "source": "SportiQ 예시 데이터 (하드코딩 순위표)",
+        "is_sample": True,
+        "sample_note": "K리그·J리그 순위·최근 폼은 실시간 연동이 아닌 예시 데이터입니다.",
         "standings": rows_out,
     }
 
@@ -20933,7 +20956,7 @@ def _format_fan_vote_payload_v32(
     tot = max(1, hv + dv + av)
     h_pct = int(round((hv / tot) * 100))
     d_pct = int(round((dv / tot) * 100)) if has_draw else 0
-    a_pct = max(0, 100 - h_pct - d_pct)
+    a_pct = max(0, 100 - h_pct - d_pct) if (hv + dv + av) > 0 else 0
     out: Dict[str, Any] = {
         "ok": True,
         "match_key": match_key,
@@ -20950,6 +20973,8 @@ def _format_fan_vote_payload_v32(
         "draw_pct": d_pct,
         "away_pct": a_pct,
         "message": message,
+        # 예전 버전이 만든 집계 행에는 기본 시드 투표(24~56표)가 섞여 있을 수 있다.
+        "votes_include_seed_baseline": True,
     }
     if points is not None:
         out["points"] = int(points)
@@ -20975,18 +21000,14 @@ def get_match_fan_vote_v32(
     _, actor_candidates = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
-        now = time.time()
-        with _smu_db_session(write=True) as conn:
+        # 조회 전용: 집계가 없으면 0표로 응답하고 DB에 아무것도 쓰지 않는다(가짜 기본 투표 생성 제거).
+        with _smu_db_session(write=False) as conn:
             t_row = conn.execute(
                 "SELECT home_votes, draw_votes, away_votes FROM match_fan_vote_totals_v32 WHERE match_key = ?",
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, hp, dp, ap)
-                conn.execute(
-                    "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
-                    (mk, hv, dv, av, now),
-                )
+                hv, dv, av = 0, 0, 0
             else:
                 hv = int(t_row["home_votes"] or 0)
                 dv = int(t_row["draw_votes"] or 0) if hd else 0
@@ -21032,7 +21053,7 @@ def submit_match_fan_vote_v32(payload: MatchFanVoteIn):
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, int(payload.hp or 45), int(payload.dp or 25), int(payload.ap or 30))
+                hv, dv, av = 0, 0, 0  # 실제 투표만 집계한다(기본 시드 투표 없음).
                 conn.execute(
                     "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
                     (mk, hv, dv, av, now),
@@ -21176,10 +21197,7 @@ def _xml_safe_cdata_v4636(val: Any) -> str:
 
 
 def _collect_indexable_posts_v38(limit: int = 60) -> List[Dict[str, Any]]:
-    try:
-        _ensure_tactical_posts_seeded_v22()
-    except Exception:
-        pass
+    # sitemap/RSS 조회 중에는 DB에 쓰지 않는다.
     now_ts = time.time()
     items: List[Dict[str, Any]] = []
     seen_ids: Set[str] = set()
@@ -24559,16 +24577,46 @@ def get_global_matches():
                 for i, r in enumerate(rows)
             ]
 
-    return {"matches": run_with_db_retry(_op)}
+    # votes/buzz_score는 초기 시드 기준값에 실제 투표가 더해진 값이다(실측 팬 수가 아님).
+    return {"matches": run_with_db_retry(_op), "votes_include_seed_baseline": True}
+
+
+_GM_VOTE_DEDUPE_LOCK = threading.Lock()
+_GM_VOTE_DEDUPE: Dict[str, float] = {}
+_GM_VOTE_DEDUPE_TTL_SEC = 12 * 3600.0
+
+
+def _gm_vote_already_cast(request: Optional[Request], match_id: int) -> bool:
+    """같은 접속자(IP 해시)가 같은 경기에 12시간 안에 다시 투표하면 True. 원본 IP는 저장하지 않는다."""
+    ip_raw = _client_ip_v4615(request)
+    salt = os.environ.get("SPORTIQ_VOTE_HASH_SALT", "sportiq-gm-vote")
+    key = hashlib.sha256(f"{salt}:{ip_raw}:{match_id}".encode("utf-8", errors="ignore")).hexdigest()
+    now_ep = time.time()
+    with _GM_VOTE_DEDUPE_LOCK:
+        if len(_GM_VOTE_DEDUPE) > 20000:
+            for k in [k for k, ts in _GM_VOTE_DEDUPE.items() if (now_ep - ts) >= _GM_VOTE_DEDUPE_TTL_SEC]:
+                _GM_VOTE_DEDUPE.pop(k, None)
+        last = _GM_VOTE_DEDUPE.get(key)
+        if last is not None and (now_ep - last) < _GM_VOTE_DEDUPE_TTL_SEC:
+            return True
+        _GM_VOTE_DEDUPE[key] = now_ep
+        return False
 
 
 @router.post("/api/rankings/global-matches/{match_id}/vote")
-def vote_global_match(match_id: int):
+def vote_global_match(match_id: int, request: Request):
+    already_voted = _gm_vote_already_cast(request, match_id)
+
     def _op() -> tuple[Optional[dict], list[dict]]:
-        with _db_session(write=True) as conn:
-            cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
-            if cur.rowcount == 0:
-                raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
+        with _db_session(write=not already_voted) as conn:
+            if already_voted:
+                exists = conn.execute("SELECT 1 FROM global_match_rankings WHERE id = ?", (match_id,)).fetchone()
+                if not exists:
+                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
+            else:
+                cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
+                if cur.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
             rows = conn.execute(
                 "SELECT id, match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC"
             ).fetchall()
@@ -24592,12 +24640,19 @@ def vote_global_match(match_id: int):
             return voted, items
 
     voted, items = run_with_db_retry(_op)
-    try:
-        from app.sportiq_auto_analyst import _backup_tables_to_pg
-        _backup_tables_to_pg("global_match_rankings")
-    except Exception:
-        pass
-    return {"ok": True, "match": voted, "matches": items}
+    if not already_voted:
+        try:
+            from app.sportiq_auto_analyst import _backup_tables_to_pg
+            _backup_tables_to_pg("global_match_rankings")
+        except Exception:
+            pass
+    return {
+        "ok": True,
+        "already_voted": already_voted,
+        "votes_include_seed_baseline": True,
+        "match": voted,
+        "matches": items,
+    }
 
 
 _DC_KO_WRAPPER_INSTALLED_V381 = False
