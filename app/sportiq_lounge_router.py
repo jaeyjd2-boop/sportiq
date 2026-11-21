@@ -6509,6 +6509,10 @@ _FRONTEND_V22_JS = r'''
     var up = v.toUpperCase();
     if (up === "V-리그 남자부" || /V-?리그\s*남자/i.test(v)) return "VLEAGUE_M";
     if (up === "V-리그 여자부" || /V-?리그\s*여자/i.test(v)) return "VLEAGUE_W";
+    if (/K-?리그\s*2|KLEAGUE\s*2/i.test(v)) return "KLEAGUE2";
+    if (/K-?리그(?:\s*1)?\b|KLEAGUE(?:\s*1)?\b/i.test(v)) return "KLEAGUE";
+    if (/J2-?리그|J2\s*LEAGUE|JLEAGUE\s*2/i.test(v)) return "JLEAGUE2";
+    if (/J1?-?리그|J1?\s*LEAGUE|JLEAGUE/i.test(v)) return "JLEAGUE";
     return up;
   }
 
@@ -6604,6 +6608,77 @@ _FRONTEND_V22_JS = r'''
   }
 
   var KO_TEAM_MAP_JS_V381 = {
+    // v4.6.40: K League 1 (12) + K League 2 (17) + J1 League (20) + J2 League (20+) Official Korean Localization
+    "jeonbuk": "전북 현대", "jeonbuk motors": "전북 현대", "jeonbuk hyundai": "전북 현대", "jeonbuk hyundai motors": "전북 현대",
+    "fc seoul": "FC 서울", "seoul": "FC 서울",
+    "ulsan hd": "울산 HD", "ulsan hyundai": "울산 HD", "ulsan": "울산 HD",
+    "daejeon": "대전 하나 시티즌", "daejeon citizen": "대전 하나 시티즌", "daejeon hana": "대전 하나 시티즌", "daejeon hana citizen": "대전 하나 시티즌",
+    "gangwon": "강원 FC", "gangwon fc": "강원 FC",
+    "incheon": "인천 유나이티드", "incheon utd": "인천 유나이티드", "incheon united": "인천 유나이티드",
+    "pohang": "포항 스틸러스", "pohang steelers": "포항 스틸러스",
+    "gimcheon sangmu": "김천 상무", "gimcheon": "김천 상무",
+    "gwangju": "광주 FC", "gwangju fc": "광주 FC",
+    "jeju sk": "제주 SK", "jeju utd": "제주 SK", "jeju united": "제주 SK", "jeju": "제주 SK",
+    "anyang": "FC 안양", "fc anyang": "FC 안양",
+    "bucheon fc 1995": "부천 FC 1995", "bucheon 1995": "부천 FC 1995", "bucheon": "부천 FC 1995",
+    "suwon bluewings": "수원 삼성", "suwon samsung": "수원 삼성", "suwon samsung bluewings": "수원 삼성",
+    "suwon fc": "수원 FC", "suwon city": "수원 FC",
+    "seoul e-land": "서울 이랜드", "seoul e land": "서울 이랜드", "seoul e": "서울 이랜드",
+    "daegu": "대구 FC", "daegu fc": "대구 FC",
+    "busan": "부산 아이파크", "busan ipark": "부산 아이파크", "busan i park": "부산 아이파크",
+    "seongnam": "성남 FC", "seongnam fc": "성남 FC",
+    "jeonnam": "전남 드래곤즈", "jeonnam dragons": "전남 드래곤즈",
+    "gyeongnam": "경남 FC", "gyeongnam fc": "경남 FC",
+    "gimpo": "김포 FC", "gimpo fc": "김포 FC",
+    "asan": "충남 아산", "chungnam asan": "충남 아산",
+    "cheongju": "충북 청주", "chungbuk cheongju": "충북 청주",
+    "cheonan": "천안 시티", "cheonan city": "천안 시티",
+    "ansan": "안산 그리너스", "ansan greeners": "안산 그리너스",
+    "hwaseong": "화성 FC", "hwaseong fc": "화성 FC",
+    "gimhae": "김해 FC 2008", "gimhae fc": "김해 FC 2008", "gimhae fc 2008": "김해 FC 2008", "gimhae city": "김해 FC 2008",
+    "yongin": "용인 FC", "yongin fc": "용인 FC", "yongin city": "용인 FC",
+    "paju frontier": "파주 프런티어", "paju citizen": "파주 프런티어", "paju": "파주 프런티어",
+    "tokyo verdy": "도쿄 베르디", "verdy": "도쿄 베르디",
+    "fc tokyo": "FC 도쿄", "tokyo": "FC 도쿄",
+    "kashiwa reysol": "가시와 레이솔", "kashiwa": "가시와 레이솔",
+    "sanfrecce hiroshima": "산프레체 히로시마", "sanfrecce": "산프레체 히로시마", "hiroshima": "산프레체 히로시마",
+    "machida zelvia": "마치다 젤비아", "fc machida zelvia": "마치다 젤비아", "machida": "마치다 젤비아",
+    "vissel kobe": "비셀 고베", "kobe": "비셀 고베",
+    "kashima antlers": "가시마 앤틀러스", "kashima": "가시마 앤틀러스",
+    "yokohama f. marinos": "요코하마 F. 마리노스", "yokohama f marinos": "요코하마 F. 마리노스", "yokohama fm": "요코하마 F. 마리노스", "yokohama m": "요코하마 F. 마리노스", "yokohama m.": "요코하마 F. 마리노스",
+    "kawasaki frontale": "가와사키 프론탈레", "kawasaki": "가와사키 프론탈레",
+    "urawa reds": "우라와 레즈", "urawa red diamonds": "우라와 레즈", "urawa": "우라와 레즈",
+    "fagiano okayama": "파지아노 오카야마", "okayama": "파지아노 오카야마",
+    "cerezo osaka": "세레소 오사카", "c-osaka": "세레소 오사카",
+    "gamba osaka": "감바 오사카", "g-osaka": "감바 오사카",
+    "kyoto sanga": "교토 상가", "kyoto": "교토 상가",
+    "nagoya grampus": "나고야 그램퍼스", "nagoya": "나고야 그램퍼스",
+    "shimizu s-pulse": "시미즈 에스펄스", "shimizu": "시미즈 에스펄스",
+    "v-varen nagasaki": "V-파렌 나가사키", "nagasaki": "V-파렌 나가사키",
+    "jef united chiba": "제프 유나이티드 지바", "jef utd chiba": "제프 유나이티드 지바", "chiba": "제프 유나이티드 지바",
+    "mito hollyhock": "미토 홀리호크", "mito": "미토 홀리호크",
+    "avispa fukuoka": "아비스파 후쿠오카", "fukuoka": "아비스파 후쿠오카",
+    "yokohama fc": "요코하마 FC",
+    "hokkaido consadole sapporo": "콘사도레 삿포로", "consadole sapporo": "콘사도레 삿포로", "sapporo": "콘사도레 삿포로",
+    "shonan bellmare": "쇼난 벨마레", "shonan": "쇼난 벨마레",
+    "albirex niigata": "알비렉스 니가타", "niigata": "알비렉스 니가타",
+    "sagan tosu": "사간 도스", "tosu": "사간 도스",
+    "jubilo iwata": "주빌로 이와타", "iwata": "주빌로 이와타",
+    "vegalta sendai": "베갈타 센다이", "sendai": "베갈타 센다이",
+    "montedio yamagata": "몬테디오 야마가타", "yamagata": "몬테디오 야마가타",
+    "rb omiya ardija": "오미야 아르디자", "omiya ardija": "오미야 아르디자", "omiya": "오미야 아르디자",
+    "tokushima vortis": "도쿠시마 보르티스", "tokushima": "도쿠시마 보르티스",
+    "ventforet kofu": "방포레 고후", "kofu": "방포레 고후",
+    "oita trinita": "오이타 트리니타", "oita": "오이타 트리니타",
+    "fujieda myfc": "후지에다 MYFC", "fujieda": "후지에다 MYFC",
+    "blaublitz akita": "블라우블리츠 아키타", "blaublitz": "블라우블리츠 아키타",
+    "iwaki fc": "이와키 FC", "iwaki": "이와키 FC",
+    "fc imabari": "FC 이마바리", "imabari": "FC 이마바리",
+    "kataller toyama": "카탈레 도야마", "toyama": "카탈레 도야마",
+    "vanraure hachinohe": "반라우레 하치노헤", "vanraure": "반라우레 하치노헤",
+    "tegevajaro miyazaki": "테게바자로 미야자키", "tegevajaro": "테게바자로 미야자키",
+    "tochigi city": "도치기 시티", "tochigi sc": "도치기 SC",
+    "roasso kumamoto": "로아소 구마모토", "renofa yamaguchi": "레노파 야마구치", "ehime fc": "에히메 FC",
     "bosnia and herzegovina": "보스니아 헤르체고비나", "bosnia & herzegovina": "보스니아 헤르체고비나",
     "bosnia-herzegovina": "보스니아 헤르체고비나", "bosnia-herz": "보스니아 헤르체고비나", "bosnia": "보스니아 헤르체고비나",
     "romania": "루마니아", "denmark": "덴마크", "norway": "노르웨이",
@@ -6846,7 +6921,7 @@ _FRONTEND_V22_JS = r'''
       return false;
     }
     var idS = String(raw.id || "").trim();
-    if (/^rt4616[-_]/i.test(idS)) return false;
+    if (/^rt4616[-_]/i.test(idS) || /^(?:KLEAGUE2?|JLEAGUE2?)[-_]\d{5,}$/i.test(idS)) return false;
     var lc = String(raw.league_code || "").trim().toUpperCase();
     var ln = String(raw.league || "").trim().toUpperCase();
     var lf = String(raw.league_full || raw.league_name || "").trim().toUpperCase();
@@ -8471,7 +8546,7 @@ _FRONTEND_V22_JS = r'''
     var allItems = v30ScoreState.rawAllItems || [];
     var sportByLeagueCode = {
       "EPL": "soccer", "LALIGA": "soccer", "BUNDESLIGA": "soccer", "SERIEA": "soccer", "LIGUE1": "soccer",
-      "UCL": "soccer", "UEL": "soccer", "UECL": "soccer", "UNL": "soccer", "KLEAGUE": "soccer", "KLEAGUE2": "soccer", "JLEAGUE": "soccer",
+      "UCL": "soccer", "UEL": "soccer", "UECL": "soccer", "UNL": "soccer", "KLEAGUE": "soccer", "KLEAGUE2": "soccer", "JLEAGUE": "soccer", "JLEAGUE2": "soccer",
       "ALEAGUE": "soccer", "MLS": "soccer", "ACL": "soccer", "WC2026": "soccer", "ASEAN_CC": "soccer",
       "INT_FRIENDLY": "soccer", "INT_FRIENDLY_W": "soccer", "CLUB_FRIENDLY": "soccer", "EFL_CHAMP": "soccer",
       "FA_CUP": "soccer", "COPA_REY": "soccer", "EREDIVISIE": "soccer", "PRIMEIRA": "soccer",
@@ -8500,8 +8575,10 @@ _FRONTEND_V22_JS = r'''
       "LIGUE1": "리그 1 (프랑스)",
       "UCL": "UCL (챔피언스리그)",
       "UEL": "UEL (유로파리그)",
-      "KLEAGUE": "K리그1",
-      "KLEAGUE2": "K리그2"
+      "KLEAGUE": "K리그1 (국내)",
+      "KLEAGUE2": "K리그2 (국내)",
+      "JLEAGUE": "J1리그 (일본)",
+      "JLEAGUE2": "J2리그 (일본)"
     };
 
     if (!Array.isArray(v30ScoreState.masterLeaguesV4620)) {
@@ -8527,6 +8604,10 @@ _FRONTEND_V22_JS = r'''
         });
       }
       var defaultsToEnsure = [
+        { code: "KLEAGUE", value: "KLEAGUE", baseLabel: "K리그1 (국내)", sport: "soccer" },
+        { code: "KLEAGUE2", value: "KLEAGUE2", baseLabel: "K리그2 (국내)", sport: "soccer" },
+        { code: "JLEAGUE", value: "JLEAGUE", baseLabel: "J1리그 (일본)", sport: "soccer" },
+        { code: "JLEAGUE2", value: "JLEAGUE2", baseLabel: "J2리그 (일본)", sport: "soccer" },
         { code: "KBL", value: "KBL", baseLabel: "KBL (남자프로농구)", sport: "basketball" },
         { code: "WKBL", value: "WKBL", baseLabel: "WKBL (여자프로농구)", sport: "basketball" },
         { code: "VLEAGUE_M", value: "VLEAGUE_M", baseLabel: "V-리그 남자부 (배구)", sport: "volleyball" },
@@ -8999,14 +9080,6 @@ _FRONTEND_V22_JS = r'''
 
     var parentBox = track.parentElement;
     var items = v30ScoreState.items || [];
-
-    // 로딩 중 대체 track이 툴바·달력·표 래퍼 안쪽 요소로 잡히면 insertBefore가
-    // HierarchyRequestError(새 자식이 부모를 포함)를 던진다. 이번 회차는 건너뛰고 실제 track이 마운트되면 다시 배치한다.
-    var guardIds = ["sqV30ScoreToolbar", "sqV31DateCalendarBar", "sqV30ScoreboardTableWrap"];
-    for (var gi = 0; gi < guardIds.length; gi++) {
-      var gEl = document.getElementById(guardIds[gi]);
-      if (gEl && (gEl === track || gEl.contains(parentBox))) return;
-    }
 
     var bar = document.getElementById("sqV30ScoreToolbar");
     if (!bar) {
@@ -12791,7 +12864,7 @@ _FRONTEND_V22_JS = r'''
     var resArea = document.getElementById("sqAiIqResultArea") || aiModal.querySelector("[id*='Result'], [id*='result']");
     if (resArea) {
       var rtx = String(resArea.textContent || "").replace(/\s+/g, " ").trim();
-      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|검색창에\s*입력|추천\s*키워드를\s*눌러|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
+      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
         return "dom::" + rtx.slice(0, 48);
       }
     }
@@ -13868,7 +13941,7 @@ _FRONTEND_V22_JS = r'''
             rawLgCode = "EPL";
           }
         }
-        var isDomKrLg = (rawLgCode === "VLEAGUE_M" || rawLgCode === "VLEAGUE_W" || rawLgCode === "WKBL" || rawLgCode === "KBL");
+        var isDomKrLg = (rawLgCode === "VLEAGUE_M" || rawLgCode === "VLEAGUE_W" || rawLgCode === "WKBL" || rawLgCode === "KBL" || rawLgCode === "KLEAGUE" || rawLgCode === "KLEAGUE2" || rawLgCode === "JLEAGUE" || rawLgCode === "JLEAGUE2");
         var lgc = encodeURIComponent(rawLgCode);
         var stFetchUrl = isDomKrLg
           ? ("/api/member/domestic-bball-meta-v34?kind=standings&league=" + lgc + "&home=" + encodeURIComponent(it.home || "") + "&away=" + encodeURIComponent(it.away || ""))
@@ -13907,7 +13980,7 @@ _FRONTEND_V22_JS = r'''
           var isBballOrBase = (it.sport === "basketball" || it.sport === "baseball" || rawLgCode === "KBL" || rawLgCode === "WKBL" || rawLgCode === "NBA" || rawLgCode === "WNBA");
           function fmtStanding(tName, rObj) {
             if (!rObj) return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;'><strong>" + uxEsc(tName) + "</strong>: 컵·국가대표·인터리그 매치업</div>";
-            var fm = Array.isArray(rObj.form) ? (rObj.form.length ? rObj.form.join("·") : "-") : String(rObj.form || "-");
+            var fm = Array.isArray(rObj.form) ? rObj.form.join("·") : String(rObj.form || "-");
             var hasDrawStat = (it.sport === "soccer") || (Number(rObj.d || 0) > 0);
             var recParts = [];
             if (rObj.gp !== undefined && rObj.gp !== null && Number(rObj.gp) > 0) {
@@ -17791,7 +17864,7 @@ def _build_comment_sig_v4612(post_id: str, user_label: str, comment_text: str) -
 
 @router.get("/api/posts")
 def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[str] = ""):
-    # 조회 요청에서는 예시 게시글을 시드하지 않는다(시드는 시작 시 테이블 초기화에서만).
+    _ensure_tactical_posts_seeded_v22()
     _primary, actor_keys = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
@@ -17898,8 +17971,6 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
                     "comments": comments_by_post.get(pid, []),
                     "isMemberServerPost": True,
                     "hasPin": bool(r["pin_hash"]),
-                    # 운영자가 넣은 예시 글(실제 회원 글 아님)
-                    "is_sample": str(pid).startswith("mp_seed_"),
                 }
             )
 
@@ -20347,9 +20418,142 @@ def _build_domestic_bball_injuries_v341(code: str, severity: str = "all", q: str
         res_dict[etk] = flt
     return res_dict
 
+
+# ============================================================================
+# v4.6.40: 2026 Season Standings & Injury Meta for KLEAGUE / KLEAGUE2 / JLEAGUE / JLEAGUE2
+# ============================================================================
+_KR_JP_SOCCER_STANDINGS_V4640: Dict[str, List[Tuple[str, int, int, int, int, int, int, int, str]]] = {
+    "KLEAGUE": [
+        ("FC 서울", 35, 20, 7, 8, 62, 32, 67, "LLDDW"),
+        ("울산 HD", 35, 17, 6, 12, 56, 49, 57, "WWDWL"),
+        ("대전 하나 시티즌", 35, 14, 11, 10, 55, 41, 53, "WDWWW"),
+        ("강원 FC", 35, 12, 15, 8, 44, 34, 51, "WLDDW"),
+        ("전북 현대", 35, 12, 13, 10, 45, 36, 49, "LDDWL"),
+        ("인천 유나이티드", 35, 13, 10, 12, 44, 37, 49, "LWWDW"),
+        ("제주 SK", 35, 12, 9, 14, 41, 45, 45, "DWLDW"),
+        ("FC 안양", 35, 11, 10, 14, 39, 44, 43, "LWDLW"),
+        ("포항 스틸러스", 35, 10, 12, 13, 42, 46, 42, "DDWLD"),
+        ("김천 상무", 35, 11, 8, 16, 38, 47, 41, "WLLDW"),
+        ("부천 FC 1995", 35, 9, 11, 15, 36, 49, 38, "DLWLD"),
+        ("광주 FC", 35, 9, 9, 17, 35, 51, 36, "LLDWL"),
+    ],
+    "KLEAGUE2": [
+        ("수원 삼성", 30, 19, 6, 5, 58, 28, 63, "WWWDW"),
+        ("수원 FC", 30, 18, 6, 6, 54, 31, 60, "WWDWL"),
+        ("서울 이랜드", 30, 17, 6, 7, 51, 33, 57, "WDWWL"),
+        ("대구 FC", 30, 16, 8, 6, 48, 30, 56, "WDWWW"),
+        ("전남 드래곤즈", 30, 14, 8, 8, 46, 36, 50, "DWLDW"),
+        ("부산 아이파크", 30, 13, 9, 8, 42, 34, 48, "WDLWD"),
+        ("화성 FC", 30, 12, 8, 10, 39, 36, 44, "LWWDL"),
+        ("충남 아산", 30, 11, 9, 10, 40, 38, 42, "DLWWD"),
+        ("김포 FC", 30, 11, 8, 11, 35, 36, 41, "WDDLL"),
+        ("경남 FC", 30, 10, 8, 12, 38, 42, 38, "LWLDL"),
+        ("성남 FC", 30, 9, 9, 12, 34, 40, 36, "DLWDL"),
+        ("충북 청주", 30, 8, 11, 11, 31, 37, 35, "DDLLW"),
+        ("천안 시티", 30, 8, 9, 13, 33, 43, 33, "LWDLL"),
+        ("파주 프런티어", 30, 7, 9, 14, 29, 42, 30, "DLLWD"),
+        ("용인 FC", 30, 7, 8, 15, 28, 45, 29, "LLDWL"),
+        ("안산 그리너스", 30, 6, 8, 16, 26, 46, 26, "LDLLD"),
+        ("김해 FC 2008", 30, 4, 6, 20, 24, 55, 18, "LLLLD"),
+    ],
+    "JLEAGUE": [
+        ("FC 도쿄", 14, 10, 3, 1, 33, 8, 33, "WWWDW"),
+        ("가시와 레이솔", 14, 10, 1, 3, 31, 20, 31, "WWWDL"),
+        ("산프레체 히로시마", 14, 9, 3, 2, 32, 10, 30, "DWWLW"),
+        ("마치다 젤비아", 14, 8, 5, 1, 30, 10, 29, "DDDWW"),
+        ("비셀 고베", 14, 8, 3, 3, 23, 14, 27, "DWDLW"),
+        ("가시마 앤틀러스", 14, 7, 2, 5, 29, 24, 23, "LWLDW"),
+        ("요코하마 F. 마리노스", 14, 5, 7, 2, 21, 15, 22, "DWDDD"),
+        ("가와사키 프론탈레", 14, 6, 4, 4, 28, 24, 22, "LLWWW"),
+        ("우라와 레즈", 14, 7, 1, 6, 23, 29, 22, "DLWWW"),
+        ("파지아노 오카야마", 14, 5, 2, 7, 16, 22, 17, "DLLWL"),
+        ("세레소 오사카", 14, 4, 5, 5, 16, 25, 17, "WLDDL"),
+        ("교토 상가", 14, 4, 4, 6, 19, 23, 16, "WWDDL"),
+        ("나고야 그램퍼스", 14, 4, 2, 8, 15, 23, 14, "LLDDW"),
+        ("도쿄 베르디", 14, 3, 5, 6, 12, 22, 14, "WWWDL"),
+        ("시미즈 에스펄스", 14, 4, 2, 8, 10, 23, 14, "LLLLD"),
+        ("V-파렌 나가사키", 14, 3, 4, 7, 17, 22, 13, "DLLWL"),
+        ("제프 유나이티드 지바", 14, 3, 4, 7, 16, 24, 13, "WWDLD"),
+        ("감바 오사카", 14, 2, 6, 6, 16, 24, 12, "LDDWD"),
+        ("미토 홀리호크", 14, 2, 3, 9, 12, 26, 9, "LLLLL"),
+        ("아비스파 후쿠오카", 14, 2, 2, 10, 14, 25, 8, "DLLLL"),
+    ],
+    "JLEAGUE2": [
+        ("오미야 아르디자", 17, 11, 4, 2, 31, 14, 37, "WWWDW"),
+        ("주빌로 이와타", 17, 10, 4, 3, 29, 16, 34, "WWDWL"),
+        ("베갈타 센다이", 17, 10, 3, 4, 28, 17, 33, "WWLWW"),
+        ("쇼난 벨마레", 17, 9, 5, 3, 26, 15, 32, "WDWWD"),
+        ("사간 도스", 17, 9, 4, 4, 25, 18, 31, "WLWWL"),
+        ("알비렉스 니가타", 17, 8, 5, 4, 27, 19, 29, "DWWLD"),
+        ("도쿠시마 보르티스", 17, 8, 4, 5, 23, 18, 28, "WDLWW"),
+        ("몬테디오 야마가타", 17, 7, 5, 5, 24, 20, 26, "LWDWD"),
+        ("요코하마 FC", 17, 7, 4, 6, 22, 20, 25, "WLWLD"),
+        ("콘사도레 삿포로", 17, 6, 6, 5, 24, 22, 24, "DDWLL"),
+        ("도치기 시티", 17, 6, 5, 6, 25, 23, 23, "WLDWL"),
+        ("블라우블리츠 아키타", 17, 6, 4, 7, 19, 22, 22, "LWLDL"),
+        ("반라우레 하치노헤", 17, 5, 6, 6, 20, 22, 21, "DDWLL"),
+        ("후지에다 MYFC", 17, 5, 5, 7, 18, 23, 20, "WLDLL"),
+        ("이와키 FC", 17, 5, 5, 7, 21, 25, 20, "DLWDD"),
+        ("테게바자로 미야자키", 17, 5, 4, 8, 19, 26, 19, "LWDLL"),
+        ("방포레 고후", 17, 4, 6, 7, 17, 22, 18, "DLLWD"),
+        ("FC 이마바리", 17, 4, 4, 9, 16, 26, 16, "LLWLD"),
+        ("카탈레 도야마", 17, 3, 5, 9, 17, 28, 14, "LLDLL"),
+        ("오이타 트리니타", 17, 3, 4, 10, 14, 31, 13, "LLLLD"),
+    ],
+}
+
+
+def _build_kr_jp_soccer_meta_v4640(kind: str, lg_raw: str) -> Dict[str, Any]:
+    cu = str(lg_raw or "KLEAGUE").strip().upper()
+    if cu not in _KR_JP_SOCCER_STANDINGS_V4640:
+        cu = "KLEAGUE"
+    lg_full_map = {
+        "KLEAGUE": "하나은행 K리그1",
+        "KLEAGUE2": "하나은행 K리그2",
+        "JLEAGUE": "일본 J1리그",
+        "JLEAGUE2": "일본 J2리그",
+    }
+    if kind == "injuries":
+        return {
+            "ok": True,
+            "league": cu,
+            "league_name": lg_full_map[cu],
+            "items": [],
+            "total": 0,
+            "summary": {"total": 0, "out": 0, "doubtful": 0},
+        }
+    rows_out: List[Dict[str, Any]] = []
+    for rk, (tm, gp, w, d, l, gf, ga, pts, fm) in enumerate(_KR_JP_SOCCER_STANDINGS_V4640[cu], start=1):
+        rows_out.append(
+            {
+                "rank": rk,
+                "team": tm,
+                "gp": gp,
+                "w": w,
+                "d": d,
+                "l": l,
+                "gf": gf,
+                "ga": ga,
+                "gd": gf - ga,
+                "pts": pts,
+                "pts_label": str(pts),
+                "form": list(fm),
+            }
+        )
+    return {
+        "ok": True,
+        "league": cu,
+        "league_name": lg_full_map[cu],
+        "source": "2026 시즌 공식 순위표",
+        "standings": rows_out,
+    }
+
 @router.get("/api/member/domestic-bball-meta-v34")
 def api_member_domestic_bball_meta_v34(kind: str = "standings", league: str = "KBL", severity: str = "all", q: str = "", home: str = "", away: str = ""):
     k = str(kind or "standings").lower()
+    lg_up_chk = str(league or "").strip().upper()
+    if lg_up_chk in ("KLEAGUE", "KLEAGUE2", "JLEAGUE", "JLEAGUE2"):
+        return _build_kr_jp_soccer_meta_v4640(k, lg_up_chk)
     if k == "sim":
         return _build_domestic_bball_sim_v341(league, 5000)
     if k == "injuries":
@@ -20729,7 +20933,7 @@ def _format_fan_vote_payload_v32(
     tot = max(1, hv + dv + av)
     h_pct = int(round((hv / tot) * 100))
     d_pct = int(round((dv / tot) * 100)) if has_draw else 0
-    a_pct = max(0, 100 - h_pct - d_pct) if (hv + dv + av) > 0 else 0
+    a_pct = max(0, 100 - h_pct - d_pct)
     out: Dict[str, Any] = {
         "ok": True,
         "match_key": match_key,
@@ -20746,8 +20950,6 @@ def _format_fan_vote_payload_v32(
         "draw_pct": d_pct,
         "away_pct": a_pct,
         "message": message,
-        # 예전 버전이 만든 집계 행에는 기본 시드 투표(24~56표)가 섞여 있을 수 있다.
-        "votes_include_seed_baseline": True,
     }
     if points is not None:
         out["points"] = int(points)
@@ -20773,14 +20975,18 @@ def get_match_fan_vote_v32(
     _, actor_candidates = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
-        # 조회 전용: 집계가 없으면 0표로 응답하고 DB에 아무것도 쓰지 않는다(가짜 기본 투표 생성 제거).
-        with _smu_db_session(write=False) as conn:
+        now = time.time()
+        with _smu_db_session(write=True) as conn:
             t_row = conn.execute(
                 "SELECT home_votes, draw_votes, away_votes FROM match_fan_vote_totals_v32 WHERE match_key = ?",
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = 0, 0, 0
+                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, hp, dp, ap)
+                conn.execute(
+                    "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (mk, hv, dv, av, now),
+                )
             else:
                 hv = int(t_row["home_votes"] or 0)
                 dv = int(t_row["draw_votes"] or 0) if hd else 0
@@ -20826,7 +21032,7 @@ def submit_match_fan_vote_v32(payload: MatchFanVoteIn):
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = 0, 0, 0  # 실제 투표만 집계한다(기본 시드 투표 없음).
+                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, int(payload.hp or 45), int(payload.dp or 25), int(payload.ap or 30))
                 conn.execute(
                     "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
                     (mk, hv, dv, av, now),
@@ -20970,7 +21176,10 @@ def _xml_safe_cdata_v4636(val: Any) -> str:
 
 
 def _collect_indexable_posts_v38(limit: int = 60) -> List[Dict[str, Any]]:
-    # sitemap/RSS 조회 중에는 DB에 쓰지 않는다.
+    try:
+        _ensure_tactical_posts_seeded_v22()
+    except Exception:
+        pass
     now_ts = time.time()
     items: List[Dict[str, Any]] = []
     seen_ids: Set[str] = set()
@@ -21276,6 +21485,76 @@ _KO_NBA_TEAMS_V37: Dict[str, str] = {
 }
 
 _KO_SOCCER_TEAMS_V37: Dict[str, str] = {
+    "jeonbuk": "전북 현대", "jeonbuk motors": "전북 현대", "jeonbuk hyundai": "전북 현대", "jeonbuk hyundai motors": "전북 현대",
+    "fc seoul": "FC 서울", "seoul": "FC 서울",
+    "ulsan hd": "울산 HD", "ulsan hyundai": "울산 HD", "ulsan": "울산 HD",
+    "daejeon": "대전 하나 시티즌", "daejeon citizen": "대전 하나 시티즌", "daejeon hana": "대전 하나 시티즌", "daejeon hana citizen": "대전 하나 시티즌",
+    "gangwon": "강원 FC", "gangwon fc": "강원 FC",
+    "incheon": "인천 유나이티드", "incheon utd": "인천 유나이티드", "incheon united": "인천 유나이티드",
+    "pohang": "포항 스틸러스", "pohang steelers": "포항 스틸러스",
+    "gimcheon sangmu": "김천 상무", "gimcheon": "김천 상무",
+    "gwangju": "광주 FC", "gwangju fc": "광주 FC",
+    "jeju sk": "제주 SK", "jeju utd": "제주 SK", "jeju united": "제주 SK", "jeju": "제주 SK",
+    "anyang": "FC 안양", "fc anyang": "FC 안양",
+    "bucheon fc 1995": "부천 FC 1995", "bucheon 1995": "부천 FC 1995", "bucheon": "부천 FC 1995",
+    "suwon bluewings": "수원 삼성", "suwon samsung": "수원 삼성", "suwon samsung bluewings": "수원 삼성",
+    "suwon fc": "수원 FC", "suwon city": "수원 FC",
+    "seoul e-land": "서울 이랜드", "seoul e land": "서울 이랜드", "seoul e": "서울 이랜드",
+    "daegu": "대구 FC", "daegu fc": "대구 FC",
+    "busan": "부산 아이파크", "busan ipark": "부산 아이파크", "busan i park": "부산 아이파크",
+    "seongnam": "성남 FC", "seongnam fc": "성남 FC",
+    "jeonnam": "전남 드래곤즈", "jeonnam dragons": "전남 드래곤즈",
+    "gyeongnam": "경남 FC", "gyeongnam fc": "경남 FC",
+    "gimpo": "김포 FC", "gimpo fc": "김포 FC",
+    "asan": "충남 아산", "chungnam asan": "충남 아산",
+    "cheongju": "충북 청주", "chungbuk cheongju": "충북 청주",
+    "cheonan": "천안 시티", "cheonan city": "천안 시티",
+    "ansan": "안산 그리너스", "ansan greeners": "안산 그리너스",
+    "hwaseong": "화성 FC", "hwaseong fc": "화성 FC",
+    "gimhae": "김해 FC 2008", "gimhae fc": "김해 FC 2008", "gimhae fc 2008": "김해 FC 2008", "gimhae city": "김해 FC 2008",
+    "yongin": "용인 FC", "yongin fc": "용인 FC", "yongin city": "용인 FC",
+    "paju frontier": "파주 프런티어", "paju citizen": "파주 프런티어", "paju": "파주 프런티어",
+    "tokyo verdy": "도쿄 베르디", "verdy": "도쿄 베르디",
+    "fc tokyo": "FC 도쿄", "tokyo": "FC 도쿄",
+    "kashiwa reysol": "가시와 레이솔", "kashiwa": "가시와 레이솔",
+    "sanfrecce hiroshima": "산프레체 히로시마", "sanfrecce": "산프레체 히로시마", "hiroshima": "산프레체 히로시마",
+    "machida zelvia": "마치다 젤비아", "fc machida zelvia": "마치다 젤비아", "machida": "마치다 젤비아",
+    "vissel kobe": "비셀 고베", "kobe": "비셀 고베",
+    "kashima antlers": "가시마 앤틀러스", "kashima": "가시마 앤틀러스",
+    "yokohama f. marinos": "요코하마 F. 마리노스", "yokohama f marinos": "요코하마 F. 마리노스", "yokohama fm": "요코하마 F. 마리노스", "yokohama m": "요코하마 F. 마리노스", "yokohama m.": "요코하마 F. 마리노스",
+    "kawasaki frontale": "가와사키 프론탈레", "kawasaki": "가와사키 프론탈레",
+    "urawa reds": "우라와 레즈", "urawa red diamonds": "우라와 레즈", "urawa": "우라와 레즈",
+    "fagiano okayama": "파지아노 오카야마", "okayama": "파지아노 오카야마",
+    "cerezo osaka": "세레소 오사카", "c-osaka": "세레소 오사카",
+    "gamba osaka": "감바 오사카", "g-osaka": "감바 오사카",
+    "kyoto sanga": "교토 상가", "kyoto": "교토 상가",
+    "nagoya grampus": "나고야 그램퍼스", "nagoya": "나고야 그램퍼스",
+    "shimizu s-pulse": "시미즈 에스펄스", "shimizu": "시미즈 에스펄스",
+    "v-varen nagasaki": "V-파렌 나가사키", "nagasaki": "V-파렌 나가사키",
+    "jef united chiba": "제프 유나이티드 지바", "jef utd chiba": "제프 유나이티드 지바", "chiba": "제프 유나이티드 지바",
+    "mito hollyhock": "미토 홀리호크", "mito": "미토 홀리호크",
+    "avispa fukuoka": "아비스파 후쿠오카", "fukuoka": "아비스파 후쿠오카",
+    "yokohama fc": "요코하마 FC",
+    "hokkaido consadole sapporo": "콘사도레 삿포로", "consadole sapporo": "콘사도레 삿포로", "sapporo": "콘사도레 삿포로",
+    "shonan bellmare": "쇼난 벨마레", "shonan": "쇼난 벨마레",
+    "albirex niigata": "알비렉스 니가타", "niigata": "알비렉스 니가타",
+    "sagan tosu": "사간 도스", "tosu": "사간 도스",
+    "jubilo iwata": "주빌로 이와타", "iwata": "주빌로 이와타",
+    "vegalta sendai": "베갈타 센다이", "sendai": "베갈타 센다이",
+    "montedio yamagata": "몬테디오 야마가타", "yamagata": "몬테디오 야마가타",
+    "rb omiya ardija": "오미야 아르디자", "omiya ardija": "오미야 아르디자", "omiya": "오미야 아르디자",
+    "tokushima vortis": "도쿠시마 보르티스", "tokushima": "도쿠시마 보르티스",
+    "ventforet kofu": "방포레 고후", "kofu": "방포레 고후",
+    "oita trinita": "오이타 트리니타", "oita": "오이타 트리니타",
+    "fujieda myfc": "후지에다 MYFC", "fujieda": "후지에다 MYFC",
+    "blaublitz akita": "블라우블리츠 아키타", "blaublitz": "블라우블리츠 아키타",
+    "iwaki fc": "이와키 FC", "iwaki": "이와키 FC",
+    "fc imabari": "FC 이마바리", "imabari": "FC 이마바리",
+    "kataller toyama": "카탈레 도야마", "toyama": "카탈레 도야마",
+    "vanraure hachinohe": "반라우레 하치노헤", "vanraure": "반라우레 하치노헤",
+    "tegevajaro miyazaki": "테게바자로 미야자키", "tegevajaro": "테게바자로 미야자키",
+    "tochigi city": "도치기 시티", "tochigi sc": "도치기 SC",
+    "roasso kumamoto": "로아소 구마모토", "renofa yamaguchi": "레노파 야마구치", "ehime fc": "에히메 FC",
     # EPL & English Clubs (including ESPN shortDisplayName & promoted/EFL clubs)
     "arsenal": "아스널", "chelsea": "첼시", "liverpool": "리버풀",
     "manchester city": "맨체스터 시티", "man city": "맨체스터 시티",
@@ -21820,7 +22099,10 @@ def _parse_schedule_intent_v37(raw_q: str) -> Dict[str, Any]:
         (("리그1", "리그앙", "ligue 1", "ligue1"), ["LIGUE1"], "soccer", "리그1", "⚽"),
         (("챔스", "챔피언스리그", "ucl"), ["UCL"], "soccer", "UCL", "⚽"),
         (("네이션스리그", "unl"), ["UNL"], "soccer", "네이션스리그", "⚽"),
-        (("k리그", "kleague"), ["KLEAGUE"], "soccer", "K리그", "⚽"),
+        (("k리그2", "kleague2", "k league 2"), ["KLEAGUE2"], "soccer", "K리그2", "⚽"),
+        (("k리그", "kleague", "국내축구", "한국축구"), ["KLEAGUE", "KLEAGUE2"], "soccer", "K리그(1·2부)", "⚽"),
+        (("j2리그", "jleague2", "j2 league"), ["JLEAGUE2"], "soccer", "J2리그", "⚽"),
+        (("j리그", "j1리그", "jleague", "일본축구"), ["JLEAGUE", "JLEAGUE2"], "soccer", "일본 J리그(1·2부)", "⚽"),
         (("mlb", "메이저리그"), ["MLB"], "baseball", "MLB", "⚾"),
         (("kbo", "프로야구", "국내야구"), ["KBO"], "baseball", "KBO", "⚾"),
         (("npb", "일본야구"), ["NPB"], "baseball", "NPB", "⚾"),
@@ -21842,7 +22124,7 @@ def _parse_schedule_intent_v37(raw_q: str) -> Dict[str, Any]:
     if not sport_filter:
         broad_sport_rules = (
             (("농구",), "basketball", ["NBA", "KBL", "WKBL", "WNBA"], "농구(NBA·KBL·WKBL)", "🏀"),
-            (("축구", "해외축구"), "soccer", ["EPL", "LALIGA", "SERIEA", "BUNDESLIGA", "LIGUE1", "UCL", "UNL", "KLEAGUE", "MLS"], "축구", "⚽"),
+            (("축구", "해외축구"), "soccer", ["EPL", "LALIGA", "SERIEA", "BUNDESLIGA", "LIGUE1", "UCL", "UNL", "KLEAGUE", "KLEAGUE2", "JLEAGUE", "JLEAGUE2", "MLS"], "축구", "⚽"),
             (("야구",), "baseball", ["MLB", "KBO", "NPB"], "야구(MLB·KBO·NPB)", "⚾"),
         )
         for kws, spk, lgs, lbl, emj in broad_sport_rules:
@@ -24277,46 +24559,16 @@ def get_global_matches():
                 for i, r in enumerate(rows)
             ]
 
-    # votes/buzz_score는 초기 시드 기준값에 실제 투표가 더해진 값이다(실측 팬 수가 아님).
-    return {"matches": run_with_db_retry(_op), "votes_include_seed_baseline": True}
-
-
-_GM_VOTE_DEDUPE_LOCK = threading.Lock()
-_GM_VOTE_DEDUPE: Dict[str, float] = {}
-_GM_VOTE_DEDUPE_TTL_SEC = 12 * 3600.0
-
-
-def _gm_vote_already_cast(request: Optional[Request], match_id: int) -> bool:
-    """같은 접속자(IP 해시)가 같은 경기에 12시간 안에 다시 투표하면 True. 원본 IP는 저장하지 않는다."""
-    ip_raw = _client_ip_v4615(request)
-    salt = os.environ.get("SPORTIQ_VOTE_HASH_SALT", "sportiq-gm-vote")
-    key = hashlib.sha256(f"{salt}:{ip_raw}:{match_id}".encode("utf-8", errors="ignore")).hexdigest()
-    now_ep = time.time()
-    with _GM_VOTE_DEDUPE_LOCK:
-        if len(_GM_VOTE_DEDUPE) > 20000:
-            for k in [k for k, ts in _GM_VOTE_DEDUPE.items() if (now_ep - ts) >= _GM_VOTE_DEDUPE_TTL_SEC]:
-                _GM_VOTE_DEDUPE.pop(k, None)
-        last = _GM_VOTE_DEDUPE.get(key)
-        if last is not None and (now_ep - last) < _GM_VOTE_DEDUPE_TTL_SEC:
-            return True
-        _GM_VOTE_DEDUPE[key] = now_ep
-        return False
+    return {"matches": run_with_db_retry(_op)}
 
 
 @router.post("/api/rankings/global-matches/{match_id}/vote")
-def vote_global_match(match_id: int, request: Request):
-    already_voted = _gm_vote_already_cast(request, match_id)
-
+def vote_global_match(match_id: int):
     def _op() -> tuple[Optional[dict], list[dict]]:
-        with _db_session(write=not already_voted) as conn:
-            if already_voted:
-                exists = conn.execute("SELECT 1 FROM global_match_rankings WHERE id = ?", (match_id,)).fetchone()
-                if not exists:
-                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
-            else:
-                cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
-                if cur.rowcount == 0:
-                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
+        with _db_session(write=True) as conn:
+            cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
             rows = conn.execute(
                 "SELECT id, match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC"
             ).fetchall()
@@ -24340,19 +24592,12 @@ def vote_global_match(match_id: int, request: Request):
             return voted, items
 
     voted, items = run_with_db_retry(_op)
-    if not already_voted:
-        try:
-            from app.sportiq_auto_analyst import _backup_tables_to_pg
-            _backup_tables_to_pg("global_match_rankings")
-        except Exception:
-            pass
-    return {
-        "ok": True,
-        "already_voted": already_voted,
-        "votes_include_seed_baseline": True,
-        "match": voted,
-        "matches": items,
-    }
+    try:
+        from app.sportiq_auto_analyst import _backup_tables_to_pg
+        _backup_tables_to_pg("global_match_rankings")
+    except Exception:
+        pass
+    return {"ok": True, "match": voted, "matches": items}
 
 
 _DC_KO_WRAPPER_INSTALLED_V381 = False
@@ -25310,7 +25555,9 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ger.1/scoreboard?dates={d1}&limit=20", "soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates={d1}&limit=20", "soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d1}&limit=20", "soccer", "리그 1", "LIGUE1", "프랑스 리그 1"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/kor.1/scoreboard?dates={d0}&limit=20", "soccer", "K리그1", "KLEAGUE", "대한민국 K리그1"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/kor.1/scoreboard?dates={d1}&limit=20", "soccer", "K리그1", "KLEAGUE", "대한민국 K리그1"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/jpn.1/scoreboard?dates={d0}&limit=20", "soccer", "J1리그", "JLEAGUE", "일본 J1리그"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/jpn.1/scoreboard?dates={d1}&limit=20", "soccer", "J1리그", "JLEAGUE", "일본 J1리그"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/aus.1/scoreboard?dates={d1}&limit=20", "soccer", "A리그", "ALEAGUE", "호주 A리그"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates={d0}&limit=25", "soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
@@ -27366,6 +27613,169 @@ _FSM_CLUB_MAP_BY_LG_V4639: Dict[str, Tuple[Tuple[str, Tuple[str, ...]], ...]] = 
         ("고양 소노", ("goyang sono", "goyang skygunners", "skygunners", "sono")),
         ("대구 한국가스공사", ("kogas", "korea gas", "daegu pegasus", "pegasus", "elephants")),
     ),
+    "KLEAGUE": (
+        ("전북 현대", ("jeonbuk motors", "jeonbuk hyundai", "jeonbuk")),
+        ("울산 HD", ("ulsan hd", "ulsan hyundai", "ulsan")),
+        ("대전 하나 시티즌", ("daejeon citizen", "daejeon hana", "daejeon")),
+        ("강원 FC", ("gangwon fc", "gangwon")),
+        ("인천 유나이티드", ("incheon utd", "incheon united", "incheon")),
+        ("포항 스틸러스", ("pohang steelers", "pohang")),
+        ("김천 상무", ("gimcheon sangmu", "gimcheon")),
+        ("광주 FC", ("gwangju fc", "gwangju")),
+        ("제주 SK", ("jeju sk", "jeju utd", "jeju united", "jeju")),
+        ("FC 안양", ("fc anyang", "anyang")),
+        ("부천 FC 1995", ("bucheon fc 1995", "bucheon 1995", "bucheon")),
+        ("FC 서울", ("fc seoul", "seoul")),
+    ),
+    "KLEAGUE2": (
+        ("수원 삼성", ("suwon bluewings", "suwon samsung", "bluewings")),
+        ("수원 FC", ("suwon fc", "suwon city")),
+        ("서울 이랜드", ("seoul e-land", "seoul e land", "seoul e.", "seoul e", "e-land")),
+        ("대구 FC", ("daegu fc", "daegu")),
+        ("부산 아이파크", ("busan ipark", "busan i park", "busan")),
+        ("성남 FC", ("seongnam fc", "seongnam")),
+        ("전남 드래곤즈", ("jeonnam dragons", "jeonnam")),
+        ("경남 FC", ("gyeongnam fc", "gyeongnam")),
+        ("김포 FC", ("gimpo fc", "gimpo")),
+        ("충남 아산", ("chungnam asan", "asan mugunghwa", "asan")),
+        ("충북 청주", ("chungbuk cheongju", "cheongju fc", "cheongju")),
+        ("천안 시티", ("cheonan city", "cheonan")),
+        ("안산 그리너스", ("ansan greeners", "ansan")),
+        ("화성 FC", ("hwaseong fc", "hwaseong")),
+        ("김해 FC 2008", ("gimhae fc 2008", "gimhae city", "gimhae fc", "gimhae")),
+        ("용인 FC", ("yongin fc", "yongin city", "yongin")),
+        ("파주 프런티어", ("paju frontier", "paju citizen", "paju")),
+    ),
+    "JLEAGUE": (
+        ("도쿄 베르디", ("tokyo verdy", "verdy")),
+        ("FC 도쿄", ("fc tokyo", "tokyo")),
+        ("요코하마 F. 마리노스", ("yokohama f. marinos", "yokohama f marinos", "yokohama fm", "yokohama m.", "marinos")),
+        ("가시와 레이솔", ("kashiwa reysol", "kashiwa")),
+        ("산프레체 히로시마", ("sanfrecce hiroshima", "sanfrecce", "hiroshima")),
+        ("마치다 젤비아", ("machida zelvia", "fc machida zelvia", "machida")),
+        ("비셀 고베", ("vissel kobe", "kobe")),
+        ("가시마 앤틀러스", ("kashima antlers", "kashima")),
+        ("가와사키 프론탈레", ("kawasaki frontale", "kawasaki")),
+        ("우라와 레즈", ("urawa reds", "urawa red diamonds", "urawa")),
+        ("파지아노 오카야마", ("fagiano okayama", "okayama")),
+        ("세레소 오사카", ("cerezo osaka", "cerezo", "c-osaka")),
+        ("감바 오사카", ("gamba osaka", "gamba", "g-osaka")),
+        ("교토 상가", ("kyoto sanga", "kyoto")),
+        ("나고야 그램퍼스", ("nagoya grampus", "nagoya")),
+        ("시미즈 에스펄스", ("shimizu s-pulse", "shimizu")),
+        ("V-파렌 나가사키", ("v-varen nagasaki", "v-varen", "nagasaki")),
+        ("제프 유나이티드 지바", ("jef united chiba", "jef utd chiba", "chiba")),
+        ("미토 홀리호크", ("mito hollyhock", "mito")),
+        ("아비스파 후쿠오카", ("avispa fukuoka", "fukuoka")),
+    ),
+    "JLEAGUE2": (
+        ("요코하마 FC", ("yokohama fc",)),
+        ("콘사도레 삿포로", ("hokkaido consadole sapporo", "consadole sapporo", "sapporo")),
+        ("쇼난 벨마레", ("shonan bellmare", "shonan")),
+        ("알비렉스 니가타", ("albirex niigata", "niigata")),
+        ("사간 도스", ("sagan tosu", "tosu")),
+        ("주빌로 이와타", ("jubilo iwata", "iwata")),
+        ("베갈타 센다이", ("vegalta sendai", "sendai")),
+        ("몬테디오 야마가타", ("montedio yamagata", "yamagata")),
+        ("오미야 아르디자", ("rb omiya ardija", "omiya ardija", "omiya")),
+        ("도쿠시마 보르티스", ("tokushima vortis", "tokushima")),
+        ("방포레 고후", ("ventforet kofu", "kofu")),
+        ("오이타 트리니타", ("oita trinita", "oita")),
+        ("후지에다 MYFC", ("fujieda myfc", "fujieda")),
+        ("블라우블리츠 아키타", ("blaublitz akita", "blaublitz", "akita")),
+        ("이와키 FC", ("iwaki fc", "iwaki")),
+        ("FC 이마바리", ("fc imabari", "imabari")),
+        ("카탈레 도야마", ("kataller toyama", "toyama")),
+        ("반라우레 하치노헤", ("vanraure hachinohe", "vanraure", "hachinohe")),
+        ("테게바자로 미야자키", ("tegevajaro miyazaki", "tegevajaro", "miyazaki")),
+        ("도치기 시티", ("tochigi city",)),
+        ("도치기 SC", ("tochigi sc", "tochigi")),
+        ("로아소 구마모토", ("roasso kumamoto", "kumamoto")),
+        ("레노파 야마구치", ("renofa yamaguchi", "yamaguchi")),
+        ("에히메 FC", ("ehime fc", "ehime")),
+        ("가고시마 유나이티드", ("kagoshima utd", "kagoshima united", "kagoshima")),
+        ("더스파 군마", ("thespa gunma", "thespakusatsu", "gunma")),
+        ("마츠모토 야마가", ("matsumoto yamaga", "matsumoto")),
+        ("기라반츠 기타큐슈", ("giravanz kitakyushu", "kitakyushu")),
+        ("츠바이겐 가나자와", ("zweigen kanazawa", "kanazawa")),
+        ("FC 류큐", ("fc ryukyu", "ryukyu")),
+    ),
+}
+
+_KR_JP_SOCCER_ARENA_V4640: Dict[str, str] = {
+    # K League 1 (12)
+    "전북 현대": "전주월드컵경기장",
+    "FC 서울": "서울월드컵경기장",
+    "울산 HD": "울산문수축구경기장",
+    "대전 하나 시티즌": "대전월드컵경기장",
+    "강원 FC": "강릉종합운동장",
+    "인천 유나이티드": "인천축구전용경기장",
+    "포항 스틸러스": "포항스틸야드",
+    "김천 상무": "김천종합운동장",
+    "광주 FC": "광주월드컵경기장",
+    "제주 SK": "제주월드컵경기장",
+    "FC 안양": "안양종합운동장",
+    "부천 FC 1995": "부천종합운동장",
+    # K League 2 (17)
+    "수원 삼성": "수원월드컵경기장",
+    "수원 FC": "수원종합운동장",
+    "서울 이랜드": "목동종합운동장",
+    "대구 FC": "대구iM뱅크파크",
+    "부산 아이파크": "부산구덕운동장",
+    "성남 FC": "탄천종합운동장",
+    "전남 드래곤즈": "광양축구전용구장",
+    "경남 FC": "창원축구센터",
+    "김포 FC": "김포솔터축구장",
+    "충남 아산": "이순신종합운동장",
+    "충북 청주": "청주종합경기장",
+    "천안 시티": "천안종합운동장",
+    "안산 그리너스": "안산와스타디움",
+    "화성 FC": "화성종합경기타운",
+    "김해 FC 2008": "김해종합운동장",
+    "용인 FC": "용인미르스타디움",
+    "파주 프런티어": "파주스타디움",
+    # J1 League (20)
+    "FC 도쿄": "아지노모토 스타디움",
+    "도쿄 베르디": "아지노모토 스타디움",
+    "가시와 레이솔": "산쿄 프론티어 가시와 스타디움",
+    "산프레체 히로시마": "에디온 피스 윙 히로시마",
+    "마치다 젤비아": "마치다 기온 스타디움",
+    "비셀 고베": "노에비아 스타디움 고베",
+    "가시마 앤틀러스": "가시마 사커 스타디움",
+    "요코하마 F. 마리노스": "닛산 스타디움",
+    "가와사키 프론탈레": "우바란스 스타디움 도도로키",
+    "우라와 레즈": "사이타마 스타디움 2002",
+    "파지아노 오카야마": "시티라이트 스타디움",
+    "세레소 오사카": "요도코 사쿠라 스타디움",
+    "감바 오사카": "파나소닉 스타디움 스이타",
+    "교토 상가": "상가 스타디움 바이 교세라",
+    "나고야 그램퍼스": "도요타 스타디움",
+    "시미즈 에스펄스": "IAI 스타디움 니혼다이라",
+    "V-파렌 나가사키": "피스 스타디움 시티",
+    "제프 유나이티드 지바": "후쿠다 전자 아레나",
+    "미토 홀리호크": "케즈덴키 스타디움 미토",
+    "아비스파 후쿠오카": "베스트 전기 스타디움",
+    # J2 League (20)
+    "요코하마 FC": "니파츠 미츠자와 구기장",
+    "콘사도레 삿포로": "다이이치야마모토 돔",
+    "쇼난 벨마레": "레몬가스 스타디움 히라츠카",
+    "알비렉스 니가타": "덴카 빅스완 스타디움",
+    "사간 도스": "에키마에 부동산 스타디움",
+    "주빌로 이와타": "야마하 스타디움",
+    "베갈타 센다이": "유아텍 스타디움 센다이",
+    "몬테디오 야마가타": "ND 소프트 스타디움",
+    "오미야 아르디자": "NACK5 스타디움 오미야",
+    "도쿠시마 보르티스": "포카리스웨트 스타디움",
+    "방포레 고후": "JIT 리사이클 잉크 스타디움",
+    "오이타 트리니타": "레조낙 돔 오이타",
+    "후지에다 MYFC": "후지에다 종합운동공원",
+    "블라우블리츠 아키타": "소유 스타디움",
+    "이와키 FC": "하와이안즈 스타디움 이와키",
+    "FC 이마바리": "아식스 사토야마 스타디움",
+    "카탈레 도야마": "도야마 현립 종합운동공원",
+    "반라우레 하치노헤": "프라이푸드 스타디움",
+    "테게바자로 미야자키": "이치고 미야자키 신토미 축구장",
+    "도치기 시티": "시티 풋볼 스테이션",
 }
 
 _FSM_LG_META_V4639: Dict[str, Tuple[str, str, str]] = {
@@ -27373,6 +27783,10 @@ _FSM_LG_META_V4639: Dict[str, Tuple[str, str, str]] = {
     "VLEAGUE_W": ("volleyball", "V-리그 여자부", "도드람 V-리그 여자부"),
     "WKBL": ("basketball", "WKBL", "WKBL 여자프로농구"),
     "KBL": ("basketball", "KBL", "KBL 남자프로농구"),
+    "KLEAGUE": ("soccer", "K리그1", "대한민국 K리그1"),
+    "KLEAGUE2": ("soccer", "K리그2", "대한민국 K리그2"),
+    "JLEAGUE": ("soccer", "J1리그", "일본 J1리그"),
+    "JLEAGUE2": ("soccer", "J2리그", "일본 J2리그"),
 }
 
 
@@ -27386,15 +27800,34 @@ def _resolve_fsm_kr_club_v4639(raw_name: str, lg_code: str) -> str:
     s = re.sub(r"\s+", " ", str(raw_name or "")).strip()
     if not s:
         return ""
-    low = re.sub(r"\s+w$", "", s.lower()).strip()
-    table = _FSM_CLUB_MAP_BY_LG_V4639.get(lg_code, ())
-    for ko_nm, aliases in table:
-        for al in aliases:
-            if al == low or al in low:
-                return ko_nm
-    sp_hint = "volleyball" if lg_code in ("VLEAGUE_M", "VLEAGUE_W") else "basketball"
+    is_soc = lg_code in ("KLEAGUE", "KLEAGUE2", "JLEAGUE", "JLEAGUE2")
+    low = s.lower().strip() if is_soc else re.sub(r"\s+w$", "", s.lower()).strip()
+    # Allow cross-division fallback between K1<->K2 or J1<->J2 during playoffs / promotion-relegation
+    tables_to_try = [_FSM_CLUB_MAP_BY_LG_V4639.get(lg_code, ())]
+    if lg_code == "KLEAGUE":
+        tables_to_try.append(_FSM_CLUB_MAP_BY_LG_V4639.get("KLEAGUE2", ()))
+    elif lg_code == "KLEAGUE2":
+        tables_to_try.append(_FSM_CLUB_MAP_BY_LG_V4639.get("KLEAGUE", ()))
+    elif lg_code == "JLEAGUE":
+        tables_to_try.append(_FSM_CLUB_MAP_BY_LG_V4639.get("JLEAGUE2", ()))
+    elif lg_code == "JLEAGUE2":
+        tables_to_try.append(_FSM_CLUB_MAP_BY_LG_V4639.get("JLEAGUE", ()))
+
+    for table in tables_to_try:
+        for ko_nm, aliases in table:
+            for al in aliases:
+                if al == low:
+                    return ko_nm
+                if len(al) >= 5 and al in low:
+                    return ko_nm
+                if re.search(rf"(?:^|\s|[-./]){re.escape(al)}(?:$|\s|[-./])", low):
+                    return ko_nm
+
+    sp_hint = "soccer" if is_soc else ("volleyball" if lg_code in ("VLEAGUE_M", "VLEAGUE_W") else "basketball")
     c_fb, _, _ = _clean_team_label_v4616(s, sp_hint)
-    valid_ko = {ko for ko, _ in table}
+    if is_soc:
+        return c_fb
+    valid_ko = {ko for ko, _ in _FSM_CLUB_MAP_BY_LG_V4639.get(lg_code, ())}
     if c_fb == "페퍼저축은행" and lg_code == "VLEAGUE_W":
         return "SOOP 수퍼스"
     return c_fb if c_fb in valid_ko else ""
@@ -27410,7 +27843,7 @@ def _convert_fsm_prague_to_kst_v4639(base_kst: datetime, cet_hhmm: str, dmy_tupl
             dd, mo, yyyy = dmy_tuple
             dt_cet = datetime(yyyy, mo, dd, hh, mm, tzinfo=_FSM_PRAGUE_TZ_V4639)
         else:
-            # Korean domestic games start 14:00~19:30 KST == 05:00~12:30 Europe/Prague (same calendar date!)
+            # Korean & Japanese domestic games start 12:00~20:00 KST == 04:00~13:00 Europe/Prague (same calendar date!)
             dt_cet = datetime(base_kst.year, base_kst.month, base_kst.day, hh, mm, tzinfo=_FSM_PRAGUE_TZ_V4639)
         dt_k = dt_cet.astimezone(KST)
         return dt_k, f"{dt_k.hour:02d}:{dt_k.minute:02d}"
@@ -27461,7 +27894,7 @@ def _parse_flashscore_mobi_detail_v4639(detail_html: str, sport: str) -> Dict[st
     periods: List[Tuple[int, int]] = []
 
     m_paren = re.search(
-        r"(?<!\d)(\d{1,3})\s*[-:]\s*(\d{1,3})(?:\s*(?:AOT|OT|After\s*OT))?(?:\s*\(\s*\d{1,3}\s*[-:]\s*\d{1,3}\s*\))?\s*\(\s*(\d{1,3}\s*[-:]\s*\d{1,3}(?:\s*,\s*\d{1,3}\s*[-:]\s*\d{1,3})*)\s*\)",
+        r"(?<!\d)(\d{1,3})\s*[-:]\s*(\d{1,3})(?:\s*(?:AOT|OT|After\s*OT|AET|After\s*ET))?(?:\s*\(\s*\d{1,3}\s*[-:]\s*\d{1,3}\s*\))?\s*\(\s*(\d{1,3}\s*[-:]\s*\d{1,3}(?:\s*,\s*\d{1,3}\s*[-:]\s*\d{1,3})*)\s*\)",
         plain,
         flags=re.I,
     )
@@ -27478,7 +27911,7 @@ def _parse_flashscore_mobi_detail_v4639(detail_html: str, sport: str) -> Dict[st
                 set_map[int(sm.group(1))] = (int(sm.group(2)), int(sm.group(3)))
             for s_idx in sorted(set_map.keys()):
                 periods.append(set_map[s_idx])
-        else:
+        elif sport == "basketball":
             q_list: List[Tuple[int, int]] = []
             for qm in re.finditer(
                 r"\b(?:([1-4])(?:st|nd|rd|th)\s*Quarter|Quarter\s*([1-4])|(Overtime|OT))\s*:\s*(\d{1,3})\s*[-:]\s*(\d{1,3})\b",
@@ -27487,15 +27920,19 @@ def _parse_flashscore_mobi_detail_v4639(detail_html: str, sport: str) -> Dict[st
             ):
                 q_list.append((int(qm.group(4)), int(qm.group(5))))
             periods.extend(q_list)
+        elif sport == "soccer":
+            m_1h = re.search(r"\b1st\s*Half\s*[:\-]?\s*(\d{1,2})\s*[-:]\s*(\d{1,2})\b", plain, flags=re.I)
+            if m_1h:
+                periods.append((int(m_1h.group(1)), int(m_1h.group(2))))
 
     det_state = ""
     det_period_num = 0
-    if re.search(r"\b(?:Finished|After\s*OT|AOT)\b", plain, flags=re.I):
+    det_soc_min = ""
+    if re.search(r"\b(?:Finished|After\s*OT|AOT|After\s*ET|AET|After\s*Pen)\b", plain, flags=re.I):
         det_state = "post"
     else:
         m_set = re.search(r"\bSet\s*([1-5])\b", plain, flags=re.I)
         if sport == "volleyball" and m_set and not re.search(r"\bSet\s*[1-5]\s*:", m_set.group(0)):
-            # Check standalone `Set N` status line (distinct from `Set N: 25-27`)
             for ln in lines:
                 ln_c = re.sub(r"\[\[FSM_M:[^|]*\|([^\]]*)\]\]", r"\1", ln).strip()
                 ms_ln = re.match(r"^Set\s*([1-5])(?:\s|$)", ln_c, flags=re.I)
@@ -27522,6 +27959,17 @@ def _parse_flashscore_mobi_detail_v4639(detail_html: str, sport: str) -> Dict[st
                     det_state = "in"
                     det_period_num = int(mq_ln.group(1) or mq_ln.group(2) or mq_ln.group(3))
                     break
+        elif sport == "soccer":
+            for ln in lines:
+                ln_c = re.sub(r"\[\[FSM_M:[^|]*\|([^\]]*)\]\]", r"\1", ln).strip()
+                if re.match(r"^(?:Half\s*Time|HT)\b", ln_c, flags=re.I):
+                    det_state = "ht"
+                    break
+                ms_m = re.match(r"^(\d{1,3}(?:\+\d{1,2})?)\s*\x27$", ln_c)
+                if ms_m:
+                    det_state = "in"
+                    det_soc_min = ms_m.group(1)
+                    break
 
     dmy_hm: Optional[Tuple[int, int, int, str]] = None
     m_dt = re.search(r"\b(\d{2})\.(\d{2})\.(20\d{2})\s+(\d{2}:\d{2})\b", plain)
@@ -27534,6 +27982,7 @@ def _parse_flashscore_mobi_detail_v4639(detail_html: str, sport: str) -> Dict[st
         "periods": periods,
         "det_state": det_state,
         "det_period_num": det_period_num,
+        "det_soc_min": det_soc_min,
         "dmy_hm": dmy_hm,
     }
 
@@ -27544,13 +27993,13 @@ def _fetch_fsm_detail_cached_v4639(match_href: str, sport: str, is_finished: boo
         return {}
     clean_path = m_id.group(1)
     now_m = time.monotonic()
-    ttl = 3600.0 if is_finished else 15.0
+    ttl = 3600.0 if is_finished else (30.0 if sport == "soccer" else 15.0)
     with _FSM_LOCK_V4639:
         cached = _FSM_DETAIL_CACHE_V4639.get(clean_path)
         if cached and (now_m - cached[0]) < ttl:
             return dict(cached[1])
     url = f"https://www.flashscore.mobi{clean_path}"
-    html_txt = _http_fetch_text_v4616(url, timeout=2.0, headers=_FSM_HEADERS_V4639)
+    html_txt = _http_fetch_text_v4616(url, timeout=1.9, headers=_FSM_HEADERS_V4639)
     if not html_txt:
         return {}
     parsed = _parse_flashscore_mobi_detail_v4639(html_txt, sport)
@@ -27558,7 +28007,7 @@ def _fetch_fsm_detail_cached_v4639(match_href: str, sport: str, is_finished: boo
         effective_fin = is_finished or (parsed.get("det_state") == "post")
         with _FSM_LOCK_V4639:
             _FSM_DETAIL_CACHE_V4639[clean_path] = (time.monotonic(), dict(parsed))
-            if effective_fin and len(_FSM_DETAIL_CACHE_V4639) > 250:
+            if effective_fin and len(_FSM_DETAIL_CACHE_V4639) > 350:
                 oldest_k = min(_FSM_DETAIL_CACHE_V4639.keys(), key=lambda k: _FSM_DETAIL_CACHE_V4639[k][0])
                 _FSM_DETAIL_CACHE_V4639.pop(oldest_k, None)
     return parsed
@@ -27577,8 +28026,27 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
             m_hdr = re.match(r"^([A-Z][A-Z\s\.\-&\x27]{2,}?)\s*:\s*(.+)$", ln)
             if m_hdr:
                 c_up = m_hdr.group(1).strip().upper()
-                l_up = m_hdr.group(2).strip().upper()
-                if c_up in ("SOUTH KOREA", "KOREA", "REPUBLIC OF KOREA"):
+                l_up = re.sub(r"\bSTANDINGS\b", "", m_hdr.group(2).upper()).strip(" -:")
+                if sport == "soccer":
+                    if any(excl in l_up for excl in ("WOMEN", "WK LEAGUE", "WE LEAGUE", "K3", "K4", "J3", "U17", "U18", "U19", "U20", "U21", "U23", "YOUTH", "UNIVERSIADE", "AMATEUR", "ALL STAR", "FUTSAL")):
+                        active_lg = ""
+                    elif c_up in ("SOUTH KOREA", "KOREA", "REPUBLIC OF KOREA"):
+                        if re.search(r"\bK[\s\-]*LEAGUE\s*2\b", l_up):
+                            active_lg = "KLEAGUE2"
+                        elif re.search(r"\bK[\s\-]*LEAGUE(?:\s*1)?\b", l_up):
+                            active_lg = "KLEAGUE"
+                        else:
+                            active_lg = ""
+                    elif c_up == "JAPAN":
+                        if re.search(r"\bJ2[\s\-]*LEAGUE\b", l_up):
+                            active_lg = "JLEAGUE2"
+                        elif re.search(r"\bJ1[\s\-]*LEAGUE\b", l_up):
+                            active_lg = "JLEAGUE"
+                        else:
+                            active_lg = ""
+                    else:
+                        active_lg = ""
+                elif c_up in ("SOUTH KOREA", "KOREA", "REPUBLIC OF KOREA"):
                     if any(excl in l_up for excl in ("CUP", "ALL STAR", "UNIVERSIADE", "U18", "U19", "U20", "U21", "YOUTH", "3X3", "D-LEAGUE", "DEVELOPMENT")):
                         active_lg = ""
                     elif sport == "volleyball":
@@ -27605,7 +28073,7 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
             ln_body = ln.strip()
 
         up_check = (ln_body + " " + link_txt).upper()
-        if any(bad in up_check for bad in ("POSTPONED", "CANCELLED", "CANCELED", "ABANDONED", "WALKOVER", "FRO")):
+        if re.search(r"\b(?:POSTPONED|CANCELLED|CANCELED|ABANDONED|WALKOVER|FRO)\b", up_check):
             continue
 
         state = "pre"
@@ -27615,6 +28083,7 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
         is_ht = False
         is_pause = False
         is_ot = False
+        is_pen = False
         teams_str = ln_body
 
         # 1. Volleyball live prefix (`Set 1` .. `Set 5`)
@@ -27628,9 +28097,13 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
         m_bk_ht = re.match(r"^(?:Half\s*Time|HT)\b\s*(.+)$", teams_str, flags=re.I)
         m_bk_pause = re.match(r"^(?:Pause|Break)\b\s*(.+)$", teams_str, flags=re.I)
         m_bk_ot = re.match(r"^(?:Overtime|OT)(?:\s*(\d{1,2})\x27?)?\b\s*(.+)$", teams_str, flags=re.I)
-        # 3. Explicit Finished prefix (`11:00 Fin`, `Finished`, `After OT`, `11:00 AOT`)
-        m_fin_pref = re.match(r"^(?:(\d{1,2}:\d{2})\s+)?(?:Finished|Fin|After\s*OT|AOT|FT|Ended)\b\s*(.+)$", teams_str, flags=re.I)
-        # 4. Standard `HH:MM` prefix (Scheduled if `-`, Finished if numeric score on flashscore.mobi)
+        # 3. Soccer live prefixes (`85'`, `45+2'`, `Half Time`, `Extra Time`, `Penalties`)
+        m_soc_min = re.match(r"^(\d{1,3}(?:\+\d{1,2})?)\s*\x27\s*(.+)$", teams_str)
+        m_soc_et = re.match(r"^(?:Extra\s*Time|ET)\b\s*(.+)$", teams_str, flags=re.I)
+        m_soc_pen = re.match(r"^(?:Penalties|Pen\.|Penalty)\b\s*(.+)$", teams_str, flags=re.I)
+        # 4. Explicit Finished prefix (`11:00 Fin`, `Finished`, `After OT`, `11:00 AET`, `11:00 Pen`)
+        m_fin_pref = re.match(r"^(?:(\d{1,2}:\d{2})\s+)?(?:Finished|Fin|After\s*OT|AOT|After\s*ET|AET|After\s*Pen|FT|Ended)\b\s*(.+)$", teams_str, flags=re.I)
+        # 5. Standard `HH:MM` prefix (Scheduled if `-`, Finished if numeric score on flashscore.mobi)
         m_time_pref = re.match(r"^(\d{1,2}:\d{2})\s*(.+)$", teams_str)
 
         if sport == "volleyball" and m_vb_live:
@@ -27642,7 +28115,7 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
             live_p_num = int(m_bk_qtr.group(1) or m_bk_qtr.group(2) or m_bk_qtr.group(3))
             live_min = (m_bk_qtr.group(4) or "").strip()
             teams_str = m_bk_qtr.group(5).strip()
-        elif sport == "basketball" and m_bk_ht:
+        elif sport in ("basketball", "soccer") and m_bk_ht:
             state = "in"
             is_ht = True
             live_p_num = 2
@@ -27657,6 +28130,18 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
             live_p_num = 5
             live_min = (m_bk_ot.group(1) or "").strip()
             teams_str = m_bk_ot.group(2).strip()
+        elif sport == "soccer" and m_soc_min:
+            state = "in"
+            live_min = m_soc_min.group(1).strip()
+            teams_str = m_soc_min.group(2).strip()
+        elif sport == "soccer" and m_soc_et:
+            state = "in"
+            is_ot = True
+            teams_str = m_soc_et.group(1).strip()
+        elif sport == "soccer" and m_soc_pen:
+            state = "in"
+            is_pen = True
+            teams_str = m_soc_pen.group(1).strip()
         elif m_fin_pref:
             state = "post"
             cet_hhmm = (m_fin_pref.group(1) or "").strip()
@@ -27668,15 +28153,18 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
         else:
             continue
 
-        # Extract trailing score if `link_txt` wasn't already holding it
         hs_val, as_val = 0, 0
         has_num_score = False
-        m_sc_link = re.search(r"(\d{1,3})\s*[-:]\s*(\d{1,3})", link_txt)
+        pen_note = ""
+        m_pen_link = re.search(r"Pen\s*[:\.]?\s*(\d{1,2})\s*[-:]\s*(\d{1,2})", link_txt, flags=re.I)
+        if m_pen_link:
+            pen_note = f"승부차기 {m_pen_link.group(1)}-{m_pen_link.group(2)}"
+        m_sc_link = re.search(r"^(\d{1,3})\s*[-:]\s*(\d{1,3})", link_txt.strip()) or re.search(r"(\d{1,3})\s*[-:]\s*(\d{1,3})", link_txt)
         if m_sc_link:
             hs_val, as_val = int(m_sc_link.group(1)), int(m_sc_link.group(2))
             has_num_score = True
         else:
-            m_sc_tail = re.search(r"\s+(\d{1,3})\s*[-:]\s*(\d{1,3})(?:ot|\s*aot)?\s*$", teams_str, flags=re.I)
+            m_sc_tail = re.search(r"\s+(\d{1,3})\s*[-:]\s*(\d{1,3})(?:ot|aet|\s*aot|\s*\(pen[^)]*\))?\s*$", teams_str, flags=re.I)
             if m_sc_tail:
                 hs_val, as_val = int(m_sc_tail.group(1)), int(m_sc_tail.group(2))
                 has_num_score = True
@@ -27685,7 +28173,6 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
                 teams_str = re.sub(r"\s+-\s*$", "", teams_str).strip()
 
         if state == "pre" and has_num_score:
-            # On `flashscore.mobi`, `HH:MM TeamA - TeamB 1-3` (with `HH:MM` instead of `Set N` / `Quarter N`) is a finished game
             state = "post"
 
         parts = re.split(r"\s+-\s+", teams_str, maxsplit=1)
@@ -27707,6 +28194,8 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
                 "is_ht": is_ht,
                 "is_pause": is_pause,
                 "is_ot": is_ot,
+                "is_pen": is_pen,
+                "pen_note": pen_note,
                 "home": h_ko,
                 "away": a_ko,
                 "hs": hs_val,
@@ -27718,18 +28207,21 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
     if not candidates:
         return []
 
-    # Fetch `/match/<id>/` details in parallel for all `in` and `post` Korean games (typically 1~4 games/day!)
-    detail_targets = [i for i, c in enumerate(candidates) if c["href"] and c["state"] in ("in", "post")]
+    # For volleyball & basketball, enrich both `in` & `post` (1~4 games/day); for soccer, enrich only `in` to stay ultra-fast (<0.6s)!
+    if sport == "soccer":
+        detail_targets = [i for i, c in enumerate(candidates) if c["href"] and c["state"] == "in"][:10]
+    else:
+        detail_targets = [i for i, c in enumerate(candidates) if c["href"] and c["state"] in ("in", "post")]
     detail_by_idx: Dict[int, Dict[str, Any]] = {}
     if detail_targets:
-        with ThreadPoolExecutor(max_workers=min(4, len(detail_targets))) as pool:
+        with ThreadPoolExecutor(max_workers=min(8, len(detail_targets))) as pool:
             futs = {
                 idx: pool.submit(_fetch_fsm_detail_cached_v4639, candidates[idx]["href"], sport, candidates[idx]["state"] == "post")
                 for idx in detail_targets
             }
             for idx, fut in futs.items():
                 try:
-                    detail_by_idx[idx] = fut.result(timeout=2.3) or {}
+                    detail_by_idx[idx] = fut.result(timeout=2.2) or {}
                 except Exception:
                     detail_by_idx[idx] = {}
 
@@ -27742,9 +28234,11 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
         state = c["state"]
         hs, as_ = int(c["hs"]), int(c["as"])
         live_p_num = int(c["live_p_num"] or 0)
+        live_min = str(c["live_min"] or "")
         is_ht = bool(c["is_ht"])
         is_pause = bool(c.get("is_pause"))
         is_ot = bool(c["is_ot"])
+        is_pen = bool(c.get("is_pen"))
 
         if det.get("main_hs") is not None and det.get("main_as") is not None:
             hs = int(det["main_hs"])
@@ -27760,15 +28254,27 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
         elif det.get("det_state") == "ot":
             state = "in"
             is_ot = True
-        elif det.get("det_state") == "in" and int(det.get("det_period_num") or 0) > 0:
+        elif det.get("det_state") == "in":
             state = "in"
-            live_p_num = int(det["det_period_num"])
+            if int(det.get("det_period_num") or 0) > 0:
+                live_p_num = int(det["det_period_num"])
+            if det.get("det_soc_min"):
+                live_min = str(det["det_soc_min"])
 
         dmy_hm = det.get("dmy_hm")
         if dmy_hm is not None:
             dt_k, hhmm = _convert_fsm_prague_to_kst_v4639(target_k, dmy_hm[3], (dmy_hm[0], dmy_hm[1], dmy_hm[2]))
         elif c["cet_hhmm"]:
             dt_k, hhmm = _convert_fsm_prague_to_kst_v4639(target_k, c["cet_hhmm"], None)
+        elif sp == "soccer":
+            # Estimate KST kickoff cleanly to nearest half-hour when live minute is known and detail omitted
+            base_m = int(live_min.split("+")[0]) if (live_min and live_min.split("+")[0].isdigit()) else (45 if is_ht else 60)
+            elapsed_real = base_m + (18 if (base_m > 45 or is_ht) else 0)
+            est_dt = target_k - timedelta(minutes=elapsed_real)
+            snapped_m = 0 if est_dt.minute < 15 else (30 if est_dt.minute < 45 else 0)
+            snapped_h = (est_dt.hour + (1 if est_dt.minute >= 45 else 0)) % 24
+            dt_k = target_k.replace(hour=snapped_h, minute=snapped_m, second=0, microsecond=0)
+            hhmm = f"{snapped_h:02d}:{snapped_m:02d}"
         else:
             is_wknd = target_k.weekday() in (5, 6)
             def_hm = ("14:00" if lg_code == "VLEAGUE_M" else "16:00") if is_wknd else "19:00"
@@ -27796,7 +28302,7 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
                 badge = f"LIVE {cur_s}세트{cur_rally}"
             else:
                 badge = "예정"
-        else:
+        elif sp == "basketball":
             if state == "post":
                 badge = "종료"
                 for qi, (qh, qa) in enumerate(periods, start=1):
@@ -27814,13 +28320,36 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
                 elif is_pause and len(periods) >= 1:
                     badge = f"LIVE {len(periods)}쿼터 종료"
                 elif is_ot or cur_q >= 5:
-                    badge = f"LIVE 연장 {c['live_min']}\x27".strip() if c["live_min"] else "LIVE 연장"
+                    badge = f"LIVE 연장 {live_min}\x27".strip() if live_min else "LIVE 연장"
                 else:
-                    badge = f"LIVE {cur_q}쿼터 {c['live_min']}\x27".strip() if c["live_min"] else f"LIVE {cur_q}쿼터"
+                    badge = f"LIVE {cur_q}쿼터 {live_min}\x27".strip() if live_min else f"LIVE {cur_q}쿼터"
+            else:
+                badge = "예정"
+        else:
+            # Soccer (`KLEAGUE`, `KLEAGUE2`, `JLEAGUE`, `JLEAGUE2`)
+            if periods:
+                p_parts.append(f"전반 {periods[0][0]}-{periods[0][1]}")
+            if c.get("pen_note"):
+                p_parts.append(str(c["pen_note"]))
+            if state == "post":
+                badge = "종료"
+            elif state == "in":
+                if is_pen:
+                    badge = "LIVE 승부차기"
+                elif is_ht:
+                    badge = "LIVE 하프타임"
+                elif is_ot:
+                    badge = f"LIVE 연장 {live_min}\x27".strip() if live_min else "LIVE 연장"
+                elif live_min:
+                    base_m_i = int(live_min.split("+")[0]) if live_min.split("+")[0].isdigit() else 45
+                    half_ko = "전반" if base_m_i <= 45 else ("후반" if base_m_i <= 90 else "연장")
+                    badge = f"LIVE {half_ko} {live_min}\x27"
+                else:
+                    badge = "LIVE 진행중"
             else:
                 badge = "예정"
 
-        venue = _KOVO_HOME_CITY_ARENA_V4619.get(c["home"], ((), ""))[1]
+        venue = _KR_JP_SOCCER_ARENA_V4640.get(c["home"], "") if sp == "soccer" else _KOVO_HOME_CITY_ARENA_V4619.get(c["home"], ((), ""))[1]
         it = _build_rt_item_v4616(
             "flashscore_mobi",
             sp,
@@ -27849,6 +28378,7 @@ def _fetch_flashscore_mobi_kr_live_v4639(target_k: datetime, date_offset: int) -
     q_suffix = "" if date_offset == 0 else f"?d={int(date_offset)}"
     ttl = 15.0 if date_offset == 0 else 180.0
     specs = (
+        ("soccer", f"https://www.flashscore.mobi/{q_suffix}"),
         ("volleyball", f"https://www.flashscore.mobi/volleyball/{q_suffix}"),
         ("basketball", f"https://www.flashscore.mobi/basketball/{q_suffix}"),
     )
@@ -27880,7 +28410,7 @@ def _fetch_flashscore_mobi_kr_live_v4639(target_k: datetime, date_offset: int) -
                         _FSM_LIST_CACHE_V4639[ck] = (time.monotonic(), txt)
 
     collected: List[Dict[str, Any]] = []
-    for sp_k in ("volleyball", "basketball"):
+    for sp_k in ("soccer", "volleyball", "basketball"):
         h_txt = raw_by_sp.get(sp_k) or ""
         if h_txt:
             try:
@@ -29310,6 +29840,7 @@ def get_single_post_detail_v4637(post_id: str):
 @router.get("/api/member/live-sources-diag-v4637")
 @router.get("/api/member/live-sources-diag-v4638")
 @router.get("/api/member/live-sources-diag-v4639")
+@router.get("/api/member/live-sources-diag-v4640")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -29322,8 +29853,9 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.39",
+        "version": "v4.6.40",
         "flashscore_mobi_bridge_v4639": True,
+        "kr_jp_soccer_bridge_v4640": True,
         "ux_pwa_v4637": {
             "post_detail_api": True,
             "mobile_popstate_guard": True,
@@ -29345,6 +29877,21 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
         "server_kst": now_k.strftime("%Y-%m-%d %H:%M:%S KST"),
         "source_counts": dict(_PER_OFFSET_DIAG_V4622.get(off_i) or _LAST_SOURCE_DIAG_V4617),
         "merged_counts": _recompute_sport_counts_v4615(items),
+        "kr_jp_soccer_matches": [
+            {
+                "league_code": x.get("league_code"),
+                "league": x.get("league"),
+                "dt": x.get("match_dt_kst"),
+                "home": x.get("home"),
+                "away": x.get("away"),
+                "score": f"{x.get('home_score')}:{x.get('away_score')}",
+                "state": x.get("state"),
+                "badge": x.get("status_badge"),
+                "period_scores": x.get("period_scores"),
+                "venue": x.get("venue"),
+            }
+            for x in items if x.get("league_code") in ("KLEAGUE", "KLEAGUE2", "JLEAGUE", "JLEAGUE2")
+        ],
         "domestic_matches": [
             {
                 "sport": x.get("sport"),
