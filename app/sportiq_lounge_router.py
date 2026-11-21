@@ -18588,57 +18588,138 @@ def _fnv1a_aa_id_py_v29(raw_title: str) -> str:
     return "aa_" + format(h, "x")
 
 
+def _normalize_full_rss_body_v4636(val: Any) -> str:
+    s = str(val or "")
+    s = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", s)
+    s = s.replace("\r\n", "\n").replace("\r", "\n")
+    lines = [re.sub(r"[ \t]+", " ", ln).strip() for ln in s.split("\n")]
+    cleaned = "\n".join(lines).strip()
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
+def _extract_auto_analyst_full_body_v4636(ar: Any, fallback_title: str = "") -> str:
+    rk = set(ar.keys()) if hasattr(ar, "keys") else set()
+    primary_text = ""
+    for col in ("content", "body", "analysis", "full_text", "markdown", "article", "detail", "summary"):
+        if col in rk:
+            cand = _normalize_full_rss_body_v4636(ar[col])
+            if cand:
+                primary_text = cand
+                break
+    summary_txt = _normalize_full_rss_body_v4636(ar["summary"]) if "summary" in rk else ""
+    pick_txt = ""
+    for pcol in ("recommended_pick", "pick", "key_point"):
+        if pcol in rk:
+            pcand = _normalize_full_rss_body_v4636(ar[pcol])
+            if pcand:
+                pick_txt = pcand
+                break
+    hash_txt = _normalize_full_rss_body_v4636(ar["hashtags"]) if "hashtags" in rk else ""
+
+    parts: List[str] = []
+    if summary_txt and primary_text and summary_txt != primary_text and summary_txt not in primary_text:
+        parts.append(f"[핵심 요약] {summary_txt}")
+    if primary_text:
+        parts.append(primary_text)
+    elif summary_txt:
+        parts.append(summary_txt)
+    if pick_txt and all(pick_txt not in seg for seg in parts):
+        parts.append(f"[AI 핵심 전술 포인트] {pick_txt}")
+    if hash_txt and all(hash_txt not in seg for seg in parts):
+        parts.append(hash_txt)
+
+    merged = "\n\n".join(p for p in parts if p).strip()
+    return merged or _normalize_full_rss_body_v4636(fallback_title)
+
+
 def resolve_post_og_meta_v29(post_id: str) -> Optional[Dict[str, str]]:
     pid = (post_id or "").strip()[:64]
     if not pid:
         return None
 
+    def _scan_conn(conn: Any) -> Optional[Dict[str, str]]:
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        if "admin_deleted_tombstones" in tables:
+            tomb = conn.execute(
+                "SELECT 1 FROM admin_deleted_tombstones WHERE target_type = 'post' AND target_id = ? LIMIT 1",
+                (pid,),
+            ).fetchone()
+            if tomb:
+                return None
+        if "community_member_posts" in tables:
+            row = conn.execute(
+                "SELECT * FROM community_member_posts WHERE id = ? LIMIT 1",
+                (pid,),
+            ).fetchone()
+            if row and row["title"]:
+                rk = set(row.keys())
+                raw_b = (row["body"] if "body" in rk else "") or (row["content"] if "content" in rk else "")
+                full_b = _normalize_full_rss_body_v4636(raw_b)
+                flat_b = re.sub(r"\s+", " ", full_b).strip()
+                return {
+                    "id": str(row["id"]),
+                    "title": str(row["title"]).strip(),
+                    "desc": (flat_b[:155] + ("..." if len(flat_b) > 155 else "")) or "SportIQ 실시간 스포츠 데이터 전술 분석 브리핑",
+                    "full_body": full_b or str(row["title"]).strip(),
+                    "author": str((row["author"] if "author" in rk else "") or "SportIQ 분석가").strip() or "SportIQ 분석가",
+                    "league": str((row["league"] if "league" in rk else "") or "SPORTIQ"),
+                }
+        if "auto_analyst_posts" in tables:
+            try:
+                cols = {c[1] for c in conn.execute("PRAGMA table_info(auto_analyst_posts)").fetchall()}
+                cand_rows = []
+                if "id" in cols:
+                    hit = conn.execute("SELECT * FROM auto_analyst_posts WHERE CAST(id AS TEXT) = ? LIMIT 1", (pid,)).fetchone()
+                    if hit:
+                        cand_rows.append(hit)
+                if not cand_rows:
+                    cand_rows = conn.execute("SELECT * FROM auto_analyst_posts ORDER BY rowid DESC LIMIT 200").fetchall()
+                for ar in cand_rows:
+                    rk = set(ar.keys())
+                    atitle = str((ar["title"] if "title" in rk else "") or "").strip()
+                    aid = str((ar["id"] if "id" in rk else "") or "").strip()
+                    if atitle and (aid == pid or _fnv1a_aa_id_py_v29(atitle) == pid):
+                        full_ab = _extract_auto_analyst_full_body_v4636(ar, atitle)
+                        flat_ab = re.sub(r"\s+", " ", full_ab).strip()
+                        alg = str((ar["league"] if "league" in rk else "") or (ar["sport"] if "sport" in rk else "") or "TOP20").strip() or "TOP20"
+                        aau = str((ar["author"] if "author" in rk else "") or "SportIQ AI 분석팀").strip() or "SportIQ AI 분석팀"
+                        return {
+                            "id": pid,
+                            "title": atitle,
+                            "desc": (flat_ab[:155] + ("..." if len(flat_ab) > 155 else "")) or "SportIQ AI 데이터 자동분석 브리핑",
+                            "full_body": full_ab,
+                            "author": aau,
+                            "league": alg,
+                        }
+            except Exception:
+                pass
+        if "member_post_bookmarks" in tables:
+            brow = conn.execute(
+                "SELECT title, league FROM member_post_bookmarks WHERE post_id = ? AND title != '' LIMIT 1",
+                (pid,),
+            ).fetchone()
+            if brow and brow["title"]:
+                return {
+                    "id": pid,
+                    "title": str(brow["title"]).strip(),
+                    "desc": "SportIQ 오픈 라운지 실시간 경기 데이터 분석 및 팬 전술 브리핑",
+                    "full_body": str(brow["title"]).strip(),
+                    "author": "SportIQ 분석가",
+                    "league": str(brow["league"] or "SPORTIQ"),
+                }
+        return None
+
     def _lookup() -> Optional[Dict[str, str]]:
         with _smu_db_session(write=False) as conn:
-            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-            if "community_member_posts" in tables:
-                row = conn.execute(
-                    "SELECT id, title, body, league, author FROM community_member_posts WHERE id = ? LIMIT 1",
-                    (pid,),
-                ).fetchone()
-                if row and row["title"]:
-                    body_clean = re.sub(r"\s+", " ", str(row["body"] or "")).strip()
-                    return {
-                        "id": str(row["id"]),
-                        "title": str(row["title"]).strip(),
-                        "desc": (body_clean[:135] + ("..." if len(body_clean) > 135 else "")) or "SportIQ 실시간 스포츠 데이터 전술 분석 브리핑",
-                        "league": str(row["league"] or "SPORTIQ"),
-                    }
-            if "auto_analyst_posts" in tables:
-                try:
-                    arows = conn.execute("SELECT * FROM auto_analyst_posts ORDER BY rowid DESC LIMIT 40").fetchall()
-                    for ar in arows:
-                        rk = set(ar.keys())
-                        atitle = str((ar["title"] if "title" in rk else "") or "").strip()
-                        aid = str((ar["id"] if "id" in rk else "") or "").strip()
-                        if atitle and (aid == pid or _fnv1a_aa_id_py_v29(atitle) == pid):
-                            abody = re.sub(r"\s+", " ", str((ar["body"] if "body" in rk else "") or (ar["summary"] if "summary" in rk else "") or "")).strip()
-                            return {
-                                "id": pid,
-                                "title": atitle,
-                                "desc": (abody[:135] + ("..." if len(abody) > 135 else "")) or "SportIQ 00:00 AI 데이터 자동분석 브리핑",
-                                "league": "TOP20",
-                            }
-                except Exception:
-                    pass
-            if "member_post_bookmarks" in tables:
-                brow = conn.execute(
-                    "SELECT title, league FROM member_post_bookmarks WHERE post_id = ? AND title != '' LIMIT 1",
-                    (pid,),
-                ).fetchone()
-                if brow and brow["title"]:
-                    return {
-                        "id": pid,
-                        "title": str(brow["title"]).strip(),
-                        "desc": "SportIQ 오픈 라운지 실시간 경기 데이터 분석 및 팬 전술 브리핑",
-                        "league": str(brow["league"] or "SPORTIQ"),
-                    }
-        return None
+            found = _scan_conn(conn)
+            if found:
+                return found
+        try:
+            with _db_session(write=False) as lconn:
+                return _scan_conn(lconn)
+        except Exception:
+            return None
 
     try:
         return run_with_db_retry(_lookup)
@@ -18651,7 +18732,8 @@ def apply_dynamic_post_og_v29(html_text: str, post_meta: Optional[Dict[str, str]
         return html_text
     esc_title = _html_lib.escape(f"{post_meta['title']} | SportIQ", quote=True)
     esc_desc = _html_lib.escape(post_meta.get("desc") or "SportIQ 실시간 스포츠 데이터 분석 브리핑", quote=True)
-    esc_url = _html_lib.escape(f"https://billnojay.com/?post={urllib.parse.quote(post_meta['id'])}", quote=True)
+    raw_url = f"https://billnojay.com/?post={urllib.parse.quote(post_meta['id'], safe='')}"
+    esc_url = _html_lib.escape(raw_url, quote=True)
 
     out = re.sub(r"<title>.*?</title>", f"<title>{esc_title}</title>", html_text, count=1, flags=re.S)
     out = re.sub(
@@ -18686,6 +18768,32 @@ def apply_dynamic_post_og_v29(html_text: str, post_meta: Optional[Dict[str, str]
         )
     elif "</head>" in out:
         out = out.replace("</head>", f'  <link rel="canonical" href="{esc_url}" />\n</head>', 1)
+
+    if "sqPostJsonLdV4636" not in out and "</head>" in out:
+        post_ld = {
+            "@context": "https://schema.org",
+            "@type": "DiscussionForumPosting",
+            "headline": post_meta["title"],
+            "articleSection": post_meta.get("league") or "SPORTIQ",
+            "articleBody": post_meta.get("full_body") or post_meta.get("desc") or post_meta["title"],
+            "url": raw_url,
+            "inLanguage": "ko-KR",
+            "author": {
+                "@type": "Person",
+                "name": post_meta.get("author") or "SportIQ AI 분석팀",
+            },
+            "publisher": {
+                "@type": "Organization",
+                "name": "SportIQ",
+                "url": "https://billnojay.com/",
+            },
+        }
+        post_ld_json = json.dumps(post_ld, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+        out = out.replace(
+            "</head>",
+            f'  <script id="sqPostJsonLdV4636" type="application/ld+json">{post_ld_json}</script>\n</head>',
+            1,
+        )
     return out
 
 
@@ -20354,6 +20462,11 @@ def _xml_safe_text_v38(val: Any) -> str:
     return _html_lib.escape(s.strip(), quote=True)
 
 
+def _xml_safe_cdata_v4636(val: Any) -> str:
+    s = _normalize_full_rss_body_v4636(val)
+    return s.replace("]]>", "]]]]><![CDATA[>")
+
+
 def _collect_indexable_posts_v38(limit: int = 60) -> List[Dict[str, Any]]:
     try:
         _ensure_tactical_posts_seeded_v22()
@@ -20363,78 +20476,103 @@ def _collect_indexable_posts_v38(limit: int = 60) -> List[Dict[str, Any]]:
     items: List[Dict[str, Any]] = []
     seen_ids: Set[str] = set()
 
+    def _harvest_conn(conn: Any, out_rows: List[Dict[str, Any]], deleted_ids: Set[str]) -> None:
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        if "admin_deleted_tombstones" in tables:
+            try:
+                for tr in conn.execute("SELECT target_id FROM admin_deleted_tombstones WHERE target_type = 'post'").fetchall():
+                    if tr and tr[0]:
+                        deleted_ids.add(str(tr[0]).strip())
+            except Exception:
+                pass
+        if "community_member_posts" in tables:
+            try:
+                rows = conn.execute(
+                    "SELECT * FROM community_member_posts ORDER BY rowid DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+                for idx_r, r in enumerate(rows):
+                    rk = set(r.keys())
+                    pid = str((r["id"] if "id" in rk else "") or "").strip()
+                    title = str((r["title"] if "title" in rk else "") or "").strip()
+                    if not pid or not title or pid in seen_ids or pid in deleted_ids:
+                        continue
+                    seen_ids.add(pid)
+                    ts = (
+                        (_to_epoch_ts(r["updated_at"]) if "updated_at" in rk else None)
+                        or (_to_epoch_ts(r["created_at"]) if "created_at" in rk else None)
+                        or (now_ts - 300 - idx_r * 30)
+                    )
+                    body_raw = (r["body"] if "body" in rk else "") or (r["content"] if "content" in rk else "")
+                    body_full = _normalize_full_rss_body_v4636(body_raw)
+                    if "tags_json" in rk and r["tags_json"]:
+                        try:
+                            tgs = ["#" + str(t).lstrip("#").strip() for t in json.loads(r["tags_json"] or "[]") if str(t).strip()]
+                            if tgs:
+                                tg_line = " ".join(tgs)
+                                if tg_line not in body_full:
+                                    body_full = (body_full + "\n\n" + tg_line).strip()
+                        except Exception:
+                            pass
+                    lg_val = str((r["league"] if "league" in rk else "") or "SPORTIQ").strip() or "SPORTIQ"
+                    au_val = str((r["author"] if "author" in rk else "") or "SportIQ 분석가").strip() or "SportIQ 분석가"
+                    out_rows.append({
+                        "id": pid,
+                        "title": title,
+                        "body": body_full or title,
+                        "source_table": "community_member_posts",
+                        "league": lg_val,
+                        "author": au_val,
+                        "ts": float(ts),
+                    })
+            except Exception:
+                pass
+        if "auto_analyst_posts" in tables and len(out_rows) < limit * 2:
+            try:
+                arows = conn.execute(
+                    "SELECT * FROM auto_analyst_posts ORDER BY rowid DESC LIMIT ?",
+                    (max(limit, 60),),
+                ).fetchall()
+                for idx_a, ar in enumerate(arows):
+                    rk = set(ar.keys())
+                    atitle = str((ar["title"] if "title" in rk else "") or "").strip()
+                    if not atitle:
+                        continue
+                    aid = str((ar["id"] if "id" in rk else "") or "").strip() or _fnv1a_aa_id_py_v29(atitle)
+                    if aid in seen_ids or aid in deleted_ids:
+                        continue
+                    seen_ids.add(aid)
+                    abody_full = _extract_auto_analyst_full_body_v4636(ar, atitle)
+                    ats = (
+                        (_to_epoch_ts(ar["updated_at"]) if "updated_at" in rk else None)
+                        or (_to_epoch_ts(ar["created_at"]) if "created_at" in rk else None)
+                        or (_to_epoch_ts(ar["published_at"]) if "published_at" in rk else None)
+                        or (now_ts - 900 - idx_a * 45)
+                    )
+                    alg = str((ar["league"] if "league" in rk else "") or (ar["sport"] if "sport" in rk else "") or "TOP20").strip() or "TOP20"
+                    aau = str((ar["author"] if "author" in rk else "") or "SportIQ AI 분석팀").strip() or "SportIQ AI 분석팀"
+                    out_rows.append({
+                        "id": aid,
+                        "title": atitle,
+                        "body": abody_full or atitle,
+                        "source_table": "auto_analyst_posts",
+                        "league": alg,
+                        "author": aau,
+                        "ts": float(ats),
+                    })
+            except Exception:
+                pass
+
     def _op() -> List[Dict[str, Any]]:
         out_rows: List[Dict[str, Any]] = []
+        deleted_ids: Set[str] = set()
         with _smu_db_session(write=False) as conn:
-            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-            if "community_member_posts" in tables:
-                try:
-                    rows = conn.execute(
-                        "SELECT * FROM community_member_posts ORDER BY rowid DESC LIMIT ?",
-                        (limit,),
-                    ).fetchall()
-                    for r in rows:
-                        rk = set(r.keys())
-                        pid = str((r["id"] if "id" in rk else "") or "").strip()
-                        title = str((r["title"] if "title" in rk else "") or "").strip()
-                        if not pid or not title or pid in seen_ids:
-                            continue
-                        seen_ids.add(pid)
-                        ts = (
-                            (_to_epoch_ts(r["updated_at"]) if "updated_at" in rk else None)
-                            or (_to_epoch_ts(r["created_at"]) if "created_at" in rk else None)
-                            or (now_ts - 600)
-                        )
-                        body_raw = str((r["body"] if "body" in rk else "") or "")
-                        body_clean = re.sub(r"\s+", " ", body_raw).strip()
-                        lg_val = str((r["league"] if "league" in rk else "") or "SPORTIQ").strip() or "SPORTIQ"
-                        au_val = str((r["author"] if "author" in rk else "") or "SportIQ 분석가").strip() or "SportIQ 분석가"
-                        out_rows.append({
-                            "id": pid,
-                            "title": title,
-                            "body": body_clean[:600] or title,
-                            "league": lg_val,
-                            "author": au_val,
-                            "ts": float(ts),
-                        })
-                except Exception:
-                    pass
-            if "auto_analyst_posts" in tables and len(out_rows) < limit:
-                try:
-                    arows = conn.execute(
-                        "SELECT * FROM auto_analyst_posts ORDER BY rowid DESC LIMIT ?",
-                        (max(10, limit - len(out_rows)),),
-                    ).fetchall()
-                    for ar in arows:
-                        rk = set(ar.keys())
-                        atitle = str((ar["title"] if "title" in rk else "") or "").strip()
-                        if not atitle:
-                            continue
-                        aid = str((ar["id"] if "id" in rk else "") or "").strip() or _fnv1a_aa_id_py_v29(atitle)
-                        if aid in seen_ids:
-                            continue
-                        seen_ids.add(aid)
-                        abody = re.sub(
-                            r"\s+",
-                            " ",
-                            str((ar["body"] if "body" in rk else "") or (ar["summary"] if "summary" in rk else "") or ""),
-                        ).strip()
-                        ats = (
-                            (_to_epoch_ts(ar["created_at"]) if "created_at" in rk else None)
-                            or (_to_epoch_ts(ar["published_at"]) if "published_at" in rk else None)
-                            or (now_ts - 1800)
-                        )
-                        alg = str((ar["league"] if "league" in rk else "") or "TOP20").strip() or "TOP20"
-                        out_rows.append({
-                            "id": aid,
-                            "title": atitle,
-                            "body": abody[:600] or atitle,
-                            "league": alg,
-                            "author": "SportIQ AI 분석팀",
-                            "ts": float(ats),
-                        })
-                except Exception:
-                    pass
+            _harvest_conn(conn, out_rows, deleted_ids)
+        try:
+            with _db_session(write=False) as lconn:
+                _harvest_conn(lconn, out_rows, deleted_ids)
+        except Exception:
+            pass
         return out_rows
 
     try:
@@ -20507,10 +20645,33 @@ def serve_naver_rss_feed_v38():
     item_blocks: List[str] = []
     for p in posts:
         pid_q = urllib.parse.quote(str(p["id"]), safe="")
-        link_url = _xml_safe_text_v38(f"https://billnojay.com/?post={pid_q}")
+        raw_link = f"https://billnojay.com/?post={pid_q}"
+        link_url = _xml_safe_text_v38(raw_link)
         title_x = _xml_safe_text_v38(p["title"])
-        desc_x = _xml_safe_text_v38(f"[{p['league']}] {p['body']} (작성: {p['author']})")
         cat_x = _xml_safe_text_v38(p["league"])
+        author_x = _xml_safe_text_v38(p["author"])
+        full_body_txt = _normalize_full_rss_body_v4636(p.get("body") or p["title"])
+        if full_body_txt != p["title"].strip():
+            full_desc_plain = f"[{p['league']}] {p['title']}\n\n{full_body_txt}\n\n(작성: {p['author']} | 원문: {raw_link})"
+        else:
+            full_desc_plain = f"[{p['league']}] {full_body_txt} (작성: {p['author']})"
+        desc_x = _xml_safe_text_v38(full_desc_plain)
+
+        para_items: List[str] = []
+        for par in full_body_txt.split("\n\n"):
+            p_clean = par.strip()
+            if p_clean:
+                p_esc = _html_lib.escape(p_clean, quote=True).replace("\n", "<br />")
+                para_items.append(f"<p>{p_esc}</p>")
+        paras_html = "".join(para_items)
+        encoded_html = (
+            f"<article><h2>{title_x}</h2>"
+            f"<p><strong>리그/분류:</strong> {cat_x} · <strong>작성자:</strong> {author_x}</p>"
+            f"{paras_html}"
+            f"<p><a href='{link_url}'>SportIQ 원문 보기</a></p></article>"
+        )
+        encoded_cdata = _xml_safe_cdata_v4636(encoded_html)
+
         try:
             pub_dt = datetime.fromtimestamp(float(p["ts"]), tz=KST)
         except Exception:
@@ -20522,14 +20683,16 @@ def serve_naver_rss_feed_v38():
             f"      <link>{link_url}</link>\n"
             f'      <guid isPermaLink="true">{link_url}</guid>\n'
             f"      <category>{cat_x}</category>\n"
+            f"      <author>{author_x}</author>\n"
             f"      <description>{desc_x}</description>\n"
+            f"      <content:encoded><![CDATA[{encoded_cdata}]]></content:encoded>\n"
             f"      <pubDate>{pub_rfc}</pubDate>\n"
             "    </item>"
         )
 
     rss_xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">\n'
         "  <channel>\n"
         "    <title>SportIQ 실시간 분석 스포츠IQ 인사이트 라운지</title>\n"
         "    <link>https://billnojay.com/</link>\n"
@@ -27777,6 +27940,7 @@ _install_overseas_precision_classifier_and_repair_db_v4627()
 @router.get("/api/member/live-sources-diag-v4633")
 @router.get("/api/member/live-sources-diag-v4634")
 @router.get("/api/member/live-sources-diag-v4635")
+@router.get("/api/member/live-sources-diag-v4636")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -27784,9 +27948,19 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     items = _collect_realtime_all_sports_v4616(tk, off_i)
     ov_items = collect_enriched_overseas_news_v22(force=False)
     ov_counts = {k: sum(1 for x in ov_items if x.get("sport_ko") == k) for k in ("축구", "야구", "농구", "하키", "NFL", "UFC", "F1", "종합")}
+    rss_posts = _collect_indexable_posts_v38(limit=40)
+    full_cnt = sum(1 for p in rss_posts if len(str(p.get("body") or "")) > len(str(p.get("title") or "")) + 20)
+    avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.35",
+        "version": "v4.6.36",
+        "rss_diag": {
+            "item_count": len(rss_posts),
+            "full_content_items": full_cnt,
+            "avg_body_chars": avg_chars,
+            "auto_analyst_items": sum(1 for p in rss_posts if p.get("source_table") == "auto_analyst_posts"),
+            "community_items": sum(1 for p in rss_posts if p.get("source_table") == "community_member_posts"),
+        },
         "overseas_counts": ov_counts,
         "apisports_bridge": _get_apisports_diag_snapshot_v4623(),
         "date_offset": off_i,
