@@ -28258,7 +28258,7 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
             state = "in"
             if int(det.get("det_period_num") or 0) > 0:
                 live_p_num = int(det["det_period_num"])
-            if det.get("det_soc_min"):
+            if det.get("det_soc_min") and not live_min:
                 live_min = str(det["det_soc_min"])
 
         dmy_hm = det.get("dmy_hm")
@@ -28342,7 +28342,10 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
                     badge = f"LIVE 연장 {live_min}\x27".strip() if live_min else "LIVE 연장"
                 elif live_min:
                     base_m_i = int(live_min.split("+")[0]) if live_min.split("+")[0].isdigit() else 45
-                    half_ko = "전반" if base_m_i <= 45 else ("후반" if base_m_i <= 90 else "연장")
+                    if len(periods) == 2 and base_m_i <= 45:
+                        base_m_i += 45
+                        live_min = f"{base_m_i}+" + live_min.split("+")[1] if "+" in live_min else str(base_m_i)
+                    half_ko = "연장" if (base_m_i > 90 or len(periods) >= 3) else ("후반" if (base_m_i >= 46 or len(periods) == 2) else "전반")
                     badge = f"LIVE {half_ko} {live_min}\x27"
                 else:
                     badge = "LIVE 진행중"
@@ -29853,7 +29856,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.40",
+        "version": "v4.6.41",
         "flashscore_mobi_bridge_v4639": True,
         "kr_jp_soccer_bridge_v4640": True,
         "ux_pwa_v4637": {
