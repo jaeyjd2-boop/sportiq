@@ -2973,17 +2973,25 @@ _FRONTEND_V22_JS = r'''
       return;
     }
 
-    var hostPanel = (!dcTabPanel && dcHub && dcHub.closest) ? dcHub.closest("[id^='tab-']") : null;
-    if (dcTabPanel || hostPanel) {
-      document.querySelectorAll("[id^='tab-']").forEach(function (sec) {
-        if (sec === dcTabPanel || sec === hostPanel) {
-          sec.classList.remove("hidden");
-          sec.style.setProperty("display", "block", "important");
-        } else {
+    var hostPanel = (!dcTabPanel && dcHub && dcHub.closest) ? dcHub.closest("[id^='tab-'], [id^='view-']") : null;
+    document.querySelectorAll("[id^='tab-'], [id^='view-']").forEach(function (sec) {
+      if (!sec || (bar && sec.contains && sec.contains(bar)) || (dcHub && sec.contains && sec.contains(dcHub))) return;
+      if (sec === dcTabPanel || sec === hostPanel) {
+        sec.classList.remove("hidden");
+        sec.style.setProperty("display", "block", "important");
+      } else {
+        var csSec = window.getComputedStyle ? window.getComputedStyle(sec) : null;
+        var isVisNow = !sec.classList.contains("hidden") && (!csSec || csSec.display !== "none");
+        if (isVisNow) {
           sec.setAttribute("data-sq-hidden-by-dc", "1");
           sec.style.setProperty("display", "none", "important");
         }
-      });
+      }
+    });
+    var dcCol = document.getElementById("dcHubCollapsible");
+    if (dcCol) {
+      dcCol.classList.remove("hidden");
+      dcCol.style.setProperty("display", "block", "important");
     }
 
     try { ensureDcHubExpandedForStandingsV344(); } catch (eEx1) {}
@@ -3069,10 +3077,17 @@ _FRONTEND_V22_JS = r'''
       dcBtn.style.setProperty("font-weight", "900", "important");
     }
 
-    var scrollAnchor = dcBody || targetEl;
+    var scrollAnchor = targetEl || dcBody;
     var rect = scrollAnchor.getBoundingClientRect();
     var curY = window.pageYOffset || document.documentElement.scrollTop || 0;
-    var destY = Math.max(0, Math.round(curY + rect.top - 86));
+    var destY = Math.max(0, Math.round(curY + rect.top - 72));
+    if (dcHub && dcHub.style) {
+      dcHub.style.transition = "box-shadow 0.28s ease, border-color 0.28s ease";
+      dcHub.style.boxShadow = "0 0 0 2px rgba(56, 189, 248, 0.72), 0 14px 34px rgba(6, 182, 212, 0.22)";
+      setTimeout(function () {
+        if (dcHub && dcHub.style) dcHub.style.boxShadow = "";
+      }, 1500);
+    }
     try {
       window.scrollTo({ top: destY, behavior: "smooth" });
     } catch (eScr) {
@@ -4944,6 +4959,88 @@ _FRONTEND_V22_JS = r'''
     return true;
   }
 
+  function mountResolvedSharedPostAndOpenV4637(postObj, targetId) {
+    if (!postObj || window.__sqDeepLinkHandledV29) return false;
+    window.__sqDeepLinkHandledV29 = true;
+    if (typeof window.state !== "object" || !window.state) {
+      window.state = { posts: [], activePostId: null };
+    }
+    if (!Array.isArray(window.state.posts)) {
+      window.state.posts = [];
+    }
+    var canonicalId = String(postObj.id || targetId);
+    var exists = window.state.posts.find(function (x) {
+      return x && (String(x.id) === canonicalId || String(x.id) === String(targetId) || (postObj.alt_id && String(x.id) === String(postObj.alt_id)));
+    });
+    if (!exists) {
+      window.state.posts.unshift(postObj);
+      exists = postObj;
+    } else if ((!exists.body || String(exists.body).length < String(postObj.body || "").length) && postObj.body) {
+      exists.body = postObj.body;
+    }
+    if (typeof window.switchTab === "function") {
+      try { window.switchTab("feed"); } catch (eSw) {}
+    }
+    if (typeof window.renderFeed === "function") {
+      try { window.renderFeed(); } catch (eRf) {}
+    }
+    try { syncRenderedFeedReactionButtonsDom(); } catch (eSy) {}
+
+    var box = document.getElementById("feedList");
+    if (box) {
+      box.querySelectorAll("article").forEach(function (art) {
+        var apid = art.getAttribute("data-sq-post-id") || "";
+        if (apid === String(exists.id) || apid === String(targetId)) {
+          art.setAttribute("data-sq-shared-highlight", "1");
+        }
+      });
+    }
+    var escHtmlFn = function (s) {
+      return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    };
+    var openedNative = false;
+    try { openedNative = Boolean(openPostDetailAndCommentsV29(String(exists.id))); } catch (eOp) {}
+    var cmEl = document.getElementById("commentModal");
+    var pmEl = document.getElementById("post-modal");
+    if (cmEl) {
+      cmEl.classList.remove("hidden");
+      cmEl.style.display = "flex";
+      var tEl = document.getElementById("commentModalTitle");
+      if (tEl) tEl.textContent = exists.title || "분석글 상세 · 댓글";
+      setTimeout(function () {
+        try { injectPostPreviewIntoCommentModalV29(exists); } catch (e1) {}
+        try { decorateCommentModalDeleteButtonsV4612(); } catch (e2) {}
+        try { polishModalsAndCloseIconsV29(); } catch (e3) {}
+      }, 40);
+    } else if (pmEl) {
+      var hdrEl = document.getElementById("modal-post-header");
+      var bodyEl = document.getElementById("modal-post-body");
+      var cntEl = document.getElementById("modal-comment-count");
+      var listEl = document.getElementById("modal-comments-list");
+      var clsBtn = document.getElementById("close-post-modal");
+      if (hdrEl) {
+        hdrEl.innerHTML = "<div class='flex items-center gap-2'><span class='text-xs font-bold px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-300'>" + escHtmlFn(exists.league || "SPORTIQ") + "</span><span class='text-xs text-emerald-400 font-semibold'>" + escHtmlFn(exists.authorBadge || "PRO 분석") + "</span></div><h3 class='text-xl font-extrabold text-white leading-snug mt-1'>" + escHtmlFn(exists.title || "") + "</h3><div class='text-xs text-slate-400'>" + escHtmlFn(exists.author || "SportIQ AI 분석팀") + " · 신뢰지수 " + escHtmlFn(exists.trust || 96) + "%</div>";
+      }
+      if (bodyEl) {
+        bodyEl.innerHTML = "<div style='white-space:pre-line;font-size:14px;line-height:1.72;color:#e2e8f0;'>" + escHtmlFn(exists.body || "") + "</div>";
+      }
+      var cmts = Array.isArray(exists.comments) ? exists.comments : [];
+      if (cntEl) cntEl.textContent = String(cmts.length);
+      if (listEl) {
+        listEl.innerHTML = cmts.length ? cmts.map(function (c) {
+          return "<div style='padding:10px 12px;border-radius:10px;background:rgba(2,6,23,0.75);border:1px solid #1e293b;margin-bottom:6px;'><div style='font-size:12px;font-weight:700;color:#6ee7b7;'>" + escHtmlFn(c.user || c.author || "익명") + "</div><div style='font-size:13px;color:#e2e8f0;margin-top:3px;'>" + escHtmlFn(c.text || "") + "</div></div>";
+        }).join("") : "<p style='font-size:12px;color:#94a3b8;'>첫 번째 데이터 의견을 남겨보세요.</p>";
+      }
+      if (clsBtn && !clsBtn.hasAttribute("data-sq-pm-close-v4637")) {
+        clsBtn.setAttribute("data-sq-pm-close-v4637", "1");
+        clsBtn.addEventListener("click", function () { closeSingleOverlayModalV461(pmEl); });
+      }
+      pmEl.classList.remove("hidden");
+      pmEl.style.display = "flex";
+    }
+    return true;
+  }
+
   function handleDeepLinkPostOnBootV29() {
     if (window.__sqDeepLinkHandledV29) return;
     var targetId = "";
@@ -4952,30 +5049,37 @@ _FRONTEND_V22_JS = r'''
       targetId = (sp.get("post") || "").trim();
     } catch (e) {}
     if (!targetId) return;
-    if (typeof state !== "object" || !state || !Array.isArray(state.posts) || !state.posts.length) return;
-    normalizeStatePostsV24();
-    var postObj = state.posts.find(function (x) { return x && String(x.id) === targetId; });
-    if (!postObj) return;
 
-    window.__sqDeepLinkHandledV29 = true;
-    if (typeof window.switchTab === "function") {
-      try { window.switchTab("feed"); } catch (e) {}
-    }
-    if (typeof window.renderFeed === "function") {
-      try { window.renderFeed(); } catch (e) {}
-    }
-    syncRenderedFeedReactionButtonsDom();
-
-    var box = document.getElementById("feedList");
-    if (box) {
-      box.querySelectorAll("article").forEach(function (art) {
-        if (art.getAttribute("data-sq-post-id") === targetId) {
-          art.setAttribute("data-sq-shared-highlight", "1");
-          if (art.scrollIntoView) art.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
+    var curState = (typeof state === "object" && state) ? state : window.state;
+    if (curState && Array.isArray(curState.posts) && curState.posts.length) {
+      try { normalizeStatePostsV24(); } catch (eN) {}
+      var localHit = curState.posts.find(function (x) {
+        return x && (String(x.id) === targetId || (x.alt_id && String(x.alt_id) === targetId));
       });
+      if (localHit) {
+        mountResolvedSharedPostAndOpenV4637(localHit, targetId);
+        return;
+      }
     }
-    openPostDetailAndCommentsV29(targetId);
+
+    if (window.__SQ_SHARED_POST_V4637 && (String(window.__SQ_SHARED_POST_V4637.id) === targetId || String(window.__SQ_SHARED_POST_V4637.alt_id || "") === targetId)) {
+      mountResolvedSharedPostAndOpenV4637(window.__SQ_SHARED_POST_V4637, targetId);
+      return;
+    }
+
+    if (window.__sqDeepLinkFetchingV4637) return;
+    window.__sqDeepLinkFetchingV4637 = true;
+    fetch("/api/posts/detail/" + encodeURIComponent(targetId), { credentials: "same-origin" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        window.__sqDeepLinkFetchingV4637 = false;
+        if (d && d.ok && d.post) {
+          mountResolvedSharedPostAndOpenV4637(d.post, targetId);
+        }
+      })
+      .catch(function () {
+        window.__sqDeepLinkFetchingV4637 = false;
+      });
   }
 
   // -------------------------------------------------------------------------
@@ -15345,9 +15449,256 @@ _FRONTEND_V22_JS = r'''
   safeRunStepV4610(installLiveScoresFetchTapV30);
   safeRunStepV4610(installTopControlCaptureSyncV304);
   safeRunStepV4610(installGlobalCardClickCaptureV30);
+  function collectOpenOverlayModalsV4637() {
+    var dynamicPartnerFixed = null;
+    if (document.body) {
+      var fDivs = document.body.querySelectorAll("div, section");
+      for (var pfi = 0; pfi < fDivs.length; pfi++) {
+        var fd = fDivs[pfi];
+        if (fd.id || !isOverlayModalVisibleV461(fd)) continue;
+        var fcs = window.getComputedStyle ? window.getComputedStyle(fd) : null;
+        if (fcs && fcs.position === "fixed" && /파트너\s*입점|제휴\s*문의/.test(String(fd.textContent || "").slice(0, 180))) {
+          dynamicPartnerFixed = fd;
+          break;
+        }
+      }
+    }
+    var candidates = [
+      document.getElementById("sqDeleteAuthModalV4612"),
+      document.getElementById("dcQuickMatchModal"),
+      document.getElementById("sqMyTeamAlertModalV4631"),
+      document.getElementById("sqPartnerInquiryModalV46"),
+      dynamicPartnerFixed,
+      document.getElementById("sqLegalPolicyModal"),
+      findAiSearchModalContainerV372(),
+      document.getElementById("sqAdminRaffleModal"),
+      document.getElementById("sqPwaIosModal"),
+      document.getElementById("sqMemberHubModal"),
+      document.getElementById("partner-inquiry-modal"),
+      document.getElementById("partnerModal"),
+      document.getElementById("commentModal"),
+      document.getElementById("post-modal"),
+      document.getElementById("writeModal"),
+      document.getElementById("write-modal"),
+      document.getElementById("news-write-modal"),
+      document.getElementById("match-report-modal"),
+      document.getElementById("dcMatchModal"),
+      document.getElementById("dcMatchDetailModal")
+    ];
+    var openList = [];
+    var seen = [];
+    for (var i = 0; i < candidates.length; i++) {
+      var m = candidates[i];
+      if (!m || seen.indexOf(m) !== -1) continue;
+      seen.push(m);
+      if (isOverlayModalVisibleV461(m)) {
+        var z = 0;
+        try { z = parseInt((window.getComputedStyle(m).zIndex || "0"), 10) || 0; } catch (eZ) {}
+        openList.push({ el: m, z: z, order: i });
+      }
+    }
+    openList.sort(function (a, b) {
+      if (b.z !== a.z) return b.z - a.z;
+      return a.order - b.order;
+    });
+    return openList;
+  }
+
+  function installMobileBackButtonModalGuardV4637() {
+    if (window.__sqMobileBackGuardInstalledV4637) return;
+    window.__sqMobileBackGuardInstalledV4637 = true;
+
+    var guardPushed = false;
+    var suppressNextPop = false;
+
+    function syncModalHistoryGuardState() {
+      var openCount = collectOpenOverlayModalsV4637().length;
+      if (openCount > 0 && !guardPushed) {
+        try {
+          window.history.pushState({ sqModalGuardV4637: 1 }, "", window.location.href);
+          guardPushed = true;
+        } catch (ePush) {}
+      } else if (openCount === 0 && guardPushed) {
+        guardPushed = false;
+        try {
+          if (window.history.state && window.history.state.sqModalGuardV4637 === 1) {
+            suppressNextPop = true;
+            window.history.back();
+          }
+        } catch (eBack) {
+          suppressNextPop = false;
+        }
+      }
+    }
+
+    window.addEventListener("popstate", function () {
+      if (suppressNextPop) {
+        suppressNextPop = false;
+        return;
+      }
+      var openList = collectOpenOverlayModalsV4637();
+      if (openList.length > 0) {
+        guardPushed = false;
+        closeSingleOverlayModalV461(openList[0].el);
+        var remaining = collectOpenOverlayModalsV4637().length;
+        if (remaining > 0) {
+          try {
+            window.history.pushState({ sqModalGuardV4637: 1 }, "", window.location.href);
+            guardPushed = true;
+          } catch (eRePush) {}
+        }
+      } else {
+        guardPushed = false;
+      }
+    });
+
+    function scheduleSync() {
+      setTimeout(syncModalHistoryGuardState, 35);
+    }
+    document.addEventListener("click", scheduleSync, true);
+    window.addEventListener("keydown", scheduleSync, true);
+    if (typeof MutationObserver !== "undefined") {
+      var bindObs = function () {
+        if (!document.body || window.__sqModalBackObsV4637) return;
+        window.__sqModalBackObsV4637 = new MutationObserver(scheduleSync);
+        window.__sqModalBackObsV4637.observe(document.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["class", "style"]
+        });
+      };
+      if (document.body) bindObs();
+      else document.addEventListener("DOMContentLoaded", bindObs);
+    }
+  }
+
+  function injectPolishCssAndUxUpgradesV4637() {
+    if (!document.getElementById("sqPolishUxCssV4637") && document.head) {
+      var st = document.createElement("style");
+      st.id = "sqPolishUxCssV4637";
+      st.textContent = [
+        "html, body, #sqMyTeamAlertModalV4631, #dcQuickMatchModal, #commentModal, #sqMemberHubModal, #sqLegalPolicyModal, #sqPartnerInquiryModalV46, [role='dialog'] {",
+        "  color-scheme: dark !important;",
+        "}",
+        "#sqMyTeamAlertModalV4631 *, #dcQuickMatchModal *, #commentModal *, #sqMemberHubModal *, [role='dialog'] * {",
+        "  scrollbar-width: thin;",
+        "  scrollbar-color: #334155 #0b1120;",
+        "}",
+        "#sqMyTeamAlertModalV4631 *::-webkit-scrollbar, #dcQuickMatchModal *::-webkit-scrollbar, #commentModal *::-webkit-scrollbar, #sqMemberHubModal *::-webkit-scrollbar {",
+        "  width: 6px; height: 6px;",
+        "}",
+        "#sqMyTeamAlertModalV4631 *::-webkit-scrollbar-track, #dcQuickMatchModal *::-webkit-scrollbar-track, #commentModal *::-webkit-scrollbar-track {",
+        "  background: #0b1120;",
+        "}",
+        "#sqMyTeamAlertModalV4631 *::-webkit-scrollbar-thumb, #dcQuickMatchModal *::-webkit-scrollbar-thumb, #commentModal *::-webkit-scrollbar-thumb {",
+        "  background: #334155; border-radius: 9999px;",
+        "}",
+        "#clear-tag-btn, button[id*='reset'], button[id*='clear'], .sq-nowrap-btn-v4637 {",
+        "  white-space: nowrap !important;",
+        "  flex-shrink: 0 !important;",
+        "  word-break: keep-all !important;",
+        "}",
+        "#sqAutoEngineBarV40 {",
+        "  padding: 8px 14px !important;",
+        "  margin-top: 6px !important;",
+        "  margin-bottom: 8px !important;",
+        "}",
+        "#sqAutoEngineBarV40 p {",
+        "  font-size: 11.5px !important;",
+        "  line-height: 1.4 !important;",
+        "  margin-top: 2px !important;",
+        "}",
+        "body[data-sq-scroll-slim-dock='1'] [data-sq-floating-dock='1'],",
+        "body[data-sq-scroll-slim-dock='1'] [data-sq-floating-item='tv'],",
+        "body[data-sq-scroll-slim-dock='1'] [data-sq-floating-item='ai'] {",
+        "  display: none !important;",
+        "}"
+      ].join("\n");
+      document.head.appendChild(st);
+    }
+
+    if (document.body) {
+      // 1) Prevent 2-line wrap on narrow Korean action buttons (`초기화`, `새로고침`, `전체해제`)
+      Array.prototype.forEach.call(document.body.querySelectorAll("button, a"), function (btn) {
+        if (!btn || btn.classList.contains("sq-nowrap-btn-v4637")) return;
+        var tx = String(btn.textContent || "").replace(/\s+/g, " ").trim();
+        if (tx === "초기화" || tx === "🔄 초기화" || tx === "전체해제" || tx === "새로고침" || tx === "필터 초기화") {
+          btn.classList.add("sq-nowrap-btn-v4637");
+        }
+      });
+
+      // 2) Default `#sqTop20BoxV40` (`화제성 TOP 20`) to compact 1-line folded bar on initial boot so feed reaches Above-the-Fold
+      var top20Box = document.getElementById("sqTop20BoxV40");
+      if (top20Box && !top20Box.hasAttribute("data-sq-v4637-init-folded")) {
+        top20Box.setAttribute("data-sq-v4637-init-folded", "1");
+        top20Box.setAttribute("data-sq-top20-folded", "1");
+        var foldBtn = document.getElementById("sqTop20HdrFoldBtn");
+        if (foldBtn) foldBtn.textContent = "TOP 20 펼치기 ▼";
+      }
+
+      // 3) Trim excess hero vertical padding slightly while keeping all badges/buttons intact
+      var h1El = document.body.querySelector("h1");
+      var heroBox = (h1El && h1El.closest) ? h1El.closest("section, header, div.rounded-2xl, div.rounded-3xl") : null;
+      if (heroBox && !heroBox.hasAttribute("data-sq-hero-slim-v4637")) {
+        heroBox.setAttribute("data-sq-hero-slim-v4637", "1");
+        heroBox.style.paddingTop = "12px";
+        heroBox.style.paddingBottom = "12px";
+        heroBox.style.marginBottom = "8px";
+      }
+    }
+
+    // 4) Scroll-smart floating dock: auto-collapse into compact `⚡ IQ ▴` pill when scrolling down > 220px
+    if (!window.__sqScrollSmartDockInstalledV4637) {
+      window.__sqScrollSmartDockInstalledV4637 = true;
+      var syncScrollDock = function () {
+        if (!document.body) return;
+        var minBtn = document.getElementById("sqFloatingDockMinBtnV382");
+        if (minBtn && !minBtn.hasAttribute("data-sq-pin-bound-v4637")) {
+          minBtn.setAttribute("data-sq-pin-bound-v4637", "1");
+          minBtn.addEventListener("click", function () {
+            window.__sqDockUserToggledV4637 = true;
+            document.body.removeAttribute("data-sq-scroll-slim-dock");
+          });
+        }
+        if (window.__sqDockUserToggledV4637) return;
+        var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+        var userSavedMin = false;
+        try { userSavedMin = (localStorage.getItem("sportiq_dock_minimized_v382") === "1"); } catch (eLs) {}
+        if (userSavedMin) return;
+
+        if (y > 220) {
+          if (document.body.getAttribute("data-sq-scroll-slim-dock") !== "1") {
+            document.body.setAttribute("data-sq-scroll-slim-dock", "1");
+            if (minBtn) {
+              minBtn.setAttribute("data-sq-mode", "min");
+              minBtn.textContent = "⚡ IQ ▴";
+              minBtn.title = "IQ중계티비 · AI 아이큐 검색 펼치기";
+            }
+          }
+        } else if (y < 120) {
+          if (document.body.getAttribute("data-sq-scroll-slim-dock") === "1") {
+            document.body.removeAttribute("data-sq-scroll-slim-dock");
+            try { harmonizeMobileFloatingOverlaysV26(); } catch (eHm) {}
+          }
+        }
+      };
+      window.addEventListener("scroll", syncScrollDock, { passive: true });
+    }
+  }
+
   safeRunStepV4610(installUniversalLifoEscapeV461);
+  safeRunStepV4610(installMobileBackButtonModalGuardV4637);
   safeRunStepV4610(injectUxV22Styles);
+  safeRunStepV4610(injectPolishCssAndUxUpgradesV4637);
   safeRunStepV4610(enforceSingleLineMainTabBar);
+  setInterval(function () { safeRunStepV4610(injectPolishCssAndUxUpgradesV4637); }, 550);
+  [120, 450, 1100, 2400].forEach(function (ms) {
+    setTimeout(function () {
+      safeRunStepV4610(injectPolishCssAndUxUpgradesV4637);
+      safeRunStepV4610(handleDeepLinkPostOnBootV29);
+    }, ms);
+  });
   [0, 60, 180, 350, 600, 1000, 1600, 2500, 3800, 5500].forEach(function (ms) {
     setTimeout(function () {
       safeRunStepV4610(injectUxV22Styles);
@@ -17196,7 +17547,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46350_{int(time.time())}"
+_BOOT_VER_V30 = f"46370_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -18789,9 +19140,30 @@ def apply_dynamic_post_og_v29(html_text: str, post_meta: Optional[Dict[str, str]
             },
         }
         post_ld_json = json.dumps(post_ld, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+        shared_boot_obj = {
+            "id": post_meta["id"],
+            "alt_id": _fnv1a_aa_id_py_v29(post_meta["title"]),
+            "league": post_meta.get("league") or "SPORTIQ",
+            "isPro": True,
+            "author": post_meta.get("author") or "SportIQ AI 분석팀",
+            "authorBadge": "PRO 분석",
+            "trust": 96,
+            "likes": 12,
+            "bookmarked": False,
+            "liked": False,
+            "hidden": False,
+            "time": 5,
+            "title": post_meta["title"],
+            "body": post_meta.get("full_body") or post_meta.get("desc") or post_meta["title"],
+            "tags": [post_meta.get("league") or "SPORTIQ", "SportIQ분석"],
+            "comments": [],
+            "isMemberServerPost": True,
+        }
+        shared_boot_json = json.dumps(shared_boot_obj, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
         out = out.replace(
             "</head>",
-            f'  <script id="sqPostJsonLdV4636" type="application/ld+json">{post_ld_json}</script>\n</head>',
+            f'  <script id="sqPostJsonLdV4636" type="application/ld+json">{post_ld_json}</script>\n'
+            f'  <script id="sqInitialSharedPostV4637">window.__SQ_SHARED_POST_V4637={shared_boot_json};</script>\n</head>',
             1,
         )
     return out
@@ -18823,6 +19195,12 @@ def inject_seo_and_og_head_v27(html_text: str) -> str:
         extra_tags.append('  <link rel="canonical" href="https://billnojay.com/" />')
     if 'application/rss+xml' not in out:
         extra_tags.append('  <link rel="alternate" type="application/rss+xml" title="SportIQ 실시간 스포츠 데이터 분석 RSS" href="https://billnojay.com/rss.xml" />')
+    if 'rel="manifest"' not in out and "rel='manifest'" not in out:
+        extra_tags.append('  <link rel="manifest" href="/manifest.webmanifest" />')
+    if 'rel="apple-touch-icon"' not in out and "rel='apple-touch-icon'" not in out:
+        extra_tags.append('  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />')
+    if 'name="theme-color"' not in out and "name='theme-color'" not in out:
+        extra_tags.append('  <meta name="theme-color" content="#0F172A" />')
     if 'property="og:site_name"' not in out and "property='og:site_name'" not in out:
         extra_tags.append('  <meta property="og:site_name" content="SportIQ" />')
     if 'property="og:locale"' not in out and "property='og:locale'" not in out:
@@ -18916,6 +19294,8 @@ def serve_hardened_robots_txt_v27():
         "Allow: /sitemap.xml\n"
         "Allow: /pwa-icon-192.png\n"
         "Allow: /pwa-icon-512.png\n"
+        "Allow: /apple-touch-icon.png\n"
+        "Allow: /manifest.webmanifest\n"
         "Disallow: /api/admin/\n"
         "Disallow: /api/wp/member/verify\n"
         "Disallow: /api/wp/member/reward\n"
@@ -27921,6 +28301,244 @@ def _install_overseas_precision_classifier_and_repair_db_v4627() -> int:
 _install_overseas_precision_classifier_and_repair_db_v4627()
 
 
+_PWA_ICON_CACHE_V4637: Dict[int, bytes] = {}
+
+
+def _get_pwa_icon_png_bytes_v4637(size: int = 512) -> bytes:
+    sz = max(64, min(1024, int(size or 512)))
+    if sz in _PWA_ICON_CACHE_V4637:
+        return _PWA_ICON_CACHE_V4637[sz]
+    png_data: bytes = b""
+    try:
+        import io
+        from PIL import Image, ImageDraw
+        img = Image.new("RGBA", (sz, sz), (7, 11, 20, 255))
+        dr = ImageDraw.Draw(img)
+        pad = max(6, sz // 14)
+        rad = max(14, sz // 5)
+        dr.rounded_rectangle([pad, pad, sz - pad - 1, sz - pad - 1], radius=rad, fill=(15, 23, 42, 255), outline=(16, 185, 129, 255), width=max(3, sz // 32))
+        # Stylized 'I' + 'Q' emblem in emerald & sky
+        ix0 = int(sz * 0.27)
+        ix1 = int(sz * 0.36)
+        iy0 = int(sz * 0.30)
+        iy1 = int(sz * 0.70)
+        dr.rounded_rectangle([ix0, iy0, ix1, iy1], radius=max(3, sz // 48), fill=(16, 185, 129, 255))
+        qx0 = int(sz * 0.43)
+        qx1 = int(sz * 0.75)
+        qy0 = int(sz * 0.30)
+        qy1 = int(sz * 0.68)
+        stroke = max(6, sz // 12)
+        dr.ellipse([qx0, qy0, qx1, qy1], outline=(56, 189, 248, 255), width=stroke)
+        dr.line([(int(sz * 0.60), int(sz * 0.54)), (int(sz * 0.76), int(sz * 0.72))], fill=(16, 185, 129, 255), width=stroke)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG", optimize=True)
+        png_data = buf.getvalue()
+    except Exception:
+        import struct
+        import zlib
+        raw_rows = []
+        for y in range(sz):
+            row = bytearray([0])
+            for x in range(sz):
+                border = (x < sz // 12 or x >= sz - sz // 12 or y < sz // 12 or y >= sz - sz // 12)
+                row.extend((16, 185, 129, 255) if border else (15, 23, 42, 255))
+            raw_rows.append(bytes(row))
+        raw = b"".join(raw_rows)
+        def _chunk(tag: bytes, data: bytes) -> bytes:
+            return struct.pack("!I", len(data)) + tag + data + struct.pack("!I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+        ihdr = struct.pack("!IIBBBBB", sz, sz, 8, 6, 0, 0, 0)
+        png_data = b"\x89PNG\r\n\x1a\n" + _chunk(b"IHDR", ihdr) + _chunk(b"IDAT", zlib.compress(raw, 6)) + _chunk(b"IEND", b"")
+    _PWA_ICON_CACHE_V4637[sz] = png_data
+    return png_data
+
+
+@router.api_route("/pwa-icon-192.png", methods=["GET", "HEAD"])
+def serve_pwa_icon_192_v4637():
+    from fastapi.responses import Response
+    b = _get_pwa_icon_png_bytes_v4637(192)
+    return Response(content=b, media_type="image/png", headers={"Cache-Control": "public, max-age=86400", "Content-Length": str(len(b))})
+
+
+@router.api_route("/pwa-icon-512.png", methods=["GET", "HEAD"])
+def serve_pwa_icon_512_v4637():
+    from fastapi.responses import Response
+    b = _get_pwa_icon_png_bytes_v4637(512)
+    return Response(content=b, media_type="image/png", headers={"Cache-Control": "public, max-age=86400", "Content-Length": str(len(b))})
+
+
+@router.api_route("/apple-touch-icon.png", methods=["GET", "HEAD"])
+def serve_apple_touch_icon_v4637():
+    from fastapi.responses import Response
+    b = _get_pwa_icon_png_bytes_v4637(180)
+    return Response(content=b, media_type="image/png", headers={"Cache-Control": "public, max-age=86400", "Content-Length": str(len(b))})
+
+
+@router.api_route("/manifest.webmanifest", methods=["GET", "HEAD"])
+@router.api_route("/manifest.json", methods=["GET", "HEAD"])
+def serve_pwa_manifest_v4637():
+    from fastapi.responses import Response
+    manifest_obj = {
+        "name": "SportIQ 실시간 분석 스포츠IQ 인사이트 라운지",
+        "short_name": "SportIQ",
+        "description": "9종목 24리그 실시간 스코어·순위, 기대득점(xG) 전술 브리핑 및 AI 아이큐 검색 커뮤니티",
+        "start_url": "/",
+        "scope": "/",
+        "display": "standalone",
+        "orientation": "portrait",
+        "background_color": "#070B14",
+        "theme_color": "#0F172A",
+        "lang": "ko",
+        "icons": [
+            {"src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+            {"src": "/pwa-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+        ],
+    }
+    body_txt = json.dumps(manifest_obj, ensure_ascii=False, indent=2)
+    return Response(content=body_txt, media_type="application/manifest+json; charset=utf-8", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@router.get("/api/posts/detail/{post_id}")
+def get_single_post_detail_v4637(post_id: str):
+    pid = (post_id or "").strip()[:80]
+    if not pid:
+        raise HTTPException(status_code=400, detail="유효하지 않은 게시글 ID입니다.")
+
+    def _scan_one(conn: Any) -> Optional[Dict[str, Any]]:
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        if "admin_deleted_tombstones" in tables:
+            tomb = conn.execute(
+                "SELECT 1 FROM admin_deleted_tombstones WHERE target_type = 'post' AND target_id = ? LIMIT 1",
+                (pid,),
+            ).fetchone()
+            if tomb:
+                return None
+
+        comments_list: List[Dict[str, Any]] = []
+        if "community_post_comments" in tables:
+            try:
+                crows = conn.execute(
+                    "SELECT id, user_name, user_badge, comment_text FROM community_post_comments WHERE post_id = ? ORDER BY id ASC LIMIT 60",
+                    (pid,),
+                ).fetchall()
+                for cr in crows:
+                    lbl = f"{cr['user_name'] or '익명'} {cr['user_badge'] or ''}".strip()
+                    comments_list.append({"id": int(cr["id"]), "user": lbl, "text": cr["comment_text"] or ""})
+            except Exception:
+                pass
+
+        like_Map: Dict[str, int] = {}
+        if "community_post_like_totals" in tables:
+            try:
+                lr = conn.execute("SELECT like_count FROM community_post_like_totals WHERE post_id = ? LIMIT 1", (pid,)).fetchone()
+                if lr:
+                    like_Map[pid] = int(lr["like_count"] or 0)
+            except Exception:
+                pass
+
+        if "community_member_posts" in tables:
+            row = conn.execute("SELECT * FROM community_member_posts WHERE id = ? LIMIT 1", (pid,)).fetchone()
+            if row and row["title"]:
+                rk = set(row.keys())
+                raw_b = (row["body"] if "body" in rk else "") or (row["content"] if "content" in rk else "")
+                full_b = _normalize_full_rss_body_v4636(raw_b) or str(row["title"]).strip()
+                tgs: List[str] = []
+                if "tags_json" in rk and row["tags_json"]:
+                    try:
+                        tgs = [str(t).lstrip("#").strip() for t in json.loads(row["tags_json"] or "[]") if str(t).strip()]
+                    except Exception:
+                        tgs = []
+                now_f = time.time()
+                c_ts = (_to_epoch_ts(row["created_at"]) if "created_at" in rk else None) or now_f
+                mins = max(0, int((now_f - float(c_ts)) // 60))
+                base_lk = int((row["likes"] if "likes" in rk else 1) or 1)
+                return {
+                    "id": str(row["id"]),
+                    "alt_id": str(row["id"]),
+                    "league": str((row["league"] if "league" in rk else "") or "SPORTIQ"),
+                    "isPro": bool(row["is_pro"]) if "is_pro" in rk else True,
+                    "author": str((row["author"] if "author" in rk else "") or "SportIQ 분석가"),
+                    "authorBadge": str((row["author_badge"] if "author_badge" in rk else "") or "PRO"),
+                    "trust": int((row["trust"] if "trust" in rk else 92) or 92),
+                    "likes": like_Map.get(pid, base_lk),
+                    "bookmarked": False,
+                    "liked": False,
+                    "hidden": False,
+                    "time": mins,
+                    "title": str(row["title"]).strip(),
+                    "body": full_b,
+                    "tags": tgs or [str((row["league"] if "league" in rk else "") or "SPORTIQ")],
+                    "comments": comments_list,
+                    "isMemberServerPost": True,
+                }
+
+        if "auto_analyst_posts" in tables:
+            try:
+                cols = {c[1] for c in conn.execute("PRAGMA table_info(auto_analyst_posts)").fetchall()}
+                cands = []
+                if "id" in cols:
+                    hit = conn.execute("SELECT * FROM auto_analyst_posts WHERE CAST(id AS TEXT) = ? LIMIT 1", (pid,)).fetchone()
+                    if hit:
+                        cands.append(hit)
+                if not cands:
+                    cands = conn.execute("SELECT * FROM auto_analyst_posts ORDER BY rowid DESC LIMIT 200").fetchall()
+                for ar in cands:
+                    rk = set(ar.keys())
+                    atitle = str((ar["title"] if "title" in rk else "") or "").strip()
+                    aid = str((ar["id"] if "id" in rk else "") or "").strip()
+                    aa_hash = _fnv1a_aa_id_py_v29(atitle) if atitle else ""
+                    if atitle and (aid == pid or aa_hash == pid):
+                        full_ab = _extract_auto_analyst_full_body_v4636(ar, atitle)
+                        alg = str((ar["league"] if "league" in rk else "") or (ar["sport"] if "sport" in rk else "") or "TOP20").strip() or "TOP20"
+                        aau = str((ar["author"] if "author" in rk else "") or "SportIQ AI 분석팀").strip() or "SportIQ AI 분석팀"
+                        ht_raw = str((ar["hashtags"] if "hashtags" in rk else "") or "")
+                        ht_list = [tok.lstrip("#").strip() for tok in ht_raw.split() if tok.lstrip("#").strip()][:6]
+                        now_f = time.time()
+                        c_ts = (
+                            (_to_epoch_ts(ar["created_at"]) if "created_at" in rk else None)
+                            or (_to_epoch_ts(ar["published_at"]) if "published_at" in rk else None)
+                            or (now_f - 600)
+                        )
+                        mins = max(1, int((now_f - float(c_ts)) // 60))
+                        return {
+                            "id": aid or aa_hash or pid,
+                            "alt_id": aa_hash or aid or pid,
+                            "league": alg,
+                            "isPro": True,
+                            "author": aau,
+                            "authorBadge": "AI 분석",
+                            "trust": 96,
+                            "likes": like_Map.get(pid, like_Map.get(aa_hash, 14)),
+                            "bookmarked": False,
+                            "liked": False,
+                            "hidden": False,
+                            "time": mins,
+                            "title": atitle,
+                            "body": full_ab,
+                            "tags": ht_list or [alg, "AI자동분석"],
+                            "comments": comments_list,
+                            "isMemberServerPost": True,
+                        }
+            except Exception:
+                pass
+        return None
+
+    def _op() -> Optional[Dict[str, Any]]:
+        with _smu_db_session(write=False) as conn:
+            found = _scan_one(conn)
+            if found:
+                return found
+        try:
+            with _db_session(write=False) as lconn:
+                return _scan_one(lconn)
+        except Exception:
+            return None
+
+    post_obj = run_with_db_retry(_op)
+    if not post_obj:
+        raise HTTPException(status_code=404, detail="요청하신 분석글을 찾을 수 없습니다.")
+    return {"ok": True, "post": post_obj}
+
+
 @router.get("/api/member/live-sources-diag-v4617")
 @router.get("/api/member/live-sources-diag-v4618")
 @router.get("/api/member/live-sources-diag-v4619")
@@ -27941,6 +28559,7 @@ _install_overseas_precision_classifier_and_repair_db_v4627()
 @router.get("/api/member/live-sources-diag-v4634")
 @router.get("/api/member/live-sources-diag-v4635")
 @router.get("/api/member/live-sources-diag-v4636")
+@router.get("/api/member/live-sources-diag-v4637")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -27953,7 +28572,14 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.36",
+        "version": "v4.6.37",
+        "ux_pwa_v4637": {
+            "post_detail_api": True,
+            "mobile_popstate_guard": True,
+            "datacenter_7tab_view_hide": True,
+            "slim_above_fold": True,
+            "pwa_manifest_icons": True,
+        },
         "rss_diag": {
             "item_count": len(rss_posts),
             "full_content_items": full_cnt,
