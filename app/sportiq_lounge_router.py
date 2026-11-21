@@ -7023,6 +7023,7 @@ _FRONTEND_V22_JS = r'''
         var hsNum = Number(it.home_score);
         var asNum = Number(it.away_score);
         var isPostPendingScore = (!isLive && !isPre && (it.sport === "volleyball" || it.sport === "basketball") && hsNum === 0 && asNum === 0);
+        var isLiveUnscoredFallback = (isLive && (it.sport === "volleyball" || it.sport === "basketball") && hsNum === 0 && asNum === 0 && !/\d\s*(?:세트|쿼터|Q)|하프타임|연장/i.test(String(it.status_badge || "") + " " + String(it.period_scores || "")));
         var stBg = isLive ? "#dc2626" : (isPre ? "#0369a1" : "#334155");
         var stTxt = isLive
           ? ("🔴 " + (it.status_badge || "LIVE").replace(/^LIVE\s*/i, ""))
@@ -7033,12 +7034,12 @@ _FRONTEND_V22_JS = r'''
         var oddsTxt = odds.home ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
         var fk = matchFavKeyV30(it);
         var isFav = Boolean(v30ScoreState.favMap[fk]);
-        var hLead = !isPre && !isPostPendingScore && !isNaN(hsNum) && !isNaN(asNum) && hsNum > asNum;
-        var aLead = !isPre && !isPostPendingScore && !isNaN(hsNum) && !isNaN(asNum) && asNum > hsNum;
-        var hScoreCell = (isPre || isPostPendingScore)
+        var hLead = !isPre && !isPostPendingScore && !isLiveUnscoredFallback && !isNaN(hsNum) && !isNaN(asNum) && hsNum > asNum;
+        var aLead = !isPre && !isPostPendingScore && !isLiveUnscoredFallback && !isNaN(hsNum) && !isNaN(asNum) && asNum > hsNum;
+        var hScoreCell = (isPre || isPostPendingScore || isLiveUnscoredFallback)
           ? "<span style='color:#94a3b8;font-size:12px;font-weight:700;'>-</span>"
           : "<span style='color:" + (isLive ? "#f87171" : (hLead ? "#38bdf8" : "#cbd5e1")) + ";font-size:14.5px;font-weight:900;min-width:22px;text-align:right;'>" + uxEsc(it.home_score) + "</span>";
-        var aScoreCell = (isPre || isPostPendingScore)
+        var aScoreCell = (isPre || isPostPendingScore || isLiveUnscoredFallback)
           ? "<span style='color:#94a3b8;font-size:12px;font-weight:700;'>-</span>"
           : "<span style='color:" + (isLive ? "#f87171" : (aLead ? "#38bdf8" : "#cbd5e1")) + ";font-size:14.5px;font-weight:900;min-width:22px;text-align:right;'>" + uxEsc(it.away_score) + "</span>";
         var cleanPeriod = String(it.period_scores || "").trim();
@@ -20654,6 +20655,9 @@ def api_member_scoreboard_v30(date_offset: int = 0):
         raw_items = _merge_fn_sb(raw_items, expected_mmdd=_pref_mmdd_v4615, is_today=(date_offset == 0))
     else:
         raw_items = _filter_official_matches_only_v4615(raw_items, expected_mmdd=_pref_mmdd_v4615)
+    _rec_dom_fn = globals().get("_reconcile_domestic_with_official_cal_v4623")
+    if callable(_rec_dom_fn):
+        raw_items = _rec_dom_fn(raw_items, target_k)
     _ord_sb = {"in": 0, "pre": 1, "post": 2}
     raw_items.sort(key=lambda x: (_ord_sb.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
 
@@ -26542,8 +26546,10 @@ def _fetch_gnews_kr_vleague_matches_v4619(target_k: datetime, date_offset: int) 
                     badge = f"LIVE {min(5, cur_s)}세트"
                 else:
                     hs, as_ = 0, 0
-                    est_s = rec["max_live_set"] if rec["max_live_set"] >= 1 else min(5, max(1, int(elapsed_min // 28) + 1))
-                    badge = f"LIVE {est_s}세트 진행중" if rec["sp"] == "volleyball" else f"LIVE {min(4, max(1, int(elapsed_min // 26) + 1))}쿼터 진행중"
+                    if rec["max_live_set"] >= 1:
+                        badge = f"LIVE {rec['max_live_set']}세트 진행중"
+                    else:
+                        badge = "LIVE 경기중"
             elif elapsed_min < 0:
                 state, badge, hs, as_ = "pre", "예정", 0, 0
             else:
@@ -26596,12 +26602,9 @@ def _enhance_kr_live_vleague_v4618(items: List[Dict[str, Any]], now_k: datetime)
         max_live_min = 185.0 if sp == "volleyball" else 145.0
         if 0.0 <= elapsed_min <= max_live_min:
             it["state"] = "in"
-            if sp == "volleyball":
-                est_set = min(5, max(1, int(elapsed_min // 28) + 1))
-                it["status_badge"] = f"LIVE {est_set}세트 진행중"
-            else:
-                est_q = min(4, max(1, int(elapsed_min // 26) + 1))
-                it["status_badge"] = f"LIVE {est_q}쿼터 진행중"
+            it["status_badge"] = "LIVE 경기중"
+            if not it.get("period_scores"):
+                it["period_scores"] = "실시간 스코어 연동중"
             upgraded_cnt += 1
         elif elapsed_min > max_live_min:
             it["state"] = "post"
@@ -27259,7 +27262,591 @@ def _fetch_kr_official_portals_v4616(target_k: datetime, date_offset: int) -> Li
 _OFFICIAL_KOVO_WKBL_SEASON_2627_V4622: Dict[str, List[List[Any]]] = json.loads('{"2026-10-31":[["VLEAGUE_M","14:00","대한항공","현대캐피탈",3,0,"인천 계양체육관"]],"2026-11-01":[["VLEAGUE_M","14:00","KB손해보험","삼성화재",1,3,"평택 이충문화체육관"],["WKBL","14:00","KB스타즈","BNK썸",53,82,"청주 체육관"]],"2026-11-02":[["WKBL","19:00","삼성생명","하나은행",84,66,"용인 실내체육관"]],"2026-11-03":[["VLEAGUE_M","19:00","한국전력","우리카드",0,3,"수원 실내체육관"]],"2026-11-04":[["VLEAGUE_M","19:00","KB손해보험","OK저축은행",1,3,"평택 이충문화체육관"],["WKBL","19:00","신한은행","우리은행",65,58,"인천 도원체육관"]],"2026-11-05":[["VLEAGUE_M","19:00","삼성화재","현대캐피탈",1,3,"대전 충무체육관"]],"2026-11-06":[["VLEAGUE_M","19:00","대한항공","한국전력",1,3,"인천 계양체육관"],["VLEAGUE_W","19:00","IBK기업은행","GS칼텍스",0,0,"화성 종합실내체육관"],["WKBL","19:00","하나은행","KB스타즈",69,74,"부천 체육관"]],"2026-11-07":[["VLEAGUE_M","14:00","OK저축은행","우리카드",1,3,"부산 강서실내체육관"],["WKBL","14:00","BNK썸","신한은행",59,68,"부산 사직실내체육관"],["VLEAGUE_W","16:00","정관장","현대건설",0,0,"대전 충무체육관"],["WKBL","16:00","우리은행","삼성생명",65,54,"아산 이순신체육관"]],"2026-11-08":[["VLEAGUE_M","14:00","현대캐피탈","KB손해보험",3,1,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","흥국생명",3,1,"김천 실내체육관"],["WKBL","16:00","BNK썸","하나은행",68,66,"부산 사직실내체육관"]],"2026-11-09":[["WKBL","19:00","KB스타즈","우리은행",51,57,"청주 체육관"]],"2026-11-10":[["VLEAGUE_M","19:00","삼성화재","한국전력",1,3,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","IBK기업은행",0,3,"광주 페퍼스타디움"]],"2026-11-11":[["VLEAGUE_M","19:00","우리카드","대한항공",3,2,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","GS칼텍스",0,3,"수원 실내체육관"],["WKBL","19:00","신한은행","삼성생명",51,54,"인천 도원체육관"]],"2026-11-12":[["VLEAGUE_M","19:00","OK저축은행","현대캐피탈",1,3,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","한국도로공사",0,0,"대전 충무체육관"]],"2026-11-13":[["VLEAGUE_M","19:00","한국전력","KB손해보험",3,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","흥국생명",3,1,"화성 종합실내체육관"],["WKBL","19:00","우리은행","BNK썸",53,52,"아산 이순신체육관"]],"2026-11-14":[["VLEAGUE_M","14:00","대한항공","삼성화재",1,3,"인천 계양체육관"],["WKBL","14:00","삼성생명","KB스타즈",79,72,"용인 실내체육관"],["VLEAGUE_W","16:00","GS칼텍스","SOOP 수퍼스",3,0,"서울 장충체육관"],["WKBL","16:00","하나은행","신한은행",73,87,"부천 체육관"]],"2026-11-15":[["VLEAGUE_M","14:00","우리카드","현대캐피탈",0,3,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","한국도로공사",0,3,"수원 실내체육관"],["WKBL","16:00","삼성생명","BNK썸",69,63,"용인 실내체육관"]],"2026-11-16":[["WKBL","19:00","하나은행","우리은행",68,67,"부천 체육관"]],"2026-11-17":[["VLEAGUE_M","19:00","한국전력","OK저축은행",3,2,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","정관장",1,3,"화성 종합실내체육관"]],"2026-11-18":[["VLEAGUE_M","19:00","삼성화재","우리카드",3,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","현대건설",1,3,"광주 페퍼스타디움"],["WKBL","19:00","신한은행","KB스타즈",62,61,"인천 도원체육관"]],"2026-11-19":[["VLEAGUE_M","19:00","KB손해보험","대한항공",1,3,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","GS칼텍스",1,3,"인천 삼산월드체육관"]],"2026-11-20":[["VLEAGUE_M","19:00","현대캐피탈","한국전력",1,3,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","IBK기업은행",3,1,"김천 실내체육관"],["WKBL","19:00","하나은행","삼성생명",57,75,"부천 체육관"]],"2026-11-21":[["VLEAGUE_M","14:00","삼성화재","OK저축은행",0,0,"대전 충무체육관"],["WKBL","15:10","KB스타즈","신한은행",0,0,"청주 체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","정관장",0,0,"광주 페퍼스타디움"],["WKBL","16:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2026-11-22":[["VLEAGUE_M","14:00","우리카드","KB손해보험",0,0,"서울 장충체육관"],["VLEAGUE_W","14:00","현대건설","흥국생명",0,0,"수원 실내체육관"],["WKBL","16:00","KB스타즈","삼성생명",0,0,"청주 체육관"]],"2026-11-23":[["WKBL","19:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2026-11-24":[["VLEAGUE_M","19:00","OK저축은행","대한항공",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","GS칼텍스",0,0,"대전 충무체육관"]],"2026-11-25":[["VLEAGUE_M","19:00","한국전력","현대캐피탈",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","한국도로공사",0,0,"화성 종합실내체육관"],["WKBL","19:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"]],"2026-11-26":[["VLEAGUE_M","19:00","우리카드","삼성화재",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","SOOP 수퍼스",0,0,"수원 실내체육관"]],"2026-11-27":[["VLEAGUE_M","19:00","대한항공","KB손해보험",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","흥국생명","GS칼텍스",0,0,"인천 삼산월드체육관"],["WKBL","19:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2026-11-28":[["VLEAGUE_M","14:00","OK저축은행","한국전력",0,0,"부산 강서실내체육관"],["WKBL","14:00","BNK썸","KB스타즈",0,0,"부산 사직실내체육관"],["VLEAGUE_W","16:00","정관장","IBK기업은행",0,0,"대전 충무체육관"],["WKBL","16:00","우리은행","하나은행",0,0,"아산 이순신체육관"]],"2026-11-29":[["VLEAGUE_M","14:00","삼성화재","현대캐피탈",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","한국도로공사",0,0,"광주 페퍼스타디움"],["WKBL","16:00","BNK썸","삼성생명",0,0,"부산 사직실내체육관"]],"2026-11-30":[["WKBL","19:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2026-12-01":[["VLEAGUE_M","19:00","KB손해보험","우리카드",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","현대건설",0,0,"인천 삼산월드체육관"]],"2026-12-02":[["VLEAGUE_M","19:00","현대캐피탈","OK저축은행",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","정관장",0,0,"김천 실내체육관"],["WKBL","19:00","하나은행","BNK썸",0,0,"부천 체육관"]],"2026-12-03":[["VLEAGUE_M","19:00","대한항공","한국전력",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","IBK기업은행",0,0,"서울 장충체육관"]],"2026-12-04":[["VLEAGUE_M","19:00","삼성화재","KB손해보험",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","흥국생명",0,0,"광주 페퍼스타디움"],["WKBL","19:00","삼성생명","우리은행",0,0,"용인 실내체육관"]],"2026-12-05":[["VLEAGUE_M","14:00","우리카드","OK저축은행",0,0,"서울 장충체육관"],["WKBL","14:00","KB스타즈","하나은행",0,0,"청주 체육관"],["VLEAGUE_W","16:00","정관장","현대건설",0,0,"대전 충무체육관"],["WKBL","16:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2026-12-06":[["VLEAGUE_M","14:00","현대캐피탈","대한항공",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","GS칼텍스",0,0,"김천 실내체육관"],["WKBL","16:00","신한은행","삼성생명",0,0,"인천 도원체육관"]],"2026-12-07":[["WKBL","19:00","KB스타즈","우리은행",0,0,"청주 체육관"]],"2026-12-08":[["VLEAGUE_M","19:00","KB손해보험","한국전력",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","IBK기업은행",0,0,"인천 삼산월드체육관"]],"2026-12-09":[["VLEAGUE_M","19:00","OK저축은행","삼성화재",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","SOOP 수퍼스",0,0,"대전 충무체육관"],["WKBL","19:00","BNK썸","하나은행",0,0,"부산 사직실내체육관"]],"2026-12-10":[["VLEAGUE_M","19:00","대한항공","우리카드",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","현대건설",0,0,"서울 장충체육관"]],"2026-12-11":[["VLEAGUE_M","19:00","KB손해보험","현대캐피탈",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","한국도로공사",0,0,"인천 삼산월드체육관"],["WKBL","19:00","삼성생명","KB스타즈",0,0,"용인 실내체육관"]],"2026-12-12":[["VLEAGUE_M","14:00","한국전력","삼성화재",0,0,"수원 실내체육관"],["WKBL","14:00","하나은행","우리은행",0,0,"부천 체육관"],["VLEAGUE_W","16:00","IBK기업은행","SOOP 수퍼스",0,0,"화성 종합실내체육관"],["WKBL","16:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2026-12-13":[["VLEAGUE_M","14:00","대한항공","OK저축은행",0,0,"인천 계양체육관"],["VLEAGUE_W","16:00","정관장","GS칼텍스",0,0,"대전 충무체육관"],["WKBL","16:00","하나은행","KB스타즈",0,0,"부천 체육관"]],"2026-12-14":[["WKBL","19:00","BNK썸","삼성생명",0,0,"부산 사직실내체육관"]],"2026-12-15":[["VLEAGUE_M","19:00","현대캐피탈","우리카드",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","현대건설",0,0,"김천 실내체육관"]],"2026-12-16":[["VLEAGUE_M","19:00","OK저축은행","KB손해보험",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","흥국생명",0,0,"대전 충무체육관"],["WKBL","19:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2026-12-17":[["VLEAGUE_M","19:00","삼성화재","대한항공",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","GS칼텍스",0,0,"광주 페퍼스타디움"],["WKBL","19:00","KB스타즈","신한은행",0,0,"청주 체육관"]],"2026-12-18":[["VLEAGUE_M","19:00","한국전력","우리카드",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","현대건설",0,0,"화성 종합실내체육관"],["WKBL","19:00","삼성생명","하나은행",0,0,"용인 실내체육관"]],"2026-12-19":[["VLEAGUE_M","14:00","현대캐피탈","KB손해보험",0,0,"천안 유관순체육관"],["WKBL","14:00","신한은행","KB스타즈",0,0,"인천 도원체육관"],["VLEAGUE_W","16:00","한국도로공사","흥국생명",0,0,"김천 실내체육관"],["WKBL","16:00","우리은행","BNK썸",0,0,"아산 이순신체육관"]],"2026-12-20":[["VLEAGUE_M","14:00","삼성화재","OK저축은행",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","정관장",0,0,"광주 페퍼스타디움"],["WKBL","16:00","우리은행","삼성생명",0,0,"아산 이순신체육관"]],"2026-12-21":[["WKBL","19:00","하나은행","신한은행",0,0,"부천 체육관"]],"2026-12-22":[["VLEAGUE_M","19:00","대한항공","현대캐피탈",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","한국도로공사",0,0,"서울 장충체육관"]],"2026-12-23":[["VLEAGUE_M","19:00","우리카드","한국전력",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","IBK기업은행",0,0,"수원 실내체육관"],["WKBL","19:00","KB스타즈","BNK썸",0,0,"청주 체육관"]],"2026-12-24":[["VLEAGUE_M","19:00","KB손해보험","삼성화재",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","SOOP 수퍼스",0,0,"인천 삼산월드체육관"]],"2026-12-25":[["VLEAGUE_M","14:00","OK저축은행","대한항공",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","정관장","GS칼텍스",0,0,"대전 충무체육관"],["WKBL","19:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2026-12-26":[["VLEAGUE_M","14:00","현대캐피탈","한국전력",0,0,"천안 유관순체육관"],["WKBL","14:00","KB스타즈","하나은행",0,0,"청주 체육관"],["VLEAGUE_W","16:00","한국도로공사","IBK기업은행",0,0,"김천 실내체육관"],["WKBL","16:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2026-12-27":[["VLEAGUE_M","14:00","삼성화재","우리카드",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","현대건설",0,0,"광주 페퍼스타디움"]],"2026-12-28":[["WKBL","19:00","하나은행","삼성생명",0,0,"부천 체육관"]],"2026-12-29":[["VLEAGUE_M","19:00","KB손해보험","대한항공",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","GS칼텍스","흥국생명",0,0,"서울 장충체육관"]],"2026-12-30":[["VLEAGUE_M","19:00","한국전력","OK저축은행",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","정관장",0,0,"화성 종합실내체육관"],["WKBL","19:00","BNK썸","신한은행",0,0,"부산 사직실내체육관"]],"2026-12-31":[["VLEAGUE_M","19:00","우리카드","현대캐피탈",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","한국도로공사",0,0,"수원 실내체육관"]],"2027-01-01":[["VLEAGUE_M","14:00","대한항공","삼성화재",0,0,"인천 계양체육관"],["VLEAGUE_W","16:00","GS칼텍스","SOOP 수퍼스",0,0,"서울 장충체육관"],["WKBL","19:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"]],"2027-01-02":[["VLEAGUE_M","14:00","한국전력","KB손해보험",0,0,"수원 실내체육관"],["WKBL","14:00","삼성생명","BNK썸",0,0,"용인 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","흥국생명",0,0,"화성 종합실내체육관"],["WKBL","16:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2027-01-03":[["VLEAGUE_M","14:00","OK저축은행","우리카드",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","현대건설","정관장",0,0,"수원 실내체육관"],["WKBL","16:00","삼성생명","우리은행",0,0,"용인 실내체육관"]],"2027-01-04":[["WKBL","19:00","KB스타즈","BNK썸",0,0,"청주 체육관"]],"2027-01-05":[["VLEAGUE_M","19:00","현대캐피탈","삼성화재",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","SOOP 수퍼스",0,0,"김천 실내체육관"]],"2027-01-06":[["VLEAGUE_M","19:00","한국전력","대한항공",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","GS칼텍스","IBK기업은행",0,0,"서울 장충체육관"],["WKBL","19:00","우리은행","하나은행",0,0,"아산 이순신체육관"]],"2027-01-07":[["VLEAGUE_M","19:00","우리카드","KB손해보험",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","흥국생명",0,0,"수원 실내체육관"]],"2027-01-08":[["VLEAGUE_M","19:00","OK저축은행","현대캐피탈",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","한국도로공사",0,0,"대전 충무체육관"]],"2027-01-09":[["VLEAGUE_M","14:00","삼성화재","한국전력",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","IBK기업은행",0,0,"광주 페퍼스타디움"]],"2027-01-10":[["VLEAGUE_M","14:00","우리카드","대한항공",0,0,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","GS칼텍스",0,0,"수원 실내체육관"]],"2027-01-12":[["VLEAGUE_M","19:00","KB손해보험","OK저축은행",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","정관장",0,0,"인천 삼산월드체육관"]],"2027-01-15":[["WKBL","19:00","KB스타즈","삼성생명",0,0,"청주 체육관"]],"2027-01-16":[["WKBL","14:00","하나은행","BNK썸",0,0,"부천 체육관"],["WKBL","16:00","신한은행","우리은행",0,0,"인천 도원체육관"]],"2027-01-17":[["WKBL","16:00","신한은행","KB스타즈",0,0,"인천 도원체육관"]],"2027-01-18":[["WKBL","19:00","삼성생명","하나은행",0,0,"용인 실내체육관"]],"2027-01-20":[["VLEAGUE_M","19:00","현대캐피탈","대한항공",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","GS칼텍스",0,0,"김천 실내체육관"],["WKBL","19:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2027-01-21":[["VLEAGUE_M","19:00","OK저축은행","KB손해보험",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","흥국생명",0,0,"대전 충무체육관"]],"2027-01-22":[["VLEAGUE_M","19:00","한국전력","삼성화재",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","SOOP 수퍼스",0,0,"화성 종합실내체육관"],["WKBL","19:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2027-01-23":[["VLEAGUE_M","14:00","대한항공","우리카드",0,0,"인천 계양체육관"],["WKBL","14:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"],["VLEAGUE_W","16:00","GS칼텍스","현대건설",0,0,"서울 장충체육관"],["WKBL","16:00","삼성생명","BNK썸",0,0,"용인 실내체육관"]],"2027-01-24":[["VLEAGUE_M","14:00","KB손해보험","현대캐피탈",0,0,"평택 이충문화체육관"],["VLEAGUE_W","16:00","흥국생명","한국도로공사",0,0,"인천 삼산월드체육관"],["WKBL","16:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2027-01-25":[["VLEAGUE_M","19:00","OK저축은행","삼성화재",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","SOOP 수퍼스",0,0,"대전 충무체육관"],["WKBL","19:00","하나은행","KB스타즈",0,0,"부천 체육관"]],"2027-01-26":[["VLEAGUE_M","19:00","우리카드","한국전력",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","IBK기업은행",0,0,"수원 실내체육관"]],"2027-01-27":[["WKBL","19:00","삼성생명","우리은행",0,0,"용인 실내체육관"]],"2027-01-28":[["VLEAGUE_M","19:00","대한항공","OK저축은행",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","정관장",0,0,"서울 장충체육관"]],"2027-01-29":[["VLEAGUE_M","19:00","삼성화재","현대캐피탈",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","한국도로공사",0,0,"광주 페퍼스타디움"],["WKBL","19:00","BNK썸","KB스타즈",0,0,"부산 사직실내체육관"]],"2027-01-30":[["VLEAGUE_M","14:00","KB손해보험","우리카드",0,0,"평택 이충문화체육관"],["WKBL","14:00","신한은행","삼성생명",0,0,"인천 도원체육관"],["VLEAGUE_W","16:00","흥국생명","현대건설",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","우리은행",0,0,"부천 체육관"]],"2027-01-31":[["VLEAGUE_M","14:00","한국전력","대한항공",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","GS칼텍스",0,0,"화성 종합실내체육관"],["WKBL","16:00","하나은행","BNK썸",0,0,"부천 체육관"]],"2027-02-01":[["VLEAGUE_M","19:00","현대캐피탈","OK저축은행",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","정관장",0,0,"김천 실내체육관"],["WKBL","19:00","KB스타즈","삼성생명",0,0,"청주 체육관"]],"2027-02-02":[["VLEAGUE_M","19:00","삼성화재","KB손해보험",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","흥국생명",0,0,"광주 페퍼스타디움"]],"2027-02-03":[["WKBL","19:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2027-02-04":[["VLEAGUE_M","19:00","OK저축은행","한국전력",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","IBK기업은행",0,0,"대전 충무체육관"]],"2027-02-05":[["VLEAGUE_M","19:00","우리카드","삼성화재",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","SOOP 수퍼스",0,0,"수원 실내체육관"],["WKBL","19:00","우리은행","하나은행",0,0,"아산 이순신체육관"]],"2027-02-06":[["VLEAGUE_M","14:00","대한항공","KB손해보험",0,0,"인천 계양체육관"],["WKBL","14:00","BNK썸","KB스타즈",0,0,"부산 사직실내체육관"],["VLEAGUE_W","16:00","GS칼텍스","흥국생명",0,0,"서울 장충체육관"],["WKBL","16:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2027-02-07":[["VLEAGUE_M","14:00","한국전력","현대캐피탈",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","한국도로공사",0,0,"화성 종합실내체육관"],["WKBL","16:00","BNK썸","하나은행",0,0,"부산 사직실내체육관"]],"2027-02-08":[["VLEAGUE_M","14:00","우리카드","OK저축은행",0,0,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","정관장",0,0,"수원 실내체육관"],["WKBL","19:00","KB스타즈","우리은행",0,0,"청주 체육관"]],"2027-02-09":[["VLEAGUE_M","14:00","삼성화재","대한항공",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","GS칼텍스",0,0,"광주 페퍼스타디움"]],"2027-02-10":[["WKBL","19:00","BNK썸","삼성생명",0,0,"부산 사직실내체육관"]],"2027-02-11":[["VLEAGUE_M","19:00","KB손해보험","한국전력",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","IBK기업은행",0,0,"인천 삼산월드체육관"]],"2027-02-12":[["VLEAGUE_M","19:00","현대캐피탈","우리카드",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","현대건설",0,0,"김천 실내체육관"],["WKBL","19:00","KB스타즈","신한은행",0,0,"청주 체육관"]],"2027-02-13":[["VLEAGUE_M","14:00","대한항공","삼성화재",0,0,"인천 계양체육관"],["WKBL","14:00","하나은행","삼성생명",0,0,"부천 체육관"],["VLEAGUE_W","16:00","GS칼텍스","SOOP 수퍼스",0,0,"서울 장충체육관"],["WKBL","16:00","우리은행","BNK썸",0,0,"아산 이순신체육관"]],"2027-02-14":[["VLEAGUE_M","14:00","KB손해보험","OK저축은행",0,0,"평택 이충문화체육관"],["VLEAGUE_W","16:00","흥국생명","정관장",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","신한은행",0,0,"부천 체육관"]],"2027-02-15":[["WKBL","19:00","삼성생명","KB스타즈",0,0,"용인 실내체육관"]],"2027-02-16":[["VLEAGUE_M","19:00","대한항공","현대캐피탈",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","한국도로공사",0,0,"서울 장충체육관"]],"2027-02-17":[["VLEAGUE_M","19:00","OK저축은행","우리카드",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","현대건설",0,0,"대전 충무체육관"],["WKBL","19:00","신한은행","우리은행",0,0,"인천 도원체육관"]],"2027-02-18":[["VLEAGUE_M","19:00","한국전력","KB손해보험",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","흥국생명",0,0,"화성 종합실내체육관"]],"2027-02-19":[["VLEAGUE_M","19:00","현대캐피탈","삼성화재",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","SOOP 수퍼스",0,0,"김천 실내체육관"],["WKBL","19:00","KB스타즈","하나은행",0,0,"청주 체육관"]],"2027-02-20":[["VLEAGUE_M","14:00","우리카드","대한항공",0,0,"서울 장충체육관"],["WKBL","14:00","우리은행","삼성생명",0,0,"아산 이순신체육관"],["VLEAGUE_W","16:00","현대건설","GS칼텍스",0,0,"수원 실내체육관"],["WKBL","16:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2027-02-21":[["VLEAGUE_M","14:00","한국전력","OK저축은행",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","정관장",0,0,"화성 종합실내체육관"],["WKBL","16:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2027-02-22":[["WKBL","19:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"]],"2027-02-23":[["VLEAGUE_M","19:00","현대캐피탈","KB손해보험",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","흥국생명",0,0,"김천 실내체육관"]],"2027-02-24":[["VLEAGUE_M","19:00","삼성화재","우리카드",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","현대건설",0,0,"광주 페퍼스타디움"],["WKBL","19:00","삼성생명","BNK썸",0,0,"용인 실내체육관"]],"2027-02-25":[["VLEAGUE_M","19:00","대한항공","한국전력",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","IBK기업은행",0,0,"서울 장충체육관"]],"2027-02-26":[["VLEAGUE_M","19:00","OK저축은행","현대캐피탈",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","한국도로공사",0,0,"대전 충무체육관"],["WKBL","19:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2027-02-27":[["VLEAGUE_M","14:00","KB손해보험","삼성화재",0,0,"평택 이충문화체육관"],["WKBL","14:00","KB스타즈","BNK썸",0,0,"청주 체육관"],["VLEAGUE_W","16:00","흥국생명","SOOP 수퍼스",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","삼성생명",0,0,"부천 체육관"]],"2027-02-28":[["VLEAGUE_M","14:00","한국전력","우리카드",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","현대건설",0,0,"화성 종합실내체육관"],["WKBL","16:00","KB스타즈","신한은행",0,0,"청주 체육관"]],"2027-03-01":[["VLEAGUE_M","14:00","OK저축은행","대한항공",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","GS칼텍스","정관장",0,0,"서울 장충체육관"],["WKBL","19:00","BNK썸","하나은행",0,0,"부산 사직실내체육관"]],"2027-03-03":[["VLEAGUE_M","19:00","우리카드","KB손해보험",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","흥국생명",0,0,"수원 실내체육관"],["WKBL","19:00","우리은행","삼성생명",0,0,"아산 이순신체육관"]],"2027-03-04":[["VLEAGUE_M","19:00","현대캐피탈","한국전력",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","IBK기업은행",0,0,"김천 실내체육관"]],"2027-03-05":[["VLEAGUE_M","19:00","삼성화재","OK저축은행",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","정관장",0,0,"광주 페퍼스타디움"],["WKBL","19:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2027-03-06":[["VLEAGUE_M","14:00","KB손해보험","대한항공",0,0,"평택 이충문화체육관"],["WKBL","14:00","삼성생명","KB스타즈",0,0,"용인 실내체육관"],["VLEAGUE_W","16:00","흥국생명","GS칼텍스",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","우리은행",0,0,"부천 체육관"]],"2027-03-07":[["VLEAGUE_M","14:00","우리카드","현대캐피탈",0,0,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","한국도로공사",0,0,"수원 실내체육관"],["WKBL","16:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2027-03-08":[["WKBL","19:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2027-03-09":[["VLEAGUE_M","19:00","삼성화재","한국전력",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","IBK기업은행",0,0,"광주 페퍼스타디움"],["WKBL","19:00","KB스타즈","하나은행",0,0,"청주 체육관"]],"2027-03-10":[["VLEAGUE_M","19:00","대한항공","우리카드",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","현대건설",0,0,"서울 장충체육관"]],"2027-03-11":[["VLEAGUE_M","19:00","OK저축은행","KB손해보험",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","흥국생명",0,0,"대전 충무체육관"]],"2027-03-12":[["VLEAGUE_M","19:00","한국전력","삼성화재",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","SOOP 수퍼스",0,0,"화성 종합실내체육관"]],"2027-03-13":[["VLEAGUE_M","14:00","현대캐피탈","대한항공",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","GS칼텍스",0,0,"김천 실내체육관"]],"2027-03-14":[["VLEAGUE_M","14:00","KB손해보험","우리카드",0,0,"평택 이충문화체육관"],["VLEAGUE_W","16:00","흥국생명","현대건설",0,0,"인천 삼산월드체육관"]],"2027-03-16":[["VLEAGUE_M","19:00","현대캐피탈","삼성화재",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","SOOP 수퍼스",0,0,"김천 실내체육관"]],"2027-03-17":[["VLEAGUE_M","19:00","OK저축은행","한국전력",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","IBK기업은행",0,0,"대전 충무체육관"]],"2027-03-18":[["VLEAGUE_M","19:00","대한항공","KB손해보험",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","흥국생명",0,0,"서울 장충체육관"]],"2027-03-19":[["VLEAGUE_M","19:00","우리카드","삼성화재",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","SOOP 수퍼스",0,0,"수원 실내체육관"]],"2027-03-20":[["VLEAGUE_M","14:00","현대캐피탈","OK저축은행",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","정관장",0,0,"김천 실내체육관"]],"2027-03-21":[["VLEAGUE_M","14:00","한국전력","대한항공",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","GS칼텍스",0,0,"화성 종합실내체육관"]],"2027-03-23":[["VLEAGUE_M","19:00","KB손해보험","현대캐피탈",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","한국도로공사",0,0,"인천 삼산월드체육관"]],"2027-03-24":[["VLEAGUE_M","19:00","우리카드","OK저축은행",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","정관장",0,0,"수원 실내체육관"]],"2027-03-25":[["VLEAGUE_M","19:00","삼성화재","대한항공",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","GS칼텍스",0,0,"광주 페퍼스타디움"]],"2027-03-26":[["VLEAGUE_M","19:00","KB손해보험","한국전력",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","IBK기업은행",0,0,"인천 삼산월드체육관"]],"2027-03-27":[["VLEAGUE_M","14:00","현대캐피탈","우리카드",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","현대건설",0,0,"김천 실내체육관"]],"2027-03-28":[["VLEAGUE_M","14:00","OK저축은행","삼성화재",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","정관장","SOOP 수퍼스",0,0,"대전 충무체육관"]],"2027-03-30":[["VLEAGUE_M","19:00","한국전력","현대캐피탈",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","한국도로공사",0,0,"화성 종합실내체육관"]],"2027-03-31":[["VLEAGUE_M","19:00","대한항공","OK저축은행",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","정관장",0,0,"서울 장충체육관"]],"2027-04-01":[["VLEAGUE_M","19:00","삼성화재","KB손해보험",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","흥국생명",0,0,"광주 페퍼스타디움"]],"2027-04-02":[["VLEAGUE_M","19:00","우리카드","한국전력",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","IBK기업은행",0,0,"수원 실내체육관"]]}')
 _OFFTHEFIELD_CACHE_V4622: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
 _PER_OFFSET_DIAG_V4622: Dict[int, Dict[str, Any]] = {}
-_RT_TOP_POOL_V4622 = ThreadPoolExecutor(max_workers=16)
+_RT_TOP_POOL_V4622 = ThreadPoolExecutor(max_workers=20)
+
+# ============================================================================
+# v4.6.39: Keyless Global Lightweight Korean V-League (M/W) & WKBL/KBL
+# Real-Time Set / Quarter / Rally Score Collector (`flashscore.mobi`)
+# ============================================================================
+_FSM_LIST_CACHE_V4639: Dict[str, Tuple[float, str]] = {}
+_FSM_DETAIL_CACHE_V4639: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_FSM_LOCK_V4639 = threading.Lock()
+
+try:
+    from zoneinfo import ZoneInfo as _ZoneInfoV4639
+    _FSM_PRAGUE_TZ_V4639 = _ZoneInfoV4639("Europe/Prague")
+except Exception:
+    _FSM_PRAGUE_TZ_V4639 = timezone(timedelta(hours=1))
+
+_FSM_HEADERS_V4639: Dict[str, str] = {
+    "User-Agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.flashscore.mobi/",
+}
+
+_FSM_CLUB_MAP_BY_LG_V4639: Dict[str, Tuple[Tuple[str, Tuple[str, ...]], ...]] = {
+    "VLEAGUE_M": (
+        ("대한항공", ("kal jumbos", "korean air", "incheon korean air", "jumbos")),
+        ("현대캐피탈", ("hyundai skywalkers", "hyundai capital", "cheonan hyundai", "skywalkers")),
+        ("한국전력", ("kepco", "korea electric", "suwon kepco", "vixtorm")),
+        ("삼성화재", ("samsung blue fangs", "samsung bluefangs", "blue fangs", "bluefangs", "daejeon samsung", "samsung fire", "samsung")),
+        ("OK저축은행", ("busan ok", "ansan ok", "ok savings", "okman", "ok financial", "rush & cash")),
+        ("KB손해보험", ("kb stars", "kb insurance", "uijeongbu kb", "pyeongtaek kb", "lig greaters")),
+        ("우리카드", ("woori card", "wooricard", "wooriwon", "seoul woori", "vibez", "woori")),
+    ),
+    "VLEAGUE_W": (
+        ("흥국생명", ("hungkuk", "heungkuk", "pink spiders", "incheon hungkuk", "incheon heungkuk")),
+        ("GS칼텍스", ("gs caltex", "seoul gs caltex", "seoul kixx", "kixx")),
+        ("현대건설", ("hyundai e&c", "hillstate", "hyundai construction", "suwon hyundai", "hyundai w", "hyundai")),
+        ("정관장", ("daejeon jkj", "jungkwanjang", "red sparks", "daejeon kgc", "kgc ginseng", "jkj")),
+        ("IBK기업은행", ("ibk", "altos", "industrial bank", "hwaseong ibk")),
+        ("한국도로공사", ("expressway", "korea expressway", "hi-pass", "hipass", "gimcheon")),
+        ("SOOP 수퍼스", ("soop soopers", "soopers", "soop", "pepper savings", "ai peppers", "gwangju pepper")),
+    ),
+    "WKBL": (
+        ("우리은행", ("woori won", "wooriwon", "woori bank", "asan woori", "woori")),
+        ("KB스타즈", ("kb stars", "cheongju kb", "kb women")),
+        ("삼성생명", ("samsung blue minx", "blue minx", "blueminx", "samsung life", "yongin samsung", "samsung")),
+        ("하나은행", ("hana bank", "hana 1q", "hana oneq", "bucheon hana", "hana")),
+        ("신한은행", ("s-birds", "sbirds", "shinhan bank", "incheon shinhan", "shinhan")),
+        ("BNK썸", ("busan bnk sum", "bnk sum", "busan bnk", "bnk")),
+    ),
+    "KBL": (
+        ("서울 SK", ("seoul knights", "sk knights", "seoul sk")),
+        ("서울 삼성", ("seoul thunders", "samsung thunders", "seoul samsung")),
+        ("창원 LG", ("lg sakers", "changwon lg", "sakers")),
+        ("수원 KT", ("suwon kt", "suwon sonicboom", "kt sonicboom", "sonicboom")),
+        ("부산 KCC", ("kcc egis", "busan kcc", "jeonju kcc", "egis")),
+        ("울산 현대모비스", ("mobis phoebus", "ulsan mobis", "hyundai mobis", "phoebus", "mobis")),
+        ("원주 DB", ("wonju db", "dongbu promy", "db promy", "promy")),
+        ("안양 정관장", ("anyang jungkwanjang", "anyang kgc", "red boosters", "anyang", "jungkwanjang")),
+        ("고양 소노", ("goyang sono", "goyang skygunners", "skygunners", "sono")),
+        ("대구 한국가스공사", ("kogas", "korea gas", "daegu pegasus", "pegasus", "elephants")),
+    ),
+}
+
+_FSM_LG_META_V4639: Dict[str, Tuple[str, str, str]] = {
+    "VLEAGUE_M": ("volleyball", "V-리그 남자부", "도드람 V-리그 남자부"),
+    "VLEAGUE_W": ("volleyball", "V-리그 여자부", "도드람 V-리그 여자부"),
+    "WKBL": ("basketball", "WKBL", "WKBL 여자프로농구"),
+    "KBL": ("basketball", "KBL", "KBL 남자프로농구"),
+}
+
+
+def _swap_period_scores_sides_v4639(text: str) -> str:
+    if not text:
+        return ""
+    return re.sub(r"(\d+)\s*-\s*(\d+)", lambda m: f"{m.group(2)}-{m.group(1)}", str(text))
+
+
+def _resolve_fsm_kr_club_v4639(raw_name: str, lg_code: str) -> str:
+    s = re.sub(r"\s+", " ", str(raw_name or "")).strip()
+    if not s:
+        return ""
+    low = re.sub(r"\s+w$", "", s.lower()).strip()
+    table = _FSM_CLUB_MAP_BY_LG_V4639.get(lg_code, ())
+    for ko_nm, aliases in table:
+        for al in aliases:
+            if al == low or al in low:
+                return ko_nm
+    sp_hint = "volleyball" if lg_code in ("VLEAGUE_M", "VLEAGUE_W") else "basketball"
+    c_fb, _, _ = _clean_team_label_v4616(s, sp_hint)
+    valid_ko = {ko for ko, _ in table}
+    if c_fb == "페퍼저축은행" and lg_code == "VLEAGUE_W":
+        return "SOOP 수퍼스"
+    return c_fb if c_fb in valid_ko else ""
+
+
+def _convert_fsm_prague_to_kst_v4639(base_kst: datetime, cet_hhmm: str, dmy_tuple: Optional[Tuple[int, int, int]] = None) -> Tuple[datetime, str]:
+    m_hm = re.match(r"^(\d{1,2}):(\d{2})$", str(cet_hhmm or "").strip())
+    if not m_hm:
+        return base_kst, f"{base_kst.hour:02d}:{base_kst.minute:02d}"
+    hh, mm = int(m_hm.group(1)) % 24, int(m_hm.group(2)) % 60
+    try:
+        if dmy_tuple is not None:
+            dd, mo, yyyy = dmy_tuple
+            dt_cet = datetime(yyyy, mo, dd, hh, mm, tzinfo=_FSM_PRAGUE_TZ_V4639)
+        else:
+            # Korean domestic games start 14:00~19:30 KST == 05:00~12:30 Europe/Prague (same calendar date!)
+            dt_cet = datetime(base_kst.year, base_kst.month, base_kst.day, hh, mm, tzinfo=_FSM_PRAGUE_TZ_V4639)
+        dt_k = dt_cet.astimezone(KST)
+        return dt_k, f"{dt_k.hour:02d}:{dt_k.minute:02d}"
+    except Exception:
+        kst_h = (hh + 8) % 24
+        dt_k = base_kst.replace(hour=kst_h, minute=mm, second=0, microsecond=0)
+        return dt_k, f"{kst_h:02d}:{mm:02d}"
+
+
+def _html_to_fsm_lines_v4639(raw_html: str) -> List[str]:
+    if not raw_html:
+        return []
+    cleaned = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", "", raw_html, flags=re.I | re.S)
+
+    def _repl_match_a(m: re.Match) -> str:
+        href = _html_lib.unescape(m.group(1) or "").strip()
+        inner = re.sub(r"<[^>]+>", " ", m.group(2) or "")
+        inner = re.sub(r"\s+", " ", _html_lib.unescape(inner)).strip()
+        return f" [[FSM_M:{href}|{inner}]] "
+
+    cleaned = re.sub(
+        r"<a\b[^>]*href=[\x22\x27]([^\x22\x27]*?/match/[A-Za-z0-9]+/[^\x22\x27]*)[\x22\x27][^>]*>(.*?)</a>",
+        _repl_match_a,
+        cleaned,
+        flags=re.I | re.S,
+    )
+    cleaned = re.sub(r"<br\s*/?>", "\n", cleaned, flags=re.I)
+    cleaned = re.sub(r"</?(?:h[1-6]|div|p|tr|li|ul|dl|dt|dd|table|section|article)\b[^>]*>", "\n", cleaned, flags=re.I)
+    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+    cleaned = _html_lib.unescape(cleaned)
+    out_lines: List[str] = []
+    for raw_ln in cleaned.splitlines():
+        ln = re.sub(r"[ \t\r\f\v]+", " ", raw_ln).strip()
+        if ln:
+            out_lines.append(ln)
+    return out_lines
+
+
+def _parse_flashscore_mobi_detail_v4639(detail_html: str, sport: str) -> Dict[str, Any]:
+    lines = _html_to_fsm_lines_v4639(detail_html)
+    if not lines:
+        return {}
+    joined = "\n".join(lines)
+    plain = re.sub(r"\[\[FSM_M:[^|]*\|([^\]]*)\]\]", r"\1", joined)
+
+    main_hs: Optional[int] = None
+    main_as: Optional[int] = None
+    periods: List[Tuple[int, int]] = []
+
+    m_paren = re.search(
+        r"(?<!\d)(\d{1,3})\s*[-:]\s*(\d{1,3})(?:\s*(?:AOT|OT|After\s*OT))?(?:\s*\(\s*\d{1,3}\s*[-:]\s*\d{1,3}\s*\))?\s*\(\s*(\d{1,3}\s*[-:]\s*\d{1,3}(?:\s*,\s*\d{1,3}\s*[-:]\s*\d{1,3})*)\s*\)",
+        plain,
+        flags=re.I,
+    )
+    if m_paren:
+        main_hs = int(m_paren.group(1))
+        main_as = int(m_paren.group(2))
+        for a_s, b_s in re.findall(r"(\d{1,3})\s*[-:]\s*(\d{1,3})", m_paren.group(3)):
+            periods.append((int(a_s), int(b_s)))
+
+    if not periods:
+        if sport == "volleyball":
+            set_map: Dict[int, Tuple[int, int]] = {}
+            for sm in re.finditer(r"\bSet\s*([1-5])\s*:\s*(\d{1,2})\s*[-:]\s*(\d{1,2})\b", plain, flags=re.I):
+                set_map[int(sm.group(1))] = (int(sm.group(2)), int(sm.group(3)))
+            for s_idx in sorted(set_map.keys()):
+                periods.append(set_map[s_idx])
+        else:
+            q_list: List[Tuple[int, int]] = []
+            for qm in re.finditer(
+                r"\b(?:([1-4])(?:st|nd|rd|th)\s*Quarter|Quarter\s*([1-4])|(Overtime|OT))\s*:\s*(\d{1,3})\s*[-:]\s*(\d{1,3})\b",
+                plain,
+                flags=re.I,
+            ):
+                q_list.append((int(qm.group(4)), int(qm.group(5))))
+            periods.extend(q_list)
+
+    det_state = ""
+    det_period_num = 0
+    if re.search(r"\b(?:Finished|After\s*OT|AOT)\b", plain, flags=re.I):
+        det_state = "post"
+    else:
+        m_set = re.search(r"\bSet\s*([1-5])\b", plain, flags=re.I)
+        if sport == "volleyball" and m_set and not re.search(r"\bSet\s*[1-5]\s*:", m_set.group(0)):
+            # Check standalone `Set N` status line (distinct from `Set N: 25-27`)
+            for ln in lines:
+                ln_c = re.sub(r"\[\[FSM_M:[^|]*\|([^\]]*)\]\]", r"\1", ln).strip()
+                ms_ln = re.match(r"^Set\s*([1-5])(?:\s|$)", ln_c, flags=re.I)
+                if ms_ln and ":" not in ln_c[:8]:
+                    det_state = "in"
+                    det_period_num = int(ms_ln.group(1))
+                    break
+        elif sport == "basketball":
+            for ln in lines:
+                ln_c = re.sub(r"\[\[FSM_M:[^|]*\|([^\]]*)\]\]", r"\1", ln).strip()
+                if re.match(r"^(?:Half\s*Time|HT)\b", ln_c, flags=re.I):
+                    det_state = "ht"
+                    det_period_num = 2
+                    break
+                if re.match(r"^(?:Pause|Break)\b", ln_c, flags=re.I):
+                    det_state = "pause"
+                    break
+                if re.match(r"^(?:Overtime|OT)\b", ln_c, flags=re.I) and ":" not in ln_c[:10]:
+                    det_state = "ot"
+                    det_period_num = 5
+                    break
+                mq_ln = re.match(r"^(?:([1-4])(?:st|nd|rd|th)\s*(?:Quarter|Qtr)|Quarter\s*([1-4])|Q([1-4]))\b", ln_c, flags=re.I)
+                if mq_ln and ":" not in ln_c[:15]:
+                    det_state = "in"
+                    det_period_num = int(mq_ln.group(1) or mq_ln.group(2) or mq_ln.group(3))
+                    break
+
+    dmy_hm: Optional[Tuple[int, int, int, str]] = None
+    m_dt = re.search(r"\b(\d{2})\.(\d{2})\.(20\d{2})\s+(\d{2}:\d{2})\b", plain)
+    if m_dt:
+        dmy_hm = (int(m_dt.group(1)), int(m_dt.group(2)), int(m_dt.group(3)), m_dt.group(4))
+
+    return {
+        "main_hs": main_hs,
+        "main_as": main_as,
+        "periods": periods,
+        "det_state": det_state,
+        "det_period_num": det_period_num,
+        "dmy_hm": dmy_hm,
+    }
+
+
+def _fetch_fsm_detail_cached_v4639(match_href: str, sport: str, is_finished: bool) -> Dict[str, Any]:
+    m_id = re.search(r"(/match/[A-Za-z0-9]+/)", str(match_href or ""))
+    if not m_id:
+        return {}
+    clean_path = m_id.group(1)
+    now_m = time.monotonic()
+    ttl = 3600.0 if is_finished else 15.0
+    with _FSM_LOCK_V4639:
+        cached = _FSM_DETAIL_CACHE_V4639.get(clean_path)
+        if cached and (now_m - cached[0]) < ttl:
+            return dict(cached[1])
+    url = f"https://www.flashscore.mobi{clean_path}"
+    html_txt = _http_fetch_text_v4616(url, timeout=2.0, headers=_FSM_HEADERS_V4639)
+    if not html_txt:
+        return {}
+    parsed = _parse_flashscore_mobi_detail_v4639(html_txt, sport)
+    if parsed:
+        effective_fin = is_finished or (parsed.get("det_state") == "post")
+        with _FSM_LOCK_V4639:
+            _FSM_DETAIL_CACHE_V4639[clean_path] = (time.monotonic(), dict(parsed))
+            if effective_fin and len(_FSM_DETAIL_CACHE_V4639) > 250:
+                oldest_k = min(_FSM_DETAIL_CACHE_V4639.keys(), key=lambda k: _FSM_DETAIL_CACHE_V4639[k][0])
+                _FSM_DETAIL_CACHE_V4639.pop(oldest_k, None)
+    return parsed
+
+
+def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
+    lines = _html_to_fsm_lines_v4639(list_html)
+    if not lines:
+        return []
+
+    active_lg = ""
+    candidates: List[Dict[str, Any]] = []
+
+    for ln in lines:
+        if "[[FSM_M:" not in ln:
+            m_hdr = re.match(r"^([A-Z][A-Z\s\.\-&\x27]{2,}?)\s*:\s*(.+)$", ln)
+            if m_hdr:
+                c_up = m_hdr.group(1).strip().upper()
+                l_up = m_hdr.group(2).strip().upper()
+                if c_up in ("SOUTH KOREA", "KOREA", "REPUBLIC OF KOREA"):
+                    if any(excl in l_up for excl in ("CUP", "ALL STAR", "UNIVERSIADE", "U18", "U19", "U20", "U21", "YOUTH", "3X3", "D-LEAGUE", "DEVELOPMENT")):
+                        active_lg = ""
+                    elif sport == "volleyball":
+                        active_lg = "VLEAGUE_W" if "WOMEN" in l_up else ("VLEAGUE_M" if ("VOLLEYBALL" in l_up or "V-LEAGUE" in l_up) else "")
+                    elif sport == "basketball":
+                        active_lg = "WKBL" if ("WKBL" in l_up or "WOMEN" in l_up) else ("KBL" if "KBL" in l_up else "")
+                    else:
+                        active_lg = ""
+                else:
+                    active_lg = ""
+                continue
+
+        if not active_lg:
+            continue
+
+        href = ""
+        link_txt = ""
+        m_link = re.search(r"\[\[FSM_M:([^|]*)\|([^\]]*)\]\]", ln)
+        if m_link:
+            href = m_link.group(1).strip()
+            link_txt = m_link.group(2).strip()
+            ln_body = (ln[:m_link.start()] + " " + ln[m_link.end():]).strip()
+        else:
+            ln_body = ln.strip()
+
+        up_check = (ln_body + " " + link_txt).upper()
+        if any(bad in up_check for bad in ("POSTPONED", "CANCELLED", "CANCELED", "ABANDONED", "WALKOVER", "FRO")):
+            continue
+
+        state = "pre"
+        cet_hhmm = ""
+        live_p_num = 0
+        live_min = ""
+        is_ht = False
+        is_pause = False
+        is_ot = False
+        teams_str = ln_body
+
+        # 1. Volleyball live prefix (`Set 1` .. `Set 5`)
+        m_vb_live = re.match(r"^Set\s*([1-5])\b\s*(.+)$", teams_str, flags=re.I)
+        # 2. Basketball live prefixes (`1st Quarter`, `2nd Qtr`, `Q2`, `Half Time`, `Pause`, `Overtime`)
+        m_bk_qtr = re.match(
+            r"^(?:([1-4])(?:st|nd|rd|th)\s*(?:Quarter|Qtr)|Quarter\s*([1-4])|Q([1-4]))(?:\s*(\d{1,2})\x27?)?\b\s*(.+)$",
+            teams_str,
+            flags=re.I,
+        )
+        m_bk_ht = re.match(r"^(?:Half\s*Time|HT)\b\s*(.+)$", teams_str, flags=re.I)
+        m_bk_pause = re.match(r"^(?:Pause|Break)\b\s*(.+)$", teams_str, flags=re.I)
+        m_bk_ot = re.match(r"^(?:Overtime|OT)(?:\s*(\d{1,2})\x27?)?\b\s*(.+)$", teams_str, flags=re.I)
+        # 3. Explicit Finished prefix (`11:00 Fin`, `Finished`, `After OT`, `11:00 AOT`)
+        m_fin_pref = re.match(r"^(?:(\d{1,2}:\d{2})\s+)?(?:Finished|Fin|After\s*OT|AOT|FT|Ended)\b\s*(.+)$", teams_str, flags=re.I)
+        # 4. Standard `HH:MM` prefix (Scheduled if `-`, Finished if numeric score on flashscore.mobi)
+        m_time_pref = re.match(r"^(\d{1,2}:\d{2})\s*(.+)$", teams_str)
+
+        if sport == "volleyball" and m_vb_live:
+            state = "in"
+            live_p_num = int(m_vb_live.group(1))
+            teams_str = m_vb_live.group(2).strip()
+        elif sport == "basketball" and m_bk_qtr:
+            state = "in"
+            live_p_num = int(m_bk_qtr.group(1) or m_bk_qtr.group(2) or m_bk_qtr.group(3))
+            live_min = (m_bk_qtr.group(4) or "").strip()
+            teams_str = m_bk_qtr.group(5).strip()
+        elif sport == "basketball" and m_bk_ht:
+            state = "in"
+            is_ht = True
+            live_p_num = 2
+            teams_str = m_bk_ht.group(1).strip()
+        elif sport == "basketball" and m_bk_pause:
+            state = "in"
+            is_pause = True
+            teams_str = m_bk_pause.group(1).strip()
+        elif sport == "basketball" and m_bk_ot:
+            state = "in"
+            is_ot = True
+            live_p_num = 5
+            live_min = (m_bk_ot.group(1) or "").strip()
+            teams_str = m_bk_ot.group(2).strip()
+        elif m_fin_pref:
+            state = "post"
+            cet_hhmm = (m_fin_pref.group(1) or "").strip()
+            teams_str = m_fin_pref.group(2).strip()
+        elif m_time_pref:
+            cet_hhmm = m_time_pref.group(1).strip()
+            teams_str = m_time_pref.group(2).strip()
+            state = "pre"
+        else:
+            continue
+
+        # Extract trailing score if `link_txt` wasn't already holding it
+        hs_val, as_val = 0, 0
+        has_num_score = False
+        m_sc_link = re.search(r"(\d{1,3})\s*[-:]\s*(\d{1,3})", link_txt)
+        if m_sc_link:
+            hs_val, as_val = int(m_sc_link.group(1)), int(m_sc_link.group(2))
+            has_num_score = True
+        else:
+            m_sc_tail = re.search(r"\s+(\d{1,3})\s*[-:]\s*(\d{1,3})(?:ot|\s*aot)?\s*$", teams_str, flags=re.I)
+            if m_sc_tail:
+                hs_val, as_val = int(m_sc_tail.group(1)), int(m_sc_tail.group(2))
+                has_num_score = True
+                teams_str = teams_str[:m_sc_tail.start()].strip()
+            else:
+                teams_str = re.sub(r"\s+-\s*$", "", teams_str).strip()
+
+        if state == "pre" and has_num_score:
+            # On `flashscore.mobi`, `HH:MM TeamA - TeamB 1-3` (with `HH:MM` instead of `Set N` / `Quarter N`) is a finished game
+            state = "post"
+
+        parts = re.split(r"\s+-\s+", teams_str, maxsplit=1)
+        if len(parts) != 2:
+            continue
+        h_ko = _resolve_fsm_kr_club_v4639(parts[0], active_lg)
+        a_ko = _resolve_fsm_kr_club_v4639(parts[1], active_lg)
+        if not h_ko or not a_ko or h_ko == a_ko:
+            continue
+
+        candidates.append(
+            {
+                "lg_code": active_lg,
+                "sport": sport,
+                "state": state,
+                "cet_hhmm": cet_hhmm,
+                "live_p_num": live_p_num,
+                "live_min": live_min,
+                "is_ht": is_ht,
+                "is_pause": is_pause,
+                "is_ot": is_ot,
+                "home": h_ko,
+                "away": a_ko,
+                "hs": hs_val,
+                "as": as_val,
+                "href": href,
+            }
+        )
+
+    if not candidates:
+        return []
+
+    # Fetch `/match/<id>/` details in parallel for all `in` and `post` Korean games (typically 1~4 games/day!)
+    detail_targets = [i for i, c in enumerate(candidates) if c["href"] and c["state"] in ("in", "post")]
+    detail_by_idx: Dict[int, Dict[str, Any]] = {}
+    if detail_targets:
+        with ThreadPoolExecutor(max_workers=min(4, len(detail_targets))) as pool:
+            futs = {
+                idx: pool.submit(_fetch_fsm_detail_cached_v4639, candidates[idx]["href"], sport, candidates[idx]["state"] == "post")
+                for idx in detail_targets
+            }
+            for idx, fut in futs.items():
+                try:
+                    detail_by_idx[idx] = fut.result(timeout=2.3) or {}
+                except Exception:
+                    detail_by_idx[idx] = {}
+
+    out: List[Dict[str, Any]] = []
+    expected_ymd = target_k.strftime("%Y-%m-%d")
+    for idx, c in enumerate(candidates):
+        det = detail_by_idx.get(idx) or {}
+        lg_code = c["lg_code"]
+        sp, lg_s, lg_f = _FSM_LG_META_V4639[lg_code]
+        state = c["state"]
+        hs, as_ = int(c["hs"]), int(c["as"])
+        live_p_num = int(c["live_p_num"] or 0)
+        is_ht = bool(c["is_ht"])
+        is_pause = bool(c.get("is_pause"))
+        is_ot = bool(c["is_ot"])
+
+        if det.get("main_hs") is not None and det.get("main_as") is not None:
+            hs = int(det["main_hs"])
+            as_ = int(det["main_as"])
+        if det.get("det_state") == "post":
+            state = "post"
+        elif det.get("det_state") == "ht":
+            state = "in"
+            is_ht = True
+        elif det.get("det_state") == "pause":
+            state = "in"
+            is_pause = True
+        elif det.get("det_state") == "ot":
+            state = "in"
+            is_ot = True
+        elif det.get("det_state") == "in" and int(det.get("det_period_num") or 0) > 0:
+            state = "in"
+            live_p_num = int(det["det_period_num"])
+
+        dmy_hm = det.get("dmy_hm")
+        if dmy_hm is not None:
+            dt_k, hhmm = _convert_fsm_prague_to_kst_v4639(target_k, dmy_hm[3], (dmy_hm[0], dmy_hm[1], dmy_hm[2]))
+        elif c["cet_hhmm"]:
+            dt_k, hhmm = _convert_fsm_prague_to_kst_v4639(target_k, c["cet_hhmm"], None)
+        else:
+            is_wknd = target_k.weekday() in (5, 6)
+            def_hm = ("14:00" if lg_code == "VLEAGUE_M" else "16:00") if is_wknd else "19:00"
+            dt_k, hhmm = target_k, def_hm
+
+        if not (date_offset == 0 and state == "in") and dt_k.strftime("%Y-%m-%d") != expected_ymd:
+            continue
+
+        periods: List[Tuple[int, int]] = list(det.get("periods") or [])
+        p_parts: List[str] = []
+        if sp == "volleyball":
+            if state == "post":
+                badge = "종료"
+                for si, (sh, sa) in enumerate(periods, start=1):
+                    if sh > 0 or sa > 0:
+                        p_parts.append(f"{si}세트 {sh}-{sa}")
+            elif state == "in":
+                cur_s = live_p_num or max(1, len(periods) or (hs + as_ + 1))
+                cur_rally = ""
+                for si, (sh, sa) in enumerate(periods, start=1):
+                    if si < cur_s or (sh > 0 or sa > 0):
+                        p_parts.append(f"{si}세트 {sh}-{sa}")
+                    if si == cur_s and (sh > 0 or sa > 0):
+                        cur_rally = f" ({sh}-{sa})"
+                badge = f"LIVE {cur_s}세트{cur_rally}"
+            else:
+                badge = "예정"
+        else:
+            if state == "post":
+                badge = "종료"
+                for qi, (qh, qa) in enumerate(periods, start=1):
+                    if qh > 0 or qa > 0:
+                        q_lbl = f"{qi}Q" if qi <= 4 else ("연장" if qi == 5 else f"{qi - 4}연장")
+                        p_parts.append(f"{q_lbl} {qh}-{qa}")
+            elif state == "in":
+                cur_q = live_p_num or max(1, len(periods))
+                for qi, (qh, qa) in enumerate(periods, start=1):
+                    if qi <= cur_q and (qh > 0 or qa > 0 or qi < cur_q):
+                        q_lbl = f"{qi}Q" if qi <= 4 else ("연장" if qi == 5 else f"{qi - 4}연장")
+                        p_parts.append(f"{q_lbl} {qh}-{qa}")
+                if is_ht or (is_pause and len(periods) == 2):
+                    badge = "LIVE 하프타임"
+                elif is_pause and len(periods) >= 1:
+                    badge = f"LIVE {len(periods)}쿼터 종료"
+                elif is_ot or cur_q >= 5:
+                    badge = f"LIVE 연장 {c['live_min']}\x27".strip() if c["live_min"] else "LIVE 연장"
+                else:
+                    badge = f"LIVE {cur_q}쿼터 {c['live_min']}\x27".strip() if c["live_min"] else f"LIVE {cur_q}쿼터"
+            else:
+                badge = "예정"
+
+        venue = _KOVO_HOME_CITY_ARENA_V4619.get(c["home"], ((), ""))[1]
+        it = _build_rt_item_v4616(
+            "flashscore_mobi",
+            sp,
+            lg_s,
+            lg_code,
+            lg_f,
+            state,
+            badge,
+            dt_k,
+            hhmm,
+            c["home"],
+            c["away"],
+            hs,
+            as_,
+            period_scores=" · ".join(p_parts),
+            venue=venue,
+        )
+        if it:
+            out.append(it)
+    return out
+
+
+def _fetch_flashscore_mobi_kr_live_v4639(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
+    if date_offset < -2 or date_offset > 2:
+        return []
+    q_suffix = "" if date_offset == 0 else f"?d={int(date_offset)}"
+    ttl = 15.0 if date_offset == 0 else 180.0
+    specs = (
+        ("volleyball", f"https://www.flashscore.mobi/volleyball/{q_suffix}"),
+        ("basketball", f"https://www.flashscore.mobi/basketball/{q_suffix}"),
+    )
+    now_m = time.monotonic()
+    raw_by_sp: Dict[str, str] = {}
+    missing_specs: List[Tuple[str, str]] = []
+
+    with _FSM_LOCK_V4639:
+        for sp_k, url in specs:
+            ck = f"{sp_k}:{date_offset}:{target_k.strftime('%Y%m%d')}"
+            cached = _FSM_LIST_CACHE_V4639.get(ck)
+            if cached and (now_m - cached[0]) < ttl:
+                raw_by_sp[sp_k] = cached[1]
+            else:
+                missing_specs.append((sp_k, url))
+
+    if missing_specs:
+        with ThreadPoolExecutor(max_workers=len(missing_specs)) as pool:
+            futs = {sp_k: pool.submit(_http_fetch_text_v4616, url, 2.5, _FSM_HEADERS_V4639) for sp_k, url in missing_specs}
+            for sp_k, fut in futs.items():
+                try:
+                    txt = fut.result(timeout=2.8) or ""
+                except Exception:
+                    txt = ""
+                if txt:
+                    raw_by_sp[sp_k] = txt
+                    ck = f"{sp_k}:{date_offset}:{target_k.strftime('%Y%m%d')}"
+                    with _FSM_LOCK_V4639:
+                        _FSM_LIST_CACHE_V4639[ck] = (time.monotonic(), txt)
+
+    collected: List[Dict[str, Any]] = []
+    for sp_k in ("volleyball", "basketball"):
+        h_txt = raw_by_sp.get(sp_k) or ""
+        if h_txt:
+            try:
+                collected.extend(_parse_flashscore_mobi_sport_list_v4639(h_txt, sp_k, target_k, date_offset))
+            except Exception:
+                continue
+    return collected
+
 
 
 def _fetch_official_kr_season_registry_v4622(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
@@ -27898,6 +28485,10 @@ def _reconcile_domestic_with_official_cal_v4623(items: List[Dict[str, Any]], tar
                 if h_cur == off_a and a_cur == off_h:
                     cp["home"], cp["away"] = off_h, off_a
                     cp["home_score"], cp["away_score"] = int(it.get("away_score") or 0), int(it.get("home_score") or 0)
+                    if cp.get("period_scores"):
+                        cp["period_scores"] = _swap_period_scores_sides_v4639(str(cp.get("period_scores") or ""))
+                    if cp.get("status_badge"):
+                        cp["status_badge"] = _swap_period_scores_sides_v4639(str(cp.get("status_badge") or ""))
                 else:
                     cp["home"], cp["away"] = off_h, off_a
                 cp["match_dt_kst"] = f"{mmdd} ({wd_ko}) {off_hhmm}"
@@ -27920,7 +28511,7 @@ def _reconcile_domestic_with_official_cal_v4623(items: List[Dict[str, Any]], tar
     if len(dom_candidates) <= 1:
         return reconciled
 
-    def _dom_auth_rank(x: Dict[str, Any]) -> Tuple[int, Tuple[int, int, int, int, int]]:
+    def _dom_auth_rank(x: Dict[str, Any]) -> Tuple[int, Tuple[int, ...]]:
         lg_x = str(x.get("league_code") or "").upper()
         pk_x = (lg_x, frozenset([str(x.get("home") or ""), str(x.get("away") or "")]))
         in_off = 1 if pk_x in official_by_pair else 0
@@ -27954,6 +28545,7 @@ def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> 
     merged_raw: List[Dict[str, Any]] = []
     futs_top = {
         "official_kr_cal": _RT_TOP_POOL_V4622.submit(_fetch_official_kr_season_registry_v4622, target_k, date_offset),
+        "flashscore_mobi": _RT_TOP_POOL_V4622.submit(_fetch_flashscore_mobi_kr_live_v4639, target_k, date_offset),
         "espn_global": _RT_TOP_POOL_V4622.submit(_fetch_espn_global_live_v4616, target_k, date_offset),
         "gnews_kr": _RT_TOP_POOL_V4622.submit(_fetch_gnews_kr_vleague_matches_v4619, target_k, date_offset),
         "offthefield_kr": _RT_TOP_POOL_V4622.submit(_fetch_offthefield_kr_schedule_v4622, target_k, date_offset),
@@ -28029,9 +28621,11 @@ def _is_authentic_official_match_v4615(item: Any, expected_mmdd: Optional[str] =
     return True
 
 
-def _item_live_priority_key_v4616(it: Dict[str, Any]) -> Tuple[int, int, int, int, int]:
+def _item_live_priority_key_v4616(it: Dict[str, Any]) -> Tuple[int, int, int, int, int, int]:
     st = str(it.get("state") or "pre").lower()
     tot_sc = int(it.get("home_score") or 0) + int(it.get("away_score") or 0)
+    per_str = str(it.get("period_scores") or "").strip()
+    has_real_period = 1 if (per_str and not any(k in per_str for k in ("집계중", "연동중", "대기"))) else 0
     # Finished match with actual score (`post` + `tot_sc > 0`) outranks an un-scored `in` (`0:0`) item!
     if st == "post" and tot_sc > 0:
         st_rank = 4
@@ -28042,10 +28636,10 @@ def _item_live_priority_key_v4616(it: Dict[str, Any]) -> Tuple[int, int, int, in
     else:
         st_rank = 1
     badge_len = len(str(it.get("status_badge") or ""))
-    per_len = len(str(it.get("period_scores") or ""))
+    per_len = len(per_str) if has_real_period else 0
     src_tag = str(it.get("_src_v4616") or "")
-    src_rank = 5 if src_tag == "apisports" else (4 if src_tag in ("kbl_official", "livescore_pc", "naver_gw", "daum_api", "thesportsdb", "offthefield_kr") else (3 if src_tag in ("daum_ssr", "spojoy", "livescore_mob", "gnews_xml") else (2 if it.get("_espn_verified_v4615") else 1)))
-    return (st_rank, tot_sc, badge_len, per_len, src_rank)
+    src_rank = 6 if src_tag in ("flashscore_mobi", "apisports") else (4 if src_tag in ("kbl_official", "livescore_pc", "naver_gw", "daum_api", "thesportsdb", "offthefield_kr") else (3 if src_tag in ("daum_ssr", "spojoy", "livescore_mob", "gnews_xml") else (2 if it.get("_espn_verified_v4615") else 1)))
+    return (st_rank, tot_sc, has_real_period, src_rank, per_len, badge_len)
 
 
 def _merge_and_filter_official_matches_v4616(
@@ -28084,14 +28678,16 @@ def _merge_and_filter_official_matches_v4616(
                 merged = dict(it)
                 if not merged.get("venue") and prev_it.get("venue"):
                     merged["venue"] = prev_it["venue"]
-                if not merged.get("period_scores") and prev_it.get("period_scores"):
-                    merged["period_scores"] = prev_it["period_scores"]
+                prev_ps = str(prev_it.get("period_scores") or "")
+                if (not merged.get("period_scores") or "연동중" in str(merged.get("period_scores") or "")) and prev_ps and "연동중" not in prev_ps:
+                    merged["period_scores"] = prev_ps
                 by_canon[existing_key] = merged
             else:
                 if not prev_it.get("venue") and it.get("venue"):
                     prev_it["venue"] = it["venue"]
-                if not prev_it.get("period_scores") and it.get("period_scores"):
-                    prev_it["period_scores"] = it["period_scores"]
+                it_ps = str(it.get("period_scores") or "")
+                if (not prev_it.get("period_scores") or "연동중" in str(prev_it.get("period_scores") or "")) and it_ps and "연동중" not in it_ps:
+                    prev_it["period_scores"] = it_ps
 
     out = [by_canon[k] for k in order_keys]
     ord_st = {"in": 0, "pre": 1, "post": 2}
@@ -28671,6 +29267,7 @@ def get_single_post_detail_v4637(post_id: str):
 @router.get("/api/member/live-sources-diag-v4636")
 @router.get("/api/member/live-sources-diag-v4637")
 @router.get("/api/member/live-sources-diag-v4638")
+@router.get("/api/member/live-sources-diag-v4639")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -28683,7 +29280,8 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.38",
+        "version": "v4.6.39",
+        "flashscore_mobi_bridge_v4639": True,
         "ux_pwa_v4637": {
             "post_detail_api": True,
             "mobile_popstate_guard": True,
@@ -28716,6 +29314,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
                 "score": f"{x.get('home_score')}:{x.get('away_score')}",
                 "state": x.get("state"),
                 "badge": x.get("status_badge"),
+                "period_scores": x.get("period_scores"),
                 "venue": x.get("venue"),
                 "src": x.get("_src_v4616"),
             }
@@ -28729,6 +29328,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
                 "away": x.get("away"),
                 "score": f"{x.get('home_score')}:{x.get('away_score')}",
                 "badge": x.get("status_badge"),
+                "period_scores": x.get("period_scores"),
             }
             for x in items if x.get("state") == "in"
         ][:20],
