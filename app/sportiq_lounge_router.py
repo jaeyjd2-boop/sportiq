@@ -13899,7 +13899,7 @@ _FRONTEND_V22_JS = r'''
           var isBballOrBase = (it.sport === "basketball" || it.sport === "baseball" || rawLgCode === "KBL" || rawLgCode === "WKBL" || rawLgCode === "NBA" || rawLgCode === "WNBA");
           function fmtStanding(tName, rObj) {
             if (!rObj) return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;'><strong>" + uxEsc(tName) + "</strong>: 컵·국가대표·인터리그 매치업</div>";
-            var fm = Array.isArray(rObj.form) ? rObj.form.join("·") : String(rObj.form || "-");
+            var fm = Array.isArray(rObj.form) ? (rObj.form.length ? rObj.form.join("·") : "-") : String(rObj.form || "-");
             var hasDrawStat = (it.sport === "soccer") || (Number(rObj.d || 0) > 0);
             var recParts = [];
             if (rObj.gp !== undefined && rObj.gp !== null && Number(rObj.gp) > 0) {

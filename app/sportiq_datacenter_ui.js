@@ -457,6 +457,7 @@
       var sc=leaders.scorers||[];
       var as=leaders.assists||[];
       var h=leaguePillsHtml(state.standingsLeague,'data-stlg');h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px">';var ext=[{id:'VLEAGUE',l:'🏐 V-리그'},{id:'UFC',l:'🥊 UFC 랭킹'},{id:'TENNIS',l:'🎾 ATP 랭킹'},{id:'F1',l:'🏎️ F1 순위'}];for(var ei=0;ei<ext.length;ei++){var ex=ext[ei];h+='<button class="dc-pill'+(state.standingsLeague===ex.id?' active':'')+'" data-stlg="'+ex.id+'">'+ex.l+'</button>';}h+='</div>';
+      if(d.is_sample){h+='<div style="font-size:11px;color:#fbbf24;margin:0 0 10px">⚠️ 실시간 데이터 연동에 실패해 예시 데이터를 표시 중입니다(실제 기록과 다를 수 있음).</div>';}
       h+='<div class="dc-grid-2">';
       h+='<div class="dc-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">🏆 '+dcEsc(d.league_name||d.league)+' 실시간 순위 ('+dcEsc(d.updated_at_kst)+')</div>';
       h+='<table class="dc-tbl"><thead><tr><th>#</th><th>구단</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>최근5</th><th>승점/승률</th></tr></thead><tbody>';
@@ -466,18 +467,19 @@
         var fm='';
         var arr=r.form||[];
         for(var f=0;f<arr.length;f++){fm+='<span class="dc-dot dc-dot-'+dcEsc(arr[f])+'"></span>';}
+        if(!arr.length){fm='<span style="color:#64748b">-</span>';}
         h+='<tr><td><span class="'+zc+'">'+dcEsc(r.rank)+'</span></td><td style="font-weight:600">'+dcEsc(r.team)+'</td><td>'+dcEsc(r.gp)+'</td><td>'+dcEsc(r.w)+'</td><td>'+dcEsc(r.d)+'</td><td>'+dcEsc(r.l)+'</td><td>'+dcEsc(r.gd)+'</td><td>'+fm+'</td><td style="font-weight:700;color:#38bdf8">'+dcEsc(r.pts_label||r._pts||r.pts)+'</td></tr>';
       }
       h+='</tbody></table></div>';
 
       h+='<div style="display:flex;flex-direction:column;gap:12px">';
-      h+='<div class="dc-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">👑 득점·핵심 타이틀 리더보드</div><table class="dc-tbl"><thead><tr><th>#</th><th>선수</th><th>구단</th><th>기록</th></tr></thead><tbody>';
+      h+='<div class="dc-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">👑 득점·핵심 타이틀 리더보드'+(d.leaders_is_sample?' <span style="font-size:11px;color:#fbbf24;font-weight:600">(예시)</span>':'')+'</div><table class="dc-tbl"><thead><tr><th>#</th><th>선수</th><th>구단</th><th>기록</th></tr></thead><tbody>';
       for(var s=0;s<sc.length;s++){
         var sr=sc[s];
         h+='<tr><td>'+dcEsc(sr.rank)+'</td><td style="font-weight:600">'+dcEsc(sr.player)+'</td><td>'+dcEsc(sr.team)+'</td><td style="color:#fbbf24;font-weight:700">'+dcEsc(sr.stat)+' '+dcEsc(sr.sub||'')+'</td></tr>';
       }
       h+='</tbody></table></div>';
-      h+='<div class="dc-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">🎯 도움·보조 타이틀 리더보드</div><table class="dc-tbl"><thead><tr><th>#</th><th>선수</th><th>구단</th><th>기록</th></tr></thead><tbody>';
+      h+='<div class="dc-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">🎯 도움·보조 타이틀 리더보드'+(d.leaders_is_sample?' <span style="font-size:11px;color:#fbbf24;font-weight:600">(예시)</span>':'')+'</div><table class="dc-tbl"><thead><tr><th>#</th><th>선수</th><th>구단</th><th>기록</th></tr></thead><tbody>';
       for(var a=0;a<as.length;a++){
         var ar=as[a];
         h+='<tr><td>'+dcEsc(ar.rank)+'</td><td style="font-weight:600">'+dcEsc(ar.player)+'</td><td>'+dcEsc(ar.team)+'</td><td style="color:#38bdf8;font-weight:700">'+dcEsc(ar.stat)+' '+dcEsc(ar.sub||'')+'</td></tr>';
@@ -588,6 +590,7 @@
       var hh=(k.hardest_hit||[]).map(function(x){return x.team+'('+x.count+')';}).join(', ')||'-';
       var fs=(k.full_squad||[]).join(', ')||'없음';
       var h=leaguePillsHtml(state.injuryLeague,'data-inlg');
+      if(d.is_sample){h+='<div style="font-size:11px;color:#fbbf24;margin:0 0 10px">⚠️ 실시간 데이터 연동에 실패해 예시 데이터를 표시 중입니다(실제 기록과 다를 수 있음).</div>';}
       h+='<div class="dc-kpi-grid">'
         +'<div class="dc-kpi"><div class="dc-kpi-lbl">총 결장자 · 팀당 평균</div><div class="dc-kpi-val">'+dcEsc(k.total_injured)+'명 · '+dcEsc(k.avg_per_team)+'명</div></div>'
         +'<div class="dc-kpi"><div class="dc-kpi-lbl">최다 부상 부위</div><div class="dc-kpi-val">'+dcEsc(k.top_part||'-')+'</div></div>'
