@@ -1436,11 +1436,17 @@ def get_scorecard():
                 "leader_model": "SportiQ Ensemble v4",
                 "cumulative_graded": 1420 + len(recent),
                 "high_conf_acc": 76.8,
-                "transparent_note": "모든 예측은 경기 시작 전 스냅샷 기준으로 자동 채점되며 수정이 불가합니다.",
+                # 예전 문구("경기 시작 전 스냅샷 기준 자동 채점")는 사실이 아니어서 바꾼다.
+                "transparent_note": "아래 모델 성적·적중률·회원 순위는 실제 채점 기록이 아닌 예시값입니다.",
+                "is_sample": True,
             },
+            # models/member_leaderboard/cumulative_graded/high_conf_acc는 하드코딩 예시값이다.
+            # recent_graded의 AI 픽은 종료 경기의 실제 결과로 만든 확률(_calc_ai_probs state='post')이라 적중 판정이 의미 없다.
             "models": models,
             "recent_graded": recent,
             "member_leaderboard": members,
+            "is_sample": True,
+            "sample_note": "적중률·모델 성적은 실제 채점 결과가 아닌 예시값입니다.",
         }
     except Exception as e:
         return {"ok": False, "error": str(e), "updated_at_kst": _fmt_kst(_now_kst()), "summary": {}, "models": [], "recent_graded": [], "member_leaderboard": []}

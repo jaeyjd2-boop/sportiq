@@ -634,11 +634,13 @@
       var ms=d.models||[];
       var rg=d.recent_graded||[];
       var ml=d.member_leaderboard||[];
-      var h='<div class="dc-kpi-grid">'
+      var h='';
+      if(d.is_sample){h+='<div style="font-size:12px;color:#fbbf24;font-weight:700;margin:0 0 10px">⚠️ '+dcEsc(d.sample_note||'아래 적중률·모델 성적은 예시값입니다.')+'</div>';}
+      h+='<div class="dc-kpi-grid">'
         +'<div class="dc-kpi"><div class="dc-kpi-lbl">🏆 현재 선두 모델</div><div class="dc-kpi-val">'+dcEsc(s.leader_model||'-')+'</div></div>'
         +'<div class="dc-kpi"><div class="dc-kpi-lbl">📊 누적 자동 채점 수</div><div class="dc-kpi-val">'+dcEsc(s.cumulative_graded||'-')+'</div></div>'
         +'<div class="dc-kpi"><div class="dc-kpi-lbl">🎯 고신뢰 픽 적중률</div><div class="dc-kpi-val">'+dcEsc(s.high_conf_acc||'-')+'</div></div>'
-        +'<div class="dc-kpi"><div class="dc-kpi-lbl">🛡️ 투명 공개 원칙</div><div class="dc-kpi-val" style="font-size:12px">'+dcEsc(s.transparent_note||'-')+'</div></div>'
+        +'<div class="dc-kpi"><div class="dc-kpi-lbl">'+(d.is_sample?'ℹ️ 데이터 안내':'🛡️ 투명 공개 원칙')+'</div><div class="dc-kpi-val" style="font-size:12px">'+dcEsc(s.transparent_note||'-')+'</div></div>'
         +'</div>';
 
       h+='<div class="dc-card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:700;margin-bottom:8px">🤖 4대 AI 모델 구간 적중률 비교표</div>';
