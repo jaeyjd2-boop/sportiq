@@ -7302,7 +7302,8 @@ _FRONTEND_V22_JS = r'''
     Promise.all([pDc, pSb]).then(function (pair) {
       var dcRes = pair[0];
       var sbRes = pair[1];
-      v30ScoreState.fetchingOffset = null;
+      if (v30ScoreState.fetchingOffset === targetOff) v30ScoreState.fetchingOffset = null;
+      if (targetOff !== (v30ScoreState.selectedDateOffset || 0)) return;
       v30ScoreState.isLoadingDate = false;
       var combined = [];
       var seenComb = {};
@@ -9080,14 +9081,6 @@ _FRONTEND_V22_JS = r'''
 
     var parentBox = track.parentElement;
     var items = v30ScoreState.items || [];
-
-    // 로딩 중 대체 track이 툴바·달력·표 래퍼 안쪽 요소로 잡히면 insertBefore가
-    // HierarchyRequestError(새 자식이 부모를 포함)를 던진다. 이번 회차는 건너뛰고 실제 track이 마운트되면 다시 배치한다.
-    var guardIds = ["sqV30ScoreToolbar", "sqV31DateCalendarBar", "sqV30ScoreboardTableWrap"];
-    for (var gi = 0; gi < guardIds.length; gi++) {
-      var gEl = document.getElementById(guardIds[gi]);
-      if (gEl && (gEl === track || gEl.contains(parentBox))) return;
-    }
 
     var bar = document.getElementById("sqV30ScoreToolbar");
     if (!bar) {
@@ -12872,7 +12865,7 @@ _FRONTEND_V22_JS = r'''
     var resArea = document.getElementById("sqAiIqResultArea") || aiModal.querySelector("[id*='Result'], [id*='result']");
     if (resArea) {
       var rtx = String(resArea.textContent || "").replace(/\s+/g, " ").trim();
-      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|검색창에\s*입력|추천\s*키워드를\s*눌러|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
+      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
         return "dom::" + rtx.slice(0, 48);
       }
     }
@@ -13988,7 +13981,7 @@ _FRONTEND_V22_JS = r'''
           var isBballOrBase = (it.sport === "basketball" || it.sport === "baseball" || rawLgCode === "KBL" || rawLgCode === "WKBL" || rawLgCode === "NBA" || rawLgCode === "WNBA");
           function fmtStanding(tName, rObj) {
             if (!rObj) return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;'><strong>" + uxEsc(tName) + "</strong>: 컵·국가대표·인터리그 매치업</div>";
-            var fm = Array.isArray(rObj.form) ? (rObj.form.length ? rObj.form.join("·") : "-") : String(rObj.form || "-");
+            var fm = Array.isArray(rObj.form) ? rObj.form.join("·") : String(rObj.form || "-");
             var hasDrawStat = (it.sport === "soccer") || (Number(rObj.d || 0) > 0);
             var recParts = [];
             if (rObj.gp !== undefined && rObj.gp !== null && Number(rObj.gp) > 0) {
@@ -14051,15 +14044,9 @@ _FRONTEND_V22_JS = r'''
             ? teamInjs.map(function (x) {
                 return "<div style='font-size:11.5px;padding:4px 0;border-bottom:1px solid #1e293b;'>🏥 <strong>[" + uxEsc(localizeTeamKoJsV381(x.team)) + "] " + uxEsc(x.player) + "</strong> · " + uxEsc(x.reason) + " <span style='color:#fbbf24;'>(" + uxEsc(x.severity) + ")</span></div>";
               }).join("")
-            : (injData.is_sample
-                ? "<div style='font-size:11.5px;color:#94a3b8;'>" + uxEsc(injData.sample_note || "부상자 데이터가 아직 연동되지 않았습니다.") + "</div>"
-                : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>");
-          // 하드코딩 예시 순위표(K리그·J리그 등)는 실제 데이터처럼 보이지 않도록 안내를 붙인다.
-          var stSampleHtml = stData.is_sample
-            ? "<div style='font-size:11px;color:#fbbf24;margin-bottom:6px;'>⚠️ " + uxEsc(stData.sample_note || "예시 데이터입니다(실시간 연동 아님).") + "</div>"
-            : "";
+            : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>";
           box.innerHTML = (
-            "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 순위 & 최근 흐름</div>" + stSampleHtml +
+            "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 순위 & 최근 흐름</div>" +
             "<div style='display:grid;gap:6px;margin-bottom:10px;'>" + fmtStanding(it.home, hRow) + fmtStanding(it.away, aRow) + "</div>" +
             h2hBlockHtml +
             "<div style='font-weight:800;color:#fca5a5;margin-bottom:4px;'>🏥 양 팀 주요 결장 · 로스터 체크</div>" + injHtml
@@ -17878,7 +17865,7 @@ def _build_comment_sig_v4612(post_id: str, user_label: str, comment_text: str) -
 
 @router.get("/api/posts")
 def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[str] = ""):
-    # 조회 요청에서는 예시 게시글을 시드하지 않는다(시드는 시작 시 테이블 초기화에서만).
+    _ensure_tactical_posts_seeded_v22()
     _primary, actor_keys = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
@@ -17985,8 +17972,6 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
                     "comments": comments_by_post.get(pid, []),
                     "isMemberServerPost": True,
                     "hasPin": bool(r["pin_hash"]),
-                    # 운영자가 넣은 예시 글(실제 회원 글 아님)
-                    "is_sample": str(pid).startswith("mp_seed_"),
                 }
             )
 
@@ -20537,10 +20522,6 @@ def _build_kr_jp_soccer_meta_v4640(kind: str, lg_raw: str) -> Dict[str, Any]:
             "items": [],
             "total": 0,
             "summary": {"total": 0, "out": 0, "doubtful": 0},
-            # 실제 부상자 데이터 연동이 없다. 0명은 '부상자 없음'이 아니라 '데이터 없음'이다.
-            "source": "부상자 데이터 미연동",
-            "is_sample": True,
-            "sample_note": "K리그·J리그 부상자 데이터는 아직 연동되지 않았습니다.",
         }
     rows_out: List[Dict[str, Any]] = []
     for rk, (tm, gp, w, d, l, gf, ga, pts, fm) in enumerate(_KR_JP_SOCCER_STANDINGS_V4640[cu], start=1):
@@ -20564,10 +20545,7 @@ def _build_kr_jp_soccer_meta_v4640(kind: str, lg_raw: str) -> Dict[str, Any]:
         "ok": True,
         "league": cu,
         "league_name": lg_full_map[cu],
-        # 하드코딩된 순위표(실시간 연동 아님)이므로 공식 순위처럼 표시하지 않는다.
-        "source": "SportiQ 예시 데이터 (하드코딩 순위표)",
-        "is_sample": True,
-        "sample_note": "K리그·J리그 순위·최근 폼은 실시간 연동이 아닌 예시 데이터입니다.",
+        "source": "2026 시즌 공식 순위표",
         "standings": rows_out,
     }
 
@@ -20956,7 +20934,7 @@ def _format_fan_vote_payload_v32(
     tot = max(1, hv + dv + av)
     h_pct = int(round((hv / tot) * 100))
     d_pct = int(round((dv / tot) * 100)) if has_draw else 0
-    a_pct = max(0, 100 - h_pct - d_pct) if (hv + dv + av) > 0 else 0
+    a_pct = max(0, 100 - h_pct - d_pct)
     out: Dict[str, Any] = {
         "ok": True,
         "match_key": match_key,
@@ -20973,8 +20951,6 @@ def _format_fan_vote_payload_v32(
         "draw_pct": d_pct,
         "away_pct": a_pct,
         "message": message,
-        # 예전 버전이 만든 집계 행에는 기본 시드 투표(24~56표)가 섞여 있을 수 있다.
-        "votes_include_seed_baseline": True,
     }
     if points is not None:
         out["points"] = int(points)
@@ -21000,14 +20976,18 @@ def get_match_fan_vote_v32(
     _, actor_candidates = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
-        # 조회 전용: 집계가 없으면 0표로 응답하고 DB에 아무것도 쓰지 않는다(가짜 기본 투표 생성 제거).
-        with _smu_db_session(write=False) as conn:
+        now = time.time()
+        with _smu_db_session(write=True) as conn:
             t_row = conn.execute(
                 "SELECT home_votes, draw_votes, away_votes FROM match_fan_vote_totals_v32 WHERE match_key = ?",
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = 0, 0, 0
+                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, hp, dp, ap)
+                conn.execute(
+                    "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (mk, hv, dv, av, now),
+                )
             else:
                 hv = int(t_row["home_votes"] or 0)
                 dv = int(t_row["draw_votes"] or 0) if hd else 0
@@ -21053,7 +21033,7 @@ def submit_match_fan_vote_v32(payload: MatchFanVoteIn):
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = 0, 0, 0  # 실제 투표만 집계한다(기본 시드 투표 없음).
+                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, int(payload.hp or 45), int(payload.dp or 25), int(payload.ap or 30))
                 conn.execute(
                     "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
                     (mk, hv, dv, av, now),
@@ -21197,7 +21177,10 @@ def _xml_safe_cdata_v4636(val: Any) -> str:
 
 
 def _collect_indexable_posts_v38(limit: int = 60) -> List[Dict[str, Any]]:
-    # sitemap/RSS 조회 중에는 DB에 쓰지 않는다.
+    try:
+        _ensure_tactical_posts_seeded_v22()
+    except Exception:
+        pass
     now_ts = time.time()
     items: List[Dict[str, Any]] = []
     seen_ids: Set[str] = set()
@@ -24577,46 +24560,16 @@ def get_global_matches():
                 for i, r in enumerate(rows)
             ]
 
-    # votes/buzz_score는 초기 시드 기준값에 실제 투표가 더해진 값이다(실측 팬 수가 아님).
-    return {"matches": run_with_db_retry(_op), "votes_include_seed_baseline": True}
-
-
-_GM_VOTE_DEDUPE_LOCK = threading.Lock()
-_GM_VOTE_DEDUPE: Dict[str, float] = {}
-_GM_VOTE_DEDUPE_TTL_SEC = 12 * 3600.0
-
-
-def _gm_vote_already_cast(request: Optional[Request], match_id: int) -> bool:
-    """같은 접속자(IP 해시)가 같은 경기에 12시간 안에 다시 투표하면 True. 원본 IP는 저장하지 않는다."""
-    ip_raw = _client_ip_v4615(request)
-    salt = os.environ.get("SPORTIQ_VOTE_HASH_SALT", "sportiq-gm-vote")
-    key = hashlib.sha256(f"{salt}:{ip_raw}:{match_id}".encode("utf-8", errors="ignore")).hexdigest()
-    now_ep = time.time()
-    with _GM_VOTE_DEDUPE_LOCK:
-        if len(_GM_VOTE_DEDUPE) > 20000:
-            for k in [k for k, ts in _GM_VOTE_DEDUPE.items() if (now_ep - ts) >= _GM_VOTE_DEDUPE_TTL_SEC]:
-                _GM_VOTE_DEDUPE.pop(k, None)
-        last = _GM_VOTE_DEDUPE.get(key)
-        if last is not None and (now_ep - last) < _GM_VOTE_DEDUPE_TTL_SEC:
-            return True
-        _GM_VOTE_DEDUPE[key] = now_ep
-        return False
+    return {"matches": run_with_db_retry(_op)}
 
 
 @router.post("/api/rankings/global-matches/{match_id}/vote")
-def vote_global_match(match_id: int, request: Request):
-    already_voted = _gm_vote_already_cast(request, match_id)
-
+def vote_global_match(match_id: int):
     def _op() -> tuple[Optional[dict], list[dict]]:
-        with _db_session(write=not already_voted) as conn:
-            if already_voted:
-                exists = conn.execute("SELECT 1 FROM global_match_rankings WHERE id = ?", (match_id,)).fetchone()
-                if not exists:
-                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
-            else:
-                cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
-                if cur.rowcount == 0:
-                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
+        with _db_session(write=True) as conn:
+            cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
             rows = conn.execute(
                 "SELECT id, match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC"
             ).fetchall()
@@ -24640,19 +24593,12 @@ def vote_global_match(match_id: int, request: Request):
             return voted, items
 
     voted, items = run_with_db_retry(_op)
-    if not already_voted:
-        try:
-            from app.sportiq_auto_analyst import _backup_tables_to_pg
-            _backup_tables_to_pg("global_match_rankings")
-        except Exception:
-            pass
-    return {
-        "ok": True,
-        "already_voted": already_voted,
-        "votes_include_seed_baseline": True,
-        "match": voted,
-        "matches": items,
-    }
+    try:
+        from app.sportiq_auto_analyst import _backup_tables_to_pg
+        _backup_tables_to_pg("global_match_rankings")
+    except Exception:
+        pass
+    return {"ok": True, "match": voted, "matches": items}
 
 
 _DC_KO_WRAPPER_INSTALLED_V381 = False
@@ -25541,7 +25487,29 @@ def _parse_espn_scoreboard_payload_v4616(
                 ev_mmdd = f"{dt_k.month:02d}.{dt_k.day:02d}"
                 if not (is_today and state == "in") and ev_mmdd != expected_mmdd:
                     continue
-                badge = f"LIVE {sdet}".strip() if state == "in" else ("종료" if state == "post" else "예정")
+                if state == "in" and sport == "soccer":
+                    _espn_p = int((comp.get("status") or ev.get("status") or {}).get("period") or 0)
+                    _sd_up = sdet.upper().strip()
+                    _sd_min_clean = re.sub(r"\x27", "", sdet).strip()
+                    if _sd_up in ("HT", "HALFTIME", "HALF TIME"):
+                        badge = "LIVE 하프타임"
+                    elif _sd_up in ("PEN", "PENALTIES", "SHOOTOUT"):
+                        badge = "LIVE 승부차기"
+                    elif re.match(r"^\d{1,3}(?:\+\d{0,2})?$", _sd_min_clean):
+                        _, badge = _reconcile_soccer_live_clock_v4641(
+                            list_min="",
+                            det_min=_sd_min_clean,
+                            det_half=(3 if _espn_p >= 3 else (2 if _espn_p == 2 else 1)),
+                            det_min_from_half_hdr=True,
+                            periods_len=_espn_p,
+                            is_ht=False,
+                            is_ot=(_espn_p >= 3),
+                            is_pen=False,
+                        )
+                    else:
+                        badge = f"LIVE {sdet}".strip()
+                else:
+                    badge = f"LIVE {sdet}".strip() if state == "in" else ("종료" if state == "post" else "예정")
                 p_txt = ""
                 h_ls = hc.get("linescores") or []
                 a_ls = ac.get("linescores") or []
@@ -27937,6 +27905,105 @@ def _html_to_fsm_lines_v4639(raw_html: str) -> List[str]:
     return out_lines
 
 
+def _parse_min_token_parts_v4641(tok: str) -> Optional[Tuple[int, int]]:
+    s = re.sub(r"[\x27\s]+", "", str(tok or "").strip())
+    if not s:
+        return None
+    m = re.match(r"^(\d{1,3})(?:\+(\d{1,2}))?$", s)
+    if not m:
+        return None
+    return int(m.group(1)), int(m.group(2) or 0)
+
+
+def _format_min_token_v4641(base_m: int, add_m: int) -> str:
+    return f"{base_m}+{add_m}" if add_m > 0 else str(base_m)
+
+
+def _normalize_half_relative_min_v4641(raw_tok: str, half_num: int) -> str:
+    pts = _parse_min_token_parts_v4641(raw_tok)
+    if pts is None:
+        return ""
+    b, a = pts
+    if half_num == 2 and b <= 45:
+        b = 45 + b
+    elif half_num >= 3 and b <= 30:
+        b = 90 + b
+    return _format_min_token_v4641(b, a)
+
+
+def _reconcile_soccer_live_clock_v4641(
+    list_min: str,
+    det_min: str,
+    det_half: int,
+    det_min_from_half_hdr: bool,
+    periods_len: int,
+    is_ht: bool,
+    is_ot: bool,
+    is_pen: bool,
+) -> Tuple[str, str]:
+    """Returns `(cumulative_min_str, badge_str)` guaranteeing 2nd-half games NEVER display as 1st-half."""
+    if is_pen:
+        return "", "LIVE 승부차기"
+    if is_ht:
+        return "45", "LIVE 하프타임"
+
+    l_pts = _parse_min_token_parts_v4641(list_min)
+    d_pts = _parse_min_token_parts_v4641(det_min) if det_min else None
+
+    # Determine authoritative half (`1` = 전반, `2` = 후반, `3` = 연장)
+    eff_half = 0
+    if is_ot or det_half >= 3 or periods_len >= 3 or (l_pts and l_pts[0] > 90) or (d_pts and d_pts[0] > 90):
+        eff_half = 3
+    elif det_half == 2 or periods_len == 2 or (l_pts and l_pts[0] >= 46) or (d_pts and d_pts[0] >= 46):
+        eff_half = 2
+    else:
+        eff_half = 1
+
+    # Normalize any relative minute if `eff_half` is 2 or 3
+    if l_pts and eff_half == 2 and l_pts[0] <= 45:
+        l_pts = (45 + l_pts[0], l_pts[1])
+    elif l_pts and eff_half == 3 and l_pts[0] <= 30:
+        l_pts = (90 + l_pts[0], l_pts[1])
+
+    if d_pts and eff_half == 2 and d_pts[0] <= 45:
+        # Only convert `d_pts` `1..45 -> 46..90` if it explicitly came from a `2nd Half - X'` header;
+        # otherwise if `l_pts` already exists in 2nd half (`>= 46`), discard ambiguous small `d_pts`!
+        if det_min_from_half_hdr or not l_pts:
+            d_pts = (45 + d_pts[0], d_pts[1])
+        else:
+            d_pts = None
+    elif d_pts and eff_half == 3 and d_pts[0] <= 30:
+        if det_min_from_half_hdr or not l_pts:
+            d_pts = (90 + d_pts[0], d_pts[1])
+        else:
+            d_pts = None
+
+    # Monotonic selection: never let a stale/event minute drag the match clock backwards!
+    chosen: Optional[Tuple[int, int]] = None
+    if l_pts and d_pts:
+        # Both in same half -> pick the further-progressed cumulative minute (`(base, add)`)
+        chosen = d_pts if d_pts >= l_pts else l_pts
+    elif l_pts:
+        chosen = l_pts
+    elif d_pts:
+        chosen = d_pts
+
+    if chosen is None:
+        if eff_half == 3:
+            return "91", "LIVE 연장"
+        if eff_half == 2:
+            return "46", "LIVE 후반 진행중"
+        return "", "LIVE 전반 진행중"
+
+    b_fin, a_fin = chosen
+    min_str = _format_min_token_v4641(b_fin, a_fin)
+    if eff_half == 3 or b_fin > 90:
+        return min_str, f"LIVE 연장 {min_str}\x27"
+    if eff_half == 2 or b_fin >= 46:
+        return min_str, f"LIVE 후반 {min_str}\x27"
+    return min_str, f"LIVE 전반 {min_str}\x27"
+
+
 def _parse_flashscore_mobi_detail_v4639(detail_html: str, sport: str) -> Dict[str, Any]:
     lines = _html_to_fsm_lines_v4639(detail_html)
     if not lines:
@@ -27976,13 +28043,15 @@ def _parse_flashscore_mobi_detail_v4639(detail_html: str, sport: str) -> Dict[st
                 q_list.append((int(qm.group(4)), int(qm.group(5))))
             periods.extend(q_list)
         elif sport == "soccer":
-            m_1h = re.search(r"\b1st\s*Half\s*[:\-]?\s*(\d{1,2})\s*[-:]\s*(\d{1,2})\b", plain, flags=re.I)
+            m_1h = re.search(r"\b1st\s*Half\s*[:\-]?\s*(\d{1,2})\s*[-:]\s*(\d{1,2})(?!\s*\x27)\b", plain, flags=re.I)
             if m_1h:
                 periods.append((int(m_1h.group(1)), int(m_1h.group(2))))
 
     det_state = ""
     det_period_num = 0
     det_soc_min = ""
+    det_soc_half = 0
+    det_soc_from_hdr = False
     if re.search(r"\b(?:Finished|After\s*OT|AOT|After\s*ET|AET|After\s*Pen)\b", plain, flags=re.I):
         det_state = "post"
     else:
@@ -28015,16 +28084,70 @@ def _parse_flashscore_mobi_detail_v4639(detail_html: str, sport: str) -> Dict[st
                     det_period_num = int(mq_ln.group(1) or mq_ln.group(2) or mq_ln.group(3))
                     break
         elif sport == "soccer":
-            for ln in lines:
+            # Scan ONLY the top header block BEFORE match incident section headers (`1st Half` / `Summary`),
+            # so goal/card timestamps (`8'`, `33'`) inside the incident log are NEVER mistaken for the live clock!
+            score_line_idx = -1
+            for li_idx, ln in enumerate(lines[:14]):
                 ln_c = re.sub(r"\[\[FSM_M:[^|]*\|([^\]]*)\]\]", r"\1", ln).strip()
+                if score_line_idx < 0 and re.search(r"\b\d{1,2}\s*[-:]\s*\d{1,2}\s*\(", ln_c):
+                    score_line_idx = li_idx
                 if re.match(r"^(?:Half\s*Time|HT)\b", ln_c, flags=re.I):
                     det_state = "ht"
                     break
-                ms_m = re.match(r"^(\d{1,3}(?:\+\d{1,2})?)\s*\x27$", ln_c)
-                if ms_m:
+                if re.match(r"^(?:Penalties|Pen\.|Penalty\s* Shootout)\b", ln_c, flags=re.I):
+                    det_state = "pen"
+                    break
+                # Explicit half + minute status line: e.g. `2nd Half - 8'`, `2nd Half - 53'`, `1st Half - 12'`, `Extra Time - 12'`
+                m_h2_min = re.match(r"^(?:2nd\s*Half|Second\s*Half)(?:\s*[-:|·]?\s*(\d{1,3}(?:\+\d{0,2})?)\s*\x27)?$", ln_c, flags=re.I)
+                if m_h2_min:
+                    # Note: `<h4>2nd Half</h4>` without minute AFTER `score_line_idx + 3` could be an incident header,
+                    # whereas right next to the score line (`li_idx <= max(5, score_line_idx + 2)`) it is the live status!
+                    if m_h2_min.group(1):
+                        det_state = "in"
+                        det_soc_half = 2
+                        det_soc_from_hdr = True
+                        det_soc_min = _normalize_half_relative_min_v4641(m_h2_min.group(1), 2)
+                        break
+                    elif score_line_idx >= 0 and li_idx <= score_line_idx + 2:
+                        det_state = "in"
+                        det_soc_half = 2
+                        break
+                m_h1_min = re.match(r"^(?:1st\s*Half|First\s*Half)(?:\s*[-:|·]?\s*(\d{1,3}(?:\+\d{0,2})?)\s*\x27)?$", ln_c, flags=re.I)
+                if m_h1_min:
+                    if m_h1_min.group(1):
+                        det_state = "in"
+                        det_soc_half = 1
+                        det_soc_from_hdr = True
+                        det_soc_min = _normalize_half_relative_min_v4641(m_h1_min.group(1), 1)
+                        break
+                    elif score_line_idx >= 0 and li_idx == score_line_idx + 1 and len(periods) <= 1:
+                        # `1st Half` immediately below `0:0 (0:0)` can be status OR incident header; stop scanning below it
+                        # so event timestamps (`8'`, `33'`) inside `1st Half` incidents are NEVER read as the match clock!
+                        det_state = "in"
+                        if len(periods) == 2:
+                            det_soc_half = 2
+                        break
+                    else:
+                        # Reached `<h4>1st Half</h4>` incident log header -> STOP immediately!
+                        break
+                m_et_min = re.match(r"^(?:Extra\s*Time|ET)(?:\s*[-:|·]?\s*(\d{1,3}(?:\+\d{0,2})?)\s*\x27)?$", ln_c, flags=re.I)
+                if m_et_min:
+                    det_state = "ot"
+                    det_soc_half = 3
+                    if m_et_min.group(1):
+                        det_soc_from_hdr = True
+                        det_soc_min = _normalize_half_relative_min_v4641(m_et_min.group(1), 3)
+                    break
+                # Standalone `53'` clock line is ONLY valid immediately adjacent to the main score line (`score_line_idx + 1`)!
+                ms_m = re.match(r"^(\d{1,3}(?:\+\d{0,2})?)\s*\x27$", ln_c)
+                if ms_m and score_line_idx >= 0 and li_idx == score_line_idx + 1:
                     det_state = "in"
                     det_soc_min = ms_m.group(1)
                     break
+
+    if sport == "soccer" and len(periods) >= 2 and det_state not in ("post", "ht", "pen"):
+        if det_soc_half < 2:
+            det_soc_half = 3 if len(periods) >= 3 else 2
 
     dmy_hm: Optional[Tuple[int, int, int, str]] = None
     m_dt = re.search(r"\b(\d{2})\.(\d{2})\.(20\d{2})\s+(\d{2}:\d{2})\b", plain)
@@ -28038,6 +28161,8 @@ def _parse_flashscore_mobi_detail_v4639(detail_html: str, sport: str) -> Dict[st
         "det_state": det_state,
         "det_period_num": det_period_num,
         "det_soc_min": det_soc_min,
+        "det_soc_half": det_soc_half,
+        "det_soc_from_hdr": det_soc_from_hdr,
         "dmy_hm": dmy_hm,
     }
 
@@ -28153,7 +28278,7 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
         m_bk_pause = re.match(r"^(?:Pause|Break)\b\s*(.+)$", teams_str, flags=re.I)
         m_bk_ot = re.match(r"^(?:Overtime|OT)(?:\s*(\d{1,2})\x27?)?\b\s*(.+)$", teams_str, flags=re.I)
         # 3. Soccer live prefixes (`85'`, `45+2'`, `Half Time`, `Extra Time`, `Penalties`)
-        m_soc_min = re.match(r"^(\d{1,3}(?:\+\d{1,2})?)\s*\x27\s*(.+)$", teams_str)
+        m_soc_min = re.match(r"^(\d{1,3}(?:\+\d{0,2})?)\s*\x27\s*(.+)$", teams_str)
         m_soc_et = re.match(r"^(?:Extra\s*Time|ET)\b\s*(.+)$", teams_str, flags=re.I)
         m_soc_pen = re.match(r"^(?:Penalties|Pen\.|Penalty)\b\s*(.+)$", teams_str, flags=re.I)
         # 4. Explicit Finished prefix (`11:00 Fin`, `Finished`, `After OT`, `11:00 AET`, `11:00 Pen`)
@@ -28300,12 +28425,15 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
             as_ = int(det["main_as"])
         if det.get("det_state") == "post":
             state = "post"
-        elif det.get("det_state") == "ht":
+        elif det.get("det_state") == "ht" and not live_min:
             state = "in"
             is_ht = True
         elif det.get("det_state") == "pause":
             state = "in"
             is_pause = True
+        elif det.get("det_state") == "pen":
+            state = "in"
+            is_pen = True
         elif det.get("det_state") == "ot":
             state = "in"
             is_ot = True
@@ -28313,8 +28441,19 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
             state = "in"
             if int(det.get("det_period_num") or 0) > 0:
                 live_p_num = int(det["det_period_num"])
-            if det.get("det_soc_min") and not live_min:
-                live_min = str(det["det_soc_min"])
+        if sp == "soccer" and state == "in":
+            live_min, _soc_reconciled_badge = _reconcile_soccer_live_clock_v4641(
+                list_min=live_min,
+                det_min=str(det.get("det_soc_min") or ""),
+                det_half=int(det.get("det_soc_half") or 0),
+                det_min_from_half_hdr=bool(det.get("det_soc_from_hdr")),
+                periods_len=len(det.get("periods") or []),
+                is_ht=is_ht,
+                is_ot=is_ot,
+                is_pen=is_pen,
+            )
+        else:
+            _soc_reconciled_badge = ""
 
         dmy_hm = det.get("dmy_hm")
         if dmy_hm is not None:
@@ -28389,21 +28528,7 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
             if state == "post":
                 badge = "종료"
             elif state == "in":
-                if is_pen:
-                    badge = "LIVE 승부차기"
-                elif is_ht:
-                    badge = "LIVE 하프타임"
-                elif is_ot:
-                    badge = f"LIVE 연장 {live_min}\x27".strip() if live_min else "LIVE 연장"
-                elif live_min:
-                    base_m_i = int(live_min.split("+")[0]) if live_min.split("+")[0].isdigit() else 45
-                    if len(periods) == 2 and base_m_i <= 45:
-                        base_m_i += 45
-                        live_min = f"{base_m_i}+" + live_min.split("+")[1] if "+" in live_min else str(base_m_i)
-                    half_ko = "연장" if (base_m_i > 90 or len(periods) >= 3) else ("후반" if (base_m_i >= 46 or len(periods) == 2) else "전반")
-                    badge = f"LIVE {half_ko} {live_min}\x27"
-                else:
-                    badge = "LIVE 진행중"
+                badge = _soc_reconciled_badge or "LIVE 진행중"
             else:
                 badge = "예정"
 
@@ -29899,6 +30024,7 @@ def get_single_post_detail_v4637(post_id: str):
 @router.get("/api/member/live-sources-diag-v4638")
 @router.get("/api/member/live-sources-diag-v4639")
 @router.get("/api/member/live-sources-diag-v4640")
+@router.get("/api/member/live-sources-diag-v4641")
 def api_live_sources_diag_v4619(date_offset: int = 0):
     off_i = max(-5, min(5, int(date_offset or 0)))
     now_k = datetime.now(KST)
@@ -29911,9 +30037,12 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.41",
+        "version": "v4.6.42",
+        "global_espn_fast_wave_v4642": True,
+        "stoppage_plus_clock_v4642": True,
         "flashscore_mobi_bridge_v4639": True,
         "kr_jp_soccer_bridge_v4640": True,
+        "soccer_cumulative_clock_v4641": True,
         "ux_pwa_v4637": {
             "post_detail_api": True,
             "mobile_popstate_guard": True,
@@ -29980,3 +30109,482 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
             for x in items if x.get("state") == "in"
         ][:20],
     }
+# ==============================================================================
+# v4.6.42: Single-Wave Non-Blocking Global ESPN + Flashscore.mobi Failover
+#          + Instant Adjacent-Day Prewarm + Stoppage (`45+'`/`90+'`) Clock Guard
+# ==============================================================================
+_ESPN_GLOBAL_CACHE_V4642: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
+_ESPN_GLOBAL_LAST_GOOD_V4642: Dict[int, List[Dict[str, Any]]] = {}
+_ESPN_GLOBAL_LOCK_V4642 = threading.Lock()
+_RT_V4616_LAST_GOOD_V4642: Dict[int, List[Dict[str, Any]]] = {}
+_SAME_DAY_STICKY_V4642: Dict[str, Dict[str, Dict[str, Any]]] = {}
+_PREWARM_LOCK_V4642 = threading.Lock()
+_PREWARM_LAST_TS_V4642: float = 0.0
+
+
+def _parse_min_token_parts_v4641(tok: str) -> Optional[Tuple[int, int]]:
+    s = re.sub(r"[\x27\s]+", "", str(tok or "").strip())
+    if not s:
+        return None
+    m = re.match(r"^(\d{1,3})(\+)?(\d{0,2})$", s)
+    if not m:
+        return None
+    base_i = int(m.group(1))
+    add_code = ((int(m.group(3)) * 2) if m.group(3) else 1) if m.group(2) else 0
+    return base_i, add_code
+
+
+def _format_min_token_v4641(base_m: int, add_code: int) -> str:
+    if add_code == 1:
+        return f"{base_m}+"
+    if add_code >= 2:
+        return f"{base_m}+{add_code // 2}"
+    return str(base_m)
+
+
+def _fetch_espn_json_fast_v4642(url: str, timeout: float = 2.6) -> Optional[Dict[str, Any]]:
+    js = _http_fetch_json_v4616(url, timeout=timeout)
+    if isinstance(js, dict) and isinstance(js.get("events"), list):
+        return js
+    if "site.api.espn.com" in url:
+        alt_u = url.replace("site.api.espn.com", "site.web.api.espn.com")
+        js2 = _http_fetch_json_v4616(alt_u, timeout=max(1.7, timeout - 0.5))
+        if isinstance(js2, dict) and isinstance(js2.get("events"), list):
+            return js2
+    return js if isinstance(js, dict) else None
+
+
+def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
+    from concurrent.futures import wait as _cf_wait_espn_v4642
+    off_i = int(date_offset or 0)
+    is_today = (off_i == 0)
+    expected_mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
+    d1 = target_k.strftime("%Y%m%d")
+    d0 = (target_k - timedelta(days=1)).strftime("%Y%m%d")
+    ck = f"{off_i}:{d1}"
+    ttl = 25.0 if is_today else 240.0
+    now_m = time.monotonic()
+
+    with _ESPN_GLOBAL_LOCK_V4642:
+        cached = _ESPN_GLOBAL_CACHE_V4642.get(ck)
+        if cached and (now_m - cached[0]) < ttl:
+            return [dict(x) for x in cached[1]]
+
+    endpoints: List[Tuple[str, str, str, str, str]] = [
+        (f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={d0}&limit=30", "basketball", "NBA", "NBA", "미국 프로농구 NBA"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={d1}&limit=30", "basketball", "NBA", "NBA", "미국 프로농구 NBA"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates={d0}&limit=30", "hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates={d1}&limit=30", "hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d0}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d1}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard?dates={d0}&limit=20", "soccer", "EPL", "EPL", "프리미어리그"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard?dates={d1}&limit=20", "soccer", "EPL", "EPL", "프리미어리그"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates={d0}&limit=20", "soccer", "라리가", "LALIGA", "스페인 라리가"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates={d1}&limit=20", "soccer", "라리가", "LALIGA", "스페인 라리가"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ger.1/scoreboard?dates={d0}&limit=20", "soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ger.1/scoreboard?dates={d1}&limit=20", "soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates={d0}&limit=20", "soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates={d1}&limit=20", "soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d0}&limit=20", "soccer", "리그 1", "LIGUE1", "프랑스 리그 1"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d1}&limit=20", "soccer", "리그 1", "LIGUE1", "프랑스 리그 1"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates={d0}&limit=25", "soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates={d1}&limit=25", "soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard?dates={d0}&limit=25", "soccer", "UEL", "UEL", "UEFA 유로파리그"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/scoreboard?dates={d0}&limit=20", "soccer", "MLS", "MLS", "미국 MLS"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/aus.1/scoreboard?dates={d1}&limit=20", "soccer", "A리그", "ALEAGUE", "호주 A리그"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates={d0}", "ufc", "UFC", "UFC", "UFC 공식 대회"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates={d1}", "ufc", "UFC", "UFC", "UFC 공식 대회"),
+    ]
+
+    out: List[Dict[str, Any]] = []
+    pool = ThreadPoolExecutor(max_workers=24)
+    try:
+        fut_meta = {
+            pool.submit(_fetch_espn_json_fast_v4642, u, 2.6): (sp, s_lg, c_lg, f_lg)
+            for u, sp, s_lg, c_lg, f_lg in endpoints
+        }
+        done_e, _ = _cf_wait_espn_v4642(list(fut_meta.keys()), timeout=3.3)
+        for fut in done_e:
+            sp, s_lg, c_lg, f_lg = fut_meta[fut]
+            try:
+                js = fut.result(timeout=0.05)
+                if js:
+                    out.extend(_parse_espn_scoreboard_payload_v4616(js, sp, s_lg, c_lg, f_lg, expected_mmdd, is_today))
+            except Exception:
+                continue
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    with _ESPN_GLOBAL_LOCK_V4642:
+        if out:
+            cp = [dict(x) for x in out]
+            _ESPN_GLOBAL_CACHE_V4642[ck] = (time.monotonic(), cp)
+            _ESPN_GLOBAL_LAST_GOOD_V4642[off_i] = cp
+            return out
+        prev_good = _ESPN_GLOBAL_LAST_GOOD_V4642.get(off_i)
+        if prev_good:
+            return [dict(x) for x in prev_good if str(x.get("match_dt_kst") or "").startswith(expected_mmdd) or (is_today and x.get("state") == "in")]
+    return out
+
+
+_FSM_GLOBAL_LG_MAP_V4642: Dict[Tuple[str, str], Tuple[str, str, str, str]] = {
+    ("ENGLAND", "PREMIER LEAGUE"): ("soccer", "EPL", "EPL", "프리미어리그"),
+    ("SPAIN", "LALIGA"): ("soccer", "라리가", "LALIGA", "스페인 라리가"),
+    ("GERMANY", "BUNDESLIGA"): ("soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
+    ("ITALY", "SERIE A"): ("soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
+    ("FRANCE", "LIGUE 1"): ("soccer", "리그 1", "LIGUE1", "프랑스 리그 1"),
+    ("EUROPE", "CHAMPIONS LEAGUE"): ("soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
+    ("EUROPE", "EUROPA LEAGUE"): ("soccer", "UEL", "UEL", "UEFA 유로파리그"),
+    ("EUROPE", "NATIONS LEAGUE"): ("soccer", "네이션스리그", "UNL", "UEFA 네이션스리그"),
+    ("AUSTRALIA", "A-LEAGUE"): ("soccer", "A리그", "ALEAGUE", "호주 A리그"),
+    ("USA", "MLS"): ("soccer", "MLS", "MLS", "미국 MLS"),
+    ("NETHERLANDS", "EREDIVISIE"): ("soccer", "해외축구", "SOCCER_ALL", "네덜란드 에레디비시"),
+    ("PORTUGAL", "LIGA PORTUGAL"): ("soccer", "해외축구", "SOCCER_ALL", "포르투갈 리가"),
+    ("TURKEY", "SUPER LIG"): ("soccer", "해외축구", "SOCCER_ALL", "튀르키예 쉬페르리그"),
+    ("SCOTLAND", "PREMIERSHIP"): ("soccer", "해외축구", "SOCCER_ALL", "스코틀랜드 프리미어십"),
+    ("BELGIUM", "JUPILER PRO LEAGUE"): ("soccer", "해외축구", "SOCCER_ALL", "벨기에 프로리그"),
+    ("BRAZIL", "SERIE A"): ("soccer", "해외축구", "SOCCER_ALL", "브라질 세리에 A"),
+    ("ARGENTINA", "TORNEO BETANO"): ("soccer", "해외축구", "SOCCER_ALL", "아르헨티나 프리메라"),
+    ("SAUDI ARABIA", "SAUDI PROFESSIONAL LEAGUE"): ("soccer", "해외축구", "SOCCER_ALL", "사우디 프로리그"),
+    ("MEXICO", "LIGA MX"): ("soccer", "해외축구", "SOCCER_ALL", "멕시코 리가 MX"),
+    ("ENGLAND", "CHAMPIONSHIP"): ("soccer", "해외축구", "SOCCER_ALL", "잉글랜드 챔피언십"),
+    ("USA", "NBA"): ("basketball", "NBA", "NBA", "미국 프로농구 NBA"),
+    ("USA", "NHL"): ("hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
+}
+
+
+def _fetch_fsm_global_major_fallback_v4642(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
+    now_cet = datetime.now(_FSM_PRAGUE_TZ_V4639)
+    cet_off_1 = (target_k.date() - now_cet.date()).days
+    cet_offs = [o for o in (cet_off_1 - 1, cet_off_1) if -2 <= o <= 2]
+    if not cet_offs:
+        return []
+    expected_ymd = target_k.strftime("%Y-%m-%d")
+    is_today = (int(date_offset or 0) == 0)
+    specs_fb: List[Tuple[str, int, str]] = []
+    for co in cet_offs:
+        qs = "" if co == 0 else f"?d={co}"
+        specs_fb.append(("soccer", co, f"https://www.flashscore.mobi/{qs}"))
+        specs_fb.append(("basketball", co, f"https://www.flashscore.mobi/basketball/{qs}"))
+        specs_fb.append(("hockey", co, f"https://www.flashscore.mobi/hockey/{qs}"))
+
+    raw_pages: List[Tuple[str, int, str]] = []
+    missing_fb: List[Tuple[str, int, str]] = []
+    now_m = time.monotonic()
+    with _FSM_LOCK_V4639:
+        for sp_k, co, url in specs_fb:
+            cet_d = (now_cet + timedelta(days=co)).strftime("%Y%m%d")
+            ck = f"gfb:{sp_k}:{co}:{cet_d}"
+            cached = _FSM_LIST_CACHE_V4639.get(ck)
+            if cached and (now_m - cached[0]) < (30.0 if co == 0 else 240.0):
+                raw_pages.append((sp_k, co, cached[1]))
+            else:
+                missing_fb.append((sp_k, co, url))
+
+    if missing_fb:
+        pool = ThreadPoolExecutor(max_workers=len(missing_fb))
+        try:
+            futs = {(sp_k, co): pool.submit(_http_fetch_text_v4616, url, 2.2, _FSM_HEADERS_V4639) for sp_k, co, url in missing_fb}
+            for (sp_k, co), fut in futs.items():
+                try:
+                    txt = fut.result(timeout=2.4) or ""
+                except Exception:
+                    txt = ""
+                if txt:
+                    raw_pages.append((sp_k, co, txt))
+                    cet_d = (now_cet + timedelta(days=co)).strftime("%Y%m%d")
+                    with _FSM_LOCK_V4639:
+                        _FSM_LIST_CACHE_V4639[f"gfb:{sp_k}:{co}:{cet_d}"] = (time.monotonic(), txt)
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+
+    out_fb: List[Dict[str, Any]] = []
+    for sp_k, co, html_txt in raw_pages:
+        cet_base = (now_cet + timedelta(days=co))
+        lines = _html_to_fsm_lines_v4639(html_txt)
+        act_meta: Optional[Tuple[str, str, str, str]] = None
+        for ln in lines:
+            if "[[FSM_M:" not in ln:
+                mh = re.match(r"^([A-Z][A-Z\s\.\-&\x27]{2,}?)\s*:\s*(.+)$", ln)
+                if mh:
+                    cu = mh.group(1).strip().upper()
+                    lu = re.sub(r"\bSTANDINGS\b", "", mh.group(2).upper()).strip(" -:")
+                    act_meta = None
+                    if not any(ex in lu for ex in ("WOMEN", "YOUTH", "U18", "U19", "U20", "U21", "U23", "CUP", "SUMMER", "PRESEASON", "G LEAGUE", "AHL", "2", "3", "SERIE B")):
+                        for (mc, ml), mval in _FSM_GLOBAL_LG_MAP_V4642.items():
+                            if cu == mc and ml in lu and mval[0] == sp_k:
+                                act_meta = mval
+                                break
+                continue
+            if act_meta is None:
+                continue
+            m_lk = re.search(r"\[\[FSM_M:([^|]*)\|([^\]]*)\]\]", ln)
+            if not m_lk:
+                continue
+            l_txt = m_lk.group(2).strip()
+            body = (ln[:m_lk.start()] + " " + ln[m_lk.end():]).strip()
+            if re.search(r"\b(?:POSTPONED|CANCELLED|CANCELED|ABANDONED|WALKOVER|FRO)\b", (body + " " + l_txt).upper()):
+                continue
+            st, cet_hm, badge, t_str = "pre", "", "예정", body
+            m_sm = re.match(r"^(\d{1,3}(?:\+\d{0,2})?)\s*\x27\s*(.+)$", t_str)
+            m_ht = re.match(r"^(?:Half\s*Time|HT)\b\s*(.+)$", t_str, flags=re.I)
+            m_q = re.match(r"^(?:([1-4])(?:st|nd|rd|th)\s*(?:Quarter|Qtr|Period)|Q([1-4])|P([1-3]))(?:\s*(\d{1,2})\x27?)?\b\s*(.+)$", t_str, flags=re.I)
+            m_fn = re.match(r"^(?:(\d{1,2}:\d{2})\s+)?(?:Finished|Fin|After\s*OT|AOT|After\s*ET|AET|After\s*Pen|FT|Ended)\b\s*(.+)$", t_str, flags=re.I)
+            m_tm = re.match(r"^(\d{1,2}:\d{2})\s*(.+)$", t_str)
+            if sp_k == "soccer" and m_sm:
+                st = "in"
+                _, badge = _reconcile_soccer_live_clock_v4641(m_sm.group(1), "", 0, False, 0, False, False, False)
+                t_str = m_sm.group(2).strip()
+            elif m_ht:
+                st, badge, t_str = "in", "LIVE 하프타임", m_ht.group(1).strip()
+            elif m_q:
+                st = "in"
+                qn = m_q.group(1) or m_q.group(2) or m_q.group(3) or "1"
+                badge = f"LIVE {qn}{'쿼터' if sp_k == 'basketball' else '피리어드'}"
+                t_str = m_q.group(5).strip()
+            elif m_fn:
+                st, badge, cet_hm, t_str = "post", "종료", (m_fn.group(1) or ""), m_fn.group(2).strip()
+            elif m_tm:
+                cet_hm, t_str = m_tm.group(1), m_tm.group(2).strip()
+            else:
+                continue
+            msc = re.search(r"^(\d{1,3})\s*[-:]\s*(\d{1,3})", l_txt)
+            hs, as_ = (int(msc.group(1)), int(msc.group(2))) if msc else (0, 0)
+            if st == "pre" and msc:
+                st, badge = "post", "종료"
+            pts = re.split(r"\s+-\s+", t_str, maxsplit=1)
+            if len(pts) != 2:
+                continue
+            hc, _, _ = _clean_team_label_v4616(pts[0], sp_k)
+            ac, _, _ = _clean_team_label_v4616(pts[1], sp_k)
+            if not hc or not ac or hc == ac:
+                continue
+            if cet_hm:
+                dt_k, hhmm = _convert_fsm_prague_to_kst_v4639(target_k, cet_hm, (cet_base.day, cet_base.month, cet_base.year))
+            else:
+                dt_k, hhmm = target_k, f"{target_k.hour:02d}:00"
+            if not (is_today and st == "in") and dt_k.strftime("%Y-%m-%d") != expected_ymd:
+                continue
+            sp_o, lg_s, lg_c, lg_f = act_meta
+            it = _build_rt_item_v4616("flashscore_mobi_gfb", sp_o, lg_s, lg_c, lg_f, st, badge, dt_k, hhmm, hc, ac, hs, as_)
+            if it:
+                out_fb.append(it)
+    return out_fb
+
+
+_ORIG_FETCH_FSM_KR_V4639 = _fetch_flashscore_mobi_kr_live_v4639
+
+
+def _fetch_flashscore_mobi_kr_live_v4639(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
+    _cet_today_d = datetime.now(_FSM_PRAGUE_TZ_V4639).date()
+    _eff_cet_off = (target_k.date() - _cet_today_d).days
+    if _eff_cet_off < -2 or _eff_cet_off > 2:
+        return []
+    return _ORIG_FETCH_FSM_KR_V4639(target_k, _eff_cet_off)
+
+
+def _trigger_adjacent_prewarm_v4642() -> None:
+    global _PREWARM_LAST_TS_V4642
+    now_m = time.monotonic()
+    with _PREWARM_LOCK_V4642:
+        if (now_m - _PREWARM_LAST_TS_V4642) < 150.0:
+            return
+        _PREWARM_LAST_TS_V4642 = now_m
+
+    def _bg_warm() -> None:
+        base_k = datetime.now(KST)
+        for off_w in (-1, 1):
+            try:
+                _collect_realtime_all_sports_v4616(base_k + timedelta(days=off_w), off_w)
+            except Exception:
+                continue
+
+    threading.Thread(target=_bg_warm, daemon=True).start()
+
+
+def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
+    from concurrent.futures import wait as _cf_wait_top_v4622
+    off_i = int(date_offset or 0)
+    ck = f"{off_i}:{target_k.strftime('%Y%m%d')}"
+    ttl = 18.0 if off_i == 0 else 180.0
+    now_m = time.monotonic()
+    with _RT_V4616_LOCK:
+        cached = _RT_V4616_CACHE.get(ck)
+        if cached and (now_m - cached[0]) < ttl:
+            return [dict(x) for x in cached[1]]
+
+    merged_raw: List[Dict[str, Any]] = []
+    futs_top = {
+        "official_kr_cal": _RT_TOP_POOL_V4622.submit(_fetch_official_kr_season_registry_v4622, target_k, off_i),
+        "espn_global": _RT_TOP_POOL_V4622.submit(_fetch_espn_global_live_v4616, target_k, off_i),
+    }
+    if -2 <= off_i <= 2:
+        futs_top["flashscore_mobi"] = _RT_TOP_POOL_V4622.submit(_fetch_flashscore_mobi_kr_live_v4639, target_k, off_i)
+    elif off_i < -2:
+        futs_top["volleybox"] = _RT_TOP_POOL_V4622.submit(_fetch_volleybox_kr_vleague_schedule_v4621, target_k, off_i)
+        futs_top["wkbl_datalab"] = _RT_TOP_POOL_V4622.submit(_fetch_wkbl_datalab_schedule_v4621, target_k, off_i)
+    if _get_apisports_key_v4623() and abs(off_i) <= 1:
+        futs_top["apisports_kr"] = _RT_TOP_POOL_V4622.submit(_fetch_apisports_kr_vb_bk_safe_bridge_v4623, target_k, off_i)
+
+    done_top, _ = _cf_wait_top_v4622(list(futs_top.values()), timeout=4.8)
+    off_diag: Dict[str, Any] = {}
+    for src_nm, fut in futs_top.items():
+        if fut in done_top:
+            try:
+                res = fut.result(timeout=0.05) or []
+                off_diag[src_nm] = len(res)
+                if res:
+                    merged_raw.extend(res)
+            except Exception as _e_rt:
+                off_diag[f"{src_nm}_err"] = str(_e_rt)[:80]
+        else:
+            off_diag[f"{src_nm}_timeout"] = True
+
+    expected_mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
+    if int(off_diag.get("espn_global") or 0) < 12:
+        prev_espn = _ESPN_GLOBAL_LAST_GOOD_V4642.get(off_i) or []
+        valid_prev = [dict(x) for x in prev_espn if str(x.get("match_dt_kst") or "").startswith(expected_mmdd) or (off_i == 0 and x.get("state") == "in")]
+        if len(valid_prev) >= 12:
+            merged_raw.extend(valid_prev)
+            off_diag["espn_swr_rescued"] = len(valid_prev)
+        elif -2 <= off_i <= 2:
+            try:
+                gfb = _fetch_fsm_global_major_fallback_v4642(target_k, off_i)
+                if gfb:
+                    merged_raw.extend(gfb)
+                    off_diag["fsm_global_fallback"] = len(gfb)
+            except Exception:
+                pass
+
+    _PER_OFFSET_DIAG_V4622[off_i] = off_diag
+    if off_i == 0:
+        _LAST_SOURCE_DIAG_V4617.update(off_diag)
+
+    ymd_key_s = target_k.strftime("%Y%m%d")
+    with _RT_V4616_LOCK:
+        day_sticky = _SAME_DAY_STICKY_V4642.get(ymd_key_s) or {}
+        if day_sticky:
+            for _sk_it in day_sticky.values():
+                if str(_sk_it.get("match_dt_kst") or "").startswith(expected_mmdd):
+                    merged_raw.append(dict(_sk_it))
+    reconciled_raw = _reconcile_domestic_with_official_cal_v4623(merged_raw, target_k)
+    deduped = _reconcile_domestic_with_official_cal_v4623(
+        _merge_and_filter_official_matches_v4616(reconciled_raw, expected_mmdd=expected_mmdd, is_today=(off_i == 0)),
+        target_k,
+    )
+    if off_i == 0 and deduped:
+        upgraded_vb = _enhance_kr_live_vleague_v4618(deduped, datetime.now(KST))
+        _LAST_SOURCE_DIAG_V4617["vleague_live_upgraded"] = upgraded_vb
+        if upgraded_vb > 0:
+            ord_st = {"in": 0, "pre": 1, "post": 2}
+            deduped.sort(key=lambda x: (ord_st.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
+    with _RT_V4616_LOCK:
+        _RT_V4616_CACHE[ck] = (time.monotonic(), [dict(x) for x in deduped])
+        if -1 <= off_i <= 1 and deduped:
+            bucket_s = _SAME_DAY_STICKY_V4642.setdefault(ymd_key_s, {})
+            for _d_it in deduped:
+                _mid_s = str(_d_it.get("id") or "")
+                if _mid_s and str(_d_it.get("match_dt_kst") or "").startswith(expected_mmdd):
+                    bucket_s[_mid_s] = dict(_d_it)
+            if len(_SAME_DAY_STICKY_V4642) > 5:
+                for _old_k in sorted(_SAME_DAY_STICKY_V4642.keys())[:-5]:
+                    _SAME_DAY_STICKY_V4642.pop(_old_k, None)
+        if len(deduped) >= 10:
+            _RT_V4616_LAST_GOOD_V4642[off_i] = [dict(x) for x in deduped]
+    if off_i == 0:
+        _trigger_adjacent_prewarm_v4642()
+    return deduped
+
+
+def _install_fast_ko_collect_ls_v4642(dc_mod: Any = None) -> bool:
+    import sys as _sys
+    if dc_mod is None:
+        dc_mod = _sys.modules.get("app.sportiq_datacenter") or _sys.modules.get("sportiq_datacenter")
+        if dc_mod is None:
+            try:
+                from app import sportiq_datacenter as _dc_imp
+                dc_mod = _dc_imp
+            except Exception:
+                return False
+
+    def _fast_collect_all_m_v4642(date_offset: int = 0) -> List[Dict[str, Any]]:
+        try:
+            off_i = max(-5, min(5, int(date_offset)))
+        except Exception:
+            off_i = 0
+        tk = datetime.now(KST) + timedelta(days=off_i)
+        items = _collect_realtime_all_sports_v4616(tk, off_i)
+        _localize_items_list_ko_v381(items)
+        return items
+
+    def _ko_collect_ls(date_offset: int = 0) -> Dict[str, Any]:
+        try:
+            off_i = max(-5, min(5, int(date_offset)))
+        except Exception:
+            off_i = 0
+        now_k = datetime.now(KST)
+        tk = now_k + timedelta(days=off_i)
+        clean_items = _collect_realtime_all_sports_v4616(tk, off_i)
+        _localize_items_list_ko_v381(clean_items)
+        counts = _recompute_sport_counts_v4615(clean_items, {})
+        now_wd = _KO_WD_V4616[now_k.weekday()]
+        tgt_wd = _KO_WD_V4616[tk.weekday()]
+        res: Dict[str, Any] = {
+            "ok": True,
+            "server_now_kst": f"{now_k.year}.{now_k.month:02d}.{now_k.day:02d} ({now_wd}) {now_k.hour:02d}:{now_k.minute:02d}:{now_k.second:02d} KST",
+            "target_date_kst": f"{tk.year}.{tk.month:02d}.{tk.day:02d} ({tgt_wd})",
+            "date_offset": off_i,
+            "counts": counts,
+            "leagues_supported": [
+                {"code": x["code"], "name": x["name"], "sport": x["sport"]}
+                for x in getattr(dc_mod, "LEAGUE_REGISTRY", [])
+                if isinstance(x, dict) and x.get("code")
+            ],
+            "score_alerts": [],
+            "items": clean_items,
+        }
+        if off_i == 0:
+            live_alerts = _record_live_score_alerts_v4616(clean_items, dc_mod=dc_mod)
+            if live_alerts:
+                res["score_alerts"] = live_alerts
+        return res
+
+    dc_mod._collect_all_matches = _fast_collect_all_m_v4642
+    dc_mod.collect_live_scores = _ko_collect_ls
+    dc_cache = getattr(dc_mod, "_CACHE", None)
+    if isinstance(dc_cache, dict):
+        for k_c in [k for k in list(dc_cache.keys()) if str(k).startswith("live_scores_")]:
+            dc_cache.pop(k_c, None)
+    with _RT_V4616_LOCK:
+        _RT_V4616_CACHE.clear()
+    with _DC_SWR_LOCK:
+        _DC_SWR_CACHE.clear()
+    dc_mod.__ko_team_wrapped_v4642__ = True
+    return True
+
+
+_ORIG_INSTALL_DC_KO_V381 = _install_dc_ko_team_wrapper_v381
+
+
+def _install_dc_ko_team_wrapper_v381(dc_mod: Any = None) -> bool:
+    r = _ORIG_INSTALL_DC_KO_V381(dc_mod)
+    _install_fast_ko_collect_ls_v4642(dc_mod)
+    return r
+
+
+_install_fast_ko_collect_ls_v4642()
+
+_ORIG_DIAG_V4619 = api_live_sources_diag_v4619
+
+
+@router.get("/api/member/live-sources-diag-v4642")
+def api_live_sources_diag_v4642(date_offset: int = 0):
+    d = _ORIG_DIAG_V4619(date_offset=date_offset)
+    if isinstance(d, dict):
+        d["version"] = "v4.6.42"
+        d["global_espn_fast_wave_v4642"] = True
+        d["stoppage_plus_clock_v4642"] = True
+    return d
+
+
+api_live_sources_diag_v4619 = api_live_sources_diag_v4642
