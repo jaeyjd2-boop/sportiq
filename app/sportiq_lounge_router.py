@@ -7280,7 +7280,7 @@ _FRONTEND_V22_JS = r'''
     var targetOff = (typeof forceOffset === "number" && !isNaN(forceOffset))
       ? forceOffset
       : (v30ScoreState.selectedDateOffset || 0);
-    if (v30ScoreState.loadedDateOffset === targetOff && v30ScoreState.rawAllItems.length > 0) {
+    if (v30ScoreState.loadedDateOffset === targetOff && (v30ScoreState.rawAllItems.length > 0 || (v30ScoreState.emptyLoadedTsV4644 && (Date.now() - v30ScoreState.emptyLoadedTsV4644) < 20000))) {
       v30ScoreState.isLoadingDate = false;
       return;
     }
@@ -7346,7 +7346,15 @@ _FRONTEND_V22_JS = r'''
       v30ScoreState.isLoadingDate = false;
       if (combined.length > 0 || (sbRes && sbRes.ok)) {
         v30ScoreState.loadedDateOffset = targetOff;
-        mergeRawScoreItemsV30(combined, Boolean(v30ScoreState.customDateRendered || (sbRes && sbRes.ok && combined.length > 0)));
+        v30ScoreState.emptyLoadedTsV4644 = (combined.length === 0) ? Date.now() : 0;
+        if (!window.__sqInMemApplyV4644) {
+          window.__sqInMemApplyV4644 = true;
+          try {
+            mergeRawScoreItemsV30(combined, Boolean(v30ScoreState.customDateRendered || (sbRes && sbRes.ok)));
+          } finally {
+            window.__sqInMemApplyV4644 = false;
+          }
+        }
       }
     }).catch(function () {
       v30ScoreState.fetchingOffset = null;
@@ -30639,7 +30647,7 @@ _ORIG_DIAG_V4619 = api_live_sources_diag_v4619
 def api_live_sources_diag_v4643(date_offset: int = 0):
     d = _ORIG_DIAG_V4619(date_offset=date_offset)
     if isinstance(d, dict):
-        d["version"] = "v4.6.43"
+        d["version"] = "v4.6.44"
         d["zero_502_shared_pool_v4643"] = True
         d["global_espn_fast_wave_v4642"] = True
         d["stoppage_plus_clock_v4642"] = True
