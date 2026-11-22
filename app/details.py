@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 from app.db import engine
+from app.match_status import with_stale_flag
 
 router = APIRouter(prefix="/v1/matches", tags=["analysis"])
 
@@ -27,7 +28,7 @@ def analysis(match_id: int):
             else: l+=1
         played=w+d+l
         return {"played":played,"wins":w,"draws":d,"losses":l,"goals_for":gf,"goals_against":ga,"points_per_game":round((3*w+d)/played,2) if played else None}
-    return {"match":dict(m),"home":{"recent":[dict(x) for x in home],"form":form(home,m["home_team_id"])},"away":{"recent":[dict(x) for x in away],"form":form(away,m["away_team_id"])},"head_to_head":[dict(x) for x in h2h],"live_statistics":[dict(x) for x in stats],"events":[dict(x) for x in events],"statistics_available":bool(stats),"note":"Only stored data is shown; unavailable statistics are not estimated."}
+    return {"match":with_stale_flag(m),"home":{"recent":[dict(x) for x in home],"form":form(home,m["home_team_id"])},"away":{"recent":[dict(x) for x in away],"form":form(away,m["away_team_id"])},"head_to_head":[dict(x) for x in h2h],"live_statistics":[dict(x) for x in stats],"events":[dict(x) for x in events],"statistics_available":bool(stats),"note":"Only stored data is shown; unavailable statistics are not estimated."}
 
 
 @router.get("/{match_id}/forecast")
