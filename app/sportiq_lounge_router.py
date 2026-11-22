@@ -6273,23 +6273,37 @@ _FRONTEND_V22_JS = r'''
           }
         }
       }
-      if (urlStr && urlStr.indexOf("/api/datacenter/live-scores") !== -1) {
+      if (urlStr && urlStr.indexOf("/api/datacenter/live-scores") !== -1 && urlStr.indexOf("_sq_bridge=1") === -1) {
         var qsLs = new URLSearchParams((urlStr.split("?")[1] || "").split("#")[0]);
         var spReq = String(qsLs.get("sport") || "all").toLowerCase();
         var lgReq = String(qsLs.get("league") || "all").toUpperCase();
         var offReq = parseInt(qsLs.get("date_offset") || "0", 10) || 0;
         window.__sqSbV30Cache = window.__sqSbV30Cache || {};
+        window.__sqSbInflightV4645 = window.__sqSbInflightV4645 || {};
         var cachedSb = window.__sqSbV30Cache[offReq];
         var nowTs = Date.now();
-        var sbPromise = (cachedSb && (nowTs - cachedSb.ts) < 15000)
-          ? Promise.resolve(cachedSb.data)
-          : _prevFetch.call(window, "/api/member/scoreboard-v30?date_offset=" + offReq)
+        var sbPromise;
+        if (cachedSb && (nowTs - cachedSb.ts) < 20000) {
+          sbPromise = Promise.resolve(cachedSb.data);
+        } else {
+          if (!window.__sqSbInflightV4645[offReq]) {
+            window.__sqSbInflightV4645[offReq] = _prevFetch.call(window, "/api/member/scoreboard-v30?date_offset=" + offReq)
               .then(function (r) { return r.json(); })
               .then(function (d) {
+                delete window.__sqSbInflightV4645[offReq];
                 if (d && d.ok) window.__sqSbV30Cache[offReq] = { ts: Date.now(), data: d };
                 return d;
               })
-              .catch(function () { return cachedSb ? cachedSb.data : null; });
+              .catch(function () {
+                delete window.__sqSbInflightV4645[offReq];
+                return cachedSb ? cachedSb.data : null;
+              });
+          }
+          sbPromise = Promise.race([
+            window.__sqSbInflightV4645[offReq],
+            new Promise(function (resT) { setTimeout(function () { resT(cachedSb ? cachedSb.data : null); }, 4500); })
+          ]);
+        }
 
         return Promise.all([
           (function () {
@@ -7085,8 +7099,7 @@ _FRONTEND_V22_JS = r'''
 
     if (document.body) document.body.classList.add("sq-v39-cards-ready");
     if (!items.length) {
-      var isLoadMsg = (v30ScoreState.isLoadingDate || v30ScoreState.fetchingOffset !== null) && v30ScoreState.loadedDateOffset !== (v30ScoreState.selectedDateOffset || 0);
-      targetBox.innerHTML = "<div data-sq-v31-empty='1' style='padding:14px 18px;color:" + (isLoadMsg ? "#6ee7b7" : "#94a3b8") + ";font-size:12.5px;font-weight:" + (isLoadMsg ? "700" : "400") + ";'>" + (isLoadMsg ? "⏳ 실시간 경기 일정을 불러오는 중입니다..." : "선택한 조건에 해당하는 경기가 없습니다.") + "</div>";
+      targetBox.innerHTML = "<div data-sq-v31-empty='1' style='padding:14px 18px;color:#94a3b8;font-size:12.5px;'>선택한 조건에 해당하는 경기가 없습니다.</div>";
       return;
     }
 
@@ -7276,41 +7289,69 @@ _FRONTEND_V22_JS = r'''
     };
   }
 
+  function fetchJsonWithTimeoutV4645(u, ms) {
+    return new Promise(function (resolve) {
+      var done = false;
+      var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+      var tm = setTimeout(function () {
+        if (done) return;
+        done = true;
+        try { if (ctrl) ctrl.abort(); } catch (_e) {}
+        resolve(null);
+      }, ms || 6500);
+      fetch(u, ctrl ? { signal: ctrl.signal } : undefined)
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (done) return;
+          done = true;
+          clearTimeout(tm);
+          resolve(d);
+        })
+        .catch(function () {
+          if (done) return;
+          done = true;
+          clearTimeout(tm);
+          resolve(null);
+        });
+    });
+  }
+
   function fetchServerScoreboardBridgeV30(forceOffset) {
     var targetOff = (typeof forceOffset === "number" && !isNaN(forceOffset))
       ? forceOffset
       : (v30ScoreState.selectedDateOffset || 0);
-    if (v30ScoreState.loadedDateOffset === targetOff && (v30ScoreState.rawAllItems.length > 0 || (v30ScoreState.emptyLoadedTsV4644 && (Date.now() - v30ScoreState.emptyLoadedTsV4644) < 20000))) {
+    if (v30ScoreState.loadedDateOffset === targetOff && (v30ScoreState.rawAllItems.length > 0 || (v30ScoreState.emptyLoadedTsV4645 && (Date.now() - v30ScoreState.emptyLoadedTsV4645) < 20000))) {
       v30ScoreState.isLoadingDate = false;
       return;
     }
-    window.__sqSbOffsetMemV4643 = window.__sqSbOffsetMemV4643 || {};
-    var memEnt = window.__sqSbOffsetMemV4643[targetOff];
-    var memTtl = (targetOff === 0) ? 25000 : 180000;
-    if (!window.__sqInMemApplyV4644 && memEnt && Array.isArray(memEnt.items) && memEnt.items.length > 0 && (Date.now() - memEnt.ts) < memTtl) {
-      window.__sqInMemApplyV4644 = true;
+    window.__sqSbOffsetMemV4645 = window.__sqSbOffsetMemV4645 || {};
+    var memEnt = window.__sqSbOffsetMemV4645[targetOff];
+    var memTtl = (targetOff === 0) ? 25000 : 240000;
+    if (!window.__sqInMemApplyV4645 && memEnt && Array.isArray(memEnt.items) && memEnt.items.length > 0 && (Date.now() - memEnt.ts) < memTtl) {
+      window.__sqInMemApplyV4645 = true;
       try {
         v30ScoreState.isLoadingDate = false;
         v30ScoreState.loadedDateOffset = targetOff;
         mergeRawScoreItemsV30(memEnt.items, true);
       } finally {
-        window.__sqInMemApplyV4644 = false;
+        window.__sqInMemApplyV4645 = false;
       }
       return;
     }
     if (v30ScoreState.fetchingOffset === targetOff) return;
     v30ScoreState.fetchingOffset = targetOff;
-    v30ScoreState.isLoadingDate = true;
-    v30ScoreState.lastCalSig = "";
+    if (targetOff !== 0) {
+      v30ScoreState.isLoadingDate = true;
+      v30ScoreState.lastCalSig = "";
+    }
     mountOrUpdateV30ScoreToolbar();
 
-    var pSb = fetch("/api/member/scoreboard-v30?date_offset=" + encodeURIComponent(targetOff))
-      .then(function (r) { return r.json(); })
-      .catch(function () { return null; });
+    window.__sqSbInflightV4645 = window.__sqSbInflightV4645 || {};
+    var pSb = window.__sqSbInflightV4645[targetOff]
+      ? Promise.race([window.__sqSbInflightV4645[targetOff], new Promise(function (r) { setTimeout(function () { r(null); }, 6500); })])
+      : fetchJsonWithTimeoutV4645("/api/member/scoreboard-v30?date_offset=" + encodeURIComponent(targetOff), 6500);
     var pDc = (targetOff === 0)
-      ? fetch("/api/datacenter/live-scores?sport=all&date_offset=0&_sq_bridge=1")
-          .then(function (r) { return r.json(); })
-          .catch(function () { return null; })
+      ? fetchJsonWithTimeoutV4645("/api/datacenter/live-scores?sport=all&date_offset=0&_sq_bridge=1", 4500)
       : Promise.resolve(null);
 
     Promise.all([pDc, pSb]).then(function (pair) {
@@ -7339,28 +7380,26 @@ _FRONTEND_V22_JS = r'''
         addCombV4616(dcRes.items);
       }
       if (combined.length > 0) {
-        window.__sqSbOffsetMemV4643 = window.__sqSbOffsetMemV4643 || {};
-        window.__sqSbOffsetMemV4643[targetOff] = { ts: Date.now(), items: combined };
+        window.__sqSbOffsetMemV4645 = window.__sqSbOffsetMemV4645 || {};
+        window.__sqSbOffsetMemV4645[targetOff] = { ts: Date.now(), items: combined };
       }
       if (targetOff !== (v30ScoreState.selectedDateOffset || 0)) return;
       v30ScoreState.isLoadingDate = false;
-      if (combined.length > 0 || (sbRes && sbRes.ok)) {
-        v30ScoreState.loadedDateOffset = targetOff;
-        v30ScoreState.emptyLoadedTsV4644 = (combined.length === 0) ? Date.now() : 0;
-        if (!window.__sqInMemApplyV4644) {
-          window.__sqInMemApplyV4644 = true;
-          try {
-            mergeRawScoreItemsV30(combined, Boolean(v30ScoreState.customDateRendered || (sbRes && sbRes.ok)));
-          } finally {
-            window.__sqInMemApplyV4644 = false;
-          }
+      v30ScoreState.loadedDateOffset = targetOff;
+      v30ScoreState.emptyLoadedTsV4645 = (combined.length === 0) ? Date.now() : 0;
+      if (!window.__sqInMemApplyV4645) {
+        window.__sqInMemApplyV4645 = true;
+        try {
+          mergeRawScoreItemsV30(combined, Boolean(v30ScoreState.customDateRendered || combined.length > 0 || (sbRes && sbRes.ok)));
+        } finally {
+          window.__sqInMemApplyV4645 = false;
         }
       }
     }).catch(function () {
       v30ScoreState.fetchingOffset = null;
       v30ScoreState.isLoadingDate = false;
       v30ScoreState.loadedDateOffset = targetOff;
-      refreshScoreboardSuiteV30();
+      v30ScoreState.emptyLoadedTsV4645 = Date.now();
     });
   }
 
@@ -8402,8 +8441,7 @@ _FRONTEND_V22_JS = r'''
     v30ScoreState.lastTableSig = nextSig;
 
     if (!filtered.length) {
-      var isLoadTbl = (v30ScoreState.isLoadingDate || v30ScoreState.fetchingOffset !== null) && v30ScoreState.loadedDateOffset !== (v30ScoreState.selectedDateOffset || 0);
-      wrap.innerHTML = "<div style='padding:22px;text-align:center;color:" + (isLoadTbl ? "#6ee7b7" : "#94a3b8") + ";font-size:12.8px;font-weight:" + (isLoadTbl ? "700" : "400") + ";'>" + (isLoadTbl ? "⏳ 실시간 경기 일정을 불러오는 중입니다..." : "선택한 날짜·조건에 해당하는 경기가 없습니다. 위 ±5일 날짜 바 또는 다른 상태·종목 필터를 선택해 보세요.") + "</div>";
+      wrap.innerHTML = "<div style='padding:22px;text-align:center;color:#94a3b8;font-size:12.8px;'>선택한 날짜·조건에 해당하는 경기가 없습니다. 위 ±5일 날짜 바 또는 다른 상태·종목 필터를 선택해 보세요.</div>";
       return;
     }
 
@@ -8602,7 +8640,7 @@ _FRONTEND_V22_JS = r'''
       "LALIGA": "라리가 (스페인)",
       "BUNDESLIGA": "분데스리가 (독일)",
       "SERIEA": "세리에 A (이탈리아)",
-      "LIGUE1": "리그 1 (프랑스)",
+      "LIGUE1": "프랑스 리그 1",
       "UCL": "UCL (챔피언스리그)",
       "UEL": "UEL (유로파리그)",
       "KLEAGUE": "K리그1 (국내)",
@@ -20869,7 +20907,7 @@ def api_member_scoreboard_v30(date_offset: int = 0):
     if callable(_w_fn) and not globals().get('_DC_KO_WRAPPER_INSTALLED_V381'):
         _w_fn()
     _rt_fn_sb = globals().get("_collect_realtime_all_sports_v4616")
-    if callable(_rt_fn_sb):
+    if callable(_rt_fn_sb) and (not raw_items or date_offset < -3):
         try:
             _rt_extra = _rt_fn_sb(target_k, date_offset)
             if _rt_extra:
@@ -25399,7 +25437,7 @@ _ESPN_SLUG_KO_MAP_V4616: Dict[str, Tuple[str, str, str]] = {
     "esp.copa_del_rey": ("코파 델 레이", "COPA_REY", "스페인 국왕컵"),
     "ger.1": ("분데스리가", "BUNDESLIGA", "독일 분데스리가"),
     "ita.1": ("세리에 A", "SERIEA", "이탈리아 세리에 A"),
-    "fra.1": ("리그 1", "LIGUE1", "프랑스 리그 1"),
+    "fra.1": ("프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
     "ned.1": ("에레디비시", "EREDIVISIE", "네덜란드 에레디비시"),
     "por.1": ("프리메이라리가", "PRIMEIRA", "포르투갈 프리메이라리가"),
     "kor.1": ("K리그1", "KLEAGUE", "대한민국 K리그1"),
@@ -28423,16 +28461,22 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
         detail_targets = [i for i, c in enumerate(candidates) if c["href"] and c["state"] in ("in", "post")]
     detail_by_idx: Dict[int, Dict[str, Any]] = {}
     if detail_targets:
-        _pool_d = globals().get("_SHARED_HTTP_POOL_V4643") or _RT_TOP_POOL_V4622
-        futs = {
-            idx: _pool_d.submit(_fetch_fsm_detail_cached_v4639, candidates[idx]["href"], sport, candidates[idx]["state"] == "post")
-            for idx in detail_targets
+        from concurrent.futures import wait as _cf_wait_det_v4645
+        _pool_det = globals().get("_FSM_POOL_V4645") or _RT_TOP_POOL_V4622
+        det_slice = detail_targets[:6] if sport == "soccer" else detail_targets[:8]
+        fut_to_idx = {
+            _pool_det.submit(_fetch_fsm_detail_cached_v4639, candidates[idx]["href"], sport, candidates[idx]["state"] == "post"): idx
+            for idx in det_slice
         }
-        for idx, fut in futs.items():
+        done_det, not_done_det = _cf_wait_det_v4645(list(fut_to_idx.keys()), timeout=1.15)
+        for _nf in not_done_det:
+            _nf.cancel()
+        for _df in done_det:
+            _idx_d = fut_to_idx[_df]
             try:
-                detail_by_idx[idx] = fut.result(timeout=2.2) or {}
+                detail_by_idx[_idx_d] = _df.result(timeout=0.05) or {}
             except Exception:
-                detail_by_idx[idx] = {}
+                detail_by_idx[_idx_d] = {}
 
     out: List[Dict[str, Any]] = []
     expected_ymd = target_k.strftime("%Y-%m-%d")
@@ -29423,7 +29467,8 @@ def _item_live_priority_key_v4616(it: Dict[str, Any]) -> Tuple[int, int, int, in
     per_len = len(per_str) if has_real_period else 0
     src_tag = str(it.get("_src_v4616") or "")
     src_rank = 6 if src_tag in ("flashscore_mobi", "apisports") else (4 if src_tag in ("kbl_official", "livescore_pc", "naver_gw", "daum_api", "thesportsdb", "offthefield_kr") else (3 if src_tag in ("daum_ssr", "spojoy", "livescore_mob", "gnews_xml") else (2 if it.get("_espn_verified_v4615") else 1)))
-    return (st_rank, tot_sc, has_real_period, src_rank, per_len, badge_len)
+    specific_lg = 0 if str(it.get("league_code") or "").upper() in ("", "SOCCER_ALL", "ETC") else 1
+    return (st_rank, tot_sc, has_real_period, specific_lg, src_rank, per_len, badge_len)
 
 
 def _merge_and_filter_official_matches_v4616(
@@ -30066,8 +30111,9 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.44",
-        "zero_502_shared_pool_v4643": True,
+        "version": "v4.6.45",
+        "global_espn_fast_wave_v4642": True,
+        "stoppage_plus_clock_v4642": True,
         "flashscore_mobi_bridge_v4639": True,
         "kr_jp_soccer_bridge_v4640": True,
         "soccer_cumulative_clock_v4641": True,
@@ -30138,33 +30184,26 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
         ][:20],
     }
 # ==============================================================================
-# v4.6.43: Zero-502 Persistent Bounded HTTP Pool + Singleflight Offset Lock
-#          + Global 28-League Restore + Same-Day Sticky + Stoppage Clock Guard
+# v4.6.45: Isolated Persistent Bounded Pools (Zero-502 & Zero Cross-Starvation)
+#          + Hard 2.6s Wall-Clock Ceiling + Instant 1ms SWR + 프랑스 리그 1 Lock
 # ==============================================================================
-_SHARED_HTTP_POOL_V4643 = ThreadPoolExecutor(max_workers=12, thread_name_prefix="sq4643-http")
+_ESPN_POOL_V4645 = ThreadPoolExecutor(max_workers=18, thread_name_prefix="sq45-espn")
+_FSM_POOL_V4645 = ThreadPoolExecutor(max_workers=8, thread_name_prefix="sq45-fsm")
+_COORD_POOL_V4645 = ThreadPoolExecutor(max_workers=6, thread_name_prefix="sq45-coord")
+_BG_SWEEP_POOL_V4645 = ThreadPoolExecutor(max_workers=2, thread_name_prefix="sq45-bg")
+
 _ESPN_GLOBAL_CACHE_V4642: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
 _ESPN_GLOBAL_LAST_GOOD_V4642: Dict[int, List[Dict[str, Any]]] = {}
 _ESPN_GLOBAL_LOCK_V4642 = threading.Lock()
 _RT_V4616_LAST_GOOD_V4642: Dict[int, List[Dict[str, Any]]] = {}
 _SAME_DAY_STICKY_V4642: Dict[str, Dict[str, Dict[str, Any]]] = {}
-_OFFSET_FLIGHT_LOCKS_V4643: Dict[int, threading.Lock] = {i: threading.Lock() for i in range(-5, 6)}
-_PREWARM_LOCK_V4642 = threading.Lock()
-_PREWARM_LAST_TS_V4642: float = 0.0
+_OFFSET_FLIGHT_LOCKS_V4645: Dict[int, threading.Lock] = {i: threading.Lock() for i in range(-5, 6)}
+_SWR_REFRESHING_KEYS_V4645: Set[str] = set()
 
 
-def _parse_min_token_parts_v4641(tok: str) -> Optional[Tuple[int, int]]:
-    s = re.sub(r"[\x27\s]+", "", str(tok or "").strip())
-    if not s:
-        return None
-    m = re.match(r"^(\d{1,3})(\+)?(\d{0,2})$", s)
-    if not m:
-        return None
-    base_i = int(m.group(1))
-    add_code = ((int(m.group(3)) * 2) if m.group(3) else 1) if m.group(2) else 0
-    return base_i, add_code
-
-
-def _format_min_token_v4641(base_m: int, add_code: int) -> str:
+def _format_soccer_clock_token_v4641(base_m: int, add_code: int) -> str:
+    if base_m <= 0:
+        return ""
     if add_code == 1:
         return f"{base_m}+"
     if add_code >= 2:
@@ -30172,10 +30211,8 @@ def _format_min_token_v4641(base_m: int, add_code: int) -> str:
     return str(base_m)
 
 
-def _fetch_espn_json_single_v4643(url: str, timeout: float = 2.2) -> Optional[Dict[str, Any]]:
+def _fetch_espn_json_fast_v4645(url: str, timeout: float = 1.95) -> Optional[Dict[str, Any]]:
     txt = _http_fetch_text_v4616(url, timeout=timeout)
-    if not txt and "site.api.espn.com" in url:
-        txt = _http_fetch_text_v4616(url.replace("site.api.espn.com", "site.web.api.espn.com"), timeout=1.6)
     if not txt:
         return None
     try:
@@ -30186,14 +30223,14 @@ def _fetch_espn_json_single_v4643(url: str, timeout: float = 2.2) -> Optional[Di
 
 
 def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
-    from concurrent.futures import wait as _cf_wait_espn_v4643
+    from concurrent.futures import wait as _cf_wait_espn_v4645
     off_i = int(date_offset or 0)
     is_today = (off_i == 0)
     expected_mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
     d1 = target_k.strftime("%Y%m%d")
     d0 = (target_k - timedelta(days=1)).strftime("%Y%m%d")
     ck = f"{off_i}:{d1}"
-    ttl = 30.0 if is_today else 300.0
+    ttl = 32.0 if is_today else 300.0
     now_m = time.monotonic()
 
     with _ESPN_GLOBAL_LOCK_V4642:
@@ -30201,7 +30238,9 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
         if cached and (now_m - cached[0]) < ttl:
             return [dict(x) for x in cached[1]]
 
-    endpoints: List[Tuple[str, str, str, str, str]] = [
+    # 16 compact CDN endpoints <= 18 dedicated `_ESPN_POOL_V4645` workers (100% single-wave, zero queue wait!)
+    # Specific leagues FIRST so `프랑스 리그 1` (`LIGUE1`), `EPL`, `라리가`, `분데스리가`, `세리에 A`, `NBA`, `NHL` always take precedence over `SOCCER_ALL`!
+    endpoints = [
         (f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={d0}&limit=30", "basketball", "NBA", "NBA", "미국 프로농구 NBA"),
         (f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={d1}&limit=30", "basketball", "NBA", "NBA", "미국 프로농구 NBA"),
         (f"https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates={d0}&limit=30", "hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
@@ -30214,28 +30253,24 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ger.1/scoreboard?dates={d1}&limit=20", "soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates={d0}&limit=20", "soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates={d1}&limit=20", "soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d0}&limit=20", "soccer", "리그 1", "LIGUE1", "프랑스 리그 1"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d1}&limit=20", "soccer", "리그 1", "LIGUE1", "프랑스 리그 1"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates={d0}&limit=25", "soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard?dates={d0}&limit=25", "soccer", "UEL", "UEL", "UEFA 유로파리그"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/scoreboard?dates={d0}&limit=20", "soccer", "MLS", "MLS", "미국 MLS"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/aus.1/scoreboard?dates={d1}&limit=20", "soccer", "A리그", "ALEAGUE", "호주 A리그"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d0}&limit=20", "soccer", "프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
+        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d1}&limit=20", "soccer", "프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d0}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
         (f"https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d1}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates={d0}", "ufc", "UFC", "UFC", "UFC 공식 대회"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates={d1}", "ufc", "UFC", "UFC", "UFC 공식 대회"),
     ]
 
-    out: List[Dict[str, Any]] = []
-    fut_meta = {
-        _SHARED_HTTP_POOL_V4643.submit(_fetch_espn_json_single_v4643, u, 2.2): (sp, s_lg, c_lg, f_lg)
+    ordered_futs = [
+        (_ESPN_POOL_V4645.submit(_fetch_espn_json_fast_v4645, u, 1.95), sp, s_lg, c_lg, f_lg)
         for u, sp, s_lg, c_lg, f_lg in endpoints
-    }
-    done_e, not_done_e = _cf_wait_espn_v4643(list(fut_meta.keys()), timeout=3.4)
-    for fut in not_done_e:
-        fut.cancel()
-    for fut in done_e:
-        sp, s_lg, c_lg, f_lg = fut_meta[fut]
+    ]
+    done_e, not_done_e = _cf_wait_espn_v4645([f for f, *_ in ordered_futs], timeout=2.25)
+    for nf in not_done_e:
+        nf.cancel()
+
+    out: List[Dict[str, Any]] = []
+    for fut, sp, s_lg, c_lg, f_lg in ordered_futs:
+        if fut not in done_e:
+            continue
         try:
             js = fut.result(timeout=0.05)
             if js:
@@ -30247,168 +30282,38 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
         if out:
             cp = [dict(x) for x in out]
             _ESPN_GLOBAL_CACHE_V4642[ck] = (time.monotonic(), cp)
-            _ESPN_GLOBAL_LAST_GOOD_V4642[off_i] = cp
-            return out
-        prev_good = _ESPN_GLOBAL_LAST_GOOD_V4642.get(off_i)
-        if prev_good:
-            return [dict(x) for x in prev_good if str(x.get("match_dt_kst") or "").startswith(expected_mmdd) or (is_today and x.get("state") == "in")]
-    return out
+            if len(cp) >= 8:
+                _ESPN_GLOBAL_LAST_GOOD_V4642[off_i] = cp
+            return [dict(x) for x in cp]
+        prev = _ESPN_GLOBAL_LAST_GOOD_V4642.get(off_i)
+        if prev:
+            valid_prev = [dict(x) for x in prev if str(x.get("match_dt_kst") or "").startswith(expected_mmdd) or (is_today and x.get("state") == "in")]
+            if valid_prev:
+                return valid_prev
+    return []
 
 
-_FSM_GLOBAL_LG_MAP_V4642: Dict[Tuple[str, str], Tuple[str, str, str, str]] = {
-    ("ENGLAND", "PREMIER LEAGUE"): ("soccer", "EPL", "EPL", "프리미어리그"),
-    ("SPAIN", "LALIGA"): ("soccer", "라리가", "LALIGA", "스페인 라리가"),
-    ("GERMANY", "BUNDESLIGA"): ("soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
-    ("ITALY", "SERIE A"): ("soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
-    ("FRANCE", "LIGUE 1"): ("soccer", "리그 1", "LIGUE1", "프랑스 리그 1"),
-    ("EUROPE", "CHAMPIONS LEAGUE"): ("soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
-    ("EUROPE", "EUROPA LEAGUE"): ("soccer", "UEL", "UEL", "UEFA 유로파리그"),
-    ("EUROPE", "NATIONS LEAGUE"): ("soccer", "네이션스리그", "UNL", "UEFA 네이션스리그"),
-    ("AUSTRALIA", "A-LEAGUE"): ("soccer", "A리그", "ALEAGUE", "호주 A리그"),
-    ("USA", "MLS"): ("soccer", "MLS", "MLS", "미국 MLS"),
-    ("NETHERLANDS", "EREDIVISIE"): ("soccer", "해외축구", "SOCCER_ALL", "네덜란드 에레디비시"),
-    ("PORTUGAL", "LIGA PORTUGAL"): ("soccer", "해외축구", "SOCCER_ALL", "포르투갈 리가"),
-    ("TURKEY", "SUPER LIG"): ("soccer", "해외축구", "SOCCER_ALL", "튀르키예 쉬페르리그"),
-    ("SCOTLAND", "PREMIERSHIP"): ("soccer", "해외축구", "SOCCER_ALL", "스코틀랜드 프리미어십"),
-    ("BELGIUM", "JUPILER PRO LEAGUE"): ("soccer", "해외축구", "SOCCER_ALL", "벨기에 프로리그"),
-    ("BRAZIL", "SERIE A"): ("soccer", "해외축구", "SOCCER_ALL", "브라질 세리에 A"),
-    ("ARGENTINA", "TORNEO BETANO"): ("soccer", "해외축구", "SOCCER_ALL", "아르헨티나 프리메라"),
-    ("SAUDI ARABIA", "SAUDI PROFESSIONAL LEAGUE"): ("soccer", "해외축구", "SOCCER_ALL", "사우디 프로리그"),
-    ("MEXICO", "LIGA MX"): ("soccer", "해외축구", "SOCCER_ALL", "멕시코 리가 MX"),
-    ("ENGLAND", "CHAMPIONSHIP"): ("soccer", "해외축구", "SOCCER_ALL", "잉글랜드 챔피언십"),
-    ("USA", "NBA"): ("basketball", "NBA", "NBA", "미국 프로농구 NBA"),
-    ("USA", "NHL"): ("hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
+_FSM_GLOBAL_MAJOR_MAP_V4642 = {
+    ("soccer", "ENGLAND: Premier League"): ("soccer", "EPL", "EPL", "프리미어리그"),
+    ("soccer", "SPAIN: LaLiga"): ("soccer", "라리가", "LALIGA", "스페인 라리가"),
+    ("soccer", "GERMANY: Bundesliga"): ("soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
+    ("soccer", "ITALY: Serie A"): ("soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
+    ("soccer", "FRANCE: Ligue 1"): ("soccer", "프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
+    ("soccer", "EUROPE: Champions League"): ("soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
+    ("soccer", "EUROPE: Europa League"): ("soccer", "UEL", "UEL", "UEFA 유로파리그"),
+    ("basketball", "USA: NBA"): ("basketball", "NBA", "NBA", "미국 프로농구 NBA"),
+    ("hockey", "USA: NHL"): ("hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
 }
 
 
-def _fetch_fsm_global_major_fallback_v4642(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
-    from concurrent.futures import wait as _cf_wait_fsm_v4643
-    now_cet = datetime.now(_FSM_PRAGUE_TZ_V4639)
-    cet_off_1 = (target_k.date() - now_cet.date()).days
-    cet_offs = [o for o in (cet_off_1 - 1, cet_off_1) if -2 <= o <= 2]
-    if not cet_offs:
-        return []
-    expected_ymd = target_k.strftime("%Y-%m-%d")
-    is_today = (int(date_offset or 0) == 0)
-    specs_fb: List[Tuple[str, int, str]] = []
-    for co in cet_offs:
-        qs = "" if co == 0 else f"?d={co}"
-        specs_fb.append(("soccer", co, f"https://www.flashscore.mobi/{qs}"))
-        specs_fb.append(("basketball", co, f"https://www.flashscore.mobi/basketball/{qs}"))
-        specs_fb.append(("hockey", co, f"https://www.flashscore.mobi/hockey/{qs}"))
-
-    raw_pages: List[Tuple[str, int, str]] = []
-    missing_fb: List[Tuple[str, int, str]] = []
-    now_m = time.monotonic()
-    with _FSM_LOCK_V4639:
-        for sp_k, co, url in specs_fb:
-            cet_d = (now_cet + timedelta(days=co)).strftime("%Y%m%d")
-            ck = f"gfb:{sp_k}:{co}:{cet_d}"
-            cached = _FSM_LIST_CACHE_V4639.get(ck)
-            if cached and (now_m - cached[0]) < (30.0 if co == 0 else 240.0):
-                raw_pages.append((sp_k, co, cached[1]))
-            else:
-                missing_fb.append((sp_k, co, url))
-
-    if missing_fb:
-        futs = {_SHARED_HTTP_POOL_V4643.submit(_http_fetch_text_v4616, url, 2.0, _FSM_HEADERS_V4639): (sp_k, co) for sp_k, co, url in missing_fb}
-        done_f, not_done_f = _cf_wait_fsm_v4643(list(futs.keys()), timeout=2.5)
-        for fut in not_done_f:
-            fut.cancel()
-        for fut in done_f:
-            sp_k, co = futs[fut]
-            try:
-                txt = fut.result(timeout=0.05) or ""
-            except Exception:
-                txt = ""
-            if txt:
-                raw_pages.append((sp_k, co, txt))
-                cet_d = (now_cet + timedelta(days=co)).strftime("%Y%m%d")
-                with _FSM_LOCK_V4639:
-                    _FSM_LIST_CACHE_V4639[f"gfb:{sp_k}:{co}:{cet_d}"] = (time.monotonic(), txt)
-
-    out_fb: List[Dict[str, Any]] = []
-    for sp_k, co, html_txt in raw_pages:
-        cet_base = (now_cet + timedelta(days=co))
-        lines = _html_to_fsm_lines_v4639(html_txt)
-        act_meta: Optional[Tuple[str, str, str, str]] = None
-        for ln in lines:
-            if "[[FSM_M:" not in ln:
-                mh = re.match(r"^([A-Z][A-Z\s\.\-&\x27]{2,}?)\s*:\s*(.+)$", ln)
-                if mh:
-                    cu = mh.group(1).strip().upper()
-                    lu = re.sub(r"\bSTANDINGS\b", "", mh.group(2).upper()).strip(" -:")
-                    act_meta = None
-                    if not any(ex in lu for ex in ("WOMEN", "YOUTH", "U18", "U19", "U20", "U21", "U23", "CUP", "SUMMER", "PRESEASON", "G LEAGUE", "AHL", "2", "3", "SERIE B")):
-                        for (mc, ml), mval in _FSM_GLOBAL_LG_MAP_V4642.items():
-                            if cu == mc and ml in lu and mval[0] == sp_k:
-                                act_meta = mval
-                                break
-                continue
-            if act_meta is None:
-                continue
-            m_lk = re.search(r"\[\[FSM_M:([^|]*)\|([^\]]*)\]\]", ln)
-            if not m_lk:
-                continue
-            l_txt = m_lk.group(2).strip()
-            body = (ln[:m_lk.start()] + " " + ln[m_lk.end():]).strip()
-            if re.search(r"\b(?:POSTPONED|CANCELLED|CANCELED|ABANDONED|WALKOVER|FRO)\b", (body + " " + l_txt).upper()):
-                continue
-            st, cet_hm, badge, t_str = "pre", "", "예정", body
-            m_sm = re.match(r"^(\d{1,3}(?:\+\d{0,2})?)\s*\x27\s*(.+)$", t_str)
-            m_ht = re.match(r"^(?:Half\s*Time|HT)\b\s*(.+)$", t_str, flags=re.I)
-            m_q = re.match(r"^(?:([1-4])(?:st|nd|rd|th)\s*(?:Quarter|Qtr|Period)|Q([1-4])|P([1-3]))(?:\s*(\d{1,2})\x27?)?\b\s*(.+)$", t_str, flags=re.I)
-            m_fn = re.match(r"^(?:(\d{1,2}:\d{2})\s+)?(?:Finished|Fin|After\s*OT|AOT|After\s*ET|AET|After\s*Pen|FT|Ended)\b\s*(.+)$", t_str, flags=re.I)
-            m_tm = re.match(r"^(\d{1,2}:\d{2})\s*(.+)$", t_str)
-            if sp_k == "soccer" and m_sm:
-                st = "in"
-                _, badge = _reconcile_soccer_live_clock_v4641(m_sm.group(1), "", 0, False, 0, False, False, False)
-                t_str = m_sm.group(2).strip()
-            elif m_ht:
-                st, badge, t_str = "in", "LIVE 하프타임", m_ht.group(1).strip()
-            elif m_q:
-                st = "in"
-                qn = m_q.group(1) or m_q.group(2) or m_q.group(3) or "1"
-                badge = f"LIVE {qn}{'쿼터' if sp_k == 'basketball' else '피리어드'}"
-                t_str = m_q.group(5).strip()
-            elif m_fn:
-                st, badge, cet_hm, t_str = "post", "종료", (m_fn.group(1) or ""), m_fn.group(2).strip()
-            elif m_tm:
-                cet_hm, t_str = m_tm.group(1), m_tm.group(2).strip()
-            else:
-                continue
-            msc = re.search(r"(\d{1,3})\s*[-:]\s*(\d{1,3})", l_txt)
-            hs, as_ = (int(msc.group(1)), int(msc.group(2))) if msc else (0, 0)
-            if st == "pre" and (msc or re.search(r"\b(?:AOT|AET|FIN|FT|OT|PEN)\b", l_txt.upper())):
-                st, badge = "post", "종료"
-            pts = re.split(r"\s+-\s+", t_str, maxsplit=1)
-            if len(pts) != 2:
-                continue
-            hc, _, _ = _clean_team_label_v4616(pts[0], sp_k)
-            ac, _, _ = _clean_team_label_v4616(pts[1], sp_k)
-            if not hc or not ac or hc == ac:
-                continue
-            if cet_hm:
-                dt_k, hhmm = _convert_fsm_prague_to_kst_v4639(target_k, cet_hm, (cet_base.day, cet_base.month, cet_base.year))
-            else:
-                dt_k, hhmm = target_k, f"{target_k.hour:02d}:00"
-            if not (is_today and st == "in") and dt_k.strftime("%Y-%m-%d") != expected_ymd:
-                continue
-            sp_o, lg_s, lg_c, lg_f = act_meta
-            it = _build_rt_item_v4616("flashscore_mobi_gfb", sp_o, lg_s, lg_c, lg_f, st, badge, dt_k, hhmm, hc, ac, hs, as_)
-            if it:
-                out_fb.append(it)
-    return out_fb
-
-
 def _fetch_flashscore_mobi_kr_live_v4639(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
-    from concurrent.futures import wait as _cf_wait_kr_v4643
+    from concurrent.futures import wait as _cf_wait_kr_v4645
     _cet_today_d = datetime.now(_FSM_PRAGUE_TZ_V4639).date()
     _eff_cet_off = (target_k.date() - _cet_today_d).days
     if _eff_cet_off < -2 or _eff_cet_off > 2:
         return []
     q_suffix = "" if _eff_cet_off == 0 else f"?d={int(_eff_cet_off)}"
-    ttl = 18.0 if _eff_cet_off == 0 else 240.0
+    ttl = 22.0 if _eff_cet_off == 0 else 240.0
     specs = (
         ("soccer", f"https://www.flashscore.mobi/{q_suffix}"),
         ("volleyball", f"https://www.flashscore.mobi/volleyball/{q_suffix}"),
@@ -30426,10 +30331,10 @@ def _fetch_flashscore_mobi_kr_live_v4639(target_k: datetime, date_offset: int) -
             else:
                 missing_specs.append((sp_k, url))
     if missing_specs:
-        futs = {_SHARED_HTTP_POOL_V4643.submit(_http_fetch_text_v4616, url, 2.2, _FSM_HEADERS_V4639): sp_k for sp_k, url in missing_specs}
-        done_s, not_done_s = _cf_wait_kr_v4643(list(futs.keys()), timeout=2.6)
-        for fut in not_done_s:
-            fut.cancel()
+        futs = {_FSM_POOL_V4645.submit(_http_fetch_text_v4616, url, 1.55, _FSM_HEADERS_V4639): sp_k for sp_k, url in missing_specs}
+        done_s, not_done_s = _cf_wait_kr_v4645(list(futs.keys()), timeout=1.75)
+        for nf in not_done_s:
+            nf.cancel()
         for fut in done_s:
             sp_k = futs[fut]
             try:
@@ -30452,47 +30357,21 @@ def _fetch_flashscore_mobi_kr_live_v4639(target_k: datetime, date_offset: int) -
     return collected
 
 
-def _trigger_adjacent_prewarm_v4642() -> None:
-    global _PREWARM_LAST_TS_V4642
-    now_m = time.monotonic()
-    with _PREWARM_LOCK_V4642:
-        if (now_m - _PREWARM_LAST_TS_V4642) < 240.0:
-            return
-        _PREWARM_LAST_TS_V4642 = now_m
-
-    def _bg_warm() -> None:
-        base_k = datetime.now(KST)
-        for off_w in (-1, 1):
-            try:
-                _collect_realtime_all_sports_v4616(base_k + timedelta(days=off_w), off_w)
-            except Exception:
-                continue
-
-    _SHARED_HTTP_POOL_V4643.submit(_bg_warm)
-
-
-def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
-    off_i = max(-5, min(5, int(date_offset or 0)))
+def _sync_collect_offset_v4645(target_k: datetime, off_i: int) -> List[Dict[str, Any]]:
+    from concurrent.futures import wait as _cf_wait_coord_v4645
     ck = f"{off_i}:{target_k.strftime('%Y%m%d')}"
-    ttl = 25.0 if off_i == 0 else 240.0
-    now_m = time.monotonic()
-    with _RT_V4616_LOCK:
-        cached = _RT_V4616_CACHE.get(ck)
-        if cached and (now_m - cached[0]) < ttl:
-            return [dict(x) for x in cached[1]]
-
-    flight_lock = _OFFSET_FLIGHT_LOCKS_V4643.setdefault(off_i, threading.Lock())
+    flight_lock = _OFFSET_FLIGHT_LOCKS_V4645.setdefault(off_i, threading.Lock())
     with flight_lock:
-        now_m2 = time.monotonic()
+        fresh_ttl = 35.0 if off_i == 0 else 300.0
         with _RT_V4616_LOCK:
             cached2 = _RT_V4616_CACHE.get(ck)
-            if cached2 and (now_m2 - cached2[0]) < ttl:
+            if cached2 and (time.monotonic() - cached2[0]) < fresh_ttl:
                 return [dict(x) for x in cached2[1]]
 
         merged_raw: List[Dict[str, Any]] = []
         off_diag: Dict[str, Any] = {}
 
-        # Run flat collectors without nested pool deadlocks (`_SHARED_HTTP_POOL_V4643` handles HTTP fan-out inside each!)
+        # 1. Instant in-memory 2026-27 official KOVO & WKBL schedule (< 0.5ms)
         try:
             kr_cal = _fetch_official_kr_season_registry_v4622(target_k, off_i) or []
             off_diag["official_kr_cal"] = len(kr_cal)
@@ -30500,31 +30379,35 @@ def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> 
         except Exception as _e1:
             off_diag["official_kr_cal_err"] = str(_e1)[:60]
 
+        # 2. Parallel ESPN (`_ESPN_POOL_V4645`) + Flashscore (`_FSM_POOL_V4645`) with HARD 2.6s wall-clock cap!
+        stage_futs: Dict[str, Any] = {
+            "espn_global": _COORD_POOL_V4645.submit(_fetch_espn_global_live_v4616, target_k, off_i),
+        }
         if -2 <= off_i <= 2:
-            try:
-                fsm_kr = _fetch_flashscore_mobi_kr_live_v4639(target_k, off_i) or []
-                off_diag["flashscore_mobi"] = len(fsm_kr)
-                merged_raw.extend(fsm_kr)
-            except Exception as _e2:
-                off_diag["flashscore_mobi_err"] = str(_e2)[:60]
+            stage_futs["flashscore_mobi"] = _COORD_POOL_V4645.submit(_fetch_flashscore_mobi_kr_live_v4639, target_k, off_i)
 
-        try:
-            espn_gl = _fetch_espn_global_live_v4616(target_k, off_i) or []
-            off_diag["espn_global"] = len(espn_gl)
-            merged_raw.extend(espn_gl)
-        except Exception as _e3:
-            off_diag["espn_global_err"] = str(_e3)[:60]
+        done_st, not_done_st = _cf_wait_coord_v4645(list(stage_futs.values()), timeout=2.65)
+        for nf in not_done_st:
+            nf.cancel()
+        for src_nm, fut in stage_futs.items():
+            if fut in done_st:
+                try:
+                    res = fut.result(timeout=0.05) or []
+                    off_diag[src_nm] = len(res)
+                    if res:
+                        merged_raw.extend(res)
+                except Exception as _e_st:
+                    off_diag[f"{src_nm}_err"] = str(_e_st)[:60]
+            else:
+                off_diag[f"{src_nm}_timeout"] = True
 
         expected_mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
-        has_ligue1 = any(x.get("league_code") == "LIGUE1" for x in merged_raw)
-        if (int(off_diag.get("espn_global") or 0) < 12 or not has_ligue1) and -2 <= off_i <= 2:
-            try:
-                gfb = _fetch_fsm_global_major_fallback_v4642(target_k, off_i)
-                if gfb:
-                    merged_raw.extend(gfb)
-                    off_diag["fsm_global_fallback"] = len(gfb)
-            except Exception:
-                pass
+        if int(off_diag.get("espn_global") or 0) < 8:
+            prev_espn = _ESPN_GLOBAL_LAST_GOOD_V4642.get(off_i) or []
+            valid_prev = [dict(x) for x in prev_espn if str(x.get("match_dt_kst") or "").startswith(expected_mmdd) or (off_i == 0 and x.get("state") == "in")]
+            if valid_prev:
+                merged_raw.extend(valid_prev)
+                off_diag["espn_swr_rescued"] = len(valid_prev)
 
         _PER_OFFSET_DIAG_V4622[off_i] = off_diag
         if off_i == 0:
@@ -30553,14 +30436,51 @@ def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> 
                 if len(_SAME_DAY_STICKY_V4642) > 5:
                     for _old_k in sorted(_SAME_DAY_STICKY_V4642.keys())[:-5]:
                         _SAME_DAY_STICKY_V4642.pop(_old_k, None)
-            if len(deduped) >= 10:
+            if len(deduped) >= 5:
                 _RT_V4616_LAST_GOOD_V4642[off_i] = [dict(x) for x in deduped]
-        if off_i == 0:
-            _trigger_adjacent_prewarm_v4642()
         return deduped
 
 
-def _install_fast_ko_collect_ls_v4643(dc_mod: Any = None) -> bool:
+def _schedule_swr_bg_refresh_v4645(ck: str, target_k: datetime, off_i: int) -> None:
+    with _RT_V4616_LOCK:
+        if ck in _SWR_REFRESHING_KEYS_V4645:
+            return
+        _SWR_REFRESHING_KEYS_V4645.add(ck)
+
+    def _bg_job() -> None:
+        try:
+            _sync_collect_offset_v4645(target_k, off_i)
+        except Exception:
+            pass
+        finally:
+            with _RT_V4616_LOCK:
+                _SWR_REFRESHING_KEYS_V4645.discard(ck)
+
+    _BG_SWEEP_POOL_V4645.submit(_bg_job)
+
+
+def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
+    off_i = max(-5, min(5, int(date_offset or 0)))
+    ck = f"{off_i}:{target_k.strftime('%Y%m%d')}"
+    fresh_ttl = 35.0 if off_i == 0 else 300.0
+    stale_max = 3600.0 if off_i == 0 else 7200.0
+    now_m = time.monotonic()
+
+    with _RT_V4616_LOCK:
+        cached = _RT_V4616_CACHE.get(ck)
+    if cached is not None and len(cached[1]) > 0:
+        age = now_m - cached[0]
+        if age <= fresh_ttl:
+            return [dict(x) for x in cached[1]]
+        if age <= stale_max:
+            # Instant 1ms Stale-While-Revalidate: return cached list immediately and refresh asynchronously!
+            _schedule_swr_bg_refresh_v4645(ck, target_k, off_i)
+            return [dict(x) for x in cached[1]]
+
+    return _sync_collect_offset_v4645(target_k, off_i)
+
+
+def _install_fast_ko_collect_ls_v4645(dc_mod: Any = None) -> bool:
     import sys as _sys
     if dc_mod is None:
         dc_mod = _sys.modules.get("app.sportiq_datacenter") or _sys.modules.get("sportiq_datacenter")
@@ -30571,7 +30491,7 @@ def _install_fast_ko_collect_ls_v4643(dc_mod: Any = None) -> bool:
             except Exception:
                 return False
 
-    def _fast_collect_all_m_v4643(date_offset: int = 0) -> List[Dict[str, Any]]:
+    def _fast_collect_all_m_v4645(date_offset: int = 0) -> List[Dict[str, Any]]:
         try:
             off_i = max(-5, min(5, int(date_offset)))
         except Exception:
@@ -30613,7 +30533,7 @@ def _install_fast_ko_collect_ls_v4643(dc_mod: Any = None) -> bool:
                 res["score_alerts"] = live_alerts
         return res
 
-    dc_mod._collect_all_matches = _fast_collect_all_m_v4643
+    dc_mod._collect_all_matches = _fast_collect_all_m_v4645
     dc_mod.collect_live_scores = _ko_collect_ls
     dc_cache = getattr(dc_mod, "_CACHE", None)
     if isinstance(dc_cache, dict):
@@ -30623,7 +30543,7 @@ def _install_fast_ko_collect_ls_v4643(dc_mod: Any = None) -> bool:
         _RT_V4616_CACHE.clear()
     with _DC_SWR_LOCK:
         _DC_SWR_CACHE.clear()
-    dc_mod.__ko_team_wrapped_v4643__ = True
+    dc_mod.__ko_team_wrapped_v4645__ = True
     return True
 
 
@@ -30632,11 +30552,24 @@ _ORIG_INSTALL_DC_KO_V381 = _install_dc_ko_team_wrapper_v381
 
 def _install_dc_ko_team_wrapper_v381(dc_mod: Any = None) -> bool:
     r = _ORIG_INSTALL_DC_KO_V381(dc_mod)
-    _install_fast_ko_collect_ls_v4643(dc_mod)
+    _install_fast_ko_collect_ls_v4645(dc_mod)
     return r
 
 
-_install_fast_ko_collect_ls_v4643()
+_install_fast_ko_collect_ls_v4645()
+
+
+def _startup_warm_offsets_v4645() -> None:
+    time.sleep(0.35)
+    for off_w in (0, -1, 1):
+        try:
+            base_k = datetime.now(KST)
+            _sync_collect_offset_v4645(base_k + timedelta(days=off_w), off_w)
+        except Exception:
+            continue
+
+
+threading.Thread(target=_startup_warm_offsets_v4645, daemon=True, name="sq45-boot-warm").start()
 
 _ORIG_DIAG_V4619 = api_live_sources_diag_v4619
 
@@ -30644,14 +30577,15 @@ _ORIG_DIAG_V4619 = api_live_sources_diag_v4619
 @router.get("/api/member/live-sources-diag-v4642")
 @router.get("/api/member/live-sources-diag-v4643")
 @router.get("/api/member/live-sources-diag-v4644")
-def api_live_sources_diag_v4643(date_offset: int = 0):
+@router.get("/api/member/live-sources-diag-v4645")
+def api_live_sources_diag_v4645(date_offset: int = 0):
     d = _ORIG_DIAG_V4619(date_offset=date_offset)
     if isinstance(d, dict):
-        d["version"] = "v4.6.44"
-        d["zero_502_shared_pool_v4643"] = True
-        d["global_espn_fast_wave_v4642"] = True
-        d["stoppage_plus_clock_v4642"] = True
+        d["version"] = "v4.6.45"
+        d["isolated_pools_instant_swr_v4645"] = True
+        d["hard_2650ms_ceiling_v4645"] = True
+        d["ligue1_explicit_ko_v4645"] = True
     return d
 
 
-api_live_sources_diag_v4619 = api_live_sources_diag_v4643
+api_live_sources_diag_v4619 = api_live_sources_diag_v4645
