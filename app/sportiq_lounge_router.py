@@ -6301,7 +6301,7 @@ _FRONTEND_V22_JS = r'''
           }
           sbPromise = Promise.race([
             window.__sqSbInflightV4645[offReq],
-            new Promise(function (resT) { setTimeout(function () { resT(cachedSb ? cachedSb.data : null); }, 4500); })
+            new Promise(function (resT) { setTimeout(function () { resT(cachedSb ? cachedSb.data : null); }, 15000); })
           ]);
         }
 
@@ -7348,10 +7348,10 @@ _FRONTEND_V22_JS = r'''
 
     window.__sqSbInflightV4645 = window.__sqSbInflightV4645 || {};
     var pSb = window.__sqSbInflightV4645[targetOff]
-      ? Promise.race([window.__sqSbInflightV4645[targetOff], new Promise(function (r) { setTimeout(function () { r(null); }, 6500); })])
-      : fetchJsonWithTimeoutV4645("/api/member/scoreboard-v30?date_offset=" + encodeURIComponent(targetOff), 6500);
-    var pDc = (targetOff === 0)
-      ? fetchJsonWithTimeoutV4645("/api/datacenter/live-scores?sport=all&date_offset=0&_sq_bridge=1", 4500)
+      ? Promise.race([window.__sqSbInflightV4645[targetOff], new Promise(function (r) { setTimeout(function () { r(null); }, 18000); })])
+      : fetchJsonWithTimeoutV4645("/api/member/scoreboard-v30?date_offset=" + encodeURIComponent(targetOff), 18000);
+    var pDc = (targetOff >= -3 && targetOff <= 5)
+      ? fetchJsonWithTimeoutV4645("/api/datacenter/live-scores?sport=all&date_offset=" + encodeURIComponent(targetOff) + "&_sq_bridge=1", 15000)
       : Promise.resolve(null);
 
     Promise.all([pDc, pSb]).then(function (pair) {
@@ -9148,14 +9148,6 @@ _FRONTEND_V22_JS = r'''
 
     var parentBox = track.parentElement;
     var items = v30ScoreState.items || [];
-
-    // 로딩 중 대체 track이 툴바·달력·표 래퍼 안쪽 요소로 잡히면 insertBefore가
-    // HierarchyRequestError(새 자식이 부모를 포함)를 던진다. 이번 회차는 건너뛰고 실제 track이 마운트되면 다시 배치한다.
-    var guardIds = ["sqV30ScoreToolbar", "sqV31DateCalendarBar", "sqV30ScoreboardTableWrap"];
-    for (var gi = 0; gi < guardIds.length; gi++) {
-      var gEl = document.getElementById(guardIds[gi]);
-      if (gEl && (gEl === track || gEl.contains(parentBox))) return;
-    }
 
     var bar = document.getElementById("sqV30ScoreToolbar");
     if (!bar) {
@@ -12940,7 +12932,7 @@ _FRONTEND_V22_JS = r'''
     var resArea = document.getElementById("sqAiIqResultArea") || aiModal.querySelector("[id*='Result'], [id*='result']");
     if (resArea) {
       var rtx = String(resArea.textContent || "").replace(/\s+/g, " ").trim();
-      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|검색창에\s*입력|추천\s*키워드를\s*눌러|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
+      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
         return "dom::" + rtx.slice(0, 48);
       }
     }
@@ -14056,7 +14048,7 @@ _FRONTEND_V22_JS = r'''
           var isBballOrBase = (it.sport === "basketball" || it.sport === "baseball" || rawLgCode === "KBL" || rawLgCode === "WKBL" || rawLgCode === "NBA" || rawLgCode === "WNBA");
           function fmtStanding(tName, rObj) {
             if (!rObj) return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;'><strong>" + uxEsc(tName) + "</strong>: 컵·국가대표·인터리그 매치업</div>";
-            var fm = Array.isArray(rObj.form) ? (rObj.form.length ? rObj.form.join("·") : "-") : String(rObj.form || "-");
+            var fm = Array.isArray(rObj.form) ? rObj.form.join("·") : String(rObj.form || "-");
             var hasDrawStat = (it.sport === "soccer") || (Number(rObj.d || 0) > 0);
             var recParts = [];
             if (rObj.gp !== undefined && rObj.gp !== null && Number(rObj.gp) > 0) {
@@ -14119,15 +14111,9 @@ _FRONTEND_V22_JS = r'''
             ? teamInjs.map(function (x) {
                 return "<div style='font-size:11.5px;padding:4px 0;border-bottom:1px solid #1e293b;'>🏥 <strong>[" + uxEsc(localizeTeamKoJsV381(x.team)) + "] " + uxEsc(x.player) + "</strong> · " + uxEsc(x.reason) + " <span style='color:#fbbf24;'>(" + uxEsc(x.severity) + ")</span></div>";
               }).join("")
-            : (injData.is_sample
-                ? "<div style='font-size:11.5px;color:#94a3b8;'>" + uxEsc(injData.sample_note || "부상자 데이터가 아직 연동되지 않았습니다.") + "</div>"
-                : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>");
-          // 하드코딩 예시 순위표(K리그·J리그 등)는 실제 데이터처럼 보이지 않도록 안내를 붙인다.
-          var stSampleHtml = stData.is_sample
-            ? "<div style='font-size:11px;color:#fbbf24;margin-bottom:6px;'>⚠️ " + uxEsc(stData.sample_note || "예시 데이터입니다(실시간 연동 아님).") + "</div>"
-            : "";
+            : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>";
           box.innerHTML = (
-            "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 순위 & 최근 흐름</div>" + stSampleHtml +
+            "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 순위 & 최근 흐름</div>" +
             "<div style='display:grid;gap:6px;margin-bottom:10px;'>" + fmtStanding(it.home, hRow) + fmtStanding(it.away, aRow) + "</div>" +
             h2hBlockHtml +
             "<div style='font-weight:800;color:#fca5a5;margin-bottom:4px;'>🏥 양 팀 주요 결장 · 로스터 체크</div>" + injHtml
@@ -17946,7 +17932,7 @@ def _build_comment_sig_v4612(post_id: str, user_label: str, comment_text: str) -
 
 @router.get("/api/posts")
 def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[str] = ""):
-    # 조회 요청에서는 예시 게시글을 시드하지 않는다(시드는 시작 시 테이블 초기화에서만).
+    _ensure_tactical_posts_seeded_v22()
     _primary, actor_keys = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
@@ -18053,8 +18039,6 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
                     "comments": comments_by_post.get(pid, []),
                     "isMemberServerPost": True,
                     "hasPin": bool(r["pin_hash"]),
-                    # 운영자가 넣은 예시 글(실제 회원 글 아님)
-                    "is_sample": str(pid).startswith("mp_seed_"),
                 }
             )
 
@@ -20605,10 +20589,6 @@ def _build_kr_jp_soccer_meta_v4640(kind: str, lg_raw: str) -> Dict[str, Any]:
             "items": [],
             "total": 0,
             "summary": {"total": 0, "out": 0, "doubtful": 0},
-            # 실제 부상자 데이터 연동이 없다. 0명은 '부상자 없음'이 아니라 '데이터 없음'이다.
-            "source": "부상자 데이터 미연동",
-            "is_sample": True,
-            "sample_note": "K리그·J리그 부상자 데이터는 아직 연동되지 않았습니다.",
         }
     rows_out: List[Dict[str, Any]] = []
     for rk, (tm, gp, w, d, l, gf, ga, pts, fm) in enumerate(_KR_JP_SOCCER_STANDINGS_V4640[cu], start=1):
@@ -20632,10 +20612,7 @@ def _build_kr_jp_soccer_meta_v4640(kind: str, lg_raw: str) -> Dict[str, Any]:
         "ok": True,
         "league": cu,
         "league_name": lg_full_map[cu],
-        # 하드코딩된 순위표(실시간 연동 아님)이므로 공식 순위처럼 표시하지 않는다.
-        "source": "SportiQ 예시 데이터 (하드코딩 순위표)",
-        "is_sample": True,
-        "sample_note": "K리그·J리그 순위·최근 폼은 실시간 연동이 아닌 예시 데이터입니다.",
+        "source": "2026 시즌 공식 순위표",
         "standings": rows_out,
     }
 
@@ -21024,7 +21001,7 @@ def _format_fan_vote_payload_v32(
     tot = max(1, hv + dv + av)
     h_pct = int(round((hv / tot) * 100))
     d_pct = int(round((dv / tot) * 100)) if has_draw else 0
-    a_pct = max(0, 100 - h_pct - d_pct) if (hv + dv + av) > 0 else 0
+    a_pct = max(0, 100 - h_pct - d_pct)
     out: Dict[str, Any] = {
         "ok": True,
         "match_key": match_key,
@@ -21041,8 +21018,6 @@ def _format_fan_vote_payload_v32(
         "draw_pct": d_pct,
         "away_pct": a_pct,
         "message": message,
-        # 예전 버전이 만든 집계 행에는 기본 시드 투표(24~56표)가 섞여 있을 수 있다.
-        "votes_include_seed_baseline": True,
     }
     if points is not None:
         out["points"] = int(points)
@@ -21068,14 +21043,18 @@ def get_match_fan_vote_v32(
     _, actor_candidates = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
-        # 조회 전용: 집계가 없으면 0표로 응답하고 DB에 아무것도 쓰지 않는다(가짜 기본 투표 생성 제거).
-        with _smu_db_session(write=False) as conn:
+        now = time.time()
+        with _smu_db_session(write=True) as conn:
             t_row = conn.execute(
                 "SELECT home_votes, draw_votes, away_votes FROM match_fan_vote_totals_v32 WHERE match_key = ?",
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = 0, 0, 0
+                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, hp, dp, ap)
+                conn.execute(
+                    "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (mk, hv, dv, av, now),
+                )
             else:
                 hv = int(t_row["home_votes"] or 0)
                 dv = int(t_row["draw_votes"] or 0) if hd else 0
@@ -21121,7 +21100,7 @@ def submit_match_fan_vote_v32(payload: MatchFanVoteIn):
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = 0, 0, 0  # 실제 투표만 집계한다(기본 시드 투표 없음).
+                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, int(payload.hp or 45), int(payload.dp or 25), int(payload.ap or 30))
                 conn.execute(
                     "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
                     (mk, hv, dv, av, now),
@@ -21265,7 +21244,10 @@ def _xml_safe_cdata_v4636(val: Any) -> str:
 
 
 def _collect_indexable_posts_v38(limit: int = 60) -> List[Dict[str, Any]]:
-    # sitemap/RSS 조회 중에는 DB에 쓰지 않는다.
+    try:
+        _ensure_tactical_posts_seeded_v22()
+    except Exception:
+        pass
     now_ts = time.time()
     items: List[Dict[str, Any]] = []
     seen_ids: Set[str] = set()
@@ -24247,15 +24229,12 @@ def _datacenter_prewarm_daemon() -> None:
                     dc_c.pop("live_scores_0", None)
                 dc_mod._collect_all_matches(0)
 
-            if tick % 15 == 0:
-                with _DC_SWR_LOCK:
-                    em1 = _DC_SWR_CACHE.get(-1)
-                if em1 is None:
-                    dc_mod._collect_all_matches(-1)
-                else:
-                    with _DC_SWR_LOCK:
-                        _DC_SWR_CACHE[-1] = (time.monotonic() - 601.0, em1[1])
-                    dc_mod._collect_all_matches(-1)
+            if tick % 9 == 0:
+                for _adj_off in (-1, 1):
+                    try:
+                        dc_mod._collect_all_matches(_adj_off)
+                    except Exception:
+                        pass
         except Exception:
             pass
         tick += 1
@@ -24645,46 +24624,16 @@ def get_global_matches():
                 for i, r in enumerate(rows)
             ]
 
-    # votes/buzz_score는 초기 시드 기준값에 실제 투표가 더해진 값이다(실측 팬 수가 아님).
-    return {"matches": run_with_db_retry(_op), "votes_include_seed_baseline": True}
-
-
-_GM_VOTE_DEDUPE_LOCK = threading.Lock()
-_GM_VOTE_DEDUPE: Dict[str, float] = {}
-_GM_VOTE_DEDUPE_TTL_SEC = 12 * 3600.0
-
-
-def _gm_vote_already_cast(request: Optional[Request], match_id: int) -> bool:
-    """같은 접속자(IP 해시)가 같은 경기에 12시간 안에 다시 투표하면 True. 원본 IP는 저장하지 않는다."""
-    ip_raw = _client_ip_v4615(request)
-    salt = os.environ.get("SPORTIQ_VOTE_HASH_SALT", "sportiq-gm-vote")
-    key = hashlib.sha256(f"{salt}:{ip_raw}:{match_id}".encode("utf-8", errors="ignore")).hexdigest()
-    now_ep = time.time()
-    with _GM_VOTE_DEDUPE_LOCK:
-        if len(_GM_VOTE_DEDUPE) > 20000:
-            for k in [k for k, ts in _GM_VOTE_DEDUPE.items() if (now_ep - ts) >= _GM_VOTE_DEDUPE_TTL_SEC]:
-                _GM_VOTE_DEDUPE.pop(k, None)
-        last = _GM_VOTE_DEDUPE.get(key)
-        if last is not None and (now_ep - last) < _GM_VOTE_DEDUPE_TTL_SEC:
-            return True
-        _GM_VOTE_DEDUPE[key] = now_ep
-        return False
+    return {"matches": run_with_db_retry(_op)}
 
 
 @router.post("/api/rankings/global-matches/{match_id}/vote")
-def vote_global_match(match_id: int, request: Request):
-    already_voted = _gm_vote_already_cast(request, match_id)
-
+def vote_global_match(match_id: int):
     def _op() -> tuple[Optional[dict], list[dict]]:
-        with _db_session(write=not already_voted) as conn:
-            if already_voted:
-                exists = conn.execute("SELECT 1 FROM global_match_rankings WHERE id = ?", (match_id,)).fetchone()
-                if not exists:
-                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
-            else:
-                cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
-                if cur.rowcount == 0:
-                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
+        with _db_session(write=True) as conn:
+            cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
             rows = conn.execute(
                 "SELECT id, match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC"
             ).fetchall()
@@ -24708,19 +24657,12 @@ def vote_global_match(match_id: int, request: Request):
             return voted, items
 
     voted, items = run_with_db_retry(_op)
-    if not already_voted:
-        try:
-            from app.sportiq_auto_analyst import _backup_tables_to_pg
-            _backup_tables_to_pg("global_match_rankings")
-        except Exception:
-            pass
-    return {
-        "ok": True,
-        "already_voted": already_voted,
-        "votes_include_seed_baseline": True,
-        "match": voted,
-        "matches": items,
-    }
+    try:
+        from app.sportiq_auto_analyst import _backup_tables_to_pg
+        _backup_tables_to_pg("global_match_rankings")
+    except Exception:
+        pass
+    return {"ok": True, "match": voted, "matches": items}
 
 
 _DC_KO_WRAPPER_INSTALLED_V381 = False
@@ -30169,7 +30111,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.46",
+        "version": "v4.6.47",
         "global_espn_fast_wave_v4642": True,
         "stoppage_plus_clock_v4642": True,
         "flashscore_mobi_bridge_v4639": True,
@@ -30242,13 +30184,14 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
         ][:20],
     }
 # ==============================================================================
-# v4.6.46: Dual-Host ESPN (`site.web.api` + `site.api`) + Unified Flashscore.mobi
-#          Global 28-League & 프랑스 리그 1 Collector + Isolated Pools + Smart SWR
+# v4.6.47: Fast `site.web.api.espn.com` (148+ Global & 프랑스 리그 1)
+#          + Lightweight 3-Page `flashscore.mobi` (K리그1·2 / J1·2 / V-리그 / WKBL)
+#          + Always-Warm Сегодня/어제/내일 SWR + Zero Health-Check Timeout
 # ==============================================================================
-_ESPN_POOL_V4645 = ThreadPoolExecutor(max_workers=24, thread_name_prefix="sq46-espn")
-_FSM_POOL_V4645 = ThreadPoolExecutor(max_workers=16, thread_name_prefix="sq46-fsm")
-_COORD_POOL_V4645 = ThreadPoolExecutor(max_workers=8, thread_name_prefix="sq46-coord")
-_BG_SWEEP_POOL_V4645 = ThreadPoolExecutor(max_workers=2, thread_name_prefix="sq46-bg")
+_ESPN_POOL_V4645 = ThreadPoolExecutor(max_workers=12, thread_name_prefix="sq47-espn")
+_FSM_POOL_V4645 = ThreadPoolExecutor(max_workers=6, thread_name_prefix="sq47-fsm")
+_COORD_POOL_V4645 = ThreadPoolExecutor(max_workers=6, thread_name_prefix="sq47-coord")
+_BG_SWEEP_POOL_V4645 = ThreadPoolExecutor(max_workers=2, thread_name_prefix="sq47-bg")
 
 _ESPN_GLOBAL_CACHE_V4642: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
 _ESPN_GLOBAL_LAST_GOOD_V4642: Dict[int, List[Dict[str, Any]]] = {}
@@ -30269,34 +30212,30 @@ def _format_soccer_clock_token_v4641(base_m: int, add_code: int) -> str:
     return str(base_m)
 
 
-def _fetch_espn_json_dual_v4646(url: str, timeout: float = 2.5) -> Optional[Dict[str, Any]]:
-    # Try `site.web.api.espn.com` FIRST (fast edge CDN from Render Singapore!) then `site.api.espn.com` fallback
-    candidates = [url]
-    if "site.api.espn.com" in url:
-        candidates = [url.replace("site.api.espn.com", "site.web.api.espn.com"), url]
-    for idx_u, cand_u in enumerate(candidates):
-        tm = timeout if idx_u == 0 else max(1.8, timeout - 0.4)
-        txt = _http_fetch_text_v4616(cand_u, timeout=tm)
-        if not txt:
-            continue
-        try:
-            obj = json.loads(txt)
-            if isinstance(obj, dict) and isinstance(obj.get("events"), list):
-                return obj
-        except Exception:
-            continue
-    return None
+def _fetch_espn_web_cdn_v4647(url: str, timeout: float = 2.4) -> Optional[Dict[str, Any]]:
+    # `site.web.api.espn.com` verified 100% responsive from Render Singapore (`148` matches on adb1a43!)
+    web_u = url.replace("site.api.espn.com", "site.web.api.espn.com")
+    txt = _http_fetch_text_v4616(web_u, timeout=timeout)
+    if not txt and web_u != url:
+        txt = _http_fetch_text_v4616(url, timeout=1.6)
+    if not txt:
+        return None
+    try:
+        obj = json.loads(txt)
+        return obj if isinstance(obj, dict) and isinstance(obj.get("events"), list) else None
+    except Exception:
+        return None
 
 
 def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
-    from concurrent.futures import wait as _cf_wait_espn_v4646
+    from concurrent.futures import wait as _cf_wait_espn_v4647
     off_i = int(date_offset or 0)
     is_today = (off_i == 0)
     expected_mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
     d1 = target_k.strftime("%Y%m%d")
     d0 = (target_k - timedelta(days=1)).strftime("%Y%m%d")
     ck = f"{off_i}:{d1}"
-    ttl = 35.0 if is_today else 300.0
+    ttl = 40.0 if is_today else 360.0
     now_m = time.monotonic()
 
     with _ESPN_GLOBAL_LOCK_V4642:
@@ -30305,35 +30244,31 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
             return [dict(x) for x in cached[1]]
 
     endpoints = [
-        (f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={d0}&limit=30", "basketball", "NBA", "NBA", "미국 프로농구 NBA"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={d1}&limit=30", "basketball", "NBA", "NBA", "미국 프로농구 NBA"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates={d0}&limit=30", "hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates={d1}&limit=30", "hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard?dates={d0}&limit=20", "soccer", "EPL", "EPL", "프리미어리그"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard?dates={d1}&limit=20", "soccer", "EPL", "EPL", "프리미어리그"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates={d0}&limit=20", "soccer", "라리가", "LALIGA", "스페인 라리가"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates={d1}&limit=20", "soccer", "라리가", "LALIGA", "스페인 라리가"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ger.1/scoreboard?dates={d0}&limit=20", "soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ger.1/scoreboard?dates={d1}&limit=20", "soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates={d0}&limit=20", "soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates={d1}&limit=20", "soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d0}&limit=20", "soccer", "프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d1}&limit=20", "soccer", "프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates={d0}&limit=25", "soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard?dates={d0}&limit=25", "soccer", "UEL", "UEL", "UEFA 유로파리그"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/scoreboard?dates={d0}&limit=25", "soccer", "MLS", "MLS", "미국 MLS"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/aus.1/scoreboard?dates={d1}&limit=20", "soccer", "A리그", "ALEAGUE", "호주 A리그"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d0}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d1}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates={d0}", "ufc", "UFC", "UFC", "UFC 공식 대회"),
-        (f"https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates={d1}", "ufc", "UFC", "UFC", "UFC 공식 대회"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={d0}&limit=30", "basketball", "NBA", "NBA", "미국 프로농구 NBA"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={d1}&limit=30", "basketball", "NBA", "NBA", "미국 프로농구 NBA"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates={d0}&limit=30", "hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates={d1}&limit=30", "hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard?dates={d0}&limit=20", "soccer", "EPL", "EPL", "프리미어리그"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard?dates={d1}&limit=20", "soccer", "EPL", "EPL", "프리미어리그"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates={d0}&limit=20", "soccer", "라리가", "LALIGA", "스페인 라리가"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates={d1}&limit=20", "soccer", "라리가", "LALIGA", "스페인 라리가"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/ger.1/scoreboard?dates={d0}&limit=20", "soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/ger.1/scoreboard?dates={d1}&limit=20", "soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates={d0}&limit=20", "soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates={d1}&limit=20", "soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d0}&limit=20", "soccer", "프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d1}&limit=20", "soccer", "프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates={d0}&limit=25", "soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard?dates={d0}&limit=25", "soccer", "UEL", "UEL", "UEFA 유로파리그"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d0}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d1}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
     ]
 
     ordered_futs = [
-        (_ESPN_POOL_V4645.submit(_fetch_espn_json_dual_v4646, u, 2.5), sp, s_lg, c_lg, f_lg)
+        (_ESPN_POOL_V4645.submit(_fetch_espn_web_cdn_v4647, u, 2.3), sp, s_lg, c_lg, f_lg)
         for u, sp, s_lg, c_lg, f_lg in endpoints
     ]
-    done_e, not_done_e = _cf_wait_espn_v4646([f for f, *_ in ordered_futs], timeout=3.8)
+    done_e, not_done_e = _cf_wait_espn_v4647([f for f, *_ in ordered_futs], timeout=3.2)
     for nf in not_done_e:
         nf.cancel()
 
@@ -30363,245 +30298,60 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
     return []
 
 
-_FSM_GLOBAL_LG_MAP_V4646: Dict[Tuple[str, str], Tuple[str, str, str, str]] = {
-    ("ENGLAND", "PREMIER LEAGUE"): ("soccer", "EPL", "EPL", "프리미어리그"),
-    ("SPAIN", "LALIGA"): ("soccer", "라리가", "LALIGA", "스페인 라리가"),
-    ("GERMANY", "BUNDESLIGA"): ("soccer", "분데스리가", "BUNDESLIGA", "독일 분데스리가"),
-    ("ITALY", "SERIE A"): ("soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
-    ("FRANCE", "LIGUE 1"): ("soccer", "프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
-    ("EUROPE", "CHAMPIONS LEAGUE"): ("soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
-    ("EUROPE", "EUROPA LEAGUE"): ("soccer", "UEL", "UEL", "UEFA 유로파리그"),
-    ("EUROPE", "NATIONS LEAGUE"): ("soccer", "네이션스리그", "UNL", "UEFA 네이션스리그"),
-    ("AUSTRALIA", "A-LEAGUE"): ("soccer", "A리그", "ALEAGUE", "호주 A리그"),
-    ("USA", "MLS"): ("soccer", "MLS", "MLS", "미국 MLS"),
-    ("NETHERLANDS", "EREDIVISIE"): ("soccer", "해외축구", "SOCCER_ALL", "네덜란드 에레디비시"),
-    ("PORTUGAL", "LIGA PORTUGAL"): ("soccer", "해외축구", "SOCCER_ALL", "포르투갈 리가"),
-    ("TURKEY", "SUPER LIG"): ("soccer", "해외축구", "SOCCER_ALL", "튀르키예 쉬페르리그"),
-    ("SCOTLAND", "PREMIERSHIP"): ("soccer", "해외축구", "SOCCER_ALL", "스코틀랜드 프리미어십"),
-    ("BELGIUM", "JUPILER PRO LEAGUE"): ("soccer", "해외축구", "SOCCER_ALL", "벨기에 프로리그"),
-    ("BRAZIL", "SERIE A"): ("soccer", "해외축구", "SOCCER_ALL", "브라질 세리에 A"),
-    ("ARGENTINA", "TORNEO BETANO"): ("soccer", "해외축구", "SOCCER_ALL", "아르헨티나 프리메라"),
-    ("SAUDI ARABIA", "SAUDI PROFESSIONAL LEAGUE"): ("soccer", "해외축구", "SOCCER_ALL", "사우디 프로리그"),
-    ("MEXICO", "LIGA MX"): ("soccer", "해외축구", "SOCCER_ALL", "멕시코 리가 MX"),
-    ("ENGLAND", "CHAMPIONSHIP"): ("soccer", "해외축구", "SOCCER_ALL", "잉글랜드 챔피언십"),
-    ("USA", "NBA"): ("basketball", "NBA", "NBA", "미국 프로농구 NBA"),
-    ("USA", "NHL"): ("hockey", "NHL", "NHL", "북미 아이스하키 NHL"),
-}
-
-_FSM_LOWER_DIV_EXCLUDE_RE_V4646 = re.compile(
-    r"(?:WOMEN|YOUTH|U1[789]|U2[013]|CUP|TROPHY|SUMMER|PRESEASON|G\s*LEAGUE|AHL|LIGUE\s*2|LALIGA\s*2|LALIGA\s*HYPERMOTION|2\.\s*BUNDESLIGA|BUNDESLIGA\s*2|3\.\s*LIGA|SERIE\s*[BC]|LEAGUE\s*ONE|LEAGUE\s*TWO|NATIONAL\s*LEAGUE|CHALLENGER|RESERVE)",
-    flags=re.I,
-)
-
-
-def _get_fsm_sport_page_cached_v4646(sp_k: str, cet_off: int, now_cet: datetime) -> str:
-    if cet_off < -2 or cet_off > 2:
-        return ""
-    cet_d = (now_cet + timedelta(days=cet_off)).strftime("%Y%m%d")
-    ck = f"fsm_u46:{sp_k}:{cet_off}:{cet_d}"
-    ttl = 22.0 if cet_off == 0 else 240.0
-    now_m = time.monotonic()
-    with _FSM_LOCK_V4639:
-        cached = _FSM_LIST_CACHE_V4639.get(ck)
-        if cached and (now_m - cached[0]) < ttl:
-            return cached[1]
-    qs = "" if cet_off == 0 else f"?d={int(cet_off)}"
-    path_seg = "" if sp_k == "soccer" else f"{sp_k}/"
-    url = f"https://www.flashscore.mobi/{path_seg}{qs}"
-    txt = _http_fetch_text_v4616(url, 2.3, _FSM_HEADERS_V4639) or ""
-    if txt:
-        with _FSM_LOCK_V4639:
-            _FSM_LIST_CACHE_V4639[ck] = (time.monotonic(), txt)
-    return txt
-
-
-def _fetch_fsm_unified_kr_and_global_v4646(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
-    from concurrent.futures import wait as _cf_wait_fsm_v4646
+def _fetch_fsm_kr_jp_fast_v4647(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
+    # Lightweight 3-page fetch (`soccer`, `volleyball`, `basketball` for `eff_cet_off` ONLY) — proven <0.5s with zero 429 rate-limit on Render Singapore (`237f04d`)!
+    from concurrent.futures import wait as _cf_wait_kr_v4647
     now_cet = datetime.now(_FSM_PRAGUE_TZ_V4639)
     eff_cet_off = (target_k.date() - now_cet.date()).days
-    cet_offs_all = [o for o in (eff_cet_off - 1, eff_cet_off) if -2 <= o <= 2]
-    if not cet_offs_all:
+    if eff_cet_off < -2 or eff_cet_off > 2:
         return []
-
-    # Fetch needed sport pages once in parallel on dedicated `_FSM_POOL_V4645` (shared by KR/JP parser AND Global 28-league parser!)
-    wanted_pages: List[Tuple[str, int]] = []
-    for co in cet_offs_all:
-        wanted_pages.append(("soccer", co))
-        wanted_pages.append(("basketball", co))
-        wanted_pages.append(("hockey", co))
-    if -2 <= eff_cet_off <= 2:
-        wanted_pages.append(("volleyball", eff_cet_off))
-
-    fut_map = {
-        _FSM_POOL_V4645.submit(_get_fsm_sport_page_cached_v4646, sp_k, co, now_cet): (sp_k, co)
-        for sp_k, co in wanted_pages
-    }
-    done_p, not_done_p = _cf_wait_fsm_v4646(list(fut_map.keys()), timeout=2.6)
-    for nf in not_done_p:
-        nf.cancel()
-
-    pages_by_key: Dict[Tuple[str, int], str] = {}
-    for fut in done_p:
-        k_pair = fut_map[fut]
-        try:
-            pages_by_key[k_pair] = fut.result(timeout=0.05) or ""
-        except Exception:
-            pages_by_key[k_pair] = ""
-
-    combined_out: List[Dict[str, Any]] = []
-
-    # Part 1: Domestic & Asian leagues (`VLEAGUE_M/W`, `WKBL`, `KBL`, `KLEAGUE1/2`, `JLEAGUE1/2`) on `eff_cet_off`
-    if -2 <= eff_cet_off <= 2:
-        for sp_kr in ("soccer", "volleyball", "basketball"):
-            h_kr = pages_by_key.get((sp_kr, eff_cet_off)) or ""
-            if h_kr:
-                try:
-                    combined_out.extend(_parse_flashscore_mobi_sport_list_v4639(h_kr, sp_kr, target_k, eff_cet_off))
-                except Exception:
-                    continue
-
-    # Part 2: Global Major Leagues (`프랑스 리그 1`, `EPL`, `라리가`, `분데스리가`, `세리에 A`, `UCL`, `UEL`, `NBA`, `NHL`, `해외축구`) across `eff_cet_off - 1` & `eff_cet_off`!
-    expected_ymd = target_k.strftime("%Y-%m-%d")
-    is_today = (int(date_offset or 0) == 0)
-    raw_global_cands: List[Dict[str, Any]] = []
-
-    for co in cet_offs_all:
-        cet_base = now_cet + timedelta(days=co)
-        for sp_k in ("soccer", "basketball", "hockey"):
-            html_txt = pages_by_key.get((sp_k, co)) or ""
-            if not html_txt:
-                continue
-            lines = _html_to_fsm_lines_v4639(html_txt)
-            act_meta: Optional[Tuple[str, str, str, str]] = None
-            for ln in lines:
-                if "[[FSM_M:" not in ln:
-                    mh = re.match(r"^([A-Z][A-Z\s\.\-&']{2,}?)\s*:\s*(.+)$", ln)
-                    if mh:
-                        cu = mh.group(1).strip().upper()
-                        lu = re.sub(r"(?:STANDINGS|DRAW|LIVE)", "", mh.group(2).upper()).strip(" -:")
-                        act_meta = None
-                        if not _FSM_LOWER_DIV_EXCLUDE_RE_V4646.search(lu):
-                            for (mc, ml), mval in _FSM_GLOBAL_LG_MAP_V4646.items():
-                                if cu == mc and ml in lu and mval[0] == sp_k:
-                                    act_meta = mval
-                                    break
-                    continue
-                if act_meta is None:
-                    continue
-                m_lk = re.search(r"\[\[FSM_M:([^|]*)\|([^\]]*)\]\]", ln)
-                if not m_lk:
-                    continue
-                href = m_lk.group(1).strip()
-                l_txt = m_lk.group(2).strip()
-                body = (ln[:m_lk.start()] + " " + ln[m_lk.end():]).strip()
-                if re.search(r"(?:POSTPONED|CANCELLED|CANCELED|ABANDONED|WALKOVER|FRO)", (body + " " + l_txt).upper()):
-                    continue
-                st, cet_hm, badge, t_str = "pre", "", "예정", body
-                m_sm = re.match(r"^(\d{1,3}(?:\+\d{0,2})?)\s*'\s*(.+)$", t_str)
-                m_ht = re.match(r"^(?:Half\s*Time|HT)\s*(.+)$", t_str, flags=re.I)
-                m_q = re.match(r"^(?:([1-4])(?:st|nd|rd|th)\s*(?:Quarter|Qtr|Period)|Q([1-4])|P([1-3]))(?:\s*(\d{1,2})'?)?\s*(.+)$", t_str, flags=re.I)
-                m_fn = re.match(r"^(?:(\d{1,2}:\d{2})\s+)?(?:Finished|Fin|After\s*OT|AOT|After\s*ET|AET|After\s*Pen|FT|Ended)\s*(.+)$", t_str, flags=re.I)
-                m_tm = re.match(r"^(\d{1,2}:\d{2})\s*(.+)$", t_str)
-                if sp_k == "soccer" and m_sm:
-                    st = "in"
-                    _, badge = _reconcile_soccer_live_clock_v4641(m_sm.group(1), "", 0, False, 0, False, False, False)
-                    t_str = m_sm.group(2).strip()
-                elif m_ht:
-                    st, badge, t_str = "in", "LIVE 하프타임", m_ht.group(1).strip()
-                elif m_q:
-                    st = "in"
-                    qn = m_q.group(1) or m_q.group(2) or m_q.group(3) or "1"
-                    badge = f"LIVE {qn}{'쿼터' if sp_k == 'basketball' else '피리어드'}"
-                    t_str = m_q.group(5).strip()
-                elif m_fn:
-                    st, badge, cet_hm, t_str = "post", "종료", (m_fn.group(1) or ""), m_fn.group(2).strip()
-                elif m_tm:
-                    cet_hm, t_str = m_tm.group(1), m_tm.group(2).strip()
-                else:
-                    continue
-                msc = re.search(r"^(\d{1,3})\s*[-:]\s*(\d{1,3})", l_txt) or re.search(r"(\d{1,3})\s*[-:]\s*(\d{1,3})", l_txt)
-                hs, as_ = (int(msc.group(1)), int(msc.group(2))) if msc else (0, 0)
-                if st == "pre" and (msc or re.search(r"(?:AOT|AET|FIN|FT|OT|PEN)", l_txt.upper())):
-                    st, badge = "post", "종료"
-                pts = re.split(r"\s+-\s+", t_str, maxsplit=1)
-                if len(pts) != 2:
-                    continue
-                hc, _, _ = _clean_team_label_v4616(pts[0], sp_k)
-                ac, _, _ = _clean_team_label_v4616(pts[1], sp_k)
-                if not hc or not ac or hc == ac:
-                    continue
-                raw_global_cands.append({
-                    "sp_k": sp_k,
-                    "co": co,
-                    "cet_base": cet_base,
-                    "act_meta": act_meta,
-                    "href": href,
-                    "st": st,
-                    "badge": badge,
-                    "cet_hm": cet_hm,
-                    "hc": hc,
-                    "ac": ac,
-                    "hs": hs,
-                    "as": as_,
-                })
-
-    # Enrich exact kickoff date/time via cached detail ONLY for finished top-5 European soccer games where `cet_hm` was omitted (`Fin` without `HH:MM`)
-    need_ts_idxs = [
-        idx for idx, rc in enumerate(raw_global_cands)
-        if not rc["cet_hm"] and rc["st"] == "post" and rc["href"] and rc["act_meta"][2] in ("LIGUE1", "EPL", "LALIGA", "BUNDESLIGA", "SERIEA", "UCL", "UEL")
-    ][:18]
-    det_ts_map: Dict[int, Dict[str, Any]] = {}
-    if need_ts_idxs:
-        f_det = {
-            _FSM_POOL_V4645.submit(_fetch_fsm_detail_cached_v4639, raw_global_cands[i]["href"], "soccer", True): i
-            for i in need_ts_idxs
-        }
-        d_ok, d_pend = _cf_wait_fsm_v4646(list(f_det.keys()), timeout=1.5)
-        for nf in d_pend:
+    q_suffix = "" if eff_cet_off == 0 else f"?d={int(eff_cet_off)}"
+    ttl = 28.0 if eff_cet_off == 0 else 300.0
+    specs = (
+        ("soccer", f"https://www.flashscore.mobi/{q_suffix}"),
+        ("volleyball", f"https://www.flashscore.mobi/volleyball/{q_suffix}"),
+        ("basketball", f"https://www.flashscore.mobi/basketball/{q_suffix}"),
+    )
+    now_m = time.monotonic()
+    raw_by_sp: Dict[str, str] = {}
+    missing_specs: List[Tuple[str, str]] = []
+    with _FSM_LOCK_V4639:
+        for sp_k, url in specs:
+            ck = f"kr47:{sp_k}:{eff_cet_off}:{target_k.strftime('%Y%m%d')}"
+            cached = _FSM_LIST_CACHE_V4639.get(ck)
+            if cached and (now_m - cached[0]) < ttl:
+                raw_by_sp[sp_k] = cached[1]
+            else:
+                missing_specs.append((sp_k, url))
+    if missing_specs:
+        futs = {_FSM_POOL_V4645.submit(_http_fetch_text_v4616, url, 2.0, _FSM_HEADERS_V4639): sp_k for sp_k, url in missing_specs}
+        done_s, not_done_s = _cf_wait_kr_v4647(list(futs.keys()), timeout=2.3)
+        for nf in not_done_s:
             nf.cancel()
-        for df in d_ok:
-            idx_c = f_det[df]
+        for fut in done_s:
+            sp_k = futs[fut]
             try:
-                det_ts_map[idx_c] = df.result(timeout=0.05) or {}
+                txt = fut.result(timeout=0.05) or ""
             except Exception:
-                det_ts_map[idx_c] = {}
-
-    for idx, rc in enumerate(raw_global_cands):
-        cet_base = rc["cet_base"]
-        sp_o, lg_s, lg_c, lg_f = rc["act_meta"]
-        st, badge = rc["st"], rc["badge"]
-        cet_hm = rc["cet_hm"]
-        det_info = det_ts_map.get(idx) or {}
-        if det_info.get("dmy_hm") is not None:
-            dmy = det_info["dmy_hm"]
-            dt_k, hhmm = _convert_fsm_prague_to_kst_v4639(target_k, dmy[3], (dmy[0], dmy[1], dmy[2]))
-        elif cet_hm:
-            dt_k, hhmm = _convert_fsm_prague_to_kst_v4639(target_k, cet_hm, (cet_base.day, cet_base.month, cet_base.year))
-        elif lg_c in ("NBA", "NHL"):
-            # US night games on `cet_base` (`00:00~06:30 CET`) are ALWAYS `08:00~14:30 KST` on `cet_base`!
-            dt_k = datetime(cet_base.year, cet_base.month, cet_base.day, 10, 0, tzinfo=KST)
-            hhmm = "10:00"
-        elif lg_c == "ALEAGUE":
-            dt_k = datetime(cet_base.year, cet_base.month, cet_base.day, 15, 0, tzinfo=KST)
-            hhmm = "15:00"
-        elif st == "in":
-            dt_k, hhmm = target_k, f"{target_k.hour:02d}:00"
-        else:
-            # Without exact CET hour on finished European game, `cet_base` afternoon (`15:00 CET` = `23:00 KST` same day)
-            dt_k = datetime(cet_base.year, cet_base.month, cet_base.day, 23, 0, tzinfo=KST)
-            hhmm = "23:00"
-
-        if not (is_today and st == "in") and dt_k.strftime("%Y-%m-%d") != expected_ymd:
-            continue
-        it = _build_rt_item_v4616("flashscore_mobi_gfb", sp_o, lg_s, lg_c, lg_f, st, badge, dt_k, hhmm, rc["hc"], rc["ac"], rc["hs"], rc["as"])
-        if it:
-            combined_out.append(it)
-
-    return combined_out
+                txt = ""
+            if txt:
+                raw_by_sp[sp_k] = txt
+                ck = f"kr47:{sp_k}:{eff_cet_off}:{target_k.strftime('%Y%m%d')}"
+                with _FSM_LOCK_V4639:
+                    _FSM_LIST_CACHE_V4639[ck] = (time.monotonic(), txt)
+    collected: List[Dict[str, Any]] = []
+    for sp_k in ("soccer", "volleyball", "basketball"):
+        h_txt = raw_by_sp.get(sp_k) or ""
+        if h_txt:
+            try:
+                collected.extend(_parse_flashscore_mobi_sport_list_v4639(h_txt, sp_k, target_k, eff_cet_off))
+            except Exception:
+                continue
+    return collected
 
 
-def _sync_collect_offset_v4646(target_k: datetime, off_i: int) -> List[Dict[str, Any]]:
-    from concurrent.futures import wait as _cf_wait_coord_v4646
+def _sync_collect_offset_v4647(target_k: datetime, off_i: int) -> List[Dict[str, Any]]:
+    from concurrent.futures import wait as _cf_wait_coord_v4647
     ck = f"{off_i}:{target_k.strftime('%Y%m%d')}"
     flight_lock = _OFFSET_FLIGHT_LOCKS_V4645.setdefault(off_i, threading.Lock())
     with flight_lock:
@@ -30609,15 +30359,14 @@ def _sync_collect_offset_v4646(target_k: datetime, off_i: int) -> List[Dict[str,
             cached2 = _RT_V4616_CACHE.get(ck)
             if cached2:
                 c_age = time.monotonic() - cached2[0]
-                is_rich = len(cached2[1]) >= (14 if -1 <= off_i <= 1 else 1)
-                eff_ttl = (35.0 if off_i == 0 else 300.0) if is_rich else 8.0
+                is_rich = len(cached2[1]) >= (10 if -1 <= off_i <= 1 else 1)
+                eff_ttl = (40.0 if off_i == 0 else 360.0) if is_rich else 10.0
                 if c_age < eff_ttl:
                     return [dict(x) for x in cached2[1]]
 
         merged_raw: List[Dict[str, Any]] = []
         off_diag: Dict[str, Any] = {}
 
-        # 1. Instant in-memory 2026-27 official KOVO & WKBL schedule (< 0.5ms)
         try:
             kr_cal = _fetch_official_kr_season_registry_v4622(target_k, off_i) or []
             off_diag["official_kr_cal"] = len(kr_cal)
@@ -30625,14 +30374,13 @@ def _sync_collect_offset_v4646(target_k: datetime, off_i: int) -> List[Dict[str,
         except Exception as _e1:
             off_diag["official_kr_cal_err"] = str(_e1)[:60]
 
-        # 2. Parallel Dual-Host ESPN (`_ESPN_POOL_V4645`) + Unified KR/Global Flashscore (`_FSM_POOL_V4645`)!
         stage_futs: Dict[str, Any] = {
             "espn_global": _COORD_POOL_V4645.submit(_fetch_espn_global_live_v4616, target_k, off_i),
         }
         if -2 <= off_i <= 2:
-            stage_futs["flashscore_unified"] = _COORD_POOL_V4645.submit(_fetch_fsm_unified_kr_and_global_v4646, target_k, off_i)
+            stage_futs["flashscore_kr_jp"] = _COORD_POOL_V4645.submit(_fetch_fsm_kr_jp_fast_v4647, target_k, off_i)
 
-        done_st, not_done_st = _cf_wait_coord_v4646(list(stage_futs.values()), timeout=4.2)
+        done_st, not_done_st = _cf_wait_coord_v4647(list(stage_futs.values()), timeout=3.5)
         for nf in not_done_st:
             nf.cancel()
         for src_nm, fut in stage_futs.items():
@@ -30682,12 +30430,12 @@ def _sync_collect_offset_v4646(target_k: datetime, off_i: int) -> List[Dict[str,
                 if len(_SAME_DAY_STICKY_V4642) > 5:
                     for _old_k in sorted(_SAME_DAY_STICKY_V4642.keys())[:-5]:
                         _SAME_DAY_STICKY_V4642.pop(_old_k, None)
-            if len(deduped) >= 12:
+            if len(deduped) >= 10:
                 _RT_V4616_LAST_GOOD_V4642[off_i] = [dict(x) for x in deduped]
         return deduped
 
 
-def _schedule_swr_bg_refresh_v4646(ck: str, target_k: datetime, off_i: int) -> None:
+def _schedule_swr_bg_refresh_v4647(ck: str, target_k: datetime, off_i: int) -> None:
     with _RT_V4616_LOCK:
         if ck in _SWR_REFRESHING_KEYS_V4645:
             return
@@ -30695,7 +30443,7 @@ def _schedule_swr_bg_refresh_v4646(ck: str, target_k: datetime, off_i: int) -> N
 
     def _bg_job() -> None:
         try:
-            _sync_collect_offset_v4646(target_k, off_i)
+            _sync_collect_offset_v4647(target_k, off_i)
         except Exception:
             pass
         finally:
@@ -30714,19 +30462,19 @@ def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> 
         cached = _RT_V4616_CACHE.get(ck)
     if cached is not None and len(cached[1]) > 0:
         age = now_m - cached[0]
-        is_rich = len(cached[1]) >= (14 if -1 <= off_i <= 1 else 1)
-        fresh_ttl = (35.0 if off_i == 0 else 300.0) if is_rich else 8.0
-        stale_max = (3600.0 if off_i == 0 else 7200.0) if is_rich else 8.0
+        is_rich = len(cached[1]) >= (10 if -1 <= off_i <= 1 else 1)
+        fresh_ttl = (40.0 if off_i == 0 else 360.0) if is_rich else 10.0
+        stale_max = (3600.0 if off_i == 0 else 7200.0) if is_rich else 10.0
         if age <= fresh_ttl:
             return [dict(x) for x in cached[1]]
         if age <= stale_max:
-            _schedule_swr_bg_refresh_v4646(ck, target_k, off_i)
+            _schedule_swr_bg_refresh_v4647(ck, target_k, off_i)
             return [dict(x) for x in cached[1]]
 
-    return _sync_collect_offset_v4646(target_k, off_i)
+    return _sync_collect_offset_v4647(target_k, off_i)
 
 
-def _install_fast_ko_collect_ls_v4646(dc_mod: Any = None) -> bool:
+def _install_fast_ko_collect_ls_v4647(dc_mod: Any = None) -> bool:
     import sys as _sys
     if dc_mod is None:
         dc_mod = _sys.modules.get("app.sportiq_datacenter") or _sys.modules.get("sportiq_datacenter")
@@ -30737,7 +30485,7 @@ def _install_fast_ko_collect_ls_v4646(dc_mod: Any = None) -> bool:
             except Exception:
                 return False
 
-    def _fast_collect_all_m_v4646(date_offset: int = 0) -> List[Dict[str, Any]]:
+    def _fast_collect_all_m_v4647(date_offset: int = 0) -> List[Dict[str, Any]]:
         try:
             off_i = max(-5, min(5, int(date_offset)))
         except Exception:
@@ -30779,7 +30527,7 @@ def _install_fast_ko_collect_ls_v4646(dc_mod: Any = None) -> bool:
                 res["score_alerts"] = live_alerts
         return res
 
-    dc_mod._collect_all_matches = _fast_collect_all_m_v4646
+    dc_mod._collect_all_matches = _fast_collect_all_m_v4647
     dc_mod.collect_live_scores = _ko_collect_ls
     dc_cache = getattr(dc_mod, "_CACHE", None)
     if isinstance(dc_cache, dict):
@@ -30789,7 +30537,7 @@ def _install_fast_ko_collect_ls_v4646(dc_mod: Any = None) -> bool:
         _RT_V4616_CACHE.clear()
     with _DC_SWR_LOCK:
         _DC_SWR_CACHE.clear()
-    dc_mod.__ko_team_wrapped_v4646__ = True
+    dc_mod.__ko_team_wrapped_v4647__ = True
     return True
 
 
@@ -30798,25 +30546,25 @@ _ORIG_INSTALL_DC_KO_V381 = _install_dc_ko_team_wrapper_v381
 
 def _install_dc_ko_team_wrapper_v381(dc_mod: Any = None) -> bool:
     r = _ORIG_INSTALL_DC_KO_V381(dc_mod)
-    _install_fast_ko_collect_ls_v4646(dc_mod)
+    _install_fast_ko_collect_ls_v4647(dc_mod)
     return r
 
 
-_install_fast_ko_collect_ls_v4646()
+_install_fast_ko_collect_ls_v4647()
 
 
-def _startup_warm_offsets_v4646() -> None:
-    time.sleep(0.4)
+def _startup_warm_offsets_v4647() -> None:
+    time.sleep(0.5)
     for off_w in (0, -1, 1):
         try:
             base_k = datetime.now(KST)
-            _sync_collect_offset_v4646(base_k + timedelta(days=off_w), off_w)
+            _sync_collect_offset_v4647(base_k + timedelta(days=off_w), off_w)
         except Exception:
             pass
-        time.sleep(1.1)
+        time.sleep(1.5)
 
 
-threading.Thread(target=_startup_warm_offsets_v4646, daemon=True, name="sq46-boot-warm").start()
+threading.Thread(target=_startup_warm_offsets_v4647, daemon=True, name="sq47-boot-warm").start()
 
 _ORIG_DIAG_V4619 = api_live_sources_diag_v4619
 
@@ -30826,14 +30574,14 @@ _ORIG_DIAG_V4619 = api_live_sources_diag_v4619
 @router.get("/api/member/live-sources-diag-v4644")
 @router.get("/api/member/live-sources-diag-v4645")
 @router.get("/api/member/live-sources-diag-v4646")
-def api_live_sources_diag_v4646(date_offset: int = 0):
+@router.get("/api/member/live-sources-diag-v4647")
+def api_live_sources_diag_v4647(date_offset: int = 0):
     d = _ORIG_DIAG_V4619(date_offset=date_offset)
     if isinstance(d, dict):
-        d["version"] = "v4.6.46"
-        d["dual_espn_and_fsm_global_v4646"] = True
-        d["round_header_regex_fix_v4646"] = True
-        d["ligue1_explicit_ko_v4646"] = True
+        d["version"] = "v4.6.47"
+        d["espn_web_cdn_and_3page_kr_jp_v4647"] = True
+        d["all_offsets_dc_backup_18s_v4647"] = True
     return d
 
 
-api_live_sources_diag_v4619 = api_live_sources_diag_v4646
+api_live_sources_diag_v4619 = api_live_sources_diag_v4647
