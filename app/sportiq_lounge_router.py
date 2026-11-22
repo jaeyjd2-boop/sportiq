@@ -4392,11 +4392,13 @@ _FRONTEND_V22_JS = r'''
       ]
     },
     privacy: {
-      title: "🔐 개인정보 비수집 · 4자리 PIN 보안 안내",
+      title: "🔒 개인정보처리방침 및 4자리 PIN 보안 안내",
       body: [
-        "1. 개인식별정보 무수집 원칙: SportIQ 오픈 라운지는 주민등록번호, 휴대전화번호, 이메일, 실명 등 민감 개인정보를 회원가입 목적으로 수집하지 않습니다.",
-        "2. 4자리 PIN 단방향 암호화 저장: 기기 간 포인트·칭호·북마크 연동을 위해 설정하는 숫자 4자리 PIN은 평문으로 저장되지 않으며, 서버 솔트 기반 PBKDF2-HMAC-SHA256(12,000회 반복) 단방향 해시값으로만 안전하게 보관됩니다.",
-        "3. 제휴 문의 보호: 파트너 입점·제휴 문의에 기재된 연락처는 공개 목록에서 즉시 마스킹 처리되며 제휴 회신 목적 외에는 사용되지 않습니다."
+        "제1조 (개인식별정보 비수집 원칙) SportIQ(billnojay.com) 오픈 라운지는 별도 회원가입 절차를 두지 않으며 주민등록번호, 실명, 휴대전화번호, 이메일, 주소 등 개인식별정보를 수집·요구하지 않습니다.",
+        "제2조 (4자리 PIN 단방향 암호화 보관) 기기 간 포인트·칭호·북마크 연동을 위해 이용자가 자율 설정하는 숫자 4자리 PIN은 평문으로 저장되지 않으며, 서버 고유 솔트 기반 PBKDF2-HMAC-SHA256(12,000회 반복) 단방향 해시값으로만 안전하게 보관됩니다.",
+        "제3조 (서비스 이용 기록의 보유 및 90일 자동 파기) 서비스 품질 개선을 위한 비식별 검색어 통계 로그(ai_iq_search_logs)는 생성일로부터 최대 90일간 보관 후 자동 정리 스케줄러에 의해 데이터베이스에서 영구 파기됩니다.",
+        "제4조 (쿠키 및 제3자 광고·분석 도구 안내) 본 사이트는 테마·관심팀 유지용 브라우저 로컬 스토리지와 함께 서비스 방문 통계 및 맞춤형 광고 제공을 위해 Google Analytics·Google AdSense 등 제3자 쿠키를 사용할 수 있으며, 이용자는 브라우저 설정 또는 Google 광고 설정 페이지에서 언제든 쿠키 저장을 거부할 수 있습니다.",
+        "제5조 (제휴 문의 보호 및 고충 처리) 파트너 입점·제휴 문의 시 기재된 담당자 연락처는 공개 화면에서 즉시 마스킹 처리되며 제휴 회신 완료 후 지체 없이 파기됩니다. 관련 문의는 하단 파트너·제휴 문의 창구를 통해 접수하실 수 있습니다."
       ]
     },
     policy: {
@@ -4425,7 +4427,7 @@ _FRONTEND_V22_JS = r'''
         "  </div>",
         "  <div id='sqLegalTabsV46'>",
         "    <button type='button' data-legal-tab='terms' class='sq-v44-hub-tab'>📜 이용약관</button>",
-        "    <button type='button' data-legal-tab='privacy' class='sq-v44-hub-tab'>🔐 PIN 보안</button>",
+        "    <button type='button' data-legal-tab='privacy' class='sq-v44-hub-tab'>🔒 개인정보처리방침</button>",
         "    <button type='button' data-legal-tab='policy' class='sq-v44-hub-tab'>🛡️ 운영정책</button>",
         "  </div>",
         "  <div id='sqLegalModalBody' style='font-size:12.4px;color:#cbd5e1;line-height:1.65;display:flex;flex-direction:column;gap:8px;'></div>",
@@ -4481,11 +4483,11 @@ _FRONTEND_V22_JS = r'''
       "  <div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;'>",
       "    <div>",
       "      <div style='font-weight:900;color:#f8fafc;font-size:13.5px;'>SportIQ Sports Data Intelligence Lounge · billnojay.com</div>",
-      "      <div style='color:#64748b;font-size:11.5px;margin-top:2px;'>실시간 글로벌 스포츠 통계 · AI 시뮬레이션 · 4자리 PIN 비식별 보안 라운지 | 불법스포츠도박 신고센터 1899-1119</div>",
+      "      <div style='color:#64748b;font-size:11.5px;margin-top:2px;'>실시간 글로벌 스포츠 통계 · AI 시뮬레이션 · 개인정보처리방침 준수(90일 로그 자동파기) | 불법스포츠도박 신고센터 1899-1119</div>",
       "    </div>",
       "    <div data-sq-footer-btn-grid='1' style='display:flex;gap:7px;flex-wrap:wrap;'>",
       "      <button type='button' class='sq-footer-link-btn' data-sq-legal='terms'>📜 이용약관</button>",
-      "      <button type='button' class='sq-footer-link-btn' data-sq-legal='privacy'>🔐 PIN 보안안내</button>",
+      "      <button type='button' class='sq-footer-link-btn' data-sq-legal='privacy'>🔒 개인정보처리방침 · PIN 보안</button>",
       "      <button type='button' class='sq-footer-link-btn' data-sq-legal='policy'>🛡️ 운영정책</button>",
       "      <button type='button' class='sq-footer-link-btn' id='sqFooterPartnerJumpBtn'>🤝 파트너·제휴 문의</button>",
       "    </div>",
@@ -7417,6 +7419,18 @@ _FRONTEND_V22_JS = r'''
         window.__sqSbOffsetMemV4645[targetOff] = { ts: Date.now(), items: combined };
       }
       if (targetOff !== (v30ScoreState.selectedDateOffset || 0)) return;
+      if (combined.length === 0 && targetOff >= -2 && targetOff <= 2 && !window["__sqRetryOnce53_" + targetOff]) {
+        window["__sqRetryOnce53_" + targetOff] = Date.now();
+        setTimeout(function () {
+          delete window["__sqRetryOnce53_" + targetOff];
+          if ((v30ScoreState.selectedDateOffset || 0) === targetOff && v30ScoreState.rawAllItems.length === 0) {
+            v30ScoreState.loadedDateOffset = null;
+            v30ScoreState.emptyLoadedTsV4645 = 0;
+            fetchServerScoreboardBridgeV30(targetOff);
+          }
+        }, 1100);
+        return;
+      }
       v30ScoreState.isLoadingDate = false;
       v30ScoreState.loadedDateOffset = targetOff;
       v30ScoreState.emptyLoadedTsV4645 = (combined.length === 0) ? Date.now() : 0;
@@ -22136,14 +22150,39 @@ _ESPN_LEAGUE_ENDPOINTS_V37: Dict[str, Tuple[str, str, str]] = {
 _ESPN_DIRECT_CACHE_V37: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
 
 
+_TEAM_KO_MEMO_V4653: Dict[Tuple[str, str], str] = {}
+_SORTED_TBL_KEYS_CACHE_V4653: Dict[int, List[Tuple[str, str, str]]] = {}
+_HANGUL_RE_V4653 = re.compile(r"[가-힣]")
+_WS_RE_V4653 = re.compile(r"\s+")
+_FC_TOKEN_RE_V4653 = re.compile(r"\b(fc|afc|cf|sc)\b")
+
+
+def _get_sorted_padded_keys_v4653(tbl: Dict[str, str], min_sub_len: int = 4) -> List[Tuple[str, str, str]]:
+    tid = id(tbl)
+    cached_k = _SORTED_TBL_KEYS_CACHE_V4653.get(tid)
+    if cached_k is not None:
+        return cached_k
+    built = [(k, f" {k} ", tbl[k]) for k in sorted(tbl.keys(), key=len, reverse=True) if len(k) >= min_sub_len]
+    _SORTED_TBL_KEYS_CACHE_V4653[tid] = built
+    return built
+
+
 def _localize_team_ko_v37(raw_name: str, sport: str = "") -> str:
     nm = (raw_name or "").strip()
-    if not nm or re.search(r"[가-힣]", nm):
+    if not nm:
         return nm
-    low = re.sub(r"\s+", " ", nm.lower().replace("’", "'")).strip()
-    low_clean = re.sub(r"\b(fc|afc|cf|sc)\b", "", low).strip()
-    low_clean = re.sub(r"\s+", " ", low_clean)
     sp = (sport or "").lower()
+    mk = (nm, sp)
+    memo_hit = _TEAM_KO_MEMO_V4653.get(mk)
+    if memo_hit is not None:
+        return memo_hit
+    if _HANGUL_RE_V4653.search(nm):
+        if len(_TEAM_KO_MEMO_V4653) < 4096:
+            _TEAM_KO_MEMO_V4653[mk] = nm
+        return nm
+    low = _WS_RE_V4653.sub(" ", nm.lower().replace("’", "'")).strip()
+    low_clean = _WS_RE_V4653.sub(" ", _FC_TOKEN_RE_V4653.sub("", low).strip())
+    padded_low = f" {low} "
 
     def _lookup_tbl(tbl: Dict[str, str], min_sub_len: int = 4) -> Optional[str]:
         if low in tbl:
@@ -22153,33 +22192,42 @@ def _localize_team_ko_v37(raw_name: str, sport: str = "") -> str:
         no_dot = low.replace(".", "")
         if no_dot in tbl:
             return tbl[no_dot]
-        for k in sorted(tbl.keys(), key=len, reverse=True):
-            if len(k) >= min_sub_len and re.search(rf"(?:^|\s){re.escape(k)}(?:$|\s)", low):
-                return tbl[k]
+        for _k_raw, k_pad, v_ko in _get_sorted_padded_keys_v4653(tbl, min_sub_len):
+            if k_pad in padded_low:
+                return v_ko
         return None
 
+    hit = None
     if sp == "basketball":
         hit = _lookup_tbl(_KO_NBA_TEAMS_V37, 4)
-        if hit:
-            return hit
     elif sp == "soccer":
         hit = _lookup_tbl(_KO_SOCCER_TEAMS_V37, 4)
-        if hit:
-            return hit
     elif sp in ("hockey", "baseball"):
         if sp == "hockey" and low == "kings":
-            return "LA 킹스"
-        if sp == "baseball" and low == "rangers":
-            return "텍사스 레인저스"
-        hit = _lookup_tbl(_KO_HOCKEY_MLB_TEAMS_V37, 4)
-        if hit:
-            return hit
+            hit = "LA 킹스"
+        elif sp == "baseball" and low == "rangers":
+            hit = "텍사스 레인저스"
+        else:
+            hit = _lookup_tbl(_KO_HOCKEY_MLB_TEAMS_V37, 4)
+    if hit:
+        if len(_TEAM_KO_MEMO_V4653) > 6000:
+            _TEAM_KO_MEMO_V4653.clear()
+        _TEAM_KO_MEMO_V4653[mk] = hit
+        return hit
+    res_nm = nm
+    if sp == "basketball" and hit:
+        res_nm = hit
     for tbl in (_KO_NBA_TEAMS_V37, _KO_SOCCER_TEAMS_V37, _KO_HOCKEY_MLB_TEAMS_V37):
         if low in tbl:
-            return tbl[low]
+            res_nm = tbl[low]
+            break
         if low_clean and low_clean in tbl:
-            return tbl[low_clean]
-    return nm
+            res_nm = tbl[low_clean]
+            break
+    if len(_TEAM_KO_MEMO_V4653) > 6000:
+        _TEAM_KO_MEMO_V4653.clear()
+    _TEAM_KO_MEMO_V4653[mk] = res_nm
+    return res_nm
 
 
 def _fetch_single_espn_json_url_v374(url: str, timeout: float = 3.4) -> Optional[Dict[str, Any]]:
@@ -23338,7 +23386,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     }
 
 
-_ESPN_PREWARM_STARTED_V373 = True  # Superseded by v4.6.53 sequential slim warmer
+_ESPN_PREWARM_STARTED_V373 = True
 
 
 def _start_coldboot_schedule_prewarmer_v373() -> None:
@@ -24525,7 +24573,6 @@ def install_datacenter_swr_accelerator(dc_mod: Any) -> bool:
 
 
 def _datacenter_prewarm_daemon() -> None:
-    # Superseded by v4.6.53 Zero-OOM single sequential warmer (prevents duplicate _DC_SWR_CACHE & 120s OOM spikes)
     time.sleep(1.0)
     try:
         from app import sportiq_datacenter as _dc
@@ -30408,7 +30455,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.53",
+        "version": "v4.6.54",
         "global_espn_fast_wave_v4642": True,
         "stoppage_plus_clock_v4642": True,
         "flashscore_mobi_bridge_v4639": True,
@@ -30485,10 +30532,10 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
 #          + 18-Worker `site.web.api.espn.com` (1-Wave Zero Queueing for 0/-1/+1)
 #          + Global-Aware `is_rich` Guard + Lightweight 3-Page KR/JP Collector
 # ==============================================================================
-_ESPN_POOL_V4645 = ThreadPoolExecutor(max_workers=6, thread_name_prefix="sq53-espn")
-_FSM_POOL_V4645 = ThreadPoolExecutor(max_workers=5, thread_name_prefix="sq53-fsm")
-_COORD_POOL_V4645 = ThreadPoolExecutor(max_workers=2, thread_name_prefix="sq53-coord")
-_BG_SWEEP_POOL_V4645 = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sq53-bg")
+_ESPN_POOL_V4645 = ThreadPoolExecutor(max_workers=18, thread_name_prefix="sq54-espn")
+_FSM_POOL_V4645 = ThreadPoolExecutor(max_workers=6, thread_name_prefix="sq53-fsm")
+_COORD_POOL_V4645 = ThreadPoolExecutor(max_workers=6, thread_name_prefix="sq53-coord")
+_BG_SWEEP_POOL_V4645 = ThreadPoolExecutor(max_workers=2, thread_name_prefix="sq53-bg")
 
 _ESPN_GLOBAL_CACHE_V4642: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
 _ESPN_GLOBAL_LAST_GOOD_V4642: Dict[int, List[Dict[str, Any]]] = {}
@@ -30577,31 +30624,35 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
         (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates={d1}&limit=20", "soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
         (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d0}&limit=20", "soccer", "프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
         (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d1}&limit=20", "soccer", "프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
-        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates={d0}&limit=20", "soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
-        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard?dates={d0}&limit=20", "soccer", "UEL", "UEL", "UEFA 유로파리그"),
-        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d0}&limit=40", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
-        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d1}&limit=40", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates={d0}&limit=25", "soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard?dates={d0}&limit=25", "soccer", "UEL", "UEL", "UEFA 유로파리그"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d0}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d1}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
     ]
 
     def _fetch_and_parse_slim_v4653(u_ep: str, sp_ep: str, sl_ep: str, cl_ep: str, fl_ep: str) -> List[Dict[str, Any]]:
-        is_all_soc = (cl_ep == "SOCCER_ALL")
-        js_ep = _fetch_espn_web_cdn_v4648(u_ep, 2.5)
+        tm_ep = 3.5 if cl_ep == "SOCCER_ALL" else 2.6
+        js_ep = _fetch_espn_web_cdn_v4648(u_ep, tm_ep)
         if not js_ep:
             return []
         try:
-            parsed_ep = _parse_espn_scoreboard_payload_v4616(js_ep, sp_ep, sl_ep, cl_ep, fl_ep, expected_mmdd, is_today)
-            return parsed_ep
+            if cl_ep == "SOCCER_ALL":
+                with _SOCCER_ALL_PARSE_LOCK_V4653:
+                    return _parse_espn_scoreboard_payload_v4616(js_ep, sp_ep, sl_ep, cl_ep, fl_ep, expected_mmdd, is_today)
+            return _parse_espn_scoreboard_payload_v4616(js_ep, sp_ep, sl_ep, cl_ep, fl_ep, expected_mmdd, is_today)
         finally:
             js_ep.clear()
             del js_ep
-            if is_all_soc:
-                gc.collect()
 
-    ordered_futs = [
-        _ESPN_POOL_V4645.submit(_fetch_and_parse_slim_v4653, u, sp, s_lg, c_lg, f_lg)
-        for u, sp, s_lg, c_lg, f_lg in endpoints
-    ]
-    done_e, not_done_e = _cf_wait_espn_v4648(ordered_futs, timeout=4.2)
+    # Submit `SOCCER_ALL` FIRST to network pool so largest payloads get maximum head-start,
+    # while storing in `ordered_futs` in original `endpoints` order so Top-5 league codes always win dedup!
+    submit_indices_v54 = sorted(range(len(endpoints)), key=lambda idx_e: (0 if endpoints[idx_e][3] == "SOCCER_ALL" else 1, idx_e))
+    fut_by_orig_idx_v54: Dict[int, Any] = {}
+    for idx_e in submit_indices_v54:
+        u, sp, s_lg, c_lg, f_lg = endpoints[idx_e]
+        fut_by_orig_idx_v54[idx_e] = _ESPN_POOL_V4645.submit(_fetch_and_parse_slim_v4653, u, sp, s_lg, c_lg, f_lg)
+    ordered_futs = [fut_by_orig_idx_v54[idx_e] for idx_e in range(len(endpoints))]
+    done_e, not_done_e = _cf_wait_espn_v4648(ordered_futs, timeout=4.3)
     for nf in not_done_e:
         nf.cancel()
 
@@ -30633,6 +30684,8 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
 
 _FSM_PARSED_SPORT_CACHE_V4653: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
 _WORKER_COLD_COLLECT_SEM_V4653 = threading.Semaphore(1)
+_SOCCER_ALL_PARSE_LOCK_V4653 = threading.Lock()
+_RT_READY_JSON_BYTES_V4653: Dict[str, Tuple[float, bool, bytes]] = {}
 
 
 def _fetch_fsm_kr_jp_fast_v4648(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
@@ -30777,11 +30830,38 @@ def _sync_collect_offset_v4648(target_k: datetime, off_i: int) -> List[Dict[str,
         if off_i == 0 and deduped:
             upgraded_vb = _enhance_kr_live_vleague_v4618(deduped, datetime.now(KST))
             _LAST_SOURCE_DIAG_V4617["vleague_live_upgraded"] = upgraded_vb
-            if upgraded_vb > 0:
-                ord_st_v51 = {"in": 0, "pre": 1, "post": 2}
-                deduped.sort(key=lambda x: (ord_st_v51.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
+        _localize_items_list_ko_v381(deduped)
+        deduped = _reconcile_domestic_with_official_cal_v4623(
+            _merge_and_filter_official_matches_v4616(deduped, expected_mmdd=expected_mmdd, is_today=(off_i == 0)),
+            target_k,
+        )
+        ord_st_v53 = {"in": 0, "pre": 1, "post": 2}
+        deduped.sort(key=lambda x: (ord_st_v53.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
+        for _d_clean in deduped:
+            _d_clean["_localized_ko_v53"] = True
+
+        now_k_fin = datetime.now(KST)
+        wd_fin = ["월", "화", "수", "목", "금", "토", "일"]
+        sb_payload_fin = {
+            "ok": True,
+            "date_offset": off_i,
+            "target_date_kst": f"{target_k.year}.{target_k.month:02d}.{target_k.day:02d} ({wd_fin[target_k.weekday()]})",
+            "server_now_kst": f"{now_k_fin.year}.{now_k_fin.month:02d}.{now_k_fin.day:02d} ({wd_fin[now_k_fin.weekday()]}) {now_k_fin.hour:02d}:{now_k_fin.minute:02d}:{now_k_fin.second:02d} KST",
+            "date_strip": _build_date_strip_v31(off_i),
+            "total": len(deduped),
+            "items": deduped,
+        }
+        ready_bytes = json.dumps(sb_payload_fin, ensure_ascii=False).encode("utf-8")
+        is_rich_fin = _is_rich_offset_items_v4648(deduped, off_i)
+        ts_fin = time.monotonic()
+
         with _RT_V4616_LOCK:
-            _RT_V4616_CACHE[ck] = (time.monotonic(), [dict(x) for x in deduped])
+            _RT_V4616_CACHE[ck] = (ts_fin, [dict(x) for x in deduped])
+            _RT_READY_JSON_BYTES_V4653[ck] = (ts_fin, is_rich_fin, ready_bytes)
+            if len(_RT_V4616_CACHE) > 7:
+                for _ck_old in list(_RT_V4616_CACHE.keys())[:-7]:
+                    _RT_V4616_CACHE.pop(_ck_old, None)
+                    _RT_READY_JSON_BYTES_V4653.pop(_ck_old, None)
             if -1 <= off_i <= 1 and deduped:
                 bucket_s = _SAME_DAY_STICKY_V4642.setdefault(ymd_key_s, {})
                 for _d_it in deduped:
@@ -30791,11 +30871,8 @@ def _sync_collect_offset_v4648(target_k: datetime, off_i: int) -> List[Dict[str,
                 if len(_SAME_DAY_STICKY_V4642) > 5:
                     for _old_k in sorted(_SAME_DAY_STICKY_V4642.keys())[:-5]:
                         _SAME_DAY_STICKY_V4642.pop(_old_k, None)
-            if _is_rich_offset_items_v4648(deduped, off_i):
+            if is_rich_fin:
                 _RT_V4616_LAST_GOOD_V4642[off_i] = [dict(x) for x in deduped]
-            if len(_RT_V4616_CACHE) > 7:
-                for _ck_old in list(_RT_V4616_CACHE.keys())[:-7]:
-                    _RT_V4616_CACHE.pop(_ck_old, None)
         gc.collect()
         return deduped
 
@@ -30853,14 +30930,15 @@ def _fast_api_member_scoreboard_v4648(date_offset: int = 0) -> Dict[str, Any]:
     server_now_kst = f"{now_k.year}.{now_k.month:02d}.{now_k.day:02d} ({wd_names[now_k.weekday()]}) {now_k.hour:02d}:{now_k.minute:02d}:{now_k.second:02d} KST"
 
     raw_items = _collect_realtime_all_sports_v4616(target_k, off_i)
-    _localize_items_list_ko_v381(raw_items)
-    mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
-    raw_items = _reconcile_domestic_with_official_cal_v4623(
-        _merge_and_filter_official_matches_v4616(raw_items, expected_mmdd=mmdd, is_today=(off_i == 0)),
-        target_k,
-    )
-    ord_sb = {"in": 0, "pre": 1, "post": 2}
-    raw_items.sort(key=lambda x: (ord_sb.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
+    if raw_items and not raw_items[0].get("_localized_ko_v53"):
+        _localize_items_list_ko_v381(raw_items)
+        mmdd = f"{target_k.month:02d}.{target_k.day:02d}"
+        raw_items = _reconcile_domestic_with_official_cal_v4623(
+            _merge_and_filter_official_matches_v4616(raw_items, expected_mmdd=mmdd, is_today=(off_i == 0)),
+            target_k,
+        )
+        ord_sb = {"in": 0, "pre": 1, "post": 2}
+        raw_items.sort(key=lambda x: (ord_sb.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
     return {
         "ok": True,
         "date_offset": off_i,
@@ -30904,7 +30982,8 @@ def _install_fast_ko_collect_ls_v4648(dc_mod: Any) -> bool:
         now_k = datetime.now(KST)
         tk = now_k + timedelta(days=off_i)
         clean_items = _collect_realtime_all_sports_v4616(tk, off_i)
-        _localize_items_list_ko_v381(clean_items)
+        if clean_items and not clean_items[0].get('_localized_ko_v53'):
+            _localize_items_list_ko_v381(clean_items)
         counts = _recompute_sport_counts_v4615(clean_items, {})
         now_wd = _KO_WD_V4616[now_k.weekday()]
         tgt_wd = _KO_WD_V4616[tk.weekday()]
@@ -30992,15 +31071,14 @@ _patch_all_loaded_dc_modules_v4648()
 
 
 def _startup_warm_offsets_v4648() -> None:
-    time.sleep(0.3)
+    time.sleep(0.25)
     _patch_all_loaded_dc_modules_v4648()
     for idx_w, off_w in enumerate((0, -1, 1)):
         if idx_w > 0:
-            time.sleep(0.5)
+            time.sleep(0.2)
         try:
             base_k = datetime.now(KST)
             _sync_collect_offset_v4648(base_k + timedelta(days=off_w), off_w)
-            gc.collect()
         except Exception:
             pass
 
@@ -31021,8 +31099,10 @@ def api_live_sources_diag_v4648(date_offset: int = 0):
     _patch_all_loaded_dc_modules_v4648()
     d = _ORIG_DIAG_V4619(date_offset=date_offset)
     if isinstance(d, dict):
-        d["version"] = "v4.6.53"
-        d["zero_oom_slim_parser_and_instant_tabs_v4653"] = True
+        d["version"] = "v4.6.54"
+        d["soccer_all_priority_retention_and_privacy_v4654"] = True
+        d["retention_status_v4654"] = dict(_RETENTION_STATE_V4654)
+        d["zero_oom_zero_regex_thrash_instant_tabs_v4653"] = True
         d["async_eventloop_and_sqlite_lock_shield_v4652"] = True
         d["realtime_15s_kleague_priority_and_sticky_guard_v4651"] = True
         d["soccer_h2h_and_ppg_verified_v4650"] = True
@@ -31359,7 +31439,7 @@ def api_member_match_h2h_v4650(
 
     out_payload: Dict[str, Any] = {
         "ok": True,
-        "version": "v4.6.53",
+        "version": "v4.6.54",
         "h2h": h2h_obj,
         "home_last": home_last,
         "away_last": away_last,
@@ -31381,7 +31461,7 @@ def api_member_match_h2h_v4650(
 # ==============================================================================
 import asyncio as _asyncio_v4652
 
-_SCOREBOARD_EXEC_POOL_V4652 = ThreadPoolExecutor(max_workers=4, thread_name_prefix="sq53-sb-exec")
+_SCOREBOARD_EXEC_POOL_V4652 = ThreadPoolExecutor(max_workers=6, thread_name_prefix="sq53-sb-exec")
 _SYNC_ME_SHIELD_LOCK_V4652 = threading.Lock()
 _SYNC_ME_LAST_BY_KEY_V4652: Dict[str, Tuple[float, bytes]] = {}
 
@@ -31500,15 +31580,39 @@ _pre_count_v4652 = len(router.routes)
 
 
 @router.get("/api/member/scoreboard-v30")
-async def _async_api_member_scoreboard_v4652(date_offset: int = 0) -> Dict[str, Any]:
+async def _async_api_member_scoreboard_v4652(date_offset: int = 0):
+    from fastapi.responses import Response
     try:
         off_i = max(-5, min(5, int(date_offset)))
     except Exception:
         off_i = 0
-    fast_hit = _try_ram_fast_scoreboard_v4652(off_i)
-    if fast_hit is not None:
-        return fast_hit
+    target_k = datetime.now(KST) + timedelta(days=off_i)
+    ck = f"{off_i}:{target_k.strftime('%Y%m%d')}"
+    with _RT_V4616_LOCK:
+        r_ent = _RT_READY_JSON_BYTES_V4653.get(ck)
+    if r_ent is not None:
+        age = time.monotonic() - r_ent[0]
+        is_rich = r_ent[1]
+        fresh_ttl = (15.0 if off_i == 0 else 1800.0) if is_rich else 4.0
+        stale_max = (3600.0 if off_i == 0 else 14400.0) if is_rich else 4.0
+        if age <= stale_max:
+            if age > fresh_ttl:
+                _schedule_swr_bg_refresh_v4648(ck, target_k, off_i)
+            return Response(
+                content=r_ent[2],
+                media_type="application/json; charset=utf-8",
+                headers={"Cache-Control": "no-store"},
+            )
     loop = _asyncio_v4652.get_running_loop()
+    await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, _sync_collect_offset_v4648, target_k, off_i)
+    with _RT_V4616_LOCK:
+        r_ent2 = _RT_READY_JSON_BYTES_V4653.get(ck)
+    if r_ent2 is not None:
+        return Response(
+            content=r_ent2[2],
+            media_type="application/json; charset=utf-8",
+            headers={"Cache-Control": "no-store"},
+        )
     return await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, _fast_api_member_scoreboard_v4648, off_i)
 
 
@@ -31713,3 +31817,80 @@ def _boot_shield_watcher_v4652() -> None:
 
 
 threading.Thread(target=_boot_shield_watcher_v4652, daemon=True, name="sq52-route-shield").start()
+
+
+# ==============================================================================
+# v4.6.54: 90-Day Search Log Auto-Retention Cleaner (`ai_iq_search_logs`)
+#          + `SOCCER_ALL` Wave-1 Priority Fetch + Explicit Privacy Policy Footer
+# ==============================================================================
+_RETENTION_STATE_V4654: Dict[str, Any] = {
+    "retention_days": 90,
+    "max_rows": 5000,
+    "last_run_kst": None,
+    "last_purged_rows": 0,
+    "remaining_rows": None,
+}
+
+
+def _prune_expired_search_logs_v4654(retention_days: int = 90, max_rows: int = 5000) -> Dict[str, Any]:
+    cutoff_ep = time.time() - (max(1, int(retention_days)) * 86400.0)
+    cap_rows = max(100, int(max_rows))
+
+    def _clean_op() -> Tuple[int, int]:
+        purged = 0
+        rem = 0
+        with _db_session(write=True) as conn:
+            exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='ai_iq_search_logs'"
+            ).fetchone()
+            if not exists:
+                return (0, 0)
+            c1 = conn.execute(
+                "DELETE FROM ai_iq_search_logs WHERE CAST(created_at AS REAL) > 0 AND CAST(created_at AS REAL) < ?",
+                (cutoff_ep,),
+            )
+            purged += int(c1.rowcount or 0)
+            tot_row = conn.execute("SELECT COUNT(*) FROM ai_iq_search_logs").fetchone()
+            tot_now = int(tot_row[0] if tot_row else 0)
+            if tot_now > cap_rows:
+                c2 = conn.execute(
+                    """
+                    DELETE FROM ai_iq_search_logs
+                    WHERE rowid NOT IN (
+                        SELECT rowid FROM ai_iq_search_logs ORDER BY rowid DESC LIMIT ?
+                    )
+                    """,
+                    (cap_rows,),
+                )
+                purged += int(c2.rowcount or 0)
+            rem_row = conn.execute("SELECT COUNT(*) FROM ai_iq_search_logs").fetchone()
+            rem = int(rem_row[0] if rem_row else 0)
+        return (purged, rem)
+
+    purged_cnt, rem_cnt = run_with_db_retry(_clean_op)
+    now_k = datetime.now(KST)
+    _RETENTION_STATE_V4654.update({
+        "retention_days": int(retention_days),
+        "max_rows": cap_rows,
+        "last_run_kst": now_k.strftime("%Y-%m-%d %H:%M:%S KST"),
+        "last_purged_rows": purged_cnt,
+        "remaining_rows": rem_cnt,
+    })
+    if purged_cnt > 0:
+        trig_pg = getattr(_smu, "_trigger_pg_backup", None)
+        if callable(trig_pg):
+            threading.Thread(target=trig_pg, args=("ai_iq_search_logs",), daemon=True).start()
+    return dict(_RETENTION_STATE_V4654)
+
+
+def _retention_cleaner_daemon_v4654() -> None:
+    time.sleep(25.0)
+    while True:
+        try:
+            _prune_expired_search_logs_v4654(retention_days=90, max_rows=5000)
+        except Exception:
+            pass
+        time.sleep(43200.0)  # Run once every 12 hours
+
+
+threading.Thread(target=_retention_cleaner_daemon_v4654, daemon=True, name="sq54-log-retention").start()
