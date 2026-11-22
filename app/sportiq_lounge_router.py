@@ -11159,6 +11159,10 @@ _FRONTEND_V22_JS = r'''
     }
 
     var shortsSec = document.getElementById("tab-shorts");
+    if (shortsSec && shortsSec.getAttribute("data-sq-v4655-managed") === "1") {
+      try { syncScheduleShortsAndChartModalV4630(); } catch (eV4630Early) {}
+      return;
+    }
     if (shortsSec) {
       var quizBox = shortsSec.querySelector("[data-sq-v43-shorts-panel='quiz']");
       var varBox = shortsSec.querySelector("[data-sq-v43-shorts-panel='var']");
@@ -15799,7 +15803,879 @@ _FRONTEND_V22_JS = r'''
     safeRunStepV4610(dedupLabKellyMonitorV36);
     safeRunStepV4610(syncAllLabEnhancementsV4629);
     safeRunStepV4610(syncScheduleShortsAndChartModalV4630);
-    safeRunStepV4610(installUniversalLifoEscapeV461);
+  
+  /* =========================================================================
+   * v4.6.55: 9:16 AI Tactical & Official YouTube RSS Auto-Updating Shorts Studio
+   *          - 30-min Server Auto-Collection (Official YouTube Atom RSS + Today's Real Matches)
+   *          - Default `🔁 자동넘김 ON` (00:00 -> 00:20 auto-advance across filtered playlist)
+   *          - Default `🆕 최신·자동수집순` so fresh daily highlights & live games appear #1
+   *          - Inline 9:16 Official YouTube Embed Toggle + Animated Tactical SVG Board
+   *          - Persistent Likes, Emoji Danmaku, +15P Quiz, VAR Vote, Timestamp Comments & Submit Modal
+   * ========================================================================= */
+  var _sqShortsStateV4655 = window._sqShortsStateV4655 = {
+    mounted: false,
+    fetching: false,
+    lastFetchMs: 0,
+    items: [],
+    likedIds: {},
+    quizDone: {},
+    varPicked: {},
+    activeClipId: "",
+    sportFilter: "all",
+    sortMode: "latest",
+    autoplay: true,
+    paused: false,
+    ytEmbedOpen: false,
+    speed: 1.0,
+    secElapsed: 0.0,
+    durationSec: 20,
+    subTab: "quiz",
+    updatedAtKst: "",
+    cycleMinutes: 30,
+    ytCount: 0,
+    matchCount: 0,
+    tickTimer: null,
+    pollTimer: null
+  };
+
+  function escHtmlShortsV55(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function injectAutoShortsCssV4655() {
+    if (document.getElementById("sqAutoShortsCssV4655")) return;
+    var st = document.createElement("style");
+    st.id = "sqAutoShortsCssV4655";
+    st.textContent = [
+      "[data-sq-legacy-shorts-hidden='1'] { display: none !important; }",
+      "#sqAutoShortsStudioV4655 { background:#090f1f; border:1px solid #1e293b; border-radius:16px; padding:14px 15px; color:#f8fafc; box-sizing:border-box; width:100%; max-width:100%; }",
+      "#sqAutoShortsSyncBarV4655 { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:8px 12px; margin-bottom:10px; border-radius:12px; background:linear-gradient(90deg,rgba(16,185,129,0.12),rgba(14,165,233,0.08)); border:1px solid rgba(16,185,129,0.32); font-size:11.5px; }",
+      "#sqAutoShortsMainGridV4655 { display:grid; grid-template-columns:332px minmax(0,1fr); gap:16px; align-items:start; }",
+      "@media (max-width: 860px) { #sqAutoShortsMainGridV4655 { grid-template-columns:1fr !important; } }",
+      ".sq-v55-pill { padding:5.5px 10px; border-radius:9px; border:1px solid #334155; background:#0f172a; color:#cbd5e1; font-size:11.8px; font-weight:700; cursor:pointer; transition:all .15s ease; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; }",
+      ".sq-v55-pill:hover { border-color:#475569; color:#ffffff; background:#1e293b; }",
+      ".sq-v55-pill.active { background:rgba(16,185,129,0.2); border-color:#10b981; color:#6ee7b7; box-shadow:0 0 0 1px rgba(16,185,129,0.25); }",
+      ".sq-v55-pill.active-sky { background:rgba(56,189,248,0.18); border-color:#38bdf8; color:#bae6fd; }",
+      "#sqV55Viewport { position:relative; height:420px; border-radius:14px; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:12px; box-sizing:border-box; border:1px solid rgba(148,163,184,0.22); user-select:none; }",
+      "@media (max-width: 480px) { #sqV55Viewport { height:380px; } }",
+      "@keyframes sqTacDashV55 { to { stroke-dashoffset: -36; } }",
+      "@keyframes sqTacNodePulseV55 { 0%,100% { transform:scale(1); opacity:0.92; } 50% { transform:scale(1.18); opacity:1; } }",
+      "@keyframes sqDanmakuFloatV55 { 0% { transform:translateY(14px) scale(0.85); opacity:0; } 15% { opacity:1; } 85% { opacity:0.95; } 100% { transform:translateY(-150px) scale(1.18); opacity:0; } }",
+      ".sq-v55-tac-line { stroke-dasharray: 7 5; animation: sqTacDashV55 1.6s linear infinite; }",
+      ".sq-v55-tac-node { transform-box: fill-box; transform-origin: center; animation: sqTacNodePulseV55 1.9s ease-in-out infinite; }",
+      ".sq-v55-float-emo { position:absolute; right:16px; bottom:90px; font-size:22px; pointer-events:none; z-index:9; animation: sqDanmakuFloatV55 1.8s ease-out forwards; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6)); }",
+      ".sq-v55-clip-card { padding:9px 11px; border-radius:11px; border:1px solid #1e293b; background:#0f172a; margin-bottom:7px; cursor:pointer; transition:all .15s ease; }",
+      ".sq-v55-clip-card:hover { border-color:#38bdf8; background:#131f38; }",
+      ".sq-v55-clip-card.active { border-color:#10b981 !important; background:linear-gradient(90deg,rgba(16,185,129,0.16),rgba(15,23,42,0.96)) !important; box-shadow:0 0 0 1px rgba(16,185,129,0.28); }",
+      ".sq-v55-progress-track { width:100%; height:4px; border-radius:999px; background:rgba(15,23,42,0.68); overflow:hidden; margin-top:6px; }",
+      ".sq-v55-progress-bar { height:100%; border-radius:999px; background:linear-gradient(90deg,#10b981,#38bdf8); transition:width .22s linear; }"
+    ].join("\n");
+    document.head.appendChild(st);
+  }
+
+  function formatSecV55(sec) {
+    var s = Math.max(0, Math.min(20, Math.floor(Number(sec) || 0)));
+    return "00:" + (s < 10 ? "0" + s : String(s));
+  }
+
+  function getFilteredClipsV4655() {
+    var list = (_sqShortsStateV4655.items || []).slice();
+    var sp = _sqShortsStateV4655.sportFilter || "all";
+    if (sp !== "all") {
+      list = list.filter(function (it) { return String(it.sport || "") === sp; });
+    }
+    var sm = _sqShortsStateV4655.sortMode || "latest";
+    if (sm === "popular") {
+      list.sort(function (a, b) { return (Number(b.likes || 0) - Number(a.likes || 0)) || (Number(b.sort_ts || 0) - Number(a.sort_ts || 0)); });
+    } else if (sm === "hotvote") {
+      list.sort(function (a, b) {
+        var va = Number(a.votes_a || 0) + Number(a.votes_b || 0);
+        var vb = Number(b.votes_a || 0) + Number(b.votes_b || 0);
+        return (vb - va) || (Number(b.sort_ts || 0) - Number(a.sort_ts || 0));
+      });
+    } else {
+      list.sort(function (a, b) {
+        var ua = (a.source_type === "user_submit") ? 1 : 0;
+        var ub = (b.source_type === "user_submit") ? 1 : 0;
+        if (ub !== ua) return ub - ua;
+        return (Number(b.sort_ts || 0) - Number(a.sort_ts || 0)) || (Number(b.likes || 0) - Number(a.likes || 0));
+      });
+    }
+    return list;
+  }
+
+  function getActiveClipObjV4655(filtered) {
+    var arr = filtered || getFilteredClipsV4655();
+    if (!arr.length) return null;
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].id === _sqShortsStateV4655.activeClipId) return arr[i];
+    }
+    _sqShortsStateV4655.activeClipId = arr[0].id;
+    return arr[0];
+  }
+
+  function buildTacticalSvgBoardV4655(clip) {
+    var sp = String((clip && clip.sport) || "soccer");
+    if (sp === "basketball") {
+      return {
+        bg: "linear-gradient(180deg,#451a03 0%,#1e1b4b 58%,#090f1f 100%)",
+        svg: "<svg viewBox='0 0 280 230' style='width:100%;height:168px;opacity:0.92;'>" +
+             "<rect x='10' y='8' width='260' height='212' rx='10' fill='rgba(245,158,11,0.08)' stroke='rgba(251,191,36,0.38)' stroke-width='1.5'/>" +
+             "<path d='M 40 220 A 100 95 0 0 1 240 220' fill='none' stroke='rgba(251,191,36,0.45)' stroke-width='1.5'/>" +
+             "<rect x='102' y='132' width='76' height='88' fill='rgba(249,115,22,0.12)' stroke='rgba(251,191,36,0.4)' stroke-width='1.3'/>" +
+             "<circle cx='140' cy='132' r='26' fill='none' stroke='rgba(251,191,36,0.35)' stroke-width='1.2'/>" +
+             "<path class='sq-v55-tac-line' d='M 140 78 L 195 112 L 236 168' fill='none' stroke='#38bdf8' stroke-width='2.6'/>" +
+             "<path class='sq-v55-tac-line' d='M 195 112 L 140 186' fill='none' stroke='#34d399' stroke-width='2.4'/>" +
+             "<circle class='sq-v55-tac-node' cx='140' cy='78' r='7' fill='#f97316' stroke='#fff' stroke-width='1.6'/>" +
+             "<circle class='sq-v55-tac-node' cx='195' cy='112' r='7' fill='#38bdf8' stroke='#fff' stroke-width='1.6'/>" +
+             "<circle class='sq-v55-tac-node' cx='236' cy='168' r='7' fill='#10b981' stroke='#fff' stroke-width='1.6'/>" +
+             "<circle cx='140' cy='198' r='6' fill='none' stroke='#fb7185' stroke-width='2.2'/>" +
+             "</svg>"
+      };
+    }
+    if (sp === "hockey") {
+      return {
+        bg: "linear-gradient(180deg,#0c4a6e 0%,#0f172a 62%,#020617 100%)",
+        svg: "<svg viewBox='0 0 280 230' style='width:100%;height:168px;opacity:0.92;'>" +
+             "<rect x='12' y='8' width='256' height='212' rx='28' fill='rgba(56,189,248,0.08)' stroke='rgba(125,211,252,0.42)' stroke-width='1.6'/>" +
+             "<line x1='12' y1='88' x2='268' y2='88' stroke='rgba(56,189,248,0.5)' stroke-width='2'/>" +
+             "<circle cx='78' cy='154' r='26' fill='none' stroke='rgba(244,63,94,0.42)' stroke-width='1.4'/>" +
+             "<circle cx='202' cy='154' r='26' fill='none' stroke='rgba(244,63,94,0.42)' stroke-width='1.4'/>" +
+             "<path class='sq-v55-tac-line' d='M 78 96 L 202 146 L 140 196' fill='none' stroke='#38bdf8' stroke-width='2.8'/>" +
+             "<circle class='sq-v55-tac-node' cx='78' cy='96' r='7' fill='#38bdf8' stroke='#fff' stroke-width='1.6'/>" +
+             "<circle class='sq-v55-tac-node' cx='202' cy='146' r='7' fill='#10b981' stroke='#fff' stroke-width='1.6'/>" +
+             "<rect x='124' y='196' width='32' height='12' rx='3' fill='rgba(244,63,94,0.3)' stroke='#fb7185' stroke-width='1.5'/>" +
+             "</svg>"
+      };
+    }
+    if (sp === "baseball") {
+      return {
+        bg: "linear-gradient(180deg,#1e3a8a 0%,#0f172a 62%,#020617 100%)",
+        svg: "<svg viewBox='0 0 280 230' style='width:100%;height:168px;opacity:0.92;'>" +
+             "<polygon points='140,26 232,118 140,206 48,118' fill='rgba(16,185,129,0.08)' stroke='rgba(148,163,184,0.4)' stroke-width='1.5'/>" +
+             "<rect x='116' y='74' width='48' height='60' fill='rgba(56,189,248,0.10)' stroke='rgba(56,189,248,0.55)' stroke-width='1.5'/>" +
+             "<path class='sq-v55-tac-line' d='M 140 34 Q 146 96 124 128' fill='none' stroke='#f43f5e' stroke-width='2.8'/>" +
+             "<path class='sq-v55-tac-line' d='M 140 34 Q 148 96 156 116' fill='none' stroke='#38bdf8' stroke-width='2.5'/>" +
+             "<circle class='sq-v55-tac-node' cx='124' cy='128' r='6.5' fill='#f43f5e' stroke='#fff' stroke-width='1.5'/>" +
+             "<circle class='sq-v55-tac-node' cx='156' cy='116' r='6.5' fill='#38bdf8' stroke='#fff' stroke-width='1.5'/>" +
+             "</svg>"
+      };
+    }
+    return {
+      bg: "linear-gradient(180deg,#064e3b 0%,#022c22 60%,#041e19 100%)",
+      svg: "<svg viewBox='0 0 280 230' style='width:100%;height:168px;opacity:0.93;'>" +
+           "<rect x='12' y='8' width='256' height='212' rx='10' fill='rgba(16,185,129,0.07)' stroke='rgba(110,231,183,0.38)' stroke-width='1.5'/>" +
+           "<line x1='12' y1='114' x2='268' y2='114' stroke='rgba(110,231,183,0.3)' stroke-width='1.3'/>" +
+           "<circle cx='140' cy='114' r='28' fill='none' stroke='rgba(110,231,183,0.3)' stroke-width='1.3'/>" +
+           "<rect x='84' y='8' width='112' height='44' fill='none' stroke='rgba(110,231,183,0.36)' stroke-width='1.3'/>" +
+           "<path class='sq-v55-tac-line' d='M 74 166 L 138 118 L 198 76 L 144 28' fill='none' stroke='#fde047' stroke-width='2.7'/>" +
+           "<path class='sq-v55-tac-line' d='M 198 152 L 198 76' fill='none' stroke='#38bdf8' stroke-width='2.2'/>" +
+           "<circle class='sq-v55-tac-node' cx='74' cy='166' r='7' fill='#10b981' stroke='#fff' stroke-width='1.6'/>" +
+           "<circle class='sq-v55-tac-node' cx='138' cy='118' r='7' fill='#38bdf8' stroke='#fff' stroke-width='1.6'/>" +
+           "<circle class='sq-v55-tac-node' cx='198' cy='76' r='7.5' fill='#f59e0b' stroke='#fff' stroke-width='1.6'/>" +
+           "<circle cx='144' cy='24' r='6' fill='#ef4444' stroke='#fff' stroke-width='1.4'/>" +
+           "</svg>"
+    };
+  }
+
+  function awardShortsPointsUiV4655(res) {
+    if (!res || typeof res.points !== "number" || !(res.awarded_points > 0)) return;
+    var stTarget = (typeof state === "object" && state) ? state : (window.state || null);
+    if (stTarget) {
+      stTarget.points = Number(res.points);
+      if (res.role_tier) stTarget.role = res.role_tier;
+    }
+    try { localStorage.setItem("sportiq_points", String(res.points)); } catch (e) {}
+    if (typeof window.updatePointsUI === "function") {
+      try { window.updatePointsUI(); } catch (e2) {}
+    }
+    ["pointsBadge", "userPoints", "heroPoints", "quickPointsBadge"].forEach(function (pid) {
+      var pel = document.getElementById(pid);
+      if (pel) pel.textContent = res.points + " P";
+    });
+    if (typeof renderTierUpgradeSidebarCard === "function") {
+      try { renderTierUpgradeSidebarCard(); } catch (e3) {}
+    }
+  }
+
+  function postShortsActionV4655(payload, cb) {
+    var stRef = (typeof state === "object" && state) ? state : (window.state || null);
+    var curPts = (stRef && stRef.points != null) ? Number(stRef.points || 120) : 120;
+    if (isNaN(curPts) || curPts < 0) curPts = 120;
+    var bodyObj = Object.assign({
+      actor_key: (typeof getActorKeyV22 === "function") ? getActorKeyV22() : "guest_v55",
+      nickname: (typeof getSavedNickV22 === "function") ? getSavedNickV22() : "",
+      pin: (typeof getSavedPinV22 === "function") ? getSavedPinV22() : "",
+      client_points: curPts
+    }, payload || {});
+    fetch("/api/member/auto-shorts-action-v4655", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bodyObj)
+    })
+      .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+      .then(function (resWrap) {
+        if (!resWrap) return;
+        var d = resWrap.data || {};
+        if (resWrap.status >= 400 || d.ok === false) {
+          var errMsg = d.detail || d.message || "요청을 처리할 수 없습니다.";
+          if (typeof showToast === "function") showToast("⚠️ " + errMsg);
+          return;
+        }
+        awardShortsPointsUiV4655(d);
+        if (d.message && typeof showToast === "function") showToast(d.message);
+        if (typeof cb === "function") cb(d);
+      })
+      .catch(function () {});
+  }
+
+  function spawnFloatingEmojiV4655(emoChar) {
+    var vp = document.getElementById("sqV55Viewport");
+    if (!vp) return;
+    var el = document.createElement("div");
+    el.className = "sq-v55-float-emo";
+    el.style.right = (14 + Math.floor(Math.random() * 68)) + "px";
+    el.textContent = emoChar || "🔥";
+    vp.appendChild(el);
+    setTimeout(function () {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    }, 1850);
+  }
+
+  function advanceNextClipV4655(delta) {
+    var filtered = getFilteredClipsV4655();
+    if (!filtered.length) return;
+    var curIdx = 0;
+    for (var i = 0; i < filtered.length; i++) {
+      if (filtered[i].id === _sqShortsStateV4655.activeClipId) {
+        curIdx = i;
+        break;
+      }
+    }
+    var nextIdx = (curIdx + (delta || 1) + filtered.length) % filtered.length;
+    _sqShortsStateV4655.activeClipId = filtered[nextIdx].id;
+    _sqShortsStateV4655.secElapsed = 0;
+    _sqShortsStateV4655.ytEmbedOpen = false;
+    renderAutoShortsStudioV4655();
+  }
+
+  function openShortsSubmitModalV4655() {
+    var oldM = document.getElementById("sqShortsSubmitModalV4655");
+    if (oldM && oldM.parentNode) oldM.parentNode.removeChild(oldM);
+    var savedNick = (typeof getSavedNickV22 === "function" ? getSavedNickV22() : "") || "SportIQ 분석러";
+    var wrap = document.createElement("div");
+    wrap.id = "sqShortsSubmitModalV4655";
+    wrap.setAttribute("role", "dialog");
+    wrap.style.cssText = "position:fixed;inset:0;z-index:99990;background:rgba(2,6,23,0.82);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;";
+    wrap.innerHTML = [
+      "<div class='sq-modal-panel' style='width:100%;max-width:460px;background:#0f172a;border:1px solid #334155;border-radius:16px;padding:18px;color:#f8fafc;box-shadow:0 20px 50px rgba(0,0,0,0.65);'>",
+      "  <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;'>",
+      "    <div style='font-size:15px;font-weight:900;color:#6ee7b7;'>➕ 나만의 유튜브 숏츠 · 하이라이트 제보하기</div>",
+      "    <button type='button' id='sqV55SubCloseBtn' class='sq-v55-pill' style='padding:4px 9px;'>닫기 ×</button>",
+      "  </div>",
+      "  <div style='display:flex;flex-direction:column;gap:9px;font-size:12px;'>",
+      "    <div><div style='color:#94a3b8;margin-bottom:3px;font-weight:700;'>종목 선택</div>",
+      "      <select id='sqV55SubSport' style='width:100%;padding:8px 10px;border-radius:9px;background:#020617;border:1px solid #334155;color:#f8fafc;font-size:12.5px;'>",
+      "        <option value='soccer'>⚽ 축구 (EPL·유럽·K리그)</option>",
+      "        <option value='baseball'>⚾ 야구 (KBO·MLB)</option>",
+      "        <option value='basketball'>🏀 농구 (NBA·WKBL)</option>",
+      "        <option value='hockey'>🏒 하키 (NHL)</option>",
+      "      </select></div>",
+      "    <div><div style='color:#94a3b8;margin-bottom:3px;font-weight:700;'>클립 제목</div>",
+      "      <input id='sqV55SubTitle' type='text' maxlength='80' placeholder='예: 손흥민 역습 스프린트 & 파포스트 마무리' style='width:100%;box-sizing:border-box;padding:8px 10px;border-radius:9px;background:#020617;border:1px solid #334155;color:#f8fafc;font-size:12.5px;'/></div>",
+      "    <div><div style='color:#94a3b8;margin-bottom:3px;font-weight:700;'>공식 유튜브 숏츠 / 하이라이트 URL</div>",
+      "      <input id='sqV55SubUrl' type='url' maxlength='200' placeholder='https://www.youtube.com/shorts/... 또는 watch?v=...' style='width:100%;box-sizing:border-box;padding:8px 10px;border-radius:9px;background:#020617;border:1px solid #334155;color:#f8fafc;font-size:12.5px;'/></div>",
+      "    <div><div style='color:#94a3b8;margin-bottom:3px;font-weight:700;'>한줄 전술 관전 포인트</div>",
+      "      <input id='sqV55SubDesc' type='text' maxlength='110' placeholder='예: 하프스페이스 침투 타이밍과 수비 라인 시선 분산' style='width:100%;box-sizing:border-box;padding:8px 10px;border-radius:9px;background:#020617;border:1px solid #334155;color:#f8fafc;font-size:12.5px;'/></div>",
+      "    <div><div style='color:#94a3b8;margin-bottom:3px;font-weight:700;'>제보자 닉네임</div>",
+      "      <input id='sqV55SubNick' type='text' maxlength='20' value='" + escHtmlShortsV55(savedNick) + "' style='width:100%;box-sizing:border-box;padding:8px 10px;border-radius:9px;background:#020617;border:1px solid #334155;color:#f8fafc;font-size:12.5px;'/></div>",
+      "  </div>",
+      "  <div style='display:flex;justify-content:flex-end;gap:8px;margin-top:14px;'>",
+      "    <button type='button' id='sqV55SubCancelBtn' class='sq-v55-pill'>취소</button>",
+      "    <button type='button' id='sqV55SubSaveBtn' class='sq-v55-pill active' style='background:#10b981;color:#022c22;font-weight:900;'>DB에 제보 등록</button>",
+      "  </div>",
+      "</div>"
+    ].join("");
+    document.body.appendChild(wrap);
+    var closeFn = function () { if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap); };
+    wrap.addEventListener("click", function (ev) { if (ev.target === wrap) closeFn(); });
+    document.getElementById("sqV55SubCloseBtn").onclick = closeFn;
+    document.getElementById("sqV55SubCancelBtn").onclick = closeFn;
+    document.getElementById("sqV55SubSaveBtn").onclick = function () {
+      var spVal = document.getElementById("sqV55SubSport").value || "soccer";
+      var tiVal = (document.getElementById("sqV55SubTitle").value || "").trim();
+      var urVal = (document.getElementById("sqV55SubUrl").value || "").trim();
+      var deVal = (document.getElementById("sqV55SubDesc").value || "").trim();
+      var niVal = (document.getElementById("sqV55SubNick").value || "").trim() || "SportIQ 분석러";
+      if (tiVal.length < 3) {
+        if (typeof showToast === "function") showToast("⚠️ 클립 제목을 3자 이상 입력해 주세요.");
+        return;
+      }
+      postShortsActionV4655({
+        action: "submit_clip",
+        sport: spVal,
+        title: tiVal,
+        youtube_url: urVal,
+        subtitle: deVal || "회원 제보 전술 하이라이트 클립",
+        nickname: niVal
+      }, function (res) {
+        closeFn();
+        if (res && res.new_clip_id) {
+          _sqShortsStateV4655.sportFilter = "all";
+          _sqShortsStateV4655.sortMode = "latest";
+          _sqShortsStateV4655.activeClipId = res.new_clip_id;
+          _sqShortsStateV4655.secElapsed = 0;
+        }
+        fetchAutoShortsDataV4655(true);
+      });
+    };
+  }
+
+  function updateViewportTimerDomOnlyV4655() {
+    var tEl = document.getElementById("sqV55TimeLabel");
+    var pEl = document.getElementById("sqV55ProgBar");
+    var tsInput = document.getElementById("sqV55CurTsBadge");
+    if (tEl) {
+      tEl.textContent = formatSecV55(_sqShortsStateV4655.secElapsed) + " / 00:20";
+    }
+    if (pEl) {
+      var pct = Math.max(0, Math.min(100, (_sqShortsStateV4655.secElapsed / 20.0) * 100.0));
+      pEl.style.width = pct.toFixed(1) + "%";
+    }
+    if (tsInput) {
+      tsInput.textContent = formatSecV55(_sqShortsStateV4655.secElapsed);
+    }
+    var filtered = getFilteredClipsV4655();
+    var clip = getActiveClipObjV4655(filtered);
+    var tkEl = document.getElementById("sqV55TopDanmakuTicker");
+    if (tkEl && clip && Array.isArray(clip.comments) && clip.comments.length > 0) {
+      var cIdx = Math.floor(_sqShortsStateV4655.secElapsed / 5) % clip.comments.length;
+      var cm = clip.comments[cIdx];
+      tkEl.textContent = "[" + (cm.ts || "00:05") + " " + (cm.author || "팬") + "] " + (cm.text || "");
+    }
+  }
+
+  function ensureShortsTimerLoopV4655() {
+    if (_sqShortsStateV4655.tickTimer) return;
+    _sqShortsStateV4655.tickTimer = setInterval(function () {
+      var shortsSec = document.getElementById("tab-shorts");
+      if (!shortsSec || shortsSec.classList.contains("hidden") || shortsSec.style.display === "none") return;
+      if (_sqShortsStateV4655.paused || _sqShortsStateV4655.ytEmbedOpen) return;
+      if (!_sqShortsStateV4655.items || !_sqShortsStateV4655.items.length) return;
+      _sqShortsStateV4655.secElapsed += 0.5 * (_sqShortsStateV4655.speed || 1.0);
+      if (_sqShortsStateV4655.secElapsed >= 20.0) {
+        if (_sqShortsStateV4655.autoplay) {
+          advanceNextClipV4655(1);
+          return;
+        } else {
+          _sqShortsStateV4655.secElapsed = 0.0;
+        }
+      }
+      updateViewportTimerDomOnlyV4655();
+    }, 500);
+  }
+
+  function renderAutoShortsStudioV4655() {
+    var shortsSec = document.getElementById("tab-shorts");
+    if (!shortsSec) return;
+    injectAutoShortsCssV4655();
+
+    if (shortsSec.getAttribute("data-sq-v4655-managed") !== "1") {
+      Array.prototype.forEach.call(shortsSec.children, function (ch) {
+        if (ch && ch.id !== "sqAutoShortsStudioV4655") {
+          ch.setAttribute("data-sq-legacy-shorts-hidden", "1");
+          ch.style.display = "none";
+        }
+      });
+      shortsSec.setAttribute("data-sq-v4655-managed", "1");
+    }
+
+    var host = document.getElementById("sqAutoShortsStudioV4655");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "sqAutoShortsStudioV4655";
+      shortsSec.appendChild(host);
+    }
+
+    var allItems = _sqShortsStateV4655.items || [];
+    var cntAll = allItems.length;
+    var cntSoc = allItems.filter(function (x) { return x.sport === "soccer"; }).length;
+    var cntBase = allItems.filter(function (x) { return x.sport === "baseball"; }).length;
+    var cntBask = allItems.filter(function (x) { return x.sport === "basketball"; }).length;
+    var cntHock = allItems.filter(function (x) { return x.sport === "hockey"; }).length;
+
+    var filtered = getFilteredClipsV4655();
+    var clip = getActiveClipObjV4655(filtered);
+
+    if (!clip) {
+      host.innerHTML = "<div style='padding:28px;text-align:center;color:#94a3b8;font-size:13px;'>⏳ 공식 스포츠 유튜브 채널 RSS 및 당일 실경기 전술 숏츠를 불러오는 중입니다...</div>";
+      return;
+    }
+
+    var boardSpec = buildTacticalSvgBoardV4655(clip);
+    var isLiked = Boolean(_sqShortsStateV4655.likedIds[clip.id]);
+    var cmts = Array.isArray(clip.comments) ? clip.comments : [];
+    var firstCmt = cmts.length ? cmts[0] : { ts: "00:04", author: "전술분석팀", text: clip.subtitle || "" };
+    var emo = clip.emojis || { fire: 38, bolt: 29, brain: 24, wow: 18, clap: 25 };
+
+    var va = Math.max(1, Number(clip.votes_a || 58));
+    var vb = Math.max(1, Number(clip.votes_b || 42));
+    var vTot = va + vb;
+    var pctA = Math.round((va / vTot) * 100);
+    var pctB = 100 - pctA;
+
+    var srcTagHtml = "";
+    if (clip.source_type === "youtube_rss") {
+      srcTagHtml = "<span style='background:rgba(239,68,68,0.22);border:1px solid rgba(248,113,113,0.45);color:#fecaca;padding:1.5px 6px;border-radius:6px;font-size:10px;font-weight:800;'>📺 공식채널 RSS</span>";
+    } else if (clip.source_type === "user_submit") {
+      srcTagHtml = "<span style='background:rgba(168,85,247,0.22);border:1px solid rgba(192,132,252,0.45);color:#e9d5ff;padding:1.5px 6px;border-radius:6px;font-size:10px;font-weight:800;'>🙋 회원제보</span>";
+    } else {
+      srcTagHtml = "<span style='background:rgba(16,185,129,0.2);border:1px solid rgba(52,211,153,0.45);color:#a7f3d0;padding:1.5px 6px;border-radius:6px;font-size:10px;font-weight:800;'>⚡ 당일 실경기</span>";
+    }
+
+    var viewportInnerHtml = "";
+    if (_sqShortsStateV4655.ytEmbedOpen && clip.video_id) {
+      viewportInnerHtml = [
+        "<div style='display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;z-index:3;'>",
+        "  <span style='background:rgba(220,38,38,0.85);padding:3px 8px;border-radius:999px;font-size:10.5px;font-weight:800;color:#fff;'>📺 공식 유튜브 재생 중</span>",
+        "  <button type='button' id='sqV55BackToBoardBtn' class='sq-v55-pill' style='padding:3px 8px;font-size:10.5px;background:rgba(15,23,42,0.9);color:#6ee7b7;border-color:#10b981;'>📊 전술보드로 복귀</button>",
+        "</div>",
+        "<iframe src='https://www.youtube-nocookie.com/embed/" + encodeURIComponent(clip.video_id) + "?autoplay=1&playsinline=1&rel=0' style='width:100%;height:320px;border:0;border-radius:10px;background:#000;' allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture' allowfullscreen></iframe>",
+        "<div style='display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:11px;color:#cbd5e1;'>",
+        "  <span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px;'>" + escHtmlShortsV55(clip.channel_name || "공식 채널") + "</span>",
+        "  <a href='" + escHtmlShortsV55(clip.youtube_url || "#") + "' target='_blank' rel='noopener noreferrer' style='color:#7dd3fc;font-weight:800;text-decoration:none;'>↗ 유튜브 새창 열기</a>",
+        "</div>"
+      ].join("");
+    } else {
+      var thumbOverlay = "";
+      if (clip.thumb_url && clip.video_id) {
+        thumbOverlay = [
+          "<div id='sqV55ThumbQuickPlay' style='display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;background:rgba(2,6,23,0.76);border:1px solid rgba(248,113,113,0.42);cursor:pointer;margin-bottom:6px;'>",
+          "  <img src='" + escHtmlShortsV55(clip.thumb_url) + "' alt='공식 하이라이트 썸네일' style='width:58px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid rgba(255,255,255,0.18);' loading='lazy'/>",
+          "  <div style='min-width:0;flex:1;'>",
+          "    <div style='font-size:10px;color:#fca5a5;font-weight:800;'>▶ " + escHtmlShortsV55(clip.channel_name || "공식 유튜브") + " 실영상 탑재</div>",
+          "    <div style='font-size:10.5px;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>클릭 시 공식 하이라이트 바로 재생</div>",
+          "  </div>",
+          "</div>"
+        ].join("");
+      }
+      var pctInit = Math.max(0, Math.min(100, (_sqShortsStateV4655.secElapsed / 20.0) * 100.0));
+      viewportInnerHtml = [
+        "<div>",
+        "  <div style='display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800;'>",
+        "    <span style='background:rgba(2,6,23,0.68);padding:3px 9px;border-radius:999px;color:#6ee7b7;border:1px solid rgba(110,231,183,0.3);'>" + escHtmlShortsV55(clip.badge || "⚽ 축구 TACTICAL") + "</span>",
+        "    <span id='sqV55TimeLabel' style='background:rgba(2,6,23,0.68);padding:2.5px 8px;border-radius:999px;color:#f8fafc;font-variant-numeric:tabular-nums;'>" + formatSecV55(_sqShortsStateV4655.secElapsed) + " / 00:20</span>",
+        "  </div>",
+        "  <div class='sq-v55-progress-track'><div id='sqV55ProgBar' class='sq-v55-progress-bar' style='width:" + pctInit.toFixed(1) + "%;'></div></div>",
+        "  <div id='sqV55TopDanmakuTicker' style='margin-top:7px;padding:4px 9px;border-radius:8px;background:rgba(2,6,23,0.62);border:1px solid rgba(148,163,184,0.2);font-size:11px;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>[" + escHtmlShortsV55(firstCmt.ts || "00:04") + " " + escHtmlShortsV55(firstCmt.author || "팬") + "] " + escHtmlShortsV55(firstCmt.text || "") + "</div>",
+        "</div>",
+        "<div style='margin:2px 0;'>" + boardSpec.svg + "</div>",
+        "<div style='background:linear-gradient(180deg,rgba(2,6,23,0.15),rgba(2,6,23,0.88));padding:8px 10px;border-radius:11px;border:1px solid rgba(148,163,184,0.18);'>",
+        thumbOverlay,
+        "  <div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;'>" + srcTagHtml + "<span style='font-size:10.8px;color:#fde68a;font-weight:800;'>" + escHtmlShortsV55(clip.kicker || "") + "</span></div>",
+        "  <div style='font-size:14.5px;font-weight:900;line-height:1.32;color:#ffffff;margin-bottom:3px;'>" + escHtmlShortsV55(clip.title || "") + "</div>",
+        "  <div style='font-size:11.3px;color:#cbd5e1;line-height:1.38;'>" + escHtmlShortsV55(clip.subtitle || "") + "</div>",
+        "</div>"
+      ].join("");
+    }
+
+    var playlistCardsHtml = filtered.map(function (it, idx) {
+      var isAct = (it.id === clip.id);
+      var miniTag = (it.source_type === "youtube_rss")
+        ? "<span style='color:#fca5a5;font-size:10px;font-weight:800;'>📺 공식RSS</span>"
+        : (it.source_type === "user_submit"
+            ? "<span style='color:#e9d5ff;font-size:10px;font-weight:800;'>🙋 제보</span>"
+            : "<span style='color:#6ee7b7;font-size:10px;font-weight:800;'>⚡ 실경기</span>");
+      var rankCrown = (idx === 0) ? "<span style='color:#fde047;font-size:10.5px;font-weight:800;'>🆕 최신 #1</span>" : "";
+      return [
+        "<div class='sq-v55-clip-card" + (isAct ? " active" : "") + "' data-sq-v55-clip='" + escHtmlShortsV55(it.id) + "'>",
+        "  <div style='display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:4px;'>",
+        "    <div style='display:flex;align-items:center;gap:5px;flex-wrap:wrap;'><span style='font-size:10.8px;font-weight:800;color:#7dd3fc;'>" + escHtmlShortsV55(it.badge || "⚽ 축구") + "</span>" + miniTag + rankCrown + "</div>",
+        "    <div style='display:flex;align-items:center;gap:6px;flex-shrink:0;'><span style='font-size:10.2px;color:#94a3b8;'>" + escHtmlShortsV55(it.time_badge || "") + "</span><span style='font-size:11px;font-weight:800;color:#fb7185;'>❤️ " + Number(it.likes || 0) + "</span></div>",
+        "  </div>",
+        "  <div style='font-size:12.4px;font-weight:800;color:#f8fafc;line-height:1.35;'>" + escHtmlShortsV55(it.title || "") + "</div>",
+        "</div>"
+      ].join("");
+    }).join("");
+
+    var quizAnsDone = _sqShortsStateV4655.quizDone[clip.id];
+    var quizOpts = Array.isArray(clip.quiz_opts) && clip.quiz_opts.length >= 3
+      ? clip.quiz_opts
+      : ["1. 전방 압박 득점 연결", "2. 측면 전환 크로스", "3. 세트피스 세컨볼"];
+
+    var quizChoicesHtml = quizOpts.map(function (optTxt, oi) {
+      var pickedThis = (quizAnsDone != null && Number(quizAnsDone) === oi);
+      var isAns = (Number(clip.quiz_ans || 0) === oi);
+      var extraCls = (quizAnsDone != null && isAns) ? " active" : (pickedThis ? " active-sky" : "");
+      return "<button type='button' class='sq-v55-pill" + extraCls + "' data-sq-v55-quiz='" + oi + "' style='justify-content:center;padding:7px 6px;font-size:11.3px;'>" + escHtmlShortsV55(optTxt) + "</button>";
+    }).join("");
+
+    var cmtRowsHtml = cmts.slice(0, 6).map(function (cm) {
+      return "<div style='padding:5px 8px;border-radius:8px;background:#020617;border:1px solid #1e293b;font-size:11.5px;color:#e2e8f0;margin-bottom:5px;'><strong style='color:#6ee7b7;margin-right:5px;'>" + escHtmlShortsV55(cm.ts || "00:05") + "</strong><strong style='color:#93c5fd;margin-right:6px;'>" + escHtmlShortsV55(cm.author || "팬") + "</strong>" + escHtmlShortsV55(cm.text || "") + "</div>";
+    }).join("");
+
+    var syncMetaTxt = _sqShortsStateV4655.updatedAtKst
+      ? ("최근 자동수집 " + _sqShortsStateV4655.updatedAtKst + " · 공식 유튜브 " + _sqShortsStateV4655.ytCount + "건 + 실경기 전술 " + _sqShortsStateV4655.matchCount + "건 (30분 주기 교체)")
+      : "공식 스포츠 유튜브 채널 RSS + 당일 실경기 전술 브리핑 30분 자동수집 가동 중";
+
+    host.innerHTML = [
+      "<div id='sqAutoShortsSyncBarV4655'>",
+      "  <div style='display:flex;align-items:center;gap:7px;min-width:0;flex-wrap:wrap;'>",
+      "    <span style='width:8px;height:8px;border-radius:999px;background:#10b981;box-shadow:0 0 8px #10b981;display:inline-block;'></span>",
+      "    <strong style='color:#6ee7b7;'>LIVE 30분 자동수집 ON</strong>",
+      "    <span style='color:#cbd5e1;'>" + escHtmlShortsV55(syncMetaTxt) + "</span>",
+      "  </div>",
+      "  <button type='button' id='sqV55ForceSyncBtn' class='sq-v55-pill' style='padding:4px 9px;font-size:11px;border-color:rgba(56,189,248,0.45);color:#7dd3fc;'>🔄 지금 즉시 갱신</button>",
+      "</div>",
+
+      "<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:11px;'>",
+      "  <div class='sq-v42-mob-swipe' style='display:flex;gap:5px;flex-wrap:wrap;'>",
+      "    <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.sportFilter === "all" ? " active" : "") + "' data-sq-v55-sport='all'>전체 (" + cntAll + ")</button>",
+      "    <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.sportFilter === "soccer" ? " active" : "") + "' data-sq-v55-sport='soccer'>⚽ 축구 (" + cntSoc + ")</button>",
+      "    <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.sportFilter === "baseball" ? " active" : "") + "' data-sq-v55-sport='baseball'>⚾ 야구 (" + cntBase + ")</button>",
+      "    <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.sportFilter === "basketball" ? " active" : "") + "' data-sq-v55-sport='basketball'>🏀 농구(NBA) (" + cntBask + ")</button>",
+      "    <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.sportFilter === "hockey" ? " active" : "") + "' data-sq-v55-sport='hockey'>🏒 하키(NHL) (" + cntHock + ")</button>",
+      "  </div>",
+      "  <div class='sq-v42-mob-swipe' style='display:flex;gap:5px;flex-wrap:wrap;'>",
+      "    <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.sortMode === "latest" ? " active-sky" : "") + "' data-sq-v55-sort='latest'>🆕 최신·자동수집순</button>",
+      "    <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.sortMode === "popular" ? " active-sky" : "") + "' data-sq-v55-sort='popular'>🔥 인기순</button>",
+      "    <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.sortMode === "hotvote" ? " active-sky" : "") + "' data-sq-v55-sort='hotvote'>⚖️ 투표 과열순</button>",
+      "    <button type='button' id='sqV55OpenSubmitBtn' class='sq-v55-pill' style='border-color:#10b981;color:#6ee7b7;'>➕ 숏츠 제보하기</button>",
+      "  </div>",
+      "</div>",
+
+      "<div id='sqAutoShortsMainGridV4655'>",
+      "  <div style='background:#0f172a;border:1px solid #334155;border-radius:16px;padding:11px;min-width:0;'>",
+      "    <div id='sqV55Viewport' style='background:" + boardSpec.bg + ";'>" + viewportInnerHtml + "</div>",
+      "    <div class='sq-v42-mob-swipe' style='display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;'>",
+      "      <button type='button' id='sqV55PlayPauseBtn' class='sq-v55-pill'>" + (_sqShortsStateV4655.paused ? "▶ 재생" : "⏸ 일시정지") + "</button>",
+      "      <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.speed === 0.5 ? " active-sky" : "") + "' data-sq-v55-spd='0.5'>0.5x 슬로모션</button>",
+      "      <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.speed === 1.0 ? " active-sky" : "") + "' data-sq-v55-spd='1'>1.0x</button>",
+      "      <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.speed === 1.5 ? " active-sky" : "") + "' data-sq-v55-spd='1.5'>1.5x</button>",
+      "    </div>",
+      "    <div class='sq-v42-mob-swipe' style='display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;'>",
+      "      <button type='button' id='sqV55AutoplayToggleBtn' class='sq-v55-pill" + (_sqShortsStateV4655.autoplay ? " active" : "") + "'>" + (_sqShortsStateV4655.autoplay ? "🔁 자동넘김 ON" : "🔁 자동넘김 OFF") + "</button>",
+      "      <button type='button' id='sqV55PrevClipBtn' class='sq-v55-pill'>▲ 이전</button>",
+      "      <button type='button' id='sqV55NextClipBtn' class='sq-v55-pill'>▼ 다음</button>",
+      "      <button type='button' id='sqV55WatchYtBtn' class='sq-v55-pill' style='border-color:rgba(248,113,113,0.5);color:#fecaca;'>📺 유튜브 실영상</button>",
+      "    </div>",
+      "    <div style='display:flex;justify-content:space-between;align-items:center;margin-top:7px;padding-top:7px;border-top:1px solid #1e293b;'>",
+      "      <button type='button' id='sqV55LikeClipBtn' class='sq-v55-pill" + (isLiked ? " active" : "") + "' style='color:" + (isLiked ? "#fda4af" : "#f8fafc") + ";'>❤️ 좋아요 " + Number(clip.likes || 0) + "</button>",
+      "      <button type='button' id='sqV55JumpCmtBtn' class='sq-v55-pill'>💬 한줄평 " + cmts.length + "</button>",
+      "    </div>",
+      "  </div>",
+
+      "  <div id='shortsRightColV4655' style='min-width:0;'>",
+      "    <div class='sq-v42-mob-swipe' style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;'>",
+      "      <button type='button' class='sq-v55-pill' data-sq-v55-emo='fire' data-sq-v55-char='🔥'>🔥 미쳤다 " + Number(emo.fire || 0) + "</button>",
+      "      <button type='button' class='sq-v55-pill' data-sq-v55-emo='bolt' data-sq-v55-char='⚡'>⚡ 레전드 " + Number(emo.bolt || 0) + "</button>",
+      "      <button type='button' class='sq-v55-pill' data-sq-v55-emo='brain' data-sq-v55-char='🧠'>🧠 전술천재 " + Number(emo.brain || 0) + "</button>",
+      "      <button type='button' class='sq-v55-pill' data-sq-v55-emo='wow' data-sq-v55-char='😱'>😱 소름 " + Number(emo.wow || 0) + "</button>",
+      "      <button type='button' class='sq-v55-pill' data-sq-v55-emo='clap' data-sq-v55-char='👏'>👏 박수 " + Number(emo.clap || 0) + "</button>",
+      "    </div>",
+
+      "    <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;'>",
+      "      <div style='font-size:13px;font-weight:800;color:#fde68a;'>🔥 공식 하이라이트 &amp; 당일 실경기 핫 숏츠 클립 (" + filtered.length + "개)</div>",
+      "      <span style='font-size:11px;color:#94a3b8;'>클릭 시 즉시 전환</span>",
+      "    </div>",
+      "    <div class='sq-v43-shorts-playlist' style='margin-bottom:12px;'>" + playlistCardsHtml + "</div>",
+
+      "    <div id='sqShortsInteractiveTabsV43'>",
+      "      <button type='button' class='sq-v42-subpill" + (_sqShortsStateV4655.subTab === "quiz" ? " active" : "") + "' data-sq-v55-subtab='quiz'>🎯 +15P 예측 퀴즈</button>",
+      "      <button type='button' class='sq-v42-subpill" + (_sqShortsStateV4655.subTab === "var" ? " active" : "") + "' data-sq-v55-subtab='var'>⚖️ VAR 밸런스 투표</button>",
+      "      <button type='button' class='sq-v42-subpill" + (_sqShortsStateV4655.subTab === "comment" ? " active" : "") + "' data-sq-v55-subtab='comment'>⏱️ 타임스탬프 한줄평</button>",
+      "    </div>",
+
+      "    <div data-sq-v43-shorts-panel='quiz' style='display:" + (_sqShortsStateV4655.subTab === "quiz" ? "block" : "none") + ";background:#0f172a;border:1px solid #1e293b;border-radius:13px;padding:12px;margin-top:8px;'>",
+      "      <div style='font-size:13px;font-weight:800;color:#6ee7b7;margin-bottom:6px;'>🎯 다음 장면 맞히기 미니 예측 퀴즈 (+15P 포인트 보상)</div>",
+      "      <div style='font-size:12px;color:#cbd5e1;margin-bottom:9px;'>" + escHtmlShortsV55(clip.quiz_q || "이 경기 핵심 전술 승부처 결과는?") + "</div>",
+      "      <div style='display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;'>" + quizChoicesHtml + "</div>",
+      (quizAnsDone != null ? "<div style='margin-top:8px;font-size:11.5px;color:#a7f3d0;'>✅ 참여 완료! 정답 포인트 검증 및 해설이 반영되었습니다.</div>" : ""),
+      "    </div>",
+
+      "    <div data-sq-v43-shorts-panel='var' style='display:" + (_sqShortsStateV4655.subTab === "var" ? "block" : "none") + ";background:#0f172a;border:1px solid #1e293b;border-radius:13px;padding:12px;margin-top:8px;'>",
+      "      <div style='font-size:13px;font-weight:800;color:#93c5fd;margin-bottom:6px;'>⚖️ 실시간 명장면 / 승부처 팬 밸런스 투표 (" + vTot + "표 참여)</div>",
+      "      <div style='font-size:12px;color:#cbd5e1;margin-bottom:9px;'>" + escHtmlShortsV55(clip.var_q || "이 장면의 결정적 승부 요인은?") + "</div>",
+      "      <div style='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:8px;'>",
+      "        <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.varPicked[clip.id] === "A" ? " active" : "") + "' data-sq-v55-var='A' style='justify-content:center;padding:8px;'>A. " + escHtmlShortsV55(clip.var_a || "전술 완성도 우위") + " (" + pctA + "%)</button>",
+      "        <button type='button' class='sq-v55-pill" + (_sqShortsStateV4655.varPicked[clip.id] === "B" ? " active-sky" : "") + "' data-sq-v55-var='B' style='justify-content:center;padding:8px;'>B. " + escHtmlShortsV55(clip.var_b || "상대 수비 전환 변수") + " (" + pctB + "%)</button>",
+      "      </div>",
+      "      <div style='height:7px;border-radius:999px;background:#020617;overflow:hidden;display:flex;'>",
+      "        <div style='width:" + pctA + "%;background:#10b981;'></div><div style='width:" + pctB + "%;background:#38bdf8;'></div>",
+      "      </div>",
+      "      <div style='display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-top:4px;'><span>A " + pctA + "% (" + va + "표)</span><span>B " + pctB + "% (" + vb + "표)</span></div>",
+      "    </div>",
+
+      "    <div data-sq-v43-shorts-panel='comment' style='display:" + (_sqShortsStateV4655.subTab === "comment" ? "block" : "none") + ";background:#0f172a;border:1px solid #1e293b;border-radius:13px;padding:12px;margin-top:8px;'>",
+      "      <div style='font-size:13px;font-weight:800;color:#fde68a;margin-bottom:7px;'>⏱️ 실시간 타임스탬프 한줄평</div>",
+      "      <div style='display:flex;gap:6px;margin-bottom:8px;'>",
+      "        <span id='sqV55CurTsBadge' style='padding:7px 9px;border-radius:8px;background:#020617;border:1px solid #334155;color:#6ee7b7;font-size:11.5px;font-weight:800;flex-shrink:0;'>" + formatSecV55(_sqShortsStateV4655.secElapsed) + "</span>",
+      "        <input id='sqV55CmtInput' type='text' maxlength='90' placeholder='이 장면의 전술 포인트를 한줄평으로 남겨보세요' style='flex:1;min-width:0;padding:7px 10px;border-radius:8px;background:#020617;border:1px solid #334155;color:#f8fafc;font-size:12px;'/>",
+      "        <button type='button' id='sqV55CmtSendBtn' class='sq-v55-pill active' style='padding:7px 11px;'>등록</button>",
+      "      </div>",
+      "      <div>" + (cmtRowsHtml || "<div style='font-size:11.5px;color:#64748b;'>첫 타임스탬프 한줄평을 남겨보세요!</div>") + "</div>",
+      "    </div>",
+      "  </div>",
+      "</div>"
+    ].join("");
+
+    // Bind events cleanly
+    var fsBtn = document.getElementById("sqV55ForceSyncBtn");
+    if (fsBtn) {
+      fsBtn.onclick = function () {
+        if (typeof showToast === "function") showToast("🔄 최신 공식 유튜브 RSS 및 실경기 전술 클립을 동기화합니다...");
+        fetchAutoShortsDataV4655(true);
+      };
+    }
+    var subOpenBtn = document.getElementById("sqV55OpenSubmitBtn");
+    if (subOpenBtn) subOpenBtn.onclick = openShortsSubmitModalV4655;
+
+    host.querySelectorAll("[data-sq-v55-sport]").forEach(function (b) {
+      b.onclick = function () {
+        _sqShortsStateV4655.sportFilter = b.getAttribute("data-sq-v55-sport") || "all";
+        _sqShortsStateV4655.secElapsed = 0;
+        _sqShortsStateV4655.ytEmbedOpen = false;
+        renderAutoShortsStudioV4655();
+      };
+    });
+    host.querySelectorAll("[data-sq-v55-sort]").forEach(function (b) {
+      b.onclick = function () {
+        _sqShortsStateV4655.sortMode = b.getAttribute("data-sq-v55-sort") || "latest";
+        _sqShortsStateV4655.secElapsed = 0;
+        _sqShortsStateV4655.ytEmbedOpen = false;
+        renderAutoShortsStudioV4655();
+      };
+    });
+    host.querySelectorAll("[data-sq-v55-clip]").forEach(function (card) {
+      card.onclick = function () {
+        _sqShortsStateV4655.activeClipId = card.getAttribute("data-sq-v55-clip") || "";
+        _sqShortsStateV4655.secElapsed = 0;
+        _sqShortsStateV4655.ytEmbedOpen = false;
+        renderAutoShortsStudioV4655();
+      };
+    });
+    var ppBtn = document.getElementById("sqV55PlayPauseBtn");
+    if (ppBtn) {
+      ppBtn.onclick = function () {
+        _sqShortsStateV4655.paused = !_sqShortsStateV4655.paused;
+        renderAutoShortsStudioV4655();
+      };
+    }
+    host.querySelectorAll("[data-sq-v55-spd]").forEach(function (b) {
+      b.onclick = function () {
+        _sqShortsStateV4655.speed = parseFloat(b.getAttribute("data-sq-v55-spd") || "1") || 1.0;
+        renderAutoShortsStudioV4655();
+      };
+    });
+    var apBtn = document.getElementById("sqV55AutoplayToggleBtn");
+    if (apBtn) {
+      apBtn.onclick = function () {
+        _sqShortsStateV4655.autoplay = !_sqShortsStateV4655.autoplay;
+        if (typeof showToast === "function") {
+          showToast(_sqShortsStateV4655.autoplay ? "🔁 자동넘김 ON: 20초 재생 후 다음 클립으로 자동 전환됩니다." : "⏸ 자동넘김 OFF: 현재 클립을 반복 재생합니다.");
+        }
+        renderAutoShortsStudioV4655();
+      };
+    }
+    var prevB = document.getElementById("sqV55PrevClipBtn");
+    if (prevB) prevB.onclick = function () { advanceNextClipV4655(-1); };
+    var nextB = document.getElementById("sqV55NextClipBtn");
+    if (nextB) nextB.onclick = function () { advanceNextClipV4655(1); };
+
+    var openYtFn = function () {
+      if (clip.video_id) {
+        _sqShortsStateV4655.ytEmbedOpen = !_sqShortsStateV4655.ytEmbedOpen;
+        renderAutoShortsStudioV4655();
+      } else if (clip.youtube_url) {
+        window.open(clip.youtube_url, "_blank", "noopener,noreferrer");
+      }
+    };
+    var ytBtn = document.getElementById("sqV55WatchYtBtn");
+    if (ytBtn) ytBtn.onclick = openYtFn;
+    var thPlay = document.getElementById("sqV55ThumbQuickPlay");
+    if (thPlay) thPlay.onclick = openYtFn;
+    var bkBoard = document.getElementById("sqV55BackToBoardBtn");
+    if (bkBoard) {
+      bkBoard.onclick = function () {
+        _sqShortsStateV4655.ytEmbedOpen = false;
+        renderAutoShortsStudioV4655();
+      };
+    }
+
+    var lkBtn = document.getElementById("sqV55LikeClipBtn");
+    if (lkBtn) {
+      lkBtn.onclick = function () {
+        postShortsActionV4655({ action: "like", clip_id: clip.id }, function (res) {
+          if (typeof res.likes === "number") clip.likes = res.likes;
+          _sqShortsStateV4655.likedIds[clip.id] = Boolean(res.liked);
+          renderAutoShortsStudioV4655();
+        });
+      };
+    }
+    var jcBtn = document.getElementById("sqV55JumpCmtBtn");
+    if (jcBtn) {
+      jcBtn.onclick = function () {
+        _sqShortsStateV4655.subTab = "comment";
+        renderAutoShortsStudioV4655();
+      };
+    }
+    host.querySelectorAll("[data-sq-v55-emo]").forEach(function (eb) {
+      eb.onclick = function () {
+        var ek = eb.getAttribute("data-sq-v55-emo") || "fire";
+        var ec = eb.getAttribute("data-sq-v55-char") || "🔥";
+        spawnFloatingEmojiV4655(ec);
+        if (!clip.emojis) clip.emojis = { fire: 38, bolt: 29, brain: 24, wow: 18, clap: 25 };
+        clip.emojis[ek] = Number(clip.emojis[ek] || 0) + 1;
+        renderAutoShortsStudioV4655();
+        spawnFloatingEmojiV4655(ec);
+        postShortsActionV4655({ action: "emoji", clip_id: clip.id, emoji_key: ek });
+      };
+    });
+    host.querySelectorAll("[data-sq-v55-subtab]").forEach(function (tb) {
+      tb.onclick = function () {
+        _sqShortsStateV4655.subTab = tb.getAttribute("data-sq-v55-subtab") || "quiz";
+        renderAutoShortsStudioV4655();
+      };
+    });
+    host.querySelectorAll("[data-sq-v55-quiz]").forEach(function (qb) {
+      qb.onclick = function () {
+        var oi = parseInt(qb.getAttribute("data-sq-v55-quiz") || "0", 10) || 0;
+        _sqShortsStateV4655.quizDone[clip.id] = oi;
+        postShortsActionV4655({ action: "quiz", clip_id: clip.id, choice_idx: oi }, function () {
+          renderAutoShortsStudioV4655();
+        });
+        renderAutoShortsStudioV4655();
+      };
+    });
+    host.querySelectorAll("[data-sq-v55-var]").forEach(function (vbBtn) {
+      vbBtn.onclick = function () {
+        var side = vbBtn.getAttribute("data-sq-v55-var") || "A";
+        _sqShortsStateV4655.varPicked[clip.id] = side;
+        postShortsActionV4655({ action: "var_vote", clip_id: clip.id, side: side }, function (res) {
+          if (typeof res.votes_a === "number") clip.votes_a = res.votes_a;
+          if (typeof res.votes_b === "number") clip.votes_b = res.votes_b;
+          renderAutoShortsStudioV4655();
+        });
+      };
+    });
+    var cmtBtn = document.getElementById("sqV55CmtSendBtn");
+    var cmtInp = document.getElementById("sqV55CmtInput");
+    if (cmtBtn && cmtInp) {
+      var submitCmtFn = function () {
+        var tx = (cmtInp.value || "").trim();
+        if (tx.length < 2) {
+          if (typeof showToast === "function") showToast("⚠️ 한줄평을 2자 이상 입력해 주세요.");
+          return;
+        }
+        var tsNow = formatSecV55(_sqShortsStateV4655.secElapsed);
+        postShortsActionV4655({
+          action: "comment",
+          clip_id: clip.id,
+          ts_label: tsNow,
+          comment_text: tx
+        }, function (res) {
+          cmtInp.value = "";
+          if (res && Array.isArray(res.comments)) {
+            clip.comments = res.comments;
+          } else {
+            clip.comments = [{ ts: tsNow, author: (typeof getSavedNickV22 === "function" ? getSavedNickV22() : "") || "스포츠팬", text: tx }].concat(clip.comments || []);
+          }
+          renderAutoShortsStudioV4655();
+        });
+      };
+      cmtBtn.onclick = submitCmtFn;
+      cmtInp.onkeydown = function (ev) {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          submitCmtFn();
+        }
+      };
+    }
+  }
+
+  function fetchAutoShortsDataV4655(forceNow) {
+    if (_sqShortsStateV4655.fetching && !forceNow) return;
+    _sqShortsStateV4655.fetching = true;
+    var ak = (typeof getActorKeyV22 === "function") ? getActorKeyV22() : "";
+    var nk = (typeof getSavedNickV22 === "function") ? getSavedNickV22() : "";
+    var url = "/api/member/auto-shorts-v4655?actor_key=" + encodeURIComponent(ak) +
+              "&nickname=" + encodeURIComponent(nk) +
+              (forceNow ? "&force=1" : "");
+    fetch(url, { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        _sqShortsStateV4655.fetching = false;
+        _sqShortsStateV4655.lastFetchMs = Date.now();
+        if (!d || !d.ok || !Array.isArray(d.items)) return;
+        var prevId = _sqShortsStateV4655.activeClipId;
+        _sqShortsStateV4655.items = d.items;
+        _sqShortsStateV4655.updatedAtKst = d.updated_at_kst || "";
+        _sqShortsStateV4655.ytCount = Number(d.youtube_rss_count || 0);
+        _sqShortsStateV4655.matchCount = Number(d.match_tactical_count || 0);
+        if (Array.isArray(d.liked_ids)) {
+          var lMap = {};
+          d.liked_ids.forEach(function (id) { lMap[id] = true; });
+          _sqShortsStateV4655.likedIds = lMap;
+        }
+        if (d.quiz_done && typeof d.quiz_done === "object") {
+          _sqShortsStateV4655.quizDone = d.quiz_done;
+        }
+        if (d.var_picked && typeof d.var_picked === "object") {
+          _sqShortsStateV4655.varPicked = d.var_picked;
+        }
+        if (!prevId && d.items.length > 0) {
+          _sqShortsStateV4655.activeClipId = d.items[0].id;
+        }
+        var topTicker = document.getElementById("lounge-ticker-text");
+        if (topTicker && d.items.length > 0) {
+          topTicker.textContent = "🎬 9:16 전술·하이라이트 30분 자동수집 ON: " + d.items[0].title + " · 공식 유튜브 RSS & 당일 실경기 실시간 연동!";
+        }
+        renderAutoShortsStudioV4655();
+      })
+      .catch(function () {
+        _sqShortsStateV4655.fetching = false;
+      });
+  }
+
+  window.bootAutoShortsStudioV4655 = bootAutoShortsStudioV4655;
+  function bootAutoShortsStudioV4655() {
+    var shortsSec = document.getElementById("tab-shorts");
+    if (shortsSec && !_sqShortsStateV4655.mounted) {
+      _sqShortsStateV4655.mounted = true;
+      renderAutoShortsStudioV4655();
+      fetchAutoShortsDataV4655(false);
+      ensureShortsTimerLoopV4655();
+      if (!_sqShortsStateV4655.pollTimer) {
+        _sqShortsStateV4655.pollTimer = setInterval(function () {
+          fetchAutoShortsDataV4655(false);
+        }, 300000); // Re-sync every 5 minutes in browser so 30-min server rotations appear live!
+      }
+      if (!window.__sqShortsTabClickHookV4655) {
+        window.__sqShortsTabClickHookV4655 = true;
+        document.addEventListener("click", function (ev) {
+          var btn = ev.target && ev.target.closest ? ev.target.closest("button, a, [data-nav]") : null;
+          if (!btn) return;
+          var tx = (btn.textContent || "") + " " + (btn.getAttribute("data-nav") || "");
+          if (/숏츠|shorts/i.test(tx)) {
+            setTimeout(function () {
+              renderAutoShortsStudioV4655();
+              if (Date.now() - _sqShortsStateV4655.lastFetchMs > 120000) {
+                fetchAutoShortsDataV4655(false);
+              }
+            }, 35);
+          }
+        }, true);
+      }
+    }
+  }
+
+  safeRunStepV4610(window.bootAutoShortsStudioV4655);
+  safeRunStepV4610(installUniversalLifoEscapeV461);
   safeRunStepV4610(installGlobalOverseasDcPillUnlockV4633);
     safeRunStepV4610(installToastNonOverlapAndPartnerCloseFixV4631);
     safeRunStepV4610(installMatchInsightModalV30);
@@ -16292,7 +17168,7 @@ _FRONTEND_V22_JS = r'''
   safeRunStepV4610(injectUxV22Styles);
   safeRunStepV4610(injectPolishCssAndUxUpgradesV4637);
   safeRunStepV4610(enforceSingleLineMainTabBar);
-  setInterval(function () { safeRunStepV4610(injectPolishCssAndUxUpgradesV4637); }, 550);
+  setInterval(function () { safeRunStepV4610(injectPolishCssAndUxUpgradesV4637); if (window.bootAutoShortsStudioV4655) { safeRunStepV4610(window.bootAutoShortsStudioV4655); } }, 550);
   [120, 450, 1100, 2400].forEach(function (ms) {
     setTimeout(function () {
       safeRunStepV4610(injectPolishCssAndUxUpgradesV4637);
@@ -30455,7 +31331,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.54",
+        "version": "v4.6.55",
         "global_espn_fast_wave_v4642": True,
         "stoppage_plus_clock_v4642": True,
         "flashscore_mobi_bridge_v4639": True,
@@ -31099,7 +31975,9 @@ def api_live_sources_diag_v4648(date_offset: int = 0):
     _patch_all_loaded_dc_modules_v4648()
     d = _ORIG_DIAG_V4619(date_offset=date_offset)
     if isinstance(d, dict):
-        d["version"] = "v4.6.54"
+        d["version"] = "v4.6.55"
+        d["auto_shorts_rss_and_autoplay_v4655"] = True
+        d["auto_shorts_status_v4655"] = _get_auto_shorts_diag_v4655()
         d["soccer_all_priority_retention_and_privacy_v4654"] = True
         d["retention_status_v4654"] = dict(_RETENTION_STATE_V4654)
         d["zero_oom_zero_regex_thrash_instant_tabs_v4653"] = True
@@ -31439,7 +32317,7 @@ def api_member_match_h2h_v4650(
 
     out_payload: Dict[str, Any] = {
         "ok": True,
-        "version": "v4.6.54",
+        "version": "v4.6.55",
         "h2h": h2h_obj,
         "home_last": home_last,
         "away_last": away_last,
@@ -31894,3 +32772,1021 @@ def _retention_cleaner_daemon_v4654() -> None:
 
 
 threading.Thread(target=_retention_cleaner_daemon_v4654, daemon=True, name="sq54-log-retention").start()
+
+
+# ==============================================================================
+# v4.6.55: 30-Minute Auto-Updating 9:16 Shorts Engine
+#          (Official Sports YouTube Atom RSS + Today's Real Match Tactical Briefings
+#           + Persistent Likes / Danmaku / +15P Quiz / VAR Vote / Comments + Autoplay ON)
+# ==============================================================================
+from concurrent.futures import wait as _cf_wait_v4655
+_YT_RSS_POOL_V4655 = ThreadPoolExecutor(max_workers=6, thread_name_prefix="sq55-ytrss")
+_AUTO_SHORTS_LOCK_V4655 = threading.Lock()
+_AUTO_SHORTS_CACHE_V4655: Dict[str, Any] = {
+    "mono_ts": 0.0,
+    "updated_at_kst": "",
+    "youtube_rss_count": 0,
+    "match_tactical_count": 0,
+    "base_items": [],
+}
+_AUTO_SHORTS_LAST_FORCE_TS_V4655: float = 0.0
+
+# 12 Wikidata-verified Official Sports League & Broadcaster YouTube Channel IDs (keyless Atom RSS)
+_OFFICIAL_YT_CHANNELS_V4655: Tuple[Tuple[str, str, str, str, str], ...] = (
+    ("EPL", "soccer", "⚽ 축구 TACTICAL", "Premier League 공식", "UCG5qGWdu8nIRZqJ_GgDwQ-w"),
+    ("LALIGA", "soccer", "⚽ 축구 TACTICAL", "LaLiga 공식", "UCTv-XvfzLX3i4IGWAm4sbmA"),
+    ("SERIEA", "soccer", "⚽ 축구 TACTICAL", "Serie A 공식", "UCBJeMCIeLQos7wacox4hmLQ"),
+    ("BUNDESLIGA", "soccer", "⚽ 축구 TACTICAL", "Bundesliga 공식", "UC6UL29enLNe4mqwTfAyeNuw"),
+    ("LIGUE1", "soccer", "⚽ 축구 TACTICAL", "Ligue 1 공식", "UC58LMAlfwtGRNR6Xpd4DlSA"),
+    ("UCL", "soccer", "⚽ 축구 TACTICAL", "UEFA 공식", "UCyGa1YEx9ST66rYrJTGIKOw"),
+    ("KLEAGUE", "soccer", "⚽ 축구 TACTICAL", "FC 서울 · K리그 공식", "UCXtWUl6qmPtibHVKIXbZlcA"),
+    ("NBA", "basketball", "🏀 농구 NBA", "NBA 공식", "UCWJ2lWNubArHWmf3FIHbfcQ"),
+    ("NHL", "hockey", "🏒 하키 NHL", "NHL 공식", "UCqFMzb-4AUf6WAIbl132QKA"),
+    ("MLB", "baseball", "⚾ 야구 PITCH TUNNEL", "MLB 공식", "UCoLrcjPV5PbUrUyXq5mjc_A"),
+    ("KBO", "baseball", "⚾ 야구 PITCH TUNNEL", "KBO 공식", "UCoVz66yWHzVsXAFG8WhJK9g"),
+    ("ESPN", "auto", "🔥 글로벌 스포츠", "ESPN 공식", "UCiWLfSweyRNmLpgEHekhoAg"),
+)
+
+_YT_ID_RE_V4655 = re.compile(r"(?:youtube\.com/(?:shorts/|watch\?v=|embed/)|youtu\.be/)([A-Za-z0-9_-]{8,16})")
+_YT_TITLE_HIGHLIGHT_MAP_V4655: Tuple[Tuple[str, str], ...] = (
+    ("Full Game Highlights", "풀 하이라이트"),
+    ("Extended Highlights", "확장 하이라이트"),
+    ("Game Highlights", "경기 하이라이트"),
+    ("HIGHLIGHTS", "하이라이트"),
+    ("Highlights", "하이라이트"),
+    ("Top 10 Plays", "명장면 TOP 10"),
+    ("Best Plays", "베스트 플레이"),
+    ("Best Goals", "베스트 골 모음"),
+    ("Every Goal", "전 득점 모음"),
+    ("Mic'd Up", "생생 보이스"),
+)
+
+
+def _register_v4655_pg_tables() -> None:
+    extra_55 = (
+        "auto_shorts_state_v4655",
+        "auto_shorts_user_acts_v4655",
+        "auto_shorts_comments_v4655",
+        "auto_shorts_custom_v4655",
+    )
+    cur = getattr(_smu, "BACKUP_TABLES", ())
+    if isinstance(cur, (tuple, list)):
+        _smu.BACKUP_TABLES = tuple(dict.fromkeys(list(cur) + list(extra_55)))
+    try:
+        from app.sportiq_auto_analyst import register_snapshot_table
+        register_snapshot_table("auto_shorts_state_v4655", "clip_id")
+        register_snapshot_table("auto_shorts_user_acts_v4655", "act_key")
+        register_snapshot_table("auto_shorts_custom_v4655", "clip_id")
+    except Exception:
+        pass
+
+
+def _init_auto_shorts_tables_v4655() -> None:
+    _register_v4655_pg_tables()
+
+    def _op() -> None:
+        with _db_session(write=True) as conn:
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS auto_shorts_state_v4655 (
+                    clip_id TEXT PRIMARY KEY,
+                    likes_delta INTEGER NOT NULL DEFAULT 0,
+                    var_a_delta INTEGER NOT NULL DEFAULT 0,
+                    var_b_delta INTEGER NOT NULL DEFAULT 0,
+                    emo_fire INTEGER NOT NULL DEFAULT 0,
+                    emo_bolt INTEGER NOT NULL DEFAULT 0,
+                    emo_brain INTEGER NOT NULL DEFAULT 0,
+                    emo_wow INTEGER NOT NULL DEFAULT 0,
+                    emo_clap INTEGER NOT NULL DEFAULT 0,
+                    updated_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS auto_shorts_user_acts_v4655 (
+                    act_key TEXT PRIMARY KEY,
+                    clip_id TEXT NOT NULL,
+                    actor_key TEXT NOT NULL,
+                    act_type TEXT NOT NULL,
+                    act_val TEXT NOT NULL DEFAULT '',
+                    rewarded INTEGER NOT NULL DEFAULT 0,
+                    updated_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS auto_shorts_comments_v4655 (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    clip_id TEXT NOT NULL,
+                    ts_label TEXT NOT NULL DEFAULT '00:05',
+                    nickname TEXT NOT NULL DEFAULT '스포츠팬',
+                    comment_text TEXT NOT NULL,
+                    created_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS auto_shorts_custom_v4655 (
+                    clip_id TEXT PRIMARY KEY,
+                    sport TEXT NOT NULL DEFAULT 'soccer',
+                    league_label TEXT NOT NULL DEFAULT '회원 제보',
+                    title TEXT NOT NULL,
+                    subtitle TEXT NOT NULL DEFAULT '',
+                    youtube_url TEXT NOT NULL DEFAULT '',
+                    video_id TEXT NOT NULL DEFAULT '',
+                    nickname TEXT NOT NULL DEFAULT 'SportIQ 분석러',
+                    created_at REAL NOT NULL
+                );
+                """
+            )
+
+    try:
+        run_with_db_retry(_op)
+    except Exception:
+        pass
+
+
+_init_auto_shorts_tables_v4655()
+
+
+def _extract_yt_video_id_v4655(url_or_id: str) -> str:
+    s = str(url_or_id or "").strip()
+    if not s:
+        return ""
+    if re.fullmatch(r"[A-Za-z0-9_-]{11}", s):
+        return s
+    m = _YT_ID_RE_V4655.search(s)
+    return m.group(1) if m else ""
+
+
+def _classify_yt_sport_v4655(default_sport: str, title: str, desc: str = "") -> Tuple[str, str]:
+    if default_sport in ("soccer", "basketball", "hockey", "baseball"):
+        badge_map = {
+            "soccer": "⚽ 축구 TACTICAL",
+            "basketball": "🏀 농구 NBA",
+            "hockey": "🏒 하키 NHL",
+            "baseball": "⚾ 야구 PITCH TUNNEL",
+        }
+        return (default_sport, badge_map[default_sport])
+    blob = f"{title} {desc}"
+    if _RE_NBA_V4627.search(blob):
+        return ("basketball", "🏀 농구 NBA")
+    if _RE_NHL_V4627.search(blob):
+        return ("hockey", "🏒 하키 NHL")
+    if _RE_MLB_V4627.search(blob):
+        return ("baseball", "⚾ 야구 PITCH TUNNEL")
+    return ("soccer", "⚽ 축구 TACTICAL")
+
+
+def _localize_yt_title_ko_v4655(raw_title: str, sport: str, ch_label: str) -> str:
+    t = re.sub(r"\s+", " ", str(raw_title or "").strip())
+    if not t:
+        return f"[{ch_label}] 최신 하이라이트 클립"
+    t_ko = re.sub(r"\s+#[A-Za-z0-9_]+\b", "", t).strip()
+    for en_p, ko_p in _YT_TITLE_HIGHLIGHT_MAP_V4655:
+        if en_p.lower() in t_ko.lower():
+            t_ko = re.sub(re.escape(en_p), ko_p, t_ko, flags=re.I)
+    sp = (sport or "").lower()
+    if sp == "basketball":
+        tbls = (_KO_NBA_TEAMS_V37,)
+    elif sp == "soccer":
+        tbls = (_KO_SOCCER_TEAMS_V37,)
+    elif sp in ("hockey", "baseball"):
+        tbls = (_KO_HOCKEY_MLB_TEAMS_V37,)
+    else:
+        tbls = (_KO_SOCCER_TEAMS_V37, _KO_NBA_TEAMS_V37, _KO_HOCKEY_MLB_TEAMS_V37)
+    low_scan = f" {t_ko.lower()} "
+    for tbl in tbls:
+        for k_raw, k_pad, v_ko in _get_sorted_padded_keys_v4653(tbl, 4):
+            if k_pad in low_scan and v_ko not in t_ko:
+                t_ko = re.sub(r"(?<![A-Za-z])" + re.escape(k_raw) + r"(?![A-Za-z])", v_ko, t_ko, flags=re.I)
+                low_scan = f" {t_ko.lower()} "
+    t_ko = re.sub(r"\bvs\.?\b", "vs", t_ko, flags=re.I)
+    if len(t_ko) > 76:
+        t_ko = t_ko[:74].rstrip() + "…"
+    if not re.search(r"[가-힣]", t_ko):
+        t_ko = f"[{ch_label} 최신] {t_ko}"
+    return t_ko
+
+
+def _default_quiz_and_var_for_sport_v4655(sport: str, title_ko: str, home_ko: str = "", away_ko: str = "") -> Dict[str, Any]:
+    h_lbl = home_ko or "홈 주전 라인"
+    a_lbl = away_ko or "원정 카운터 라인"
+    if sport == "basketball":
+        return {
+            "quiz_q": f"00:14 클러치 스페이싱 전개 직후 결정적 득점 패턴은?",
+            "quiz_opts": ["1. 코너 3점 킥아웃 적중", "2. 림어택 앤드원 돌파", "3. 하이포스트 플로터"],
+            "quiz_ans": 0,
+            "var_q": f"이 장면에서 승부를 가른 핵심 전술 요인은?",
+            "var_a": f"{h_lbl} 외곽 스페이싱·볼 무브먼트",
+            "var_b": f"{a_lbl} 스위치 디펜스 미스매치",
+        }
+    if sport == "hockey":
+        return {
+            "quiz_q": f"00:14 블루라인 진입 직후 파워플레이 마무리 방식은?",
+            "quiz_opts": ["1. 원타이머 슬랩샷 득점", "2. 골문 앞 디플렉션", "3. 백핸드 랩어라운드"],
+            "quiz_ans": 0,
+            "var_q": f"이 득점 찬스의 결정적 원동력은?",
+            "var_a": f"{h_lbl} 패스 속도·원타이머 각도",
+            "var_b": f"{a_lbl} 페널티킬 박스 간격 균열",
+        }
+    if sport == "baseball":
+        return {
+            "quiz_q": f"00:14 볼카운트 승부처에서 타자 타이밍을 뺏은 결정구는?",
+            "quiz_opts": ["1. 하이패스트볼 삼진", "2. 떨어지는 스플리터", "3. 몸쪽 보더라인 슬라이더"],
+            "quiz_ans": 1,
+            "var_q": f"이 승부처 결과를 만든 핵심 요인은?",
+            "var_a": f"{h_lbl} 피치터널 볼배합 완성도",
+            "var_b": f"{a_lbl} 노림수 수싸움 타이밍",
+        }
+    return {
+        "quiz_q": f"00:14 하프스페이스 전진 패스 직후 이어진 결정적 장면은?",
+        "quiz_opts": ["1. 파포스트 감아차기 슈팅", "2. 컷백 원터치 마무리", "3. 박스 침투 반칙 유도"],
+        "quiz_ans": 0,
+        "var_q": f"이 장면의 승부처를 지배한 결정적 요인은?",
+        "var_a": f"{h_lbl} 전방 압박·하프스페이스 침투",
+        "var_b": f"{a_lbl} 수비 라인 배후 공간 전환",
+    }
+
+
+def _fetch_single_yt_channel_rss_v4655(ch_tuple: Tuple[str, str, str, str, str]) -> List[Dict[str, Any]]:
+    lg_code, def_sport, def_badge, ch_label, ch_id = ch_tuple
+    rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={ch_id}"
+    xml_txt = _http_fetch_text_v4616(rss_url, timeout=2.9)
+    if not xml_txt or "<entry" not in xml_txt:
+        return []
+    out: List[Dict[str, Any]] = []
+    try:
+        root = ET.fromstring(xml_txt)
+        ns = {
+            "atom": "http://www.w3.org/2005/Atom",
+            "yt": "http://www.youtube.com/xml/schemas/2015",
+            "media": "http://search.yahoo.com/mrss/",
+        }
+        now_ep = time.time()
+        for idx, ent in enumerate(root.findall("atom:entry", ns)[:4]):
+            vid_el = ent.find("yt:videoId", ns)
+            tit_el = ent.find("atom:title", ns)
+            pub_el = ent.find("atom:published", ns)
+            vid = (vid_el.text or "").strip() if vid_el is not None else ""
+            raw_tit = (tit_el.text or "").strip() if tit_el is not None else ""
+            if not vid or not raw_tit:
+                continue
+            link_href = ""
+            for lk in ent.findall("atom:link", ns):
+                if lk.attrib.get("rel", "alternate") == "alternate":
+                    link_href = lk.attrib.get("href", "")
+                    break
+            pub_ts = _to_epoch_ts(pub_el.text if pub_el is not None else "") or (now_ep - idx * 600)
+            # Keep videos from last 21 days so off-day channels stay fresh while stale old videos drop out
+            if (now_ep - pub_ts) > (21 * 86400):
+                continue
+            mg = ent.find("media:group", ns)
+            desc_txt = ""
+            views_cnt = 0
+            stars_cnt = 0
+            if mg is not None:
+                d_el = mg.find("media:description", ns)
+                if d_el is not None and d_el.text:
+                    desc_txt = d_el.text[:240]
+                cm_el = mg.find("media:community", ns)
+                if cm_el is not None:
+                    st_el = cm_el.find("media:statistics", ns)
+                    sr_el = cm_el.find("media:starRating", ns)
+                    if st_el is not None:
+                        try:
+                            views_cnt = int(st_el.attrib.get("views") or 0)
+                        except Exception:
+                            views_cnt = 0
+                    if sr_el is not None:
+                        try:
+                            stars_cnt = int(sr_el.attrib.get("count") or 0)
+                        except Exception:
+                            stars_cnt = 0
+
+            sp_key, sp_badge = _classify_yt_sport_v4655(def_sport, raw_tit, desc_txt)
+            tit_ko = _localize_yt_title_ko_v4655(raw_tit, sp_key, ch_label)
+            pub_dt_k = datetime.fromtimestamp(pub_ts, tz=KST)
+            pub_badge = pub_dt_k.strftime("%m.%d %H:%M")
+            is_short_url = ("/shorts/" in link_href) or ("#shorts" in raw_tit.lower())
+            yt_url = f"https://www.youtube.com/shorts/{vid}" if is_short_url else f"https://www.youtube.com/watch?v={vid}"
+            view_str = f" · 조회수 {views_cnt:,}회" if views_cnt > 0 else ""
+            sub_ko = f"📺 {ch_label} 공식 업로드 ({pub_badge} KST){view_str} · 9:16 전술보드 & 실영상 연동"
+            base_likes = min(420, max(78, int(stars_cnt // 12) if stars_cnt > 0 else int(92 + (views_cnt // 1800))))
+            qv = _default_quiz_and_var_for_sport_v4655(sp_key, tit_ko)
+            cid = f"yt55_{vid}"
+            h_seed = int(hashlib.md5(cid.encode("utf-8")).hexdigest()[:6], 16)
+            out.append({
+                "id": cid,
+                "source_type": "youtube_rss",
+                "sport": sp_key,
+                "league": lg_code,
+                "badge": sp_badge,
+                "kicker": f"공식 유튜브 RSS · {ch_label}",
+                "channel_name": ch_label,
+                "title": tit_ko,
+                "raw_title": raw_tit,
+                "subtitle": sub_ko,
+                "video_id": vid,
+                "youtube_url": yt_url,
+                "thumb_url": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
+                "time_badge": pub_badge,
+                "sort_ts": float(pub_ts),
+                "base_likes": base_likes,
+                "base_votes_a": 48 + (h_seed % 34),
+                "base_votes_b": 34 + ((h_seed >> 4) % 30),
+                "base_emojis": {
+                    "fire": 26 + (h_seed % 28),
+                    "bolt": 19 + ((h_seed >> 3) % 22),
+                    "brain": 16 + ((h_seed >> 6) % 20),
+                    "wow": 12 + ((h_seed >> 9) % 17),
+                    "clap": 18 + ((h_seed >> 12) % 21),
+                },
+                "quiz_q": qv["quiz_q"],
+                "quiz_opts": qv["quiz_opts"],
+                "quiz_ans": qv["quiz_ans"],
+                "var_q": qv["var_q"],
+                "var_a": qv["var_a"],
+                "var_b": qv["var_b"],
+                "seed_comments": [
+                    {"ts": "00:04", "author": "하이라이트봇", "text": f"{ch_label} 최신 업로드 명장면 자동 연동 완료!"},
+                    {"ts": "00:12", "author": "전술스카우터", "text": "전환 속도와 공간 창출 움직임이 돋보이는 장면입니다."},
+                ],
+            })
+    except Exception:
+        return []
+    return out
+
+
+def _build_match_tactical_clips_v4655(yt_clips: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    now_k = datetime.now(KST)
+    now_ep = time.time()
+    all_matches: List[Tuple[int, Dict[str, Any]]] = []
+
+    for off_i in (0, -1):
+        tk = now_k + timedelta(days=off_i)
+        ck = f"{off_i}:{tk.strftime('%Y%m%d')}"
+        with _RT_V4616_LOCK:
+            c_ent = _RT_V4616_CACHE.get(ck)
+        rows = list(c_ent[1]) if (c_ent and c_ent[1]) else []
+        if not rows and off_i == 0:
+            try:
+                rows = _sync_collect_offset_v4648(tk, 0)
+            except Exception:
+                rows = []
+        for m in rows:
+            all_matches.append((off_i, m))
+
+    # Score matches so LIVE -> exciting finished games -> marquee upcoming games rise to the top
+    priority_leagues = {
+        "EPL": 420, "LALIGA": 400, "SERIEA": 390, "BUNDESLIGA": 385, "LIGUE1": 375,
+        "UCL": 430, "UEL": 360, "KLEAGUE1": 415, "KLEAGUE2": 370, "J1": 330,
+        "NBA": 410, "WKBL": 365, "KBL": 365,
+        "NHL": 390,
+        "MLB": 395, "KBO": 415, "ABL": 340,
+        "VLEAGUE_M": 370, "VLEAGUE_W": 370,
+    }
+
+    scored: List[Tuple[int, int, Dict[str, Any]]] = []
+    for off_i, m in all_matches:
+        sp_raw = str(m.get("sport") or "").lower()
+        lg_code = str(m.get("league_code") or m.get("league") or "").upper()
+        if sp_raw not in ("soccer", "basketball", "hockey", "baseball"):
+            continue
+        st = str(m.get("state") or "pre").lower()
+        hs = int(m.get("home_score") or 0) if str(m.get("home_score") or "").isdigit() else 0
+        as_ = int(m.get("away_score") or 0) if str(m.get("away_score") or "").isdigit() else 0
+        prio = priority_leagues.get(lg_code, 180)
+        if st == "in":
+            prio += 5000 + (hs + as_) * 15
+        elif st == "post":
+            prio += (2600 if off_i == 0 else 1900) + min(300, (hs + as_) * 12)
+        else:
+            if off_i == 0:
+                prio += 1400
+            else:
+                continue
+        scored.append((prio, off_i, m))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    per_sport_cap = {"soccer": 5, "basketball": 3, "hockey": 3, "baseball": 3}
+    per_sport_cnt = {"soccer": 0, "basketball": 0, "hockey": 0, "baseball": 0}
+    seen_matchups: Set[str] = set()
+    clips: List[Dict[str, Any]] = []
+
+    badge_by_sport = {
+        "soccer": "⚽ 축구 TACTICAL",
+        "basketball": "🏀 농구 NBA",
+        "hockey": "🏒 하키 NHL",
+        "baseball": "⚾ 야구 PITCH TUNNEL",
+    }
+
+    for idx_s, (_, off_i, m) in enumerate(scored):
+        sp_raw = str(m.get("sport") or "soccer").lower()
+        if per_sport_cnt.get(sp_raw, 0) >= per_sport_cap.get(sp_raw, 3):
+            continue
+        h_ko = _localize_team_ko_v37(str(m.get("home") or m.get("home_team") or "").strip(), sp_raw)
+        a_ko = _localize_team_ko_v37(str(m.get("away") or m.get("away_team") or "").strip(), sp_raw)
+        if not h_ko or not a_ko:
+            continue
+        m_sig = f"{sp_raw}:{h_ko}:{a_ko}"
+        if m_sig in seen_matchups:
+            continue
+        seen_matchups.add(m_sig)
+        per_sport_cnt[sp_raw] = per_sport_cnt.get(sp_raw, 0) + 1
+
+        lg_disp = str(m.get("league_ko") or m.get("league") or m.get("league_code") or sp_raw.upper()).strip()
+        st = str(m.get("state") or "pre").lower()
+        hs = m.get("home_score", 0)
+        as_ = m.get("away_score", 0)
+        dt_lbl = str(m.get("date_mmdd") or m.get("kickoff_kst") or now_k.strftime("%m.%d")).strip()
+        stat_txt = str(m.get("status_ko") or m.get("status") or "").strip()
+        per_det = str(m.get("period_detail") or "").strip()
+        venue_ko = str(m.get("venue") or "").strip()
+
+        if st == "in":
+            title_ko = f"[🔴 실시간 {stat_txt or 'LIVE'}] {h_ko} {hs}:{as_} {a_ko} — 라이브 승부처 전술 보드"
+            sub_ko = f"{lg_disp} 실시간 진행 중" + (f" ({per_det})" if per_det else "") + " · 공수 전환 간격 및 핵심 매치업 실시간 브리핑"
+            time_badge = f"🔴 {stat_txt or 'LIVE'}"
+            sort_ts = now_ep + 300 - idx_s * 10
+        elif st == "post":
+            day_tag = "오늘 종료" if off_i == 0 else "어제 종료"
+            title_ko = f"[{day_tag} 전술복기] {h_ko} {hs}:{as_} {a_ko} — 승부 가른 결정적 장면"
+            sub_ko = f"{lg_disp} 공식 스코어 반영" + (f" · {per_det}" if per_det else "") + " · 득점 구간 포메이션 움직임 집중 분석"
+            time_badge = f"종료 {hs}:{as_}"
+            sort_ts = now_ep - (120 if off_i == 0 else 7200) - idx_s * 45
+        else:
+            kick_t = str(m.get("time_kst") or m.get("kickoff_time") or dt_lbl).strip()
+            title_ko = f"[오늘 {kick_t} 빅매치] {h_ko} vs {a_ko} — 9:16 AI 전술 시뮬레이션"
+            sub_ko = f"{lg_disp}" + (f" · {venue_ko}" if venue_ko else "") + " · 초반 압박 라인 및 승부처 공간 공략 프리뷰"
+            time_badge = f"예정 {kick_t}"
+            sort_ts = now_ep - 1800 - idx_s * 45
+
+        # Cross-match with fetched official YouTube RSS clips if team name overlaps
+        matched_vid = ""
+        matched_yt_url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(f'{h_ko} {a_ko} 하이라이트 {lg_disp}')}"
+        matched_thumb = ""
+        matched_ch = f"{lg_disp} 공식 하이라이트 검색"
+        for yc in yt_clips:
+            if yc.get("sport") == sp_raw and (h_ko in yc.get("title", "") or a_ko in yc.get("title", "")):
+                matched_vid = str(yc.get("video_id") or "")
+                matched_yt_url = str(yc.get("youtube_url") or matched_yt_url)
+                matched_thumb = str(yc.get("thumb_url") or "")
+                matched_ch = str(yc.get("channel_name") or matched_ch)
+                break
+
+        raw_key = f"{now_k.strftime('%Y%m%d')}:{m_sig}"
+        cid = "mt55_" + hashlib.md5(raw_key.encode("utf-8")).hexdigest()[:10]
+        h_seed = int(hashlib.md5(cid.encode("utf-8")).hexdigest()[:6], 16)
+        qv = _default_quiz_and_var_for_sport_v4655(sp_raw, title_ko, h_ko, a_ko)
+        clips.append({
+            "id": cid,
+            "source_type": "match_tactical",
+            "sport": sp_raw,
+            "league": lg_disp,
+            "badge": badge_by_sport.get(sp_raw, "⚽ 축구 TACTICAL"),
+            "kicker": f"당일 실경기 전술 연동 · {lg_disp}",
+            "channel_name": matched_ch,
+            "title": title_ko,
+            "subtitle": sub_ko,
+            "video_id": matched_vid,
+            "youtube_url": matched_yt_url,
+            "thumb_url": matched_thumb,
+            "time_badge": time_badge,
+            "sort_ts": float(sort_ts),
+            "base_likes": 95 + (h_seed % 75) + (40 if st == "in" else 0),
+            "base_votes_a": 52 + (h_seed % 32),
+            "base_votes_b": 38 + ((h_seed >> 4) % 28),
+            "base_emojis": {
+                "fire": 28 + (h_seed % 24),
+                "bolt": 21 + ((h_seed >> 3) % 19),
+                "brain": 22 + ((h_seed >> 6) % 21),
+                "wow": 14 + ((h_seed >> 9) % 16),
+                "clap": 19 + ((h_seed >> 12) % 18),
+            },
+            "quiz_q": qv["quiz_q"],
+            "quiz_opts": qv["quiz_opts"],
+            "quiz_ans": qv["quiz_ans"],
+            "var_q": qv["var_q"],
+            "var_a": qv["var_a"],
+            "var_b": qv["var_b"],
+            "seed_comments": [
+                {"ts": "00:05", "author": "AI전술보드", "text": f"{h_ko} vs {a_ko} 실경기 전광판 데이터 자동 연동 브리핑입니다."},
+                {"ts": "00:13", "author": "데이터분석러", "text": f"{lg_disp} 핵심 공간 점유와 전환 타이밍이 승부처네요!"},
+            ],
+        })
+
+    # Ensure baseball tab is never empty during winter offseason even if RSS hasn't returned yet
+    if per_sport_cnt.get("baseball", 0) == 0 and not any(c.get("sport") == "baseball" for c in yt_clips):
+        today_tag = now_k.strftime("%m.%d")
+        cid_bb = "mt55_bb_" + now_k.strftime("%Y%m%d")
+        qv_bb = _default_quiz_and_var_for_sport_v4655("baseball", "스토브리그 피치터널 분석", "KBO·MLB 선발진", "중심타선")
+        clips.append({
+            "id": cid_bb,
+            "source_type": "match_tactical",
+            "sport": "baseball",
+            "league": "KBO · MLB",
+            "badge": "⚾ 야구 PITCH TUNNEL",
+            "kicker": f"{today_tag} 세이버메트릭스 브리핑 · KBO/MLB",
+            "channel_name": "KBO · MLB 공식 하이라이트",
+            "title": f"[{today_tag} 투타 브리핑] 하이패스트볼-스플리터 피치터널 회전수 & 헛스윙률 분석",
+            "subtitle": "초구 스트라이크 선점 이후 결정구 터널링 궤적 및 좌우 타자 상대 승부처 시뮬레이션",
+            "video_id": "",
+            "youtube_url": "https://www.youtube.com/results?search_query=KBO+MLB+%ED%95%98%EC%9D%B4%EB%9D%BC%EC%9D%B4%ED%8A%B8",
+            "thumb_url": "",
+            "time_badge": today_tag,
+            "sort_ts": float(now_ep - 3600),
+            "base_likes": 112,
+            "base_votes_a": 64,
+            "base_votes_b": 41,
+            "base_emojis": {"fire": 31, "bolt": 24, "brain": 29, "wow": 17, "clap": 22},
+            "quiz_q": qv_bb["quiz_q"],
+            "quiz_opts": qv_bb["quiz_opts"],
+            "quiz_ans": qv_bb["quiz_ans"],
+            "var_q": qv_bb["var_q"],
+            "var_a": qv_bb["var_a"],
+            "var_b": qv_bb["var_b"],
+            "seed_comments": [
+                {"ts": "00:05", "author": "세이버랩", "text": "릴리스 포인트 일정할 때 하이패스트볼-스플리터 조합은 공략이 정말 어렵죠."},
+            ],
+        })
+
+    return clips
+
+
+def _sync_collect_auto_shorts_base_v4655(force: bool = False) -> Dict[str, Any]:
+    now_m = time.monotonic()
+    with _AUTO_SHORTS_LOCK_V4655:
+        if not force and _AUTO_SHORTS_CACHE_V4655["base_items"] and (now_m - _AUTO_SHORTS_CACHE_V4655["mono_ts"]) < 1800.0:
+            return dict(_AUTO_SHORTS_CACHE_V4655)
+
+    # 1. Parallel fetch across 12 Official Sports YouTube Atom RSS channels (cap wait <= 3.8s)
+    futs = [_YT_RSS_POOL_V4655.submit(_fetch_single_yt_channel_rss_v4655, ch) for ch in _OFFICIAL_YT_CHANNELS_V4655]
+    done_f, _ = _cf_wait_v4655(futs, timeout=3.8)
+    yt_raw: List[Dict[str, Any]] = []
+    seen_vids: Set[str] = set()
+    for f in futs:
+        if f in done_f:
+            try:
+                for item in (f.result() or []):
+                    vid = item.get("video_id") or item.get("id")
+                    if vid and vid not in seen_vids:
+                        seen_vids.add(vid)
+                        yt_raw.append(item)
+            except Exception:
+                pass
+    yt_raw.sort(key=lambda x: float(x.get("sort_ts") or 0), reverse=True)
+    # Keep balanced top official RSS clips per sport (up to 14 total)
+    yt_kept: List[Dict[str, Any]] = []
+    sp_yt_cnt: Dict[str, int] = {}
+    for y in yt_raw:
+        sk = str(y.get("sport") or "soccer")
+        cap_s = 6 if sk == "soccer" else 3
+        if sp_yt_cnt.get(sk, 0) >= cap_s:
+            continue
+        sp_yt_cnt[sk] = sp_yt_cnt.get(sk, 0) + 1
+        yt_kept.append(y)
+
+    # 2. Synthesize real-time tactical briefings from today's & yesterday's live scoreboard
+    match_clips = _build_match_tactical_clips_v4655(yt_kept)
+
+    # 3. Merge & sort newest first
+    merged_base = yt_kept + match_clips
+    merged_base.sort(key=lambda x: float(x.get("sort_ts") or 0), reverse=True)
+
+    now_kst_str = datetime.now(KST).strftime("%m.%d %H:%M KST")
+    with _AUTO_SHORTS_LOCK_V4655:
+        _AUTO_SHORTS_CACHE_V4655.update({
+            "mono_ts": time.monotonic(),
+            "updated_at_kst": now_kst_str,
+            "youtube_rss_count": len(yt_kept),
+            "match_tactical_count": len(match_clips),
+            "base_items": merged_base,
+        })
+        return dict(_AUTO_SHORTS_CACHE_V4655)
+
+
+def _hydrate_auto_shorts_for_actor_v4655(actor_key: str = "", nickname: str = "", force: bool = False) -> Dict[str, Any]:
+    global _AUTO_SHORTS_LAST_FORCE_TS_V4655
+    do_force = False
+    if force and (time.monotonic() - _AUTO_SHORTS_LAST_FORCE_TS_V4655) >= 15.0:
+        _AUTO_SHORTS_LAST_FORCE_TS_V4655 = time.monotonic()
+        do_force = True
+
+    snap = _sync_collect_auto_shorts_base_v4655(force=do_force)
+    base_items = [dict(x) for x in (snap.get("base_items") or [])]
+
+    ak = str(actor_key or "").strip()[:64]
+    nk = str(nickname or "").strip()[:32]
+    actor_cands = [x for x in dict.fromkeys([ak, f"nick:{nk.lower()}" if nk else ""]) if x]
+
+    def _read_db_op():
+        with _db_session(write=False) as conn:
+            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            st_map: Dict[str, sqlite3.Row] = {}
+            if "auto_shorts_state_v4655" in tables:
+                for r in conn.execute("SELECT * FROM auto_shorts_state_v4655").fetchall():
+                    st_map[str(r["clip_id"])] = r
+
+            cmt_map: Dict[str, List[Dict[str, Any]]] = {}
+            if "auto_shorts_comments_v4655" in tables:
+                for r in conn.execute("SELECT clip_id, ts_label, nickname, comment_text FROM auto_shorts_comments_v4655 ORDER BY id DESC LIMIT 200").fetchall():
+                    cmt_map.setdefault(str(r["clip_id"]), []).append({
+                        "ts": str(r["ts_label"] or "00:05"),
+                        "author": str(r["nickname"] or "스포츠팬"),
+                        "text": str(r["comment_text"] or ""),
+                    })
+
+            custom_list: List[Dict[str, Any]] = []
+            if "auto_shorts_custom_v4655" in tables:
+                for r in conn.execute("SELECT * FROM auto_shorts_custom_v4655 ORDER BY created_at DESC LIMIT 25").fetchall():
+                    sp_c = str(r["sport"] or "soccer")
+                    _, b_lbl = _classify_yt_sport_v4655(sp_c, str(r["title"] or ""))
+                    vid_c = str(r["video_id"] or "")
+                    dt_c = datetime.fromtimestamp(float(r["created_at"] or time.time()), tz=KST).strftime("%m.%d %H:%M")
+                    qv_c = _default_quiz_and_var_for_sport_v4655(sp_c, str(r["title"] or ""))
+                    custom_list.append({
+                        "id": str(r["clip_id"]),
+                        "source_type": "user_submit",
+                        "sport": sp_c,
+                        "league": str(r["league_label"] or "회원 제보"),
+                        "badge": b_lbl,
+                        "kicker": f"회원 직접 제보 · {r['nickname']}",
+                        "channel_name": f"{r['nickname']} 제보 클립",
+                        "title": str(r["title"]),
+                        "subtitle": str(r["subtitle"] or "회원 제보 전술 하이라이트 클립"),
+                        "video_id": vid_c,
+                        "youtube_url": str(r["youtube_url"] or ""),
+                        "thumb_url": f"https://i.ytimg.com/vi/{vid_c}/hqdefault.jpg" if vid_c else "",
+                        "time_badge": dt_c,
+                        "sort_ts": float(r["created_at"] or time.time()) + 600.0,
+                        "base_likes": 15,
+                        "base_votes_a": 12,
+                        "base_votes_b": 8,
+                        "base_emojis": {"fire": 8, "bolt": 6, "brain": 5, "wow": 4, "clap": 7},
+                        "quiz_q": qv_c["quiz_q"],
+                        "quiz_opts": qv_c["quiz_opts"],
+                        "quiz_ans": qv_c["quiz_ans"],
+                        "var_q": qv_c["var_q"],
+                        "var_a": qv_c["var_a"],
+                        "var_b": qv_c["var_b"],
+                        "seed_comments": [
+                            {"ts": "00:03", "author": str(r["nickname"] or "제보자"), "text": str(r["subtitle"] or "함께 볼 만한 명장면 제보합니다!")}
+                        ],
+                    })
+
+            liked_ids: List[str] = []
+            quiz_done: Dict[str, int] = {}
+            var_picked: Dict[str, str] = {}
+            if "auto_shorts_user_acts_v4655" in tables and actor_cands:
+                ph = ",".join("?" for _ in actor_cands)
+                u_rows = conn.execute(
+                    f"SELECT clip_id, act_type, act_val FROM auto_shorts_user_acts_v4655 WHERE actor_key IN ({ph})",
+                    tuple(actor_cands),
+                ).fetchall()
+                for ur in u_rows:
+                    cid_u = str(ur["clip_id"])
+                    at_u = str(ur["act_type"])
+                    av_u = str(ur["act_val"] or "")
+                    if at_u == "like" and av_u == "1":
+                        liked_ids.append(cid_u)
+                    elif at_u == "quiz":
+                        try:
+                            quiz_done[cid_u] = int(av_u)
+                        except Exception:
+                            quiz_done[cid_u] = 0
+                    elif at_u == "var_vote" and av_u in ("A", "B"):
+                        var_picked[cid_u] = av_u
+
+            return (st_map, cmt_map, custom_list, liked_ids, quiz_done, var_picked)
+
+    st_map, cmt_map, custom_list, liked_ids, quiz_done, var_picked = run_with_db_retry(_read_db_op)
+
+    all_raw = custom_list + base_items
+    final_items: List[Dict[str, Any]] = []
+    for it in all_raw:
+        cid = str(it["id"])
+        sr = st_map.get(cid)
+        lk_delta = int(sr["likes_delta"] or 0) if sr else 0
+        va_delta = int(sr["var_a_delta"] or 0) if sr else 0
+        vb_delta = int(sr["var_b_delta"] or 0) if sr else 0
+        b_emo = dict(it.get("base_emojis") or {"fire": 25, "bolt": 18, "brain": 16, "wow": 12, "clap": 15})
+        if sr:
+            b_emo["fire"] = max(0, b_emo.get("fire", 0) + int(sr["emo_fire"] or 0))
+            b_emo["bolt"] = max(0, b_emo.get("bolt", 0) + int(sr["emo_bolt"] or 0))
+            b_emo["brain"] = max(0, b_emo.get("brain", 0) + int(sr["emo_brain"] or 0))
+            b_emo["wow"] = max(0, b_emo.get("wow", 0) + int(sr["emo_wow"] or 0))
+            b_emo["clap"] = max(0, b_emo.get("clap", 0) + int(sr["emo_clap"] or 0))
+        user_cmts = cmt_map.get(cid, [])
+        seed_cmts = list(it.get("seed_comments") or [])
+        final_items.append({
+            "id": cid,
+            "source_type": it.get("source_type", "match_tactical"),
+            "sport": it.get("sport", "soccer"),
+            "league": it.get("league", ""),
+            "badge": it.get("badge", "⚽ 축구 TACTICAL"),
+            "kicker": it.get("kicker", ""),
+            "channel_name": it.get("channel_name", ""),
+            "title": it.get("title", ""),
+            "subtitle": it.get("subtitle", ""),
+            "video_id": it.get("video_id", ""),
+            "youtube_url": it.get("youtube_url", ""),
+            "thumb_url": it.get("thumb_url", ""),
+            "time_badge": it.get("time_badge", ""),
+            "sort_ts": float(it.get("sort_ts") or 0),
+            "likes": max(0, int(it.get("base_likes") or 50) + lk_delta),
+            "votes_a": max(1, int(it.get("base_votes_a") or 40) + va_delta),
+            "votes_b": max(1, int(it.get("base_votes_b") or 30) + vb_delta),
+            "emojis": b_emo,
+            "quiz_q": it.get("quiz_q", ""),
+            "quiz_opts": it.get("quiz_opts", []),
+            "quiz_ans": int(it.get("quiz_ans") or 0),
+            "var_q": it.get("var_q", ""),
+            "var_a": it.get("var_a", ""),
+            "var_b": it.get("var_b", ""),
+            "comments": (user_cmts + seed_cmts)[:12],
+        })
+
+    return {
+        "ok": True,
+        "version": "v4.6.55",
+        "autoplay_default": True,
+        "cycle_minutes": 30,
+        "updated_at_kst": snap.get("updated_at_kst") or datetime.now(KST).strftime("%m.%d %H:%M KST"),
+        "youtube_rss_count": int(snap.get("youtube_rss_count") or 0),
+        "match_tactical_count": int(snap.get("match_tactical_count") or 0),
+        "custom_count": len(custom_list),
+        "total": len(final_items),
+        "items": final_items,
+        "liked_ids": list(dict.fromkeys(liked_ids)),
+        "quiz_done": quiz_done,
+        "var_picked": var_picked,
+    }
+
+
+class _AutoShortsActionPayloadV4655(BaseModel):
+    action: str
+    clip_id: str = ""
+    actor_key: str = ""
+    nickname: str = ""
+    pin: str = ""
+    client_points: int = 120
+    emoji_key: str = ""
+    choice_idx: int = 0
+    side: str = ""
+    ts_label: str = "00:05"
+    comment_text: str = ""
+    sport: str = "soccer"
+    title: str = ""
+    subtitle: str = ""
+    youtube_url: str = ""
+
+
+def _handle_auto_shorts_action_sync_v4655(payload: _AutoShortsActionPayloadV4655) -> Dict[str, Any]:
+    act = str(payload.action or "").strip().lower()
+    cid = str(payload.clip_id or "").strip()[:64]
+    nick = str(payload.nickname or "").strip()[:24]
+    pin = str(payload.pin or "").strip()[:8]
+    ak = str(payload.actor_key or "").strip()[:64] or (f"nick:{nick.lower()}" if nick else "anon_v55")
+    now = time.time()
+    today_kst = datetime.now(KST).strftime("%Y-%m-%d")
+
+    if act == "submit_clip":
+        ti = str(payload.title or "").strip()[:80]
+        sub = str(payload.subtitle or "").strip()[:120]
+        yt_u = str(payload.youtube_url or "").strip()[:220]
+        sp = str(payload.sport or "soccer").strip().lower()
+        if sp not in ("soccer", "baseball", "basketball", "hockey"):
+            sp = "soccer"
+        if len(ti) < 3:
+            raise HTTPException(status_code=400, detail="클립 제목을 3자 이상 입력해 주세요.")
+        _validate_clean_content_v4613([ti, sub, nick], kind_label="숏츠제보", actor=nick or ak, check_flood=True)
+        vid = _extract_yt_video_id_v4655(yt_u)
+        if yt_u and not (yt_u.startswith("https://www.youtube.com/") or yt_u.startswith("https://youtu.be/") or yt_u.startswith("https://m.youtube.com/")):
+            raise HTTPException(status_code=400, detail="공식 유튜브(youtube.com / youtu.be) URL만 등록할 수 있습니다.")
+        if not yt_u:
+            yt_u = f"https://www.youtube.com/results?search_query={urllib.parse.quote(ti)}"
+        new_cid = "usr55_" + hashlib.sha1(f"{now}:{ti}:{ak}".encode("utf-8")).hexdigest()[:10]
+
+        def _sub_op():
+            with _db_session(write=True) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO auto_shorts_custom_v4655(clip_id, sport, league_label, title, subtitle, youtube_url, video_id, nickname, created_at)
+                    VALUES (?, ?, '회원 제보', ?, ?, ?, ?, ?, ?)
+                    """,
+                    (new_cid, sp, ti, sub or "회원 제보 전술 하이라이트", yt_u, vid, nick or "SportIQ 분석러", now),
+                )
+
+        run_with_db_retry(_sub_op)
+        _trigger_smu_pg_backup("auto_shorts_custom_v4655")
+        return {"ok": True, "new_clip_id": new_cid, "message": "🎬 새 숏츠 클립이 등록되어 최상단에 반영되었습니다!"}
+
+    if not cid:
+        raise HTTPException(status_code=400, detail="대상 클립 ID가 필요합니다.")
+
+    if act == "comment":
+        c_txt = str(payload.comment_text or "").strip()[:100]
+        ts_lbl = re.sub(r"[^0-9:]", "", str(payload.ts_label or "00:05"))[:5] or "00:05"
+        if len(c_txt) < 2:
+            raise HTTPException(status_code=400, detail="한줄평을 2자 이상 입력해 주세요.")
+        _validate_clean_content_v4613([c_txt, nick], kind_label="숏츠한줄평", actor=nick or ak, check_flood=True)
+        disp_nick = nick or "스포츠팬"
+
+        def _cmt_op() -> List[Dict[str, Any]]:
+            with _db_session(write=True) as conn:
+                conn.execute(
+                    "INSERT INTO auto_shorts_comments_v4655(clip_id, ts_label, nickname, comment_text, created_at) VALUES (?, ?, ?, ?, ?)",
+                    (cid, ts_lbl, disp_nick, c_txt, now),
+                )
+                rows = conn.execute(
+                    "SELECT ts_label, nickname, comment_text FROM auto_shorts_comments_v4655 WHERE clip_id = ? ORDER BY id DESC LIMIT 10",
+                    (cid,),
+                ).fetchall()
+                return [{"ts": str(r["ts_label"]), "author": str(r["nickname"]), "text": str(r["comment_text"])} for r in rows]
+
+        cmts = run_with_db_retry(_cmt_op)
+        _trigger_smu_pg_backup("auto_shorts_comments_v4655")
+        return {"ok": True, "comments": cmts, "message": "⏱️ 타임스탬프 한줄평이 등록되었습니다!"}
+
+    # Lookup base clip metrics for accurate return values
+    snap = _sync_collect_auto_shorts_base_v4655(force=False)
+    base_lookup = {str(x["id"]): x for x in (snap.get("base_items") or [])}
+    b_item = base_lookup.get(cid, {})
+
+    def _state_op() -> Tuple[Dict[str, Any], List[str]]:
+        touched: List[str] = ["auto_shorts_state_v4655"]
+        with _db_session(write=True) as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO auto_shorts_state_v4655(clip_id, updated_at) VALUES (?, ?)",
+                (cid, now),
+            )
+            st_row = conn.execute("SELECT * FROM auto_shorts_state_v4655 WHERE clip_id = ?", (cid,)).fetchone()
+            lk_d = int(st_row["likes_delta"] or 0)
+            va_d = int(st_row["var_a_delta"] or 0)
+            vb_d = int(st_row["var_b_delta"] or 0)
+
+            if act == "like":
+                act_k = f"like:{cid}:{ak}"
+                prev = conn.execute("SELECT act_val FROM auto_shorts_user_acts_v4655 WHERE act_key = ?", (act_k,)).fetchone()
+                was_on = bool(prev and str(prev["act_val"]) == "1")
+                new_val = "0" if was_on else "1"
+                lk_d = lk_d - 1 if was_on else lk_d + 1
+                conn.execute(
+                    """
+                    INSERT INTO auto_shorts_user_acts_v4655(act_key, clip_id, actor_key, act_type, act_val, rewarded, updated_at)
+                    VALUES (?, ?, ?, 'like', ?, 0, ?)
+                    ON CONFLICT(act_key) DO UPDATE SET act_val = excluded.act_val, updated_at = excluded.updated_at
+                    """,
+                    (act_k, cid, ak, new_val, now),
+                )
+                conn.execute("UPDATE auto_shorts_state_v4655 SET likes_delta = ?, updated_at = ? WHERE clip_id = ?", (lk_d, now, cid))
+                touched.append("auto_shorts_user_acts_v4655")
+                tot_lk = max(0, int(b_item.get("base_likes") or 15) + lk_d)
+                return ({"ok": True, "liked": (new_val == "1"), "likes": tot_lk}, touched)
+
+            if act == "emoji":
+                ek = str(payload.emoji_key or "fire").strip().lower()
+                col_map = {"fire": "emo_fire", "bolt": "emo_bolt", "brain": "emo_brain", "wow": "emo_wow", "clap": "emo_clap"}
+                col = col_map.get(ek, "emo_fire")
+                conn.execute(f"UPDATE auto_shorts_state_v4655 SET {col} = {col} + 1, updated_at = ? WHERE clip_id = ?", (now, cid))
+                return ({"ok": True}, touched)
+
+            if act == "var_vote":
+                side = "B" if str(payload.side or "A").upper() == "B" else "A"
+                act_k = f"var:{cid}:{ak}"
+                prev = conn.execute("SELECT act_val FROM auto_shorts_user_acts_v4655 WHERE act_key = ?", (act_k,)).fetchone()
+                prev_side = str(prev["act_val"] or "") if prev else ""
+                if prev_side != side:
+                    if prev_side == "A":
+                        va_d -= 1
+                    elif prev_side == "B":
+                        vb_d -= 1
+                    if side == "A":
+                        va_d += 1
+                    else:
+                        vb_d += 1
+                    conn.execute(
+                        """
+                        INSERT INTO auto_shorts_user_acts_v4655(act_key, clip_id, actor_key, act_type, act_val, rewarded, updated_at)
+                        VALUES (?, ?, ?, 'var_vote', ?, 0, ?)
+                        ON CONFLICT(act_key) DO UPDATE SET act_val = excluded.act_val, updated_at = excluded.updated_at
+                        """,
+                        (act_k, cid, ak, side, now),
+                    )
+                    conn.execute(
+                        "UPDATE auto_shorts_state_v4655 SET var_a_delta = ?, var_b_delta = ?, updated_at = ? WHERE clip_id = ?",
+                        (va_d, vb_d, now, cid),
+                    )
+                    touched.append("auto_shorts_user_acts_v4655")
+                tot_a = max(1, int(b_item.get("base_votes_a") or 40) + va_d)
+                tot_b = max(1, int(b_item.get("base_votes_b") or 30) + vb_d)
+                return ({"ok": True, "side": side, "votes_a": tot_a, "votes_b": tot_b, "message": f"⚖️ 밸런스 투표({side}안)가 실시간 반영되었습니다!"}, touched)
+
+            if act == "quiz":
+                c_idx = max(0, min(2, int(payload.choice_idx or 0)))
+                act_k = f"quiz:{cid}:{ak}"
+                prev = conn.execute("SELECT rewarded FROM auto_shorts_user_acts_v4655 WHERE act_key = ?", (act_k,)).fetchone()
+                already = bool(prev and int(prev["rewarded"] or 0) == 1)
+                awarded = 0 if already else 15
+                new_pts = None
+                new_tier = ""
+                if awarded > 0:
+                    hash_fn = getattr(_smu, "_hash_pin", None)
+                    tier_fn = getattr(_smu, "_tier_for_points", lambda p: "PRO" if p >= 350 else ("MEMBER" if p >= 150 else "GUEST"))
+                    credited = False
+                    has_ma = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='member_accounts'").fetchone()
+                    if has_ma and len(nick) >= 2 and len(pin) == 4 and callable(hash_fn):
+                        m_row = conn.execute("SELECT nickname, pin_hash, points FROM member_accounts WHERE lower(nickname)=lower(?)", (nick,)).fetchone()
+                        if m_row and m_row["pin_hash"] == hash_fn(nick, pin):
+                            new_pts = int(m_row["points"] or 120) + awarded
+                            new_tier = tier_fn(new_pts)
+                            conn.execute("UPDATE member_accounts SET points=?, role_tier=?, updated_at=? WHERE nickname=?", (new_pts, new_tier, now, m_row["nickname"]))
+                            touched.append("member_accounts")
+                            credited = True
+                    if not credited:
+                        new_pts = max(120, int(payload.client_points or 120)) + awarded
+                        new_tier = tier_fn(new_pts)
+                    has_led = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wp_point_ledger'").fetchone()
+                    if has_led:
+                        conn.execute(
+                            "INSERT INTO wp_point_ledger(nickname, event_type, ref_id, points_delta, kst_date, site_origin, created_at) VALUES (?, 'shorts_quiz_v55', ?, ?, ?, 'open_lounge', ?)",
+                            (nick or ak, cid, awarded, today_kst, now),
+                        )
+                        touched.append("wp_point_ledger")
+                conn.execute(
+                    """
+                    INSERT INTO auto_shorts_user_acts_v4655(act_key, clip_id, actor_key, act_type, act_val, rewarded, updated_at)
+                    VALUES (?, ?, ?, 'quiz', ?, 1, ?)
+                    ON CONFLICT(act_key) DO UPDATE SET act_val = excluded.act_val, rewarded = 1, updated_at = excluded.updated_at
+                    """,
+                    (act_k, cid, ak, str(c_idx), now),
+                )
+                touched.append("auto_shorts_user_acts_v4655")
+                msg_q = f"🎯 예측 퀴즈 참여 완료! +{awarded}P가 즉시 적립되었습니다." if awarded > 0 else "🎯 예측 퀴즈 선택이 반영되었습니다. (이미 포인트 수령 완료)"
+                return ({"ok": True, "awarded_points": awarded, "points": new_pts, "role_tier": new_tier, "message": msg_q}, touched)
+
+            return ({"ok": True}, [])
+
+    res_obj, touched_tbls = run_with_db_retry(_state_op)
+    if touched_tbls:
+        _trigger_smu_pg_backup(*tuple(dict.fromkeys(touched_tbls)))
+    return res_obj
+
+
+def _get_auto_shorts_diag_v4655() -> Dict[str, Any]:
+    with _AUTO_SHORTS_LOCK_V4655:
+        return {
+            "cycle_minutes": 30,
+            "autoplay_default": True,
+            "official_yt_channels": len(_OFFICIAL_YT_CHANNELS_V4655),
+            "updated_at_kst": _AUTO_SHORTS_CACHE_V4655.get("updated_at_kst") or None,
+            "youtube_rss_count": int(_AUTO_SHORTS_CACHE_V4655.get("youtube_rss_count") or 0),
+            "match_tactical_count": int(_AUTO_SHORTS_CACHE_V4655.get("match_tactical_count") or 0),
+            "cached_total": len(_AUTO_SHORTS_CACHE_V4655.get("base_items") or []),
+        }
+
+
+def _auto_shorts_daemon_v4655() -> None:
+    time.sleep(2.2)
+    while True:
+        try:
+            _sync_collect_auto_shorts_base_v4655(force=True)
+        except Exception:
+            pass
+        time.sleep(1800.0)  # Refresh every 30 minutes automatically!
+
+
+threading.Thread(target=_auto_shorts_daemon_v4655, daemon=True, name="sq55-auto-shorts").start()
+
+_V4655_NEW_PATHS = {
+    "/api/member/auto-shorts-v4655",
+    "/api/member/auto-shorts-action-v4655",
+    "/api/member/live-sources-diag-v4655",
+}
+router.routes = [rt for rt in router.routes if getattr(rt, "path", "") not in _V4655_NEW_PATHS]
+_pre_cnt_v4655 = len(router.routes)
+
+
+@router.get("/api/member/auto-shorts-v4655")
+async def _async_api_auto_shorts_v4655(actor_key: str = "", nickname: str = "", force: int = 0):
+    loop = _asyncio_v4652.get_running_loop()
+    data = await loop.run_in_executor(
+        _SCOREBOARD_EXEC_POOL_V4652,
+        _hydrate_auto_shorts_for_actor_v4655,
+        actor_key,
+        nickname,
+        bool(force),
+    )
+    return Response(
+        content=json.dumps(data, ensure_ascii=False).encode("utf-8"),
+        media_type="application/json; charset=utf-8",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.post("/api/member/auto-shorts-action-v4655")
+async def _async_api_auto_shorts_action_v4655(payload: _AutoShortsActionPayloadV4655):
+    loop = _asyncio_v4652.get_running_loop()
+    return await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, _handle_auto_shorts_action_sync_v4655, payload)
+
+
+@router.get("/api/member/live-sources-diag-v4655")
+async def _async_api_live_sources_diag_v4655(date_offset: int = 0):
+    loop = _asyncio_v4652.get_running_loop()
+    return await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, api_live_sources_diag_v4648, date_offset)
+
+
+router.routes = router.routes[_pre_cnt_v4655:] + router.routes[:_pre_cnt_v4655]
