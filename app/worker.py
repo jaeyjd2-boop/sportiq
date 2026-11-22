@@ -4,7 +4,8 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from sqlalchemy import text
 from app.config import settings
 from app.db import engine
-from app.collector import collect_leagues, collect_fixtures, collect_live, refresh_forecast_results
+from app.collector import (collect_leagues, collect_fixtures, collect_live, refresh_forecast_results,
+                           recheck_unfinished, collect_head_to_head)
 from app.forecast_tracking import snapshot_forecasts, evaluate_forecasts
 
 logging.basicConfig(level=logging.INFO)
@@ -58,9 +59,13 @@ def safe(label, fn):
 
 
 def fixture_window():
+    # Start at yesterday (UTC): late kickoffs (e.g. Brazil 19:30Z+) finish
+    # after midnight UTC and were never rescanned once "today" moved on.
+    # football-data returns a whole date range per competition request, so
+    # the extra day costs no additional API calls.
     today = datetime.now(timezone.utc).date()
     end_day = today + timedelta(days=max(1, settings.fixture_lookahead_days) - 1)
-    return collect_fixtures(today, end_day)
+    return collect_fixtures(today - timedelta(days=1), end_day)
 
 
 scheduler = BlockingScheduler(timezone="UTC")
@@ -70,6 +75,13 @@ scheduler.add_job(lambda: safe("forecast_evaluation", evaluate_forecasts), "inte
 scheduler.add_job(lambda: safe("leagues", collect_leagues), "interval", hours=24, id="leagues", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("fixtures", fixture_window), "interval", hours=12, id="fixtures", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("live", collect_live), "interval", seconds=max(3600, settings.live_poll_seconds), id="live", max_instances=1, coalesce=True)
+# Matches past kickoff+2h that are still NS/LIVE are rechecked until the
+# provider reports a final status (bounded to the last 3 days).
+scheduler.add_job(lambda: safe("recheck_unfinished", recheck_unfinished), "interval", minutes=30, id="recheck_unfinished", max_instances=1, coalesce=True)
+# First run 10 min after start: the worker restarts on every deploy, so a
+# plain 24h interval might never fire.
+scheduler.add_job(lambda: safe("head_to_head", collect_head_to_head), "interval", hours=24, id="head_to_head", max_instances=1, coalesce=True,
+                  next_run_time=datetime.now(timezone.utc) + timedelta(minutes=10))
 
 if __name__ == "__main__":
     safe("leagues", collect_leagues)
@@ -77,4 +89,5 @@ if __name__ == "__main__":
     safe("forecast_snapshot", snapshot_forecasts)
     safe("forecast_result_refresh", refresh_forecast_results)
     safe("forecast_evaluation", evaluate_forecasts)
+    safe("recheck_unfinished", recheck_unfinished)
     scheduler.start()

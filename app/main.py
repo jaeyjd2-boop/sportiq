@@ -10,6 +10,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.db import engine
 from app.details import router as details_router
+from app.match_status import live_cutoff, with_stale_flag
 from app.diagnostics import router as diagnostics_router
 from app.security.wp_bridge_router import router as wp_bridge_router
 from app.scheduler import web_backfill_lifespan
@@ -64,6 +65,10 @@ async def sportiq_security_and_ratelimit_middleware(request: Request, call_next)
         bucket.append(now_ts)
 
     response = await call_next(request)
+    # JSON is UTF-8, but some clients (e.g. Windows PowerShell 5.1) fall back
+    # to Latin-1 without an explicit charset and show "MÃ¼nchen".
+    if response.headers.get("content-type") == "application/json":
+        response.headers["content-type"] = "application/json; charset=utf-8"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -180,7 +185,7 @@ def matches(
             params,
         ).mappings().all()
     return {
-        "items": [dict(row) for row in rows],
+        "items": [with_stale_flag(row) for row in rows],
         "total": total,
         "page": page,
         "limit": limit,
@@ -191,14 +196,15 @@ def matches(
 @app.get("/v1/matches/live")
 def live(sport:str="football"):
     with engine.connect() as c:
-        rows=c.execute(text("SELECT m.id,l.name AS league,l.logo_url AS league_logo_url,ht.name AS home_team,ht.logo_url AS home_team_logo_url,at.name AS away_team,at.logo_url AS away_team_logo_url,m.start_time,m.status,m.status_detail,m.home_score,m.away_score,m.updated_at FROM matches m JOIN sports s ON s.id=m.sport_id LEFT JOIN leagues l ON l.id=m.league_id LEFT JOIN teams ht ON ht.id=m.home_team_id LEFT JOIN teams at ON at.id=m.away_team_id WHERE s.code=:sport AND m.status IN ('1H','HT','2H','ET','P','LIVE','Q1','Q2','Q3','Q4','IN') ORDER BY m.start_time"),{"sport":sport}).mappings().all()
-        return {"items":[dict(r) for r in rows],"total":len(rows)}
+        rows=c.execute(text("SELECT m.id,l.name AS league,l.logo_url AS league_logo_url,ht.name AS home_team,ht.logo_url AS home_team_logo_url,at.name AS away_team,at.logo_url AS away_team_logo_url,m.start_time,m.status,m.status_detail,m.home_score,m.away_score,m.updated_at FROM matches m JOIN sports s ON s.id=m.sport_id LEFT JOIN leagues l ON l.id=m.league_id LEFT JOIN teams ht ON ht.id=m.home_team_id LEFT JOIN teams at ON at.id=m.away_team_id WHERE s.code=:sport AND m.status IN ('1H','HT','2H','ET','P','LIVE','Q1','Q2','Q3','Q4','IN') AND m.start_time >= :cutoff ORDER BY m.start_time"),{"sport":sport,"cutoff":live_cutoff()}).mappings().all()
+        # Rows still marked live 4h+ after kickoff are stale provider data, not live games.
+        return {"items":[with_stale_flag(r) for r in rows],"total":len(rows)}
 @app.get("/v1/matches/{match_id}")
 def match_detail(match_id:int):
     with engine.connect() as c:
         row=c.execute(text("SELECT m.id,s.code AS sport,l.name AS league,l.logo_url AS league_logo_url,ht.name AS home_team,ht.logo_url AS home_team_logo_url,at.name AS away_team,at.logo_url AS away_team_logo_url,m.start_time,m.status,m.status_detail,m.home_score,m.away_score,m.venue,m.referee,m.updated_at FROM matches m JOIN sports s ON s.id=m.sport_id LEFT JOIN leagues l ON l.id=m.league_id LEFT JOIN teams ht ON ht.id=m.home_team_id LEFT JOIN teams at ON at.id=m.away_team_id WHERE m.id=:id"),{"id":match_id}).mappings().first()
         if not row: raise HTTPException(404,"match not found")
-        return dict(row)
+        return with_stale_flag(row)
 @app.get("/v1/predictions/{match_id}")
 def prediction(match_id:int):
     with engine.connect() as c:
