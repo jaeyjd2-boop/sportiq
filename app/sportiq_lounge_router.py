@@ -4,7 +4,12 @@ import json
 import os
 import re
 import sqlite3
+import gc
 import threading
+try:
+    threading.stack_size(524288)
+except Exception:
+    pass
 import time
 import urllib.parse
 import urllib.request
@@ -23333,7 +23338,7 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
     }
 
 
-_ESPN_PREWARM_STARTED_V373 = False
+_ESPN_PREWARM_STARTED_V373 = True  # Superseded by v4.6.53 sequential slim warmer
 
 
 def _start_coldboot_schedule_prewarmer_v373() -> None:
@@ -24520,47 +24525,15 @@ def install_datacenter_swr_accelerator(dc_mod: Any) -> bool:
 
 
 def _datacenter_prewarm_daemon() -> None:
-    time.sleep(1.5)
-    dc_mod = None
-    for _ in range(20):
-        try:
-            from app import sportiq_datacenter as _dc
-            _install_dc_ko_team_wrapper_v381(_dc)
-            if install_datacenter_swr_accelerator(_dc):
-                dc_mod = _dc
-                break
-        except Exception:
-            pass
-        time.sleep(1.0)
-    if dc_mod is None:
-        return
-
-    tick = 0
-    while True:
-        try:
-            with _DC_SWR_LOCK:
-                e0 = _DC_SWR_CACHE.get(0)
-            if e0 is None:
-                dc_mod._collect_all_matches(0)
-            elif (time.monotonic() - e0[0]) >= 18.0:
-                with _DC_SWR_LOCK:
-                    _DC_SWR_CACHE[0] = (time.monotonic() - 25.0, e0[1])
-                dc_c = getattr(dc_mod, "_CACHE", None)
-                if isinstance(dc_c, dict):
-                    dc_c.pop("live_scores_0", None)
-                dc_mod._collect_all_matches(0)
-
-            _patch_all_loaded_dc_modules_v4648()
-            if tick > 0 and tick % 6 == 0:
-                for _adj_off in (-1, 1):
-                    try:
-                        _collect_realtime_all_sports_v4616(datetime.now(KST) + timedelta(days=_adj_off), _adj_off)
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-        tick += 1
-        time.sleep(20.0)
+    # Superseded by v4.6.53 Zero-OOM single sequential warmer (prevents duplicate _DC_SWR_CACHE & 120s OOM spikes)
+    time.sleep(1.0)
+    try:
+        from app import sportiq_datacenter as _dc
+        _dc._STARTED = True
+        _install_dc_ko_team_wrapper_v381(_dc)
+    except Exception:
+        pass
+    return
 
 
 threading.Thread(target=_datacenter_prewarm_daemon, daemon=True, name="sportiq-dc-prewarm").start()
@@ -27960,7 +27933,7 @@ def _fetch_kr_official_portals_v4616(target_k: datetime, date_offset: int) -> Li
 _OFFICIAL_KOVO_WKBL_SEASON_2627_V4622: Dict[str, List[List[Any]]] = json.loads('{"2026-10-31":[["VLEAGUE_M","14:00","대한항공","현대캐피탈",3,0,"인천 계양체육관"]],"2026-11-01":[["VLEAGUE_M","14:00","KB손해보험","삼성화재",1,3,"평택 이충문화체육관"],["WKBL","14:00","KB스타즈","BNK썸",53,82,"청주 체육관"]],"2026-11-02":[["WKBL","19:00","삼성생명","하나은행",84,66,"용인 실내체육관"]],"2026-11-03":[["VLEAGUE_M","19:00","한국전력","우리카드",0,3,"수원 실내체육관"]],"2026-11-04":[["VLEAGUE_M","19:00","KB손해보험","OK저축은행",1,3,"평택 이충문화체육관"],["WKBL","19:00","신한은행","우리은행",65,58,"인천 도원체육관"]],"2026-11-05":[["VLEAGUE_M","19:00","삼성화재","현대캐피탈",1,3,"대전 충무체육관"]],"2026-11-06":[["VLEAGUE_M","19:00","대한항공","한국전력",1,3,"인천 계양체육관"],["VLEAGUE_W","19:00","IBK기업은행","GS칼텍스",0,0,"화성 종합실내체육관"],["WKBL","19:00","하나은행","KB스타즈",69,74,"부천 체육관"]],"2026-11-07":[["VLEAGUE_M","14:00","OK저축은행","우리카드",1,3,"부산 강서실내체육관"],["WKBL","14:00","BNK썸","신한은행",59,68,"부산 사직실내체육관"],["VLEAGUE_W","16:00","정관장","현대건설",0,0,"대전 충무체육관"],["WKBL","16:00","우리은행","삼성생명",65,54,"아산 이순신체육관"]],"2026-11-08":[["VLEAGUE_M","14:00","현대캐피탈","KB손해보험",3,1,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","흥국생명",3,1,"김천 실내체육관"],["WKBL","16:00","BNK썸","하나은행",68,66,"부산 사직실내체육관"]],"2026-11-09":[["WKBL","19:00","KB스타즈","우리은행",51,57,"청주 체육관"]],"2026-11-10":[["VLEAGUE_M","19:00","삼성화재","한국전력",1,3,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","IBK기업은행",0,3,"광주 페퍼스타디움"]],"2026-11-11":[["VLEAGUE_M","19:00","우리카드","대한항공",3,2,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","GS칼텍스",0,3,"수원 실내체육관"],["WKBL","19:00","신한은행","삼성생명",51,54,"인천 도원체육관"]],"2026-11-12":[["VLEAGUE_M","19:00","OK저축은행","현대캐피탈",1,3,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","한국도로공사",0,0,"대전 충무체육관"]],"2026-11-13":[["VLEAGUE_M","19:00","한국전력","KB손해보험",3,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","흥국생명",3,1,"화성 종합실내체육관"],["WKBL","19:00","우리은행","BNK썸",53,52,"아산 이순신체육관"]],"2026-11-14":[["VLEAGUE_M","14:00","대한항공","삼성화재",1,3,"인천 계양체육관"],["WKBL","14:00","삼성생명","KB스타즈",79,72,"용인 실내체육관"],["VLEAGUE_W","16:00","GS칼텍스","SOOP 수퍼스",3,0,"서울 장충체육관"],["WKBL","16:00","하나은행","신한은행",73,87,"부천 체육관"]],"2026-11-15":[["VLEAGUE_M","14:00","우리카드","현대캐피탈",0,3,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","한국도로공사",0,3,"수원 실내체육관"],["WKBL","16:00","삼성생명","BNK썸",69,63,"용인 실내체육관"]],"2026-11-16":[["WKBL","19:00","하나은행","우리은행",68,67,"부천 체육관"]],"2026-11-17":[["VLEAGUE_M","19:00","한국전력","OK저축은행",3,2,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","정관장",1,3,"화성 종합실내체육관"]],"2026-11-18":[["VLEAGUE_M","19:00","삼성화재","우리카드",3,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","현대건설",1,3,"광주 페퍼스타디움"],["WKBL","19:00","신한은행","KB스타즈",62,61,"인천 도원체육관"]],"2026-11-19":[["VLEAGUE_M","19:00","KB손해보험","대한항공",1,3,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","GS칼텍스",1,3,"인천 삼산월드체육관"]],"2026-11-20":[["VLEAGUE_M","19:00","현대캐피탈","한국전력",1,3,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","IBK기업은행",3,1,"김천 실내체육관"],["WKBL","19:00","하나은행","삼성생명",57,75,"부천 체육관"]],"2026-11-21":[["VLEAGUE_M","14:00","삼성화재","OK저축은행",3,1,"대전 충무체육관"],["WKBL","15:10","KB스타즈","신한은행",0,0,"청주 체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","정관장",2,3,"광주 페퍼스타디움"],["WKBL","16:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2026-11-22":[["VLEAGUE_M","14:00","우리카드","KB손해보험",0,0,"서울 장충체육관"],["VLEAGUE_W","14:00","현대건설","흥국생명",0,0,"수원 실내체육관"],["WKBL","16:00","KB스타즈","삼성생명",0,0,"청주 체육관"]],"2026-11-23":[["WKBL","19:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2026-11-24":[["VLEAGUE_M","19:00","OK저축은행","대한항공",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","GS칼텍스",0,0,"대전 충무체육관"]],"2026-11-25":[["VLEAGUE_M","19:00","한국전력","현대캐피탈",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","한국도로공사",0,0,"화성 종합실내체육관"],["WKBL","19:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"]],"2026-11-26":[["VLEAGUE_M","19:00","우리카드","삼성화재",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","SOOP 수퍼스",0,0,"수원 실내체육관"]],"2026-11-27":[["VLEAGUE_M","19:00","대한항공","KB손해보험",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","흥국생명","GS칼텍스",0,0,"인천 삼산월드체육관"],["WKBL","19:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2026-11-28":[["VLEAGUE_M","14:00","OK저축은행","한국전력",0,0,"부산 강서실내체육관"],["WKBL","14:00","BNK썸","KB스타즈",0,0,"부산 사직실내체육관"],["VLEAGUE_W","16:00","정관장","IBK기업은행",0,0,"대전 충무체육관"],["WKBL","16:00","우리은행","하나은행",0,0,"아산 이순신체육관"]],"2026-11-29":[["VLEAGUE_M","14:00","삼성화재","현대캐피탈",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","한국도로공사",0,0,"광주 페퍼스타디움"],["WKBL","16:00","BNK썸","삼성생명",0,0,"부산 사직실내체육관"]],"2026-11-30":[["WKBL","19:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2026-12-01":[["VLEAGUE_M","19:00","KB손해보험","우리카드",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","현대건설",0,0,"인천 삼산월드체육관"]],"2026-12-02":[["VLEAGUE_M","19:00","현대캐피탈","OK저축은행",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","정관장",0,0,"김천 실내체육관"],["WKBL","19:00","하나은행","BNK썸",0,0,"부천 체육관"]],"2026-12-03":[["VLEAGUE_M","19:00","대한항공","한국전력",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","IBK기업은행",0,0,"서울 장충체육관"]],"2026-12-04":[["VLEAGUE_M","19:00","삼성화재","KB손해보험",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","흥국생명",0,0,"광주 페퍼스타디움"],["WKBL","19:00","삼성생명","우리은행",0,0,"용인 실내체육관"]],"2026-12-05":[["VLEAGUE_M","14:00","우리카드","OK저축은행",0,0,"서울 장충체육관"],["WKBL","14:00","KB스타즈","하나은행",0,0,"청주 체육관"],["VLEAGUE_W","16:00","정관장","현대건설",0,0,"대전 충무체육관"],["WKBL","16:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2026-12-06":[["VLEAGUE_M","14:00","현대캐피탈","대한항공",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","GS칼텍스",0,0,"김천 실내체육관"],["WKBL","16:00","신한은행","삼성생명",0,0,"인천 도원체육관"]],"2026-12-07":[["WKBL","19:00","KB스타즈","우리은행",0,0,"청주 체육관"]],"2026-12-08":[["VLEAGUE_M","19:00","KB손해보험","한국전력",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","IBK기업은행",0,0,"인천 삼산월드체육관"]],"2026-12-09":[["VLEAGUE_M","19:00","OK저축은행","삼성화재",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","SOOP 수퍼스",0,0,"대전 충무체육관"],["WKBL","19:00","BNK썸","하나은행",0,0,"부산 사직실내체육관"]],"2026-12-10":[["VLEAGUE_M","19:00","대한항공","우리카드",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","현대건설",0,0,"서울 장충체육관"]],"2026-12-11":[["VLEAGUE_M","19:00","KB손해보험","현대캐피탈",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","한국도로공사",0,0,"인천 삼산월드체육관"],["WKBL","19:00","삼성생명","KB스타즈",0,0,"용인 실내체육관"]],"2026-12-12":[["VLEAGUE_M","14:00","한국전력","삼성화재",0,0,"수원 실내체육관"],["WKBL","14:00","하나은행","우리은행",0,0,"부천 체육관"],["VLEAGUE_W","16:00","IBK기업은행","SOOP 수퍼스",0,0,"화성 종합실내체육관"],["WKBL","16:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2026-12-13":[["VLEAGUE_M","14:00","대한항공","OK저축은행",0,0,"인천 계양체육관"],["VLEAGUE_W","16:00","정관장","GS칼텍스",0,0,"대전 충무체육관"],["WKBL","16:00","하나은행","KB스타즈",0,0,"부천 체육관"]],"2026-12-14":[["WKBL","19:00","BNK썸","삼성생명",0,0,"부산 사직실내체육관"]],"2026-12-15":[["VLEAGUE_M","19:00","현대캐피탈","우리카드",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","현대건설",0,0,"김천 실내체육관"]],"2026-12-16":[["VLEAGUE_M","19:00","OK저축은행","KB손해보험",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","흥국생명",0,0,"대전 충무체육관"],["WKBL","19:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2026-12-17":[["VLEAGUE_M","19:00","삼성화재","대한항공",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","GS칼텍스",0,0,"광주 페퍼스타디움"],["WKBL","19:00","KB스타즈","신한은행",0,0,"청주 체육관"]],"2026-12-18":[["VLEAGUE_M","19:00","한국전력","우리카드",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","현대건설",0,0,"화성 종합실내체육관"],["WKBL","19:00","삼성생명","하나은행",0,0,"용인 실내체육관"]],"2026-12-19":[["VLEAGUE_M","14:00","현대캐피탈","KB손해보험",0,0,"천안 유관순체육관"],["WKBL","14:00","신한은행","KB스타즈",0,0,"인천 도원체육관"],["VLEAGUE_W","16:00","한국도로공사","흥국생명",0,0,"김천 실내체육관"],["WKBL","16:00","우리은행","BNK썸",0,0,"아산 이순신체육관"]],"2026-12-20":[["VLEAGUE_M","14:00","삼성화재","OK저축은행",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","정관장",0,0,"광주 페퍼스타디움"],["WKBL","16:00","우리은행","삼성생명",0,0,"아산 이순신체육관"]],"2026-12-21":[["WKBL","19:00","하나은행","신한은행",0,0,"부천 체육관"]],"2026-12-22":[["VLEAGUE_M","19:00","대한항공","현대캐피탈",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","한국도로공사",0,0,"서울 장충체육관"]],"2026-12-23":[["VLEAGUE_M","19:00","우리카드","한국전력",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","IBK기업은행",0,0,"수원 실내체육관"],["WKBL","19:00","KB스타즈","BNK썸",0,0,"청주 체육관"]],"2026-12-24":[["VLEAGUE_M","19:00","KB손해보험","삼성화재",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","SOOP 수퍼스",0,0,"인천 삼산월드체육관"]],"2026-12-25":[["VLEAGUE_M","14:00","OK저축은행","대한항공",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","정관장","GS칼텍스",0,0,"대전 충무체육관"],["WKBL","19:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2026-12-26":[["VLEAGUE_M","14:00","현대캐피탈","한국전력",0,0,"천안 유관순체육관"],["WKBL","14:00","KB스타즈","하나은행",0,0,"청주 체육관"],["VLEAGUE_W","16:00","한국도로공사","IBK기업은행",0,0,"김천 실내체육관"],["WKBL","16:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2026-12-27":[["VLEAGUE_M","14:00","삼성화재","우리카드",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","현대건설",0,0,"광주 페퍼스타디움"]],"2026-12-28":[["WKBL","19:00","하나은행","삼성생명",0,0,"부천 체육관"]],"2026-12-29":[["VLEAGUE_M","19:00","KB손해보험","대한항공",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","GS칼텍스","흥국생명",0,0,"서울 장충체육관"]],"2026-12-30":[["VLEAGUE_M","19:00","한국전력","OK저축은행",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","정관장",0,0,"화성 종합실내체육관"],["WKBL","19:00","BNK썸","신한은행",0,0,"부산 사직실내체육관"]],"2026-12-31":[["VLEAGUE_M","19:00","우리카드","현대캐피탈",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","한국도로공사",0,0,"수원 실내체육관"]],"2027-01-01":[["VLEAGUE_M","14:00","대한항공","삼성화재",0,0,"인천 계양체육관"],["VLEAGUE_W","16:00","GS칼텍스","SOOP 수퍼스",0,0,"서울 장충체육관"],["WKBL","19:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"]],"2027-01-02":[["VLEAGUE_M","14:00","한국전력","KB손해보험",0,0,"수원 실내체육관"],["WKBL","14:00","삼성생명","BNK썸",0,0,"용인 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","흥국생명",0,0,"화성 종합실내체육관"],["WKBL","16:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2027-01-03":[["VLEAGUE_M","14:00","OK저축은행","우리카드",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","현대건설","정관장",0,0,"수원 실내체육관"],["WKBL","16:00","삼성생명","우리은행",0,0,"용인 실내체육관"]],"2027-01-04":[["WKBL","19:00","KB스타즈","BNK썸",0,0,"청주 체육관"]],"2027-01-05":[["VLEAGUE_M","19:00","현대캐피탈","삼성화재",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","SOOP 수퍼스",0,0,"김천 실내체육관"]],"2027-01-06":[["VLEAGUE_M","19:00","한국전력","대한항공",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","GS칼텍스","IBK기업은행",0,0,"서울 장충체육관"],["WKBL","19:00","우리은행","하나은행",0,0,"아산 이순신체육관"]],"2027-01-07":[["VLEAGUE_M","19:00","우리카드","KB손해보험",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","흥국생명",0,0,"수원 실내체육관"]],"2027-01-08":[["VLEAGUE_M","19:00","OK저축은행","현대캐피탈",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","한국도로공사",0,0,"대전 충무체육관"]],"2027-01-09":[["VLEAGUE_M","14:00","삼성화재","한국전력",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","IBK기업은행",0,0,"광주 페퍼스타디움"]],"2027-01-10":[["VLEAGUE_M","14:00","우리카드","대한항공",0,0,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","GS칼텍스",0,0,"수원 실내체육관"]],"2027-01-12":[["VLEAGUE_M","19:00","KB손해보험","OK저축은행",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","정관장",0,0,"인천 삼산월드체육관"]],"2027-01-15":[["WKBL","19:00","KB스타즈","삼성생명",0,0,"청주 체육관"]],"2027-01-16":[["WKBL","14:00","하나은행","BNK썸",0,0,"부천 체육관"],["WKBL","16:00","신한은행","우리은행",0,0,"인천 도원체육관"]],"2027-01-17":[["WKBL","16:00","신한은행","KB스타즈",0,0,"인천 도원체육관"]],"2027-01-18":[["WKBL","19:00","삼성생명","하나은행",0,0,"용인 실내체육관"]],"2027-01-20":[["VLEAGUE_M","19:00","현대캐피탈","대한항공",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","GS칼텍스",0,0,"김천 실내체육관"],["WKBL","19:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2027-01-21":[["VLEAGUE_M","19:00","OK저축은행","KB손해보험",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","흥국생명",0,0,"대전 충무체육관"]],"2027-01-22":[["VLEAGUE_M","19:00","한국전력","삼성화재",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","SOOP 수퍼스",0,0,"화성 종합실내체육관"],["WKBL","19:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2027-01-23":[["VLEAGUE_M","14:00","대한항공","우리카드",0,0,"인천 계양체육관"],["WKBL","14:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"],["VLEAGUE_W","16:00","GS칼텍스","현대건설",0,0,"서울 장충체육관"],["WKBL","16:00","삼성생명","BNK썸",0,0,"용인 실내체육관"]],"2027-01-24":[["VLEAGUE_M","14:00","KB손해보험","현대캐피탈",0,0,"평택 이충문화체육관"],["VLEAGUE_W","16:00","흥국생명","한국도로공사",0,0,"인천 삼산월드체육관"],["WKBL","16:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2027-01-25":[["VLEAGUE_M","19:00","OK저축은행","삼성화재",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","SOOP 수퍼스",0,0,"대전 충무체육관"],["WKBL","19:00","하나은행","KB스타즈",0,0,"부천 체육관"]],"2027-01-26":[["VLEAGUE_M","19:00","우리카드","한국전력",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","IBK기업은행",0,0,"수원 실내체육관"]],"2027-01-27":[["WKBL","19:00","삼성생명","우리은행",0,0,"용인 실내체육관"]],"2027-01-28":[["VLEAGUE_M","19:00","대한항공","OK저축은행",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","정관장",0,0,"서울 장충체육관"]],"2027-01-29":[["VLEAGUE_M","19:00","삼성화재","현대캐피탈",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","한국도로공사",0,0,"광주 페퍼스타디움"],["WKBL","19:00","BNK썸","KB스타즈",0,0,"부산 사직실내체육관"]],"2027-01-30":[["VLEAGUE_M","14:00","KB손해보험","우리카드",0,0,"평택 이충문화체육관"],["WKBL","14:00","신한은행","삼성생명",0,0,"인천 도원체육관"],["VLEAGUE_W","16:00","흥국생명","현대건설",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","우리은행",0,0,"부천 체육관"]],"2027-01-31":[["VLEAGUE_M","14:00","한국전력","대한항공",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","GS칼텍스",0,0,"화성 종합실내체육관"],["WKBL","16:00","하나은행","BNK썸",0,0,"부천 체육관"]],"2027-02-01":[["VLEAGUE_M","19:00","현대캐피탈","OK저축은행",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","정관장",0,0,"김천 실내체육관"],["WKBL","19:00","KB스타즈","삼성생명",0,0,"청주 체육관"]],"2027-02-02":[["VLEAGUE_M","19:00","삼성화재","KB손해보험",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","흥국생명",0,0,"광주 페퍼스타디움"]],"2027-02-03":[["WKBL","19:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2027-02-04":[["VLEAGUE_M","19:00","OK저축은행","한국전력",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","IBK기업은행",0,0,"대전 충무체육관"]],"2027-02-05":[["VLEAGUE_M","19:00","우리카드","삼성화재",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","SOOP 수퍼스",0,0,"수원 실내체육관"],["WKBL","19:00","우리은행","하나은행",0,0,"아산 이순신체육관"]],"2027-02-06":[["VLEAGUE_M","14:00","대한항공","KB손해보험",0,0,"인천 계양체육관"],["WKBL","14:00","BNK썸","KB스타즈",0,0,"부산 사직실내체육관"],["VLEAGUE_W","16:00","GS칼텍스","흥국생명",0,0,"서울 장충체육관"],["WKBL","16:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2027-02-07":[["VLEAGUE_M","14:00","한국전력","현대캐피탈",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","한국도로공사",0,0,"화성 종합실내체육관"],["WKBL","16:00","BNK썸","하나은행",0,0,"부산 사직실내체육관"]],"2027-02-08":[["VLEAGUE_M","14:00","우리카드","OK저축은행",0,0,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","정관장",0,0,"수원 실내체육관"],["WKBL","19:00","KB스타즈","우리은행",0,0,"청주 체육관"]],"2027-02-09":[["VLEAGUE_M","14:00","삼성화재","대한항공",0,0,"대전 충무체육관"],["VLEAGUE_W","16:00","SOOP 수퍼스","GS칼텍스",0,0,"광주 페퍼스타디움"]],"2027-02-10":[["WKBL","19:00","BNK썸","삼성생명",0,0,"부산 사직실내체육관"]],"2027-02-11":[["VLEAGUE_M","19:00","KB손해보험","한국전력",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","IBK기업은행",0,0,"인천 삼산월드체육관"]],"2027-02-12":[["VLEAGUE_M","19:00","현대캐피탈","우리카드",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","현대건설",0,0,"김천 실내체육관"],["WKBL","19:00","KB스타즈","신한은행",0,0,"청주 체육관"]],"2027-02-13":[["VLEAGUE_M","14:00","대한항공","삼성화재",0,0,"인천 계양체육관"],["WKBL","14:00","하나은행","삼성생명",0,0,"부천 체육관"],["VLEAGUE_W","16:00","GS칼텍스","SOOP 수퍼스",0,0,"서울 장충체육관"],["WKBL","16:00","우리은행","BNK썸",0,0,"아산 이순신체육관"]],"2027-02-14":[["VLEAGUE_M","14:00","KB손해보험","OK저축은행",0,0,"평택 이충문화체육관"],["VLEAGUE_W","16:00","흥국생명","정관장",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","신한은행",0,0,"부천 체육관"]],"2027-02-15":[["WKBL","19:00","삼성생명","KB스타즈",0,0,"용인 실내체육관"]],"2027-02-16":[["VLEAGUE_M","19:00","대한항공","현대캐피탈",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","한국도로공사",0,0,"서울 장충체육관"]],"2027-02-17":[["VLEAGUE_M","19:00","OK저축은행","우리카드",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","현대건설",0,0,"대전 충무체육관"],["WKBL","19:00","신한은행","우리은행",0,0,"인천 도원체육관"]],"2027-02-18":[["VLEAGUE_M","19:00","한국전력","KB손해보험",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","흥국생명",0,0,"화성 종합실내체육관"]],"2027-02-19":[["VLEAGUE_M","19:00","현대캐피탈","삼성화재",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","SOOP 수퍼스",0,0,"김천 실내체육관"],["WKBL","19:00","KB스타즈","하나은행",0,0,"청주 체육관"]],"2027-02-20":[["VLEAGUE_M","14:00","우리카드","대한항공",0,0,"서울 장충체육관"],["WKBL","14:00","우리은행","삼성생명",0,0,"아산 이순신체육관"],["VLEAGUE_W","16:00","현대건설","GS칼텍스",0,0,"수원 실내체육관"],["WKBL","16:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2027-02-21":[["VLEAGUE_M","14:00","한국전력","OK저축은행",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","정관장",0,0,"화성 종합실내체육관"],["WKBL","16:00","신한은행","하나은행",0,0,"인천 도원체육관"]],"2027-02-22":[["WKBL","19:00","우리은행","KB스타즈",0,0,"아산 이순신체육관"]],"2027-02-23":[["VLEAGUE_M","19:00","현대캐피탈","KB손해보험",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","흥국생명",0,0,"김천 실내체육관"]],"2027-02-24":[["VLEAGUE_M","19:00","삼성화재","우리카드",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","현대건설",0,0,"광주 페퍼스타디움"],["WKBL","19:00","삼성생명","BNK썸",0,0,"용인 실내체육관"]],"2027-02-25":[["VLEAGUE_M","19:00","대한항공","한국전력",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","IBK기업은행",0,0,"서울 장충체육관"]],"2027-02-26":[["VLEAGUE_M","19:00","OK저축은행","현대캐피탈",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","한국도로공사",0,0,"대전 충무체육관"],["WKBL","19:00","우리은행","신한은행",0,0,"아산 이순신체육관"]],"2027-02-27":[["VLEAGUE_M","14:00","KB손해보험","삼성화재",0,0,"평택 이충문화체육관"],["WKBL","14:00","KB스타즈","BNK썸",0,0,"청주 체육관"],["VLEAGUE_W","16:00","흥국생명","SOOP 수퍼스",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","삼성생명",0,0,"부천 체육관"]],"2027-02-28":[["VLEAGUE_M","14:00","한국전력","우리카드",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","현대건설",0,0,"화성 종합실내체육관"],["WKBL","16:00","KB스타즈","신한은행",0,0,"청주 체육관"]],"2027-03-01":[["VLEAGUE_M","14:00","OK저축은행","대한항공",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","GS칼텍스","정관장",0,0,"서울 장충체육관"],["WKBL","19:00","BNK썸","하나은행",0,0,"부산 사직실내체육관"]],"2027-03-03":[["VLEAGUE_M","19:00","우리카드","KB손해보험",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","흥국생명",0,0,"수원 실내체육관"],["WKBL","19:00","우리은행","삼성생명",0,0,"아산 이순신체육관"]],"2027-03-04":[["VLEAGUE_M","19:00","현대캐피탈","한국전력",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","IBK기업은행",0,0,"김천 실내체육관"]],"2027-03-05":[["VLEAGUE_M","19:00","삼성화재","OK저축은행",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","정관장",0,0,"광주 페퍼스타디움"],["WKBL","19:00","신한은행","BNK썸",0,0,"인천 도원체육관"]],"2027-03-06":[["VLEAGUE_M","14:00","KB손해보험","대한항공",0,0,"평택 이충문화체육관"],["WKBL","14:00","삼성생명","KB스타즈",0,0,"용인 실내체육관"],["VLEAGUE_W","16:00","흥국생명","GS칼텍스",0,0,"인천 삼산월드체육관"],["WKBL","16:00","하나은행","우리은행",0,0,"부천 체육관"]],"2027-03-07":[["VLEAGUE_M","14:00","우리카드","현대캐피탈",0,0,"서울 장충체육관"],["VLEAGUE_W","16:00","현대건설","한국도로공사",0,0,"수원 실내체육관"],["WKBL","16:00","삼성생명","신한은행",0,0,"용인 실내체육관"]],"2027-03-08":[["WKBL","19:00","BNK썸","우리은행",0,0,"부산 사직실내체육관"]],"2027-03-09":[["VLEAGUE_M","19:00","삼성화재","한국전력",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","IBK기업은행",0,0,"광주 페퍼스타디움"],["WKBL","19:00","KB스타즈","하나은행",0,0,"청주 체육관"]],"2027-03-10":[["VLEAGUE_M","19:00","대한항공","우리카드",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","현대건설",0,0,"서울 장충체육관"]],"2027-03-11":[["VLEAGUE_M","19:00","OK저축은행","KB손해보험",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","흥국생명",0,0,"대전 충무체육관"]],"2027-03-12":[["VLEAGUE_M","19:00","한국전력","삼성화재",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","SOOP 수퍼스",0,0,"화성 종합실내체육관"]],"2027-03-13":[["VLEAGUE_M","14:00","현대캐피탈","대한항공",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","GS칼텍스",0,0,"김천 실내체육관"]],"2027-03-14":[["VLEAGUE_M","14:00","KB손해보험","우리카드",0,0,"평택 이충문화체육관"],["VLEAGUE_W","16:00","흥국생명","현대건설",0,0,"인천 삼산월드체육관"]],"2027-03-16":[["VLEAGUE_M","19:00","현대캐피탈","삼성화재",0,0,"천안 유관순체육관"],["VLEAGUE_W","19:00","한국도로공사","SOOP 수퍼스",0,0,"김천 실내체육관"]],"2027-03-17":[["VLEAGUE_M","19:00","OK저축은행","한국전력",0,0,"부산 강서실내체육관"],["VLEAGUE_W","19:00","정관장","IBK기업은행",0,0,"대전 충무체육관"]],"2027-03-18":[["VLEAGUE_M","19:00","대한항공","KB손해보험",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","흥국생명",0,0,"서울 장충체육관"]],"2027-03-19":[["VLEAGUE_M","19:00","우리카드","삼성화재",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","SOOP 수퍼스",0,0,"수원 실내체육관"]],"2027-03-20":[["VLEAGUE_M","14:00","현대캐피탈","OK저축은행",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","정관장",0,0,"김천 실내체육관"]],"2027-03-21":[["VLEAGUE_M","14:00","한국전력","대한항공",0,0,"수원 실내체육관"],["VLEAGUE_W","16:00","IBK기업은행","GS칼텍스",0,0,"화성 종합실내체육관"]],"2027-03-23":[["VLEAGUE_M","19:00","KB손해보험","현대캐피탈",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","한국도로공사",0,0,"인천 삼산월드체육관"]],"2027-03-24":[["VLEAGUE_M","19:00","우리카드","OK저축은행",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","정관장",0,0,"수원 실내체육관"]],"2027-03-25":[["VLEAGUE_M","19:00","삼성화재","대한항공",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","GS칼텍스",0,0,"광주 페퍼스타디움"]],"2027-03-26":[["VLEAGUE_M","19:00","KB손해보험","한국전력",0,0,"평택 이충문화체육관"],["VLEAGUE_W","19:00","흥국생명","IBK기업은행",0,0,"인천 삼산월드체육관"]],"2027-03-27":[["VLEAGUE_M","14:00","현대캐피탈","우리카드",0,0,"천안 유관순체육관"],["VLEAGUE_W","16:00","한국도로공사","현대건설",0,0,"김천 실내체육관"]],"2027-03-28":[["VLEAGUE_M","14:00","OK저축은행","삼성화재",0,0,"부산 강서실내체육관"],["VLEAGUE_W","16:00","정관장","SOOP 수퍼스",0,0,"대전 충무체육관"]],"2027-03-30":[["VLEAGUE_M","19:00","한국전력","현대캐피탈",0,0,"수원 실내체육관"],["VLEAGUE_W","19:00","IBK기업은행","한국도로공사",0,0,"화성 종합실내체육관"]],"2027-03-31":[["VLEAGUE_M","19:00","대한항공","OK저축은행",0,0,"인천 계양체육관"],["VLEAGUE_W","19:00","GS칼텍스","정관장",0,0,"서울 장충체육관"]],"2027-04-01":[["VLEAGUE_M","19:00","삼성화재","KB손해보험",0,0,"대전 충무체육관"],["VLEAGUE_W","19:00","SOOP 수퍼스","흥국생명",0,0,"광주 페퍼스타디움"]],"2027-04-02":[["VLEAGUE_M","19:00","우리카드","한국전력",0,0,"서울 장충체육관"],["VLEAGUE_W","19:00","현대건설","IBK기업은행",0,0,"수원 실내체육관"]]}')
 _OFFTHEFIELD_CACHE_V4622: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
 _PER_OFFSET_DIAG_V4622: Dict[int, Dict[str, Any]] = {}
-_RT_TOP_POOL_V4622 = ThreadPoolExecutor(max_workers=20)
+_RT_TOP_POOL_V4622 = ThreadPoolExecutor(max_workers=3)
 
 # ============================================================================
 # v4.6.39: Keyless Global Lightweight Korean V-League (M/W) & WKBL/KBL
@@ -30435,7 +30408,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.52",
+        "version": "v4.6.53",
         "global_espn_fast_wave_v4642": True,
         "stoppage_plus_clock_v4642": True,
         "flashscore_mobi_bridge_v4639": True,
@@ -30512,10 +30485,10 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
 #          + 18-Worker `site.web.api.espn.com` (1-Wave Zero Queueing for 0/-1/+1)
 #          + Global-Aware `is_rich` Guard + Lightweight 3-Page KR/JP Collector
 # ==============================================================================
-_ESPN_POOL_V4645 = ThreadPoolExecutor(max_workers=32, thread_name_prefix="sq52-espn")
-_FSM_POOL_V4645 = ThreadPoolExecutor(max_workers=10, thread_name_prefix="sq51-fsm")
-_COORD_POOL_V4645 = ThreadPoolExecutor(max_workers=6, thread_name_prefix="sq48-coord")
-_BG_SWEEP_POOL_V4645 = ThreadPoolExecutor(max_workers=2, thread_name_prefix="sq48-bg")
+_ESPN_POOL_V4645 = ThreadPoolExecutor(max_workers=6, thread_name_prefix="sq53-espn")
+_FSM_POOL_V4645 = ThreadPoolExecutor(max_workers=5, thread_name_prefix="sq53-fsm")
+_COORD_POOL_V4645 = ThreadPoolExecutor(max_workers=2, thread_name_prefix="sq53-coord")
+_BG_SWEEP_POOL_V4645 = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sq53-bg")
 
 _ESPN_GLOBAL_CACHE_V4642: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
 _ESPN_GLOBAL_LAST_GOOD_V4642: Dict[int, List[Dict[str, Any]]] = {}
@@ -30581,7 +30554,7 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
     d1 = target_k.strftime("%Y%m%d")
     d0 = (target_k - timedelta(days=1)).strftime("%Y%m%d")
     ck = f"{off_i}:{d1}"
-    ttl = 16.0 if is_today else 600.0
+    ttl = 16.0 if is_today else 1800.0
     now_m = time.monotonic()
 
     with _ESPN_GLOBAL_LOCK_V4642:
@@ -30604,28 +30577,42 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
         (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates={d1}&limit=20", "soccer", "세리에 A", "SERIEA", "이탈리아 세리에 A"),
         (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d0}&limit=20", "soccer", "프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
         (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates={d1}&limit=20", "soccer", "프랑스 리그 1", "LIGUE1", "프랑스 리그 1"),
-        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates={d0}&limit=25", "soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
-        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard?dates={d0}&limit=25", "soccer", "UEL", "UEL", "UEFA 유로파리그"),
-        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d0}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
-        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d1}&limit=100", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates={d0}&limit=20", "soccer", "UCL", "UCL", "UEFA 챔피언스리그"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard?dates={d0}&limit=20", "soccer", "UEL", "UEL", "UEFA 유로파리그"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d0}&limit=40", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
+        (f"https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d1}&limit=40", "soccer", "해외축구", "SOCCER_ALL", "글로벌 축구"),
     ]
 
+    def _fetch_and_parse_slim_v4653(u_ep: str, sp_ep: str, sl_ep: str, cl_ep: str, fl_ep: str) -> List[Dict[str, Any]]:
+        is_all_soc = (cl_ep == "SOCCER_ALL")
+        js_ep = _fetch_espn_web_cdn_v4648(u_ep, 2.5)
+        if not js_ep:
+            return []
+        try:
+            parsed_ep = _parse_espn_scoreboard_payload_v4616(js_ep, sp_ep, sl_ep, cl_ep, fl_ep, expected_mmdd, is_today)
+            return parsed_ep
+        finally:
+            js_ep.clear()
+            del js_ep
+            if is_all_soc:
+                gc.collect()
+
     ordered_futs = [
-        (_ESPN_POOL_V4645.submit(_fetch_espn_web_cdn_v4648, u, 2.8), sp, s_lg, c_lg, f_lg)
+        _ESPN_POOL_V4645.submit(_fetch_and_parse_slim_v4653, u, sp, s_lg, c_lg, f_lg)
         for u, sp, s_lg, c_lg, f_lg in endpoints
     ]
-    done_e, not_done_e = _cf_wait_espn_v4648([f for f, *_ in ordered_futs], timeout=4.2)
+    done_e, not_done_e = _cf_wait_espn_v4648(ordered_futs, timeout=4.2)
     for nf in not_done_e:
         nf.cancel()
 
     out: List[Dict[str, Any]] = []
-    for fut, sp, s_lg, c_lg, f_lg in ordered_futs:
+    for fut in ordered_futs:
         if fut not in done_e:
             continue
         try:
-            js = fut.result(timeout=0.05)
-            if js:
-                out.extend(_parse_espn_scoreboard_payload_v4616(js, sp, s_lg, c_lg, f_lg, expected_mmdd, is_today))
+            rows_ep = fut.result(timeout=0.05)
+            if rows_ep:
+                out.extend(rows_ep)
         except Exception:
             continue
 
@@ -30644,6 +30631,10 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
     return []
 
 
+_FSM_PARSED_SPORT_CACHE_V4653: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
+_WORKER_COLD_COLLECT_SEM_V4653 = threading.Semaphore(1)
+
+
 def _fetch_fsm_kr_jp_fast_v4648(target_k: datetime, date_offset: int) -> List[Dict[str, Any]]:
     from concurrent.futures import wait as _cf_wait_kr_v4648
     now_cet = datetime.now(_FSM_PRAGUE_TZ_V4639)
@@ -30651,21 +30642,24 @@ def _fetch_fsm_kr_jp_fast_v4648(target_k: datetime, date_offset: int) -> List[Di
     if eff_cet_off < -2 or eff_cet_off > 2:
         return []
     q_suffix = "" if eff_cet_off == 0 else f"?d={int(eff_cet_off)}"
-    ttl = 12.0 if eff_cet_off == 0 else 600.0
+    ttl = 12.0 if eff_cet_off == 0 else 1800.0
     specs = (
         ("soccer", f"https://www.flashscore.mobi/{q_suffix}"),
         ("volleyball", f"https://www.flashscore.mobi/volleyball/{q_suffix}"),
         ("basketball", f"https://www.flashscore.mobi/basketball/{q_suffix}"),
     )
     now_m = time.monotonic()
-    raw_by_sp: Dict[str, str] = {}
+    parsed_by_sp: Dict[str, List[Dict[str, Any]]] = {}
     missing_specs: List[Tuple[str, str]] = []
     with _FSM_LOCK_V4639:
+        _FSM_LIST_CACHE_V4639.clear()
+        if len(_FSM_DETAIL_CACHE_V4639) > 120:
+            _FSM_DETAIL_CACHE_V4639.clear()
         for sp_k, url in specs:
-            ck = f"kr48:{sp_k}:{eff_cet_off}:{target_k.strftime('%Y%m%d')}"
-            cached = _FSM_LIST_CACHE_V4639.get(ck)
+            ck = f"kr53:{sp_k}:{eff_cet_off}:{target_k.strftime('%Y%m%d')}"
+            cached = _FSM_PARSED_SPORT_CACHE_V4653.get(ck)
             if cached and (now_m - cached[0]) < ttl:
-                raw_by_sp[sp_k] = cached[1]
+                parsed_by_sp[sp_k] = [dict(x) for x in cached[1]]
             else:
                 missing_specs.append((sp_k, url))
     if missing_specs:
@@ -30680,18 +30674,20 @@ def _fetch_fsm_kr_jp_fast_v4648(target_k: datetime, date_offset: int) -> List[Di
             except Exception:
                 txt = ""
             if txt:
-                raw_by_sp[sp_k] = txt
-                ck = f"kr48:{sp_k}:{eff_cet_off}:{target_k.strftime('%Y%m%d')}"
+                try:
+                    sp_rows = _parse_flashscore_mobi_sport_list_v4639(txt, sp_k, target_k, eff_cet_off)
+                except Exception:
+                    sp_rows = []
+                del txt
+                parsed_by_sp[sp_k] = sp_rows
+                ck = f"kr53:{sp_k}:{eff_cet_off}:{target_k.strftime('%Y%m%d')}"
                 with _FSM_LOCK_V4639:
-                    _FSM_LIST_CACHE_V4639[ck] = (time.monotonic(), txt)
+                    if len(_FSM_PARSED_SPORT_CACHE_V4653) > 24:
+                        _FSM_PARSED_SPORT_CACHE_V4653.clear()
+                    _FSM_PARSED_SPORT_CACHE_V4653[ck] = (time.monotonic(), [dict(x) for x in sp_rows])
     collected: List[Dict[str, Any]] = []
     for sp_k in ("soccer", "volleyball", "basketball"):
-        h_txt = raw_by_sp.get(sp_k) or ""
-        if h_txt:
-            try:
-                collected.extend(_parse_flashscore_mobi_sport_list_v4639(h_txt, sp_k, target_k, eff_cet_off))
-            except Exception:
-                continue
+        collected.extend(parsed_by_sp.get(sp_k) or [])
     return collected
 
 
@@ -30699,13 +30695,13 @@ def _sync_collect_offset_v4648(target_k: datetime, off_i: int) -> List[Dict[str,
     from concurrent.futures import wait as _cf_wait_coord_v4648
     ck = f"{off_i}:{target_k.strftime('%Y%m%d')}"
     flight_lock = _OFFSET_FLIGHT_LOCKS_V4645.setdefault(off_i, threading.Lock())
-    with flight_lock:
+    with flight_lock, _WORKER_COLD_COLLECT_SEM_V4653:
         with _RT_V4616_LOCK:
             cached2 = _RT_V4616_CACHE.get(ck)
             if cached2:
                 c_age = time.monotonic() - cached2[0]
                 is_rich = _is_rich_offset_items_v4648(cached2[1], off_i)
-                eff_ttl = (15.0 if off_i == 0 else 600.0) if is_rich else 4.0
+                eff_ttl = (15.0 if off_i == 0 else 1800.0) if is_rich else 4.0
                 if c_age < eff_ttl:
                     return [dict(x) for x in cached2[1]]
 
@@ -30797,6 +30793,10 @@ def _sync_collect_offset_v4648(target_k: datetime, off_i: int) -> List[Dict[str,
                         _SAME_DAY_STICKY_V4642.pop(_old_k, None)
             if _is_rich_offset_items_v4648(deduped, off_i):
                 _RT_V4616_LAST_GOOD_V4642[off_i] = [dict(x) for x in deduped]
+            if len(_RT_V4616_CACHE) > 7:
+                for _ck_old in list(_RT_V4616_CACHE.keys())[:-7]:
+                    _RT_V4616_CACHE.pop(_ck_old, None)
+        gc.collect()
         return deduped
 
 
@@ -30828,8 +30828,8 @@ def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> 
     if cached is not None and len(cached[1]) > 0:
         age = now_m - cached[0]
         is_rich = _is_rich_offset_items_v4648(cached[1], off_i)
-        fresh_ttl = (15.0 if off_i == 0 else 600.0) if is_rich else 4.0
-        stale_max = (3600.0 if off_i == 0 else 7200.0) if is_rich else 4.0
+        fresh_ttl = (15.0 if off_i == 0 else 1800.0) if is_rich else 4.0
+        stale_max = (3600.0 if off_i == 0 else 14400.0) if is_rich else 4.0
         if age <= fresh_ttl:
             return [dict(x) for x in cached[1]]
         if age <= stale_max:
@@ -30992,14 +30992,15 @@ _patch_all_loaded_dc_modules_v4648()
 
 
 def _startup_warm_offsets_v4648() -> None:
-    time.sleep(0.4)
+    time.sleep(0.3)
     _patch_all_loaded_dc_modules_v4648()
     for idx_w, off_w in enumerate((0, -1, 1)):
         if idx_w > 0:
-            time.sleep(1.2)
+            time.sleep(0.5)
         try:
             base_k = datetime.now(KST)
             _sync_collect_offset_v4648(base_k + timedelta(days=off_w), off_w)
+            gc.collect()
         except Exception:
             pass
 
@@ -31020,7 +31021,8 @@ def api_live_sources_diag_v4648(date_offset: int = 0):
     _patch_all_loaded_dc_modules_v4648()
     d = _ORIG_DIAG_V4619(date_offset=date_offset)
     if isinstance(d, dict):
-        d["version"] = "v4.6.52"
+        d["version"] = "v4.6.53"
+        d["zero_oom_slim_parser_and_instant_tabs_v4653"] = True
         d["async_eventloop_and_sqlite_lock_shield_v4652"] = True
         d["realtime_15s_kleague_priority_and_sticky_guard_v4651"] = True
         d["soccer_h2h_and_ppg_verified_v4650"] = True
@@ -31357,7 +31359,7 @@ def api_member_match_h2h_v4650(
 
     out_payload: Dict[str, Any] = {
         "ok": True,
-        "version": "v4.6.52",
+        "version": "v4.6.53",
         "h2h": h2h_obj,
         "home_last": home_last,
         "away_last": away_last,
@@ -31379,7 +31381,7 @@ def api_member_match_h2h_v4650(
 # ==============================================================================
 import asyncio as _asyncio_v4652
 
-_SCOREBOARD_EXEC_POOL_V4652 = ThreadPoolExecutor(max_workers=8, thread_name_prefix="sq52-sb-exec")
+_SCOREBOARD_EXEC_POOL_V4652 = ThreadPoolExecutor(max_workers=4, thread_name_prefix="sq53-sb-exec")
 _SYNC_ME_SHIELD_LOCK_V4652 = threading.Lock()
 _SYNC_ME_LAST_BY_KEY_V4652: Dict[str, Tuple[float, bytes]] = {}
 
@@ -31436,8 +31438,8 @@ def _try_ram_fast_scoreboard_v4652(off_i: int) -> Optional[Dict[str, Any]]:
         return None
     age = now_m - cached[0]
     is_rich = _is_rich_offset_items_v4648(cached[1], off_i)
-    fresh_ttl = (15.0 if off_i == 0 else 600.0) if is_rich else 4.0
-    stale_max = (3600.0 if off_i == 0 else 7200.0) if is_rich else 4.0
+    fresh_ttl = (15.0 if off_i == 0 else 1800.0) if is_rich else 4.0
+    stale_max = (3600.0 if off_i == 0 else 14400.0) if is_rich else 4.0
     if age > stale_max:
         return None
     if age > fresh_ttl:
@@ -31480,7 +31482,21 @@ _ASYNC_UPGRADED_PATHS_V4652 = {
     "/api/member/live-sources-diag-v4647",
     "/api/member/live-sources-diag-v4648",
 }
-router.routes = [rt for rt in router.routes if getattr(rt, "path", "") not in _ASYNC_UPGRADED_PATHS_V4652]
+
+def _purge_sync_duplicates_recursive_v4652(rt_container: Any) -> None:
+    if rt_container is None or not hasattr(rt_container, "routes"):
+        return
+    rt_container.routes = [x for x in rt_container.routes if getattr(x, "path", "") not in _ASYNC_UPGRADED_PATHS_V4652]
+    for _sub in rt_container.routes:
+        for _at in ("router", "original_router"):
+            _child = getattr(_sub, _at, None)
+            if _child is not None:
+                _purge_sync_duplicates_recursive_v4652(_child)
+        if hasattr(_sub, "_effective_candidates"):
+            _sub._effective_candidates = None
+
+_purge_sync_duplicates_recursive_v4652(router)
+_pre_count_v4652 = len(router.routes)
 
 
 @router.get("/api/member/scoreboard-v30")
@@ -31556,81 +31572,135 @@ async def _async_api_live_sources_diag_v4652(date_offset: int = 0):
     loop = _asyncio_v4652.get_running_loop()
     return await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, api_live_sources_diag_v4648, date_offset)
 
+# Place all newly registered native `async def` routes at the VERY FRONT of `router.routes`!
+router.routes = router.routes[_pre_count_v4652:] + router.routes[:_pre_count_v4652]
+
+
+def _upgrade_dc_router_async_v4652(dc_mod: Any) -> bool:
+    dc_r = getattr(dc_mod, "router", None)
+    if dc_r is None or getattr(dc_r, "__async_upgraded_v4652__", False):
+        return False
+    orig_ep = getattr(dc_mod, "api_live_scores", None)
+    if not callable(orig_ep):
+        return False
+    dc_r.routes = [rt for rt in dc_r.routes if getattr(rt, "path", "") not in ("/api/datacenter/live-scores", "/live-scores")]
+
+    @dc_r.get("/live-scores")
+    async def _async_dc_live_scores_v4652(sport: str = "all", league: str = "all", date_offset: int = 0, __ep=orig_ep):
+        loop = _asyncio_v4652.get_running_loop()
+        return await loop.run_in_executor(
+            _SCOREBOARD_EXEC_POOL_V4652,
+            lambda: __ep(sport=sport, league=league, date_offset=max(-3, min(7, int(date_offset or 0)))),
+        )
+
+    for _rt_dc in dc_r.routes:
+        if getattr(_rt_dc, "path", "") in ("/api/datacenter/live-scores", "/live-scores"):
+            _rt_dc.__shielded_v4652__ = True
+    dc_r.__async_upgraded_v4652__ = True
+    return True
+
+
+def _shield_route_list_v4652(route_iter: Any) -> int:
+    from urllib.parse import parse_qs as _parse_qs_v52
+    cnt = 0
+    for _rt in list(route_iter or []):
+        for _attr_sub in ("router", "original_router"):
+            _sub_r = getattr(_rt, _attr_sub, None)
+            if _sub_r is not None and hasattr(_sub_r, "routes"):
+                sub_added = _shield_route_list_v4652(_sub_r.routes)
+                if sub_added > 0 and hasattr(_rt, "_effective_candidates"):
+                    _rt._effective_candidates = None
+                cnt += sub_added
+        _p = getattr(_rt, "path", "") or ""
+        if _p == "/api/leaderboard/sync-me" and not getattr(_rt, "__shielded_v4652__", False):
+            _orig_app = _rt.app
+
+            async def _safe_sync_me_asgi_v4652(scope, receive, send, __orig=_orig_app):
+                client_host = (scope.get("client") or ("anon", 0))[0]
+                now_m = time.monotonic()
+                with _SYNC_ME_SHIELD_LOCK_V4652:
+                    prev = _SYNC_ME_LAST_BY_KEY_V4652.get(client_host)
+                    if prev and (now_m - prev[0]) < 90.0:
+                        await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json")]})
+                        await send({"type": "http.response.body", "body": prev[1]})
+                        return
+                fallback_body = b'{"ok":true,"deferred":true}'
+                try:
+                    await _asyncio_v4652.wait_for(__orig(scope, receive, send), timeout=1.1)
+                    with _SYNC_ME_SHIELD_LOCK_V4652:
+                        if len(_SYNC_ME_LAST_BY_KEY_V4652) > 500:
+                            _SYNC_ME_LAST_BY_KEY_V4652.clear()
+                        _SYNC_ME_LAST_BY_KEY_V4652[client_host] = (time.monotonic(), b'{"ok":true,"cached":true}')
+                except Exception:
+                    try:
+                        await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json")]})
+                        await send({"type": "http.response.body", "body": fallback_body})
+                    except Exception:
+                        pass
+
+            _rt.app = _safe_sync_me_asgi_v4652
+            _rt.__shielded_v4652__ = True
+            cnt += 1
+
+        elif _p in ("/api/datacenter/live-scores", "/live-scores") and not getattr(_rt, "__shielded_v4652__", False):
+            _ep_ls = getattr(_rt, "endpoint", None)
+            if callable(_ep_ls):
+                async def _fast_ls_asgi_v4652(scope, receive, send, __ep=_ep_ls):
+                    qs = _parse_qs_v52((scope.get("query_string") or b"").decode("utf-8", "ignore"))
+                    sp_q = (qs.get("sport") or ["all"])[0]
+                    lg_q = (qs.get("league") or ["all"])[0]
+                    try:
+                        off_q = int((qs.get("date_offset") or ["0"])[0])
+                    except Exception:
+                        off_q = 0
+                    loop = _asyncio_v4652.get_running_loop()
+                    data = await loop.run_in_executor(
+                        _SCOREBOARD_EXEC_POOL_V4652,
+                        lambda: __ep(sport=sp_q, league=lg_q, date_offset=off_q),
+                    )
+                    body_b = json.dumps(data, ensure_ascii=False).encode("utf-8")
+                    await send({
+                        "type": "http.response.start",
+                        "status": 200,
+                        "headers": [
+                            (b"content-type", b"application/json; charset=utf-8"),
+                            (b"cache-control", b"no-store"),
+                        ],
+                    })
+                    await send({
+                        "type": "http.response.body",
+                        "body": body_b,
+                    })
+
+                _rt.app = _fast_ls_asgi_v4652
+                _rt.__shielded_v4652__ = True
+                cnt += 1
+    return cnt
+
 
 def _shield_main_fastapi_routes_v4652() -> int:
     import sys as _sys_m
-    from urllib.parse import parse_qs as _parse_qs_v52
     _tame_sqlite_guard_lock_storm_v4652()
+    _patch_all_loaded_dc_modules_v4648()
     shielded = 0
     for _mod_k, _mod_v in list(_sys_m.modules.items()):
         if _mod_v is None:
             continue
+        if _mod_k == "sportiq_datacenter" or _mod_k.endswith(".sportiq_datacenter"):
+            _upgrade_dc_router_async_v4652(_mod_v)
+            _dc_rt = getattr(_mod_v, "router", None)
+            if _dc_rt is not None and hasattr(_dc_rt, "routes"):
+                shielded += _shield_route_list_v4652(_dc_rt.routes)
         _app_cand = getattr(_mod_v, "app", None)
-        if _app_cand is None or not hasattr(_app_cand, "router") or not hasattr(_app_cand.router, "routes"):
-            continue
-        for _rt in list(_app_cand.router.routes):
-            _p = getattr(_rt, "path", "")
-            if _p == "/api/leaderboard/sync-me" and not getattr(_rt, "__shielded_v4652__", False):
-                _orig_app = _rt.app
-
-                async def _safe_sync_me_asgi_v4652(scope, receive, send, __orig=_orig_app):
-                    client_host = (scope.get("client") or ("anon", 0))[0]
-                    now_m = time.monotonic()
-                    with _SYNC_ME_SHIELD_LOCK_V4652:
-                        prev = _SYNC_ME_LAST_BY_KEY_V4652.get(client_host)
-                        if prev and (now_m - prev[0]) < 90.0:
-                            await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json")]})
-                            await send({"type": "http.response.body", "body": prev[1]})
-                            return
-                    fallback_body = b'{"ok":true,"deferred":true}'
-                    try:
-                        await _asyncio_v4652.wait_for(__orig(scope, receive, send), timeout=3.2)
-                        with _SYNC_ME_SHIELD_LOCK_V4652:
-                            if len(_SYNC_ME_LAST_BY_KEY_V4652) > 500:
-                                _SYNC_ME_LAST_BY_KEY_V4652.clear()
-                            _SYNC_ME_LAST_BY_KEY_V4652[client_host] = (time.monotonic(), b'{"ok":true,"cached":true}')
-                    except Exception:
-                        try:
-                            await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json")]})
-                            await send({"type": "http.response.body", "body": fallback_body})
-                        except Exception:
-                            pass
-
-                _rt.app = _safe_sync_me_asgi_v4652
-                _rt.__shielded_v4652__ = True
-                shielded += 1
-
-            elif _p == "/api/datacenter/live-scores" and not getattr(_rt, "__shielded_v4652__", False):
-                _ep_ls = getattr(_rt, "endpoint", None)
-                if callable(_ep_ls):
-                    async def _fast_ls_asgi_v4652(scope, receive, send, __ep=_ep_ls):
-                        qs = _parse_qs_v52((scope.get("query_string") or b"").decode("utf-8", "ignore"))
-                        sp_q = (qs.get("sport") or ["all"])[0]
-                        lg_q = (qs.get("league") or ["all"])[0]
-                        try:
-                            off_q = int((qs.get("date_offset") or ["0"])[0])
-                        except Exception:
-                            off_q = 0
-                        loop = _asyncio_v4652.get_running_loop()
-                        data = await loop.run_in_executor(
-                            _SCOREBOARD_EXEC_POOL_V4652,
-                            lambda: __ep(sport=sp_q, league=lg_q, date_offset=off_q),
-                        )
-                        body_b = json.dumps(data, ensure_ascii=False).encode("utf-8")
-                        await send({
-                            "type": "http.response.start",
-                            "status": 200,
-                            "headers": [
-                                (b"content-type", b"application/json; charset=utf-8"),
-                                (b"cache-control", b"no-store"),
-                            ],
-                        })
-                        await send({"type": "http.response.body", "body": body_b})
-
-                    _rt.app = _fast_ls_asgi_v4652
-                    _rt.__shielded_v4652__ = True
-                    shielded += 1
+        if _app_cand is not None:
+            if hasattr(_app_cand, "routes"):
+                shielded += _shield_route_list_v4652(_app_cand.routes)
+            if hasattr(_app_cand, "router") and hasattr(_app_cand.router, "routes"):
+                shielded += _shield_route_list_v4652(_app_cand.router.routes)
     return shielded
+
+
+_shield_main_fastapi_routes_v4652()
 
 
 def _boot_shield_watcher_v4652() -> None:
