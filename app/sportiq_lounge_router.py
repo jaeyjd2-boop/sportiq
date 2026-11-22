@@ -7418,6 +7418,7 @@ _FRONTEND_V22_JS = r'''
         if (document.visibilityState === "hidden") return;
         if ((v30ScoreState.selectedDateOffset || 0) !== 0) return;
         if (window.__sqSbV30Cache) delete window.__sqSbV30Cache[0];
+        if (window.__sqSbOffsetMemV4645) delete window.__sqSbOffsetMemV4645[0];
         fetch("/api/member/scoreboard-v30?date_offset=0&_rt=" + Date.now())
           .then(function (r) { return r.json(); })
           .then(function (d) {
@@ -7427,7 +7428,7 @@ _FRONTEND_V22_JS = r'''
           })
           .catch(function () {});
       } catch (_e) {}
-    }, 20000);
+    }, 15000);
   }
   installRealtimeScorePollerV4616();
   (function prefetchAdjacentOffsetsV4650() {
@@ -28531,7 +28532,7 @@ def _fetch_fsm_detail_cached_v4639(match_href: str, sport: str, is_finished: boo
         return {}
     clean_path = m_id.group(1)
     now_m = time.monotonic()
-    ttl = 3600.0 if is_finished else (30.0 if sport == "soccer" else 15.0)
+    ttl = 3600.0 if is_finished else 12.0
     with _FSM_LOCK_V4639:
         cached = _FSM_DETAIL_CACHE_V4639.get(clean_path)
         if cached and (now_m - cached[0]) < ttl:
@@ -28747,19 +28748,21 @@ def _parse_flashscore_mobi_sport_list_v4639(list_html: str, sport: str, target_k
 
     # For volleyball & basketball, enrich both `in` & `post` (1~4 games/day); for soccer, enrich only `in` to stay ultra-fast (<0.6s)!
     if sport == "soccer":
-        detail_targets = [i for i, c in enumerate(candidates) if c["href"] and c["state"] == "in"][:10]
+        raw_soc_live = [i for i, c in enumerate(candidates) if c["href"] and c["state"] == "in"]
+        raw_soc_live.sort(key=lambda idx_s: (0 if candidates[idx_s]["lg_code"] in ("KLEAGUE", "KLEAGUE2") else 1, idx_s))
+        detail_targets = raw_soc_live[:14]
     else:
         detail_targets = [i for i, c in enumerate(candidates) if c["href"] and c["state"] in ("in", "post")]
     detail_by_idx: Dict[int, Dict[str, Any]] = {}
     if detail_targets:
         from concurrent.futures import wait as _cf_wait_det_v4645
         _pool_det = globals().get("_FSM_POOL_V4645") or _RT_TOP_POOL_V4622
-        det_slice = detail_targets[:6] if sport == "soccer" else detail_targets[:8]
+        det_slice = detail_targets[:12] if sport == "soccer" else detail_targets[:10]
         fut_to_idx = {
             _pool_det.submit(_fetch_fsm_detail_cached_v4639, candidates[idx]["href"], sport, candidates[idx]["state"] == "post"): idx
             for idx in det_slice
         }
-        done_det, not_done_det = _cf_wait_det_v4645(list(fut_to_idx.keys()), timeout=1.15)
+        done_det, not_done_det = _cf_wait_det_v4645(list(fut_to_idx.keys()), timeout=1.45)
         for _nf in not_done_det:
             _nf.cancel()
         for _df in done_det:
@@ -30405,7 +30408,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.50",
+        "version": "v4.6.51",
         "global_espn_fast_wave_v4642": True,
         "stoppage_plus_clock_v4642": True,
         "flashscore_mobi_bridge_v4639": True,
@@ -30483,7 +30486,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
 #          + Global-Aware `is_rich` Guard + Lightweight 3-Page KR/JP Collector
 # ==============================================================================
 _ESPN_POOL_V4645 = ThreadPoolExecutor(max_workers=18, thread_name_prefix="sq48-espn")
-_FSM_POOL_V4645 = ThreadPoolExecutor(max_workers=6, thread_name_prefix="sq48-fsm")
+_FSM_POOL_V4645 = ThreadPoolExecutor(max_workers=10, thread_name_prefix="sq51-fsm")
 _COORD_POOL_V4645 = ThreadPoolExecutor(max_workers=6, thread_name_prefix="sq48-coord")
 _BG_SWEEP_POOL_V4645 = ThreadPoolExecutor(max_workers=2, thread_name_prefix="sq48-bg")
 
@@ -30551,7 +30554,7 @@ def _fetch_espn_global_live_v4616(target_k: datetime, date_offset: int) -> List[
     d1 = target_k.strftime("%Y%m%d")
     d0 = (target_k - timedelta(days=1)).strftime("%Y%m%d")
     ck = f"{off_i}:{d1}"
-    ttl = 40.0 if is_today else 600.0
+    ttl = 16.0 if is_today else 600.0
     now_m = time.monotonic()
 
     with _ESPN_GLOBAL_LOCK_V4642:
@@ -30621,7 +30624,7 @@ def _fetch_fsm_kr_jp_fast_v4648(target_k: datetime, date_offset: int) -> List[Di
     if eff_cet_off < -2 or eff_cet_off > 2:
         return []
     q_suffix = "" if eff_cet_off == 0 else f"?d={int(eff_cet_off)}"
-    ttl = 28.0 if eff_cet_off == 0 else 600.0
+    ttl = 12.0 if eff_cet_off == 0 else 600.0
     specs = (
         ("soccer", f"https://www.flashscore.mobi/{q_suffix}"),
         ("volleyball", f"https://www.flashscore.mobi/volleyball/{q_suffix}"),
@@ -30675,7 +30678,7 @@ def _sync_collect_offset_v4648(target_k: datetime, off_i: int) -> List[Dict[str,
             if cached2:
                 c_age = time.monotonic() - cached2[0]
                 is_rich = _is_rich_offset_items_v4648(cached2[1], off_i)
-                eff_ttl = (40.0 if off_i == 0 else 600.0) if is_rich else 4.0
+                eff_ttl = (15.0 if off_i == 0 else 600.0) if is_rich else 4.0
                 if c_age < eff_ttl:
                     return [dict(x) for x in cached2[1]]
 
@@ -30722,18 +30725,38 @@ def _sync_collect_offset_v4648(target_k: datetime, off_i: int) -> List[Dict[str,
         if off_i == 0:
             _LAST_SOURCE_DIAG_V4617.update(off_diag)
 
+        fresh_live_post_pairs_v4651: Set[Tuple[str, Any]] = set()
+        for _fm_it in merged_raw:
+            if isinstance(_fm_it, dict) and str(_fm_it.get("state") or "") in ("in", "post") and str(_fm_it.get("_src_v4616") or "") != "official_cal":
+                _sp_f = str(_fm_it.get("sport") or "soccer").strip().lower()
+                _ch_f = _canon_team_key_v4616(str(_fm_it.get("home") or ""), _sp_f)
+                _ca_f = _canon_team_key_v4616(str(_fm_it.get("away") or ""), _sp_f)
+                fresh_live_post_pairs_v4651.add((_sp_f, frozenset([_ch_f, _ca_f])))
+
         ymd_key_s = target_k.strftime("%Y%m%d")
         with _RT_V4616_LOCK:
             day_sticky = _SAME_DAY_STICKY_V4642.get(ymd_key_s) or {}
             for _sk_it in day_sticky.values():
-                if str(_sk_it.get("match_dt_kst") or "").startswith(expected_mmdd):
-                    merged_raw.append(dict(_sk_it))
+                if not str(_sk_it.get("match_dt_kst") or "").startswith(expected_mmdd):
+                    continue
+                _sp_sk = str(_sk_it.get("sport") or "soccer").strip().lower()
+                _ch_sk = _canon_team_key_v4616(str(_sk_it.get("home") or ""), _sp_sk)
+                _ca_sk = _canon_team_key_v4616(str(_sk_it.get("away") or ""), _sp_sk)
+                if (_sp_sk, frozenset([_ch_sk, _ca_sk])) in fresh_live_post_pairs_v4651:
+                    continue
+                merged_raw.append(dict(_sk_it))
 
         reconciled_raw = _reconcile_domestic_with_official_cal_v4623(merged_raw, target_k)
         deduped = _reconcile_domestic_with_official_cal_v4623(
             _merge_and_filter_official_matches_v4616(reconciled_raw, expected_mmdd=expected_mmdd, is_today=(off_i == 0)),
             target_k,
         )
+        if off_i == 0 and deduped:
+            upgraded_vb = _enhance_kr_live_vleague_v4618(deduped, datetime.now(KST))
+            _LAST_SOURCE_DIAG_V4617["vleague_live_upgraded"] = upgraded_vb
+            if upgraded_vb > 0:
+                ord_st_v51 = {"in": 0, "pre": 1, "post": 2}
+                deduped.sort(key=lambda x: (ord_st_v51.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
         with _RT_V4616_LOCK:
             _RT_V4616_CACHE[ck] = (time.monotonic(), [dict(x) for x in deduped])
             if -1 <= off_i <= 1 and deduped:
@@ -30778,7 +30801,7 @@ def _collect_realtime_all_sports_v4616(target_k: datetime, date_offset: int) -> 
     if cached is not None and len(cached[1]) > 0:
         age = now_m - cached[0]
         is_rich = _is_rich_offset_items_v4648(cached[1], off_i)
-        fresh_ttl = (40.0 if off_i == 0 else 600.0) if is_rich else 4.0
+        fresh_ttl = (15.0 if off_i == 0 else 600.0) if is_rich else 4.0
         stale_max = (3600.0 if off_i == 0 else 7200.0) if is_rich else 4.0
         if age <= fresh_ttl:
             return [dict(x) for x in cached[1]]
@@ -30970,7 +30993,8 @@ def api_live_sources_diag_v4648(date_offset: int = 0):
     _patch_all_loaded_dc_modules_v4648()
     d = _ORIG_DIAG_V4619(date_offset=date_offset)
     if isinstance(d, dict):
-        d["version"] = "v4.6.50"
+        d["version"] = "v4.6.51"
+        d["realtime_15s_kleague_priority_and_sticky_guard_v4651"] = True
         d["soccer_h2h_and_ppg_verified_v4650"] = True
         d["zero_hop_scoreboard_v4648"] = True
         d["all_alias_dc_patcher_v4648"] = True
@@ -31305,7 +31329,7 @@ def api_member_match_h2h_v4650(
 
     out_payload: Dict[str, Any] = {
         "ok": True,
-        "version": "v4.6.50",
+        "version": "v4.6.51",
         "h2h": h2h_obj,
         "home_last": home_last,
         "away_last": away_last,
