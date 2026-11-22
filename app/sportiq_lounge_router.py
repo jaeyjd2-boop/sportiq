@@ -14004,7 +14004,7 @@ _FRONTEND_V22_JS = r'''
           "</div>"
         ].join("");
       } else if (tabKey === "h2h") {
-        box.innerHTML = "<div style='color:#94a3b8;'>⚔️ 양 팀 실시간 리그 순위·맞대결 전적 및 로스터 이슈를 조회 중입니다...</div>";
+        box.innerHTML = "<div style='color:#94a3b8;'>⚔️ 양 팀 실시간 리그 순위·맞대결 흐름 및 핵심 비교 지표를 조회 중입니다...</div>";
         var rawLgCode = String(it.league_code || "").toUpperCase();
         if (!rawLgCode || rawLgCode === "VLEAGUE") {
           if (String(it.sport || "").toLowerCase() === "volleyball") {
@@ -14014,20 +14014,32 @@ _FRONTEND_V22_JS = r'''
           }
         }
         var isDomKrLg = (rawLgCode === "VLEAGUE_M" || rawLgCode === "VLEAGUE_W" || rawLgCode === "WKBL" || rawLgCode === "KBL" || rawLgCode === "KLEAGUE" || rawLgCode === "KLEAGUE2" || rawLgCode === "JLEAGUE" || rawLgCode === "JLEAGUE2");
+        var isGenericSoccerAll = (rawLgCode === "SOCCER_ALL" || rawLgCode === "UEL" || rawLgCode === "ALEAGUE");
         var lgc = encodeURIComponent(rawLgCode);
         var stFetchUrl = isDomKrLg
           ? ("/api/member/domestic-bball-meta-v34?kind=standings&league=" + lgc + "&home=" + encodeURIComponent(it.home || "") + "&away=" + encodeURIComponent(it.away || ""))
-          : ("/api/datacenter/standings?league=" + lgc);
+          : (isGenericSoccerAll ? "" : ("/api/datacenter/standings?league=" + lgc));
         var injFetchUrl = isDomKrLg
           ? ("/api/member/domestic-bball-meta-v34?kind=injuries&league=" + lgc)
-          : ("/api/datacenter/injuries?league=" + lgc);
+          : (isGenericSoccerAll ? "" : ("/api/datacenter/injuries?league=" + lgc));
+        var h2hFetchUrl = "/api/member/match-h2h-v4649?sport=" + encodeURIComponent(it.sport || "soccer") +
+          "&league=" + lgc +
+          "&match_id=" + encodeURIComponent(it.id || "") +
+          "&home=" + encodeURIComponent(it.home || "") +
+          "&away=" + encodeURIComponent(it.away || "");
+
         Promise.all([
-          fetch(stFetchUrl).then(function (r) { return r.json(); }).catch(function () { return {}; }),
-          fetch(injFetchUrl).then(function (r) { return r.json(); }).catch(function () { return {}; })
+          stFetchUrl ? fetch(stFetchUrl).then(function (r) { return r.json(); }).catch(function () { return {}; }) : Promise.resolve({}),
+          injFetchUrl ? fetch(injFetchUrl).then(function (r) { return r.json(); }).catch(function () { return {}; }) : Promise.resolve({}),
+          fetch(h2hFetchUrl).then(function (r) { return r.json(); }).catch(function () { return {}; })
         ]).then(function (arr) {
           var stData = arr[0] || {};
           var injData = arr[1] || {};
-          var rows = stData.standings || [];
+          var h2hExtra = arr[2] || {};
+          var rows = (Array.isArray(stData.standings) && stData.standings.length)
+            ? stData.standings
+            : (Array.isArray(h2hExtra.standings) ? h2hExtra.standings : []);
+
           function matchTeamRow(name) {
             var nRaw = String(name || "").trim();
             var nLow = nRaw.toLowerCase();
@@ -14047,13 +14059,20 @@ _FRONTEND_V22_JS = r'''
               );
             });
           }
+
           var hRow = matchTeamRow(it.home);
           var aRow = matchTeamRow(it.away);
           var isBballOrBase = (it.sport === "basketball" || it.sport === "baseball" || rawLgCode === "KBL" || rawLgCode === "WKBL" || rawLgCode === "NBA" || rawLgCode === "WNBA");
+          var isVolley = (it.sport === "volleyball" || rawLgCode === "VLEAGUE_M" || rawLgCode === "VLEAGUE_W");
+          var isSoccer = (it.sport === "soccer" || (!isBballOrBase && !isVolley && it.sport !== "hockey"));
+
           function fmtStanding(tName, rObj) {
-            if (!rObj) return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;'><strong>" + uxEsc(tName) + "</strong>: 컵·국가대표·인터리그 매치업</div>";
+            if (!rObj) {
+              var lgFallbackLbl = uxEsc(it.league_full || it.league || "공식 리그");
+              return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:6px;'><strong>" + uxEsc(tName) + "</strong><span style='font-size:11px;color:#94a3b8;'>" + lgFallbackLbl + " 매치업</span></div>";
+            }
             var fm = Array.isArray(rObj.form) ? rObj.form.join("·") : String(rObj.form || "-");
-            var hasDrawStat = (it.sport === "soccer") || (Number(rObj.d || 0) > 0);
+            var hasDrawStat = isSoccer || (Number(rObj.d || 0) > 0);
             var recParts = [];
             if (rObj.gp !== undefined && rObj.gp !== null && Number(rObj.gp) > 0) {
               recParts.push(uxEsc(rObj.gp) + "경기");
@@ -14074,37 +14093,253 @@ _FRONTEND_V22_JS = r'''
               var ptsRaw = (rObj.pts !== undefined && rObj.pts !== null && String(rObj.pts).trim() !== "")
                 ? String(rObj.pts).trim()
                 : String(rObj.pts_label || rObj.points || "").trim();
-              if (ptsRaw) recParts.push("승점 " + uxEsc(ptsRaw));
+              if (ptsRaw) recParts.push("승점 " + uxEsc(/점$/.test(ptsRaw) ? ptsRaw : (ptsRaw + "점")));
               if (rObj.set_ratio) recParts.push("세트득실 " + uxEsc(rObj.set_ratio));
             }
             var recStr = recParts.length ? " (" + recParts.join(" · ") + ")" : "";
             return "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;'><span><strong style='color:#fde68a;'>#" + uxEsc(rObj.rank) + "</strong> <strong>" + uxEsc(localizeTeamKoJsV381(rObj.team)) + "</strong>" + recStr + "</span><span style='font-size:11px;color:#34d399;font-weight:800;'>최근폼 " + uxEsc(fm) + "</span></div>";
           }
+
+          function calcFormStatsV4649(rObj) {
+            var arrF = [];
+            if (rObj && Array.isArray(rObj.form)) arrF = rObj.form;
+            else if (rObj && typeof rObj.form === "string") arrF = rObj.form.split(/[^A-Za-z]+/).filter(Boolean);
+            var w = 0, d = 0, l = 0;
+            arrF.slice(0, 5).forEach(function (ch) {
+              var u = String(ch || "").toUpperCase();
+              if (u === "W") w++;
+              else if (u === "D") d++;
+              else if (u === "L") l++;
+            });
+            return { w: w, d: d, l: l, n: (w + d + l), pts: (w * 3 + d), seq: arrF.slice(0, 5).join("·") || "-" };
+          }
+
+          var hFm = calcFormStatsV4649(hRow);
+          var aFm = calcFormStatsV4649(aRow);
+
+          // 1) H2H Flow Block (`🆚 양 팀 맞대결 흐름 & 최근 전적`)
+          var activeH2h = (stData.h2h && typeof stData.h2h === "object")
+            ? stData.h2h
+            : ((h2hExtra && h2hExtra.h2h && typeof h2hExtra.h2h === "object") ? h2hExtra.h2h : null);
+
           var h2hBlockHtml = "";
-          if (stData.h2h && typeof stData.h2h === "object") {
-            var h2hObj = stData.h2h;
-            var pastHtml = Array.isArray(h2hObj.past_games) && h2hObj.past_games.length
-              ? h2hObj.past_games.map(function (g) {
-                  return "<div style='font-size:11.2px;color:#cbd5e1;margin-top:3px;'>• " + uxEsc(g) + "</div>";
-                }).join("")
-              : "";
-            var recentTeamHtml = (h2hObj.home_last || h2hObj.away_last)
-              ? ("<div style='font-size:11px;color:#94a3b8;margin-top:4px;border-top:1px dashed #1e293b;padding-top:4px;'>" +
-                 (h2hObj.home_last ? "<div>🏠 <strong>" + uxEsc(it.home) + " 직전:</strong> " + uxEsc(h2hObj.home_last) + "</div>" : "") +
-                 (h2hObj.away_last ? "<div style='margin-top:2px;'>✈️ <strong>" + uxEsc(it.away) + " 직전:</strong> " + uxEsc(h2hObj.away_last) + "</div>" : "") +
+          if (activeH2h && ((Array.isArray(activeH2h.past_games) && activeH2h.past_games.length > 0) || activeH2h.summary)) {
+            var pastArr = Array.isArray(activeH2h.past_games) ? activeH2h.past_games : [];
+            var pastHtml = pastArr.map(function (g) {
+              return "<div style='font-size:11.2px;color:#cbd5e1;margin-top:3px;'>• " + uxEsc(g) + "</div>";
+            }).join("");
+            var hwCnt = Number(activeH2h.home_wins || 0);
+            var drCnt = Number(activeH2h.draws || 0);
+            var awCnt = Number(activeH2h.away_wins || 0);
+            var totH2h = hwCnt + drCnt + awCnt;
+            var h2hBarHtml = "";
+            if (totH2h > 0) {
+              var hwPct = Math.round((hwCnt / totH2h) * 100);
+              var drPct = Math.round((drCnt / totH2h) * 100);
+              var awPct = Math.max(0, 100 - hwPct - drPct);
+              h2hBarHtml = (
+                "<div style='margin:6px 0 5px;'>" +
+                "  <div style='display:flex;justify-content:space-between;font-size:10.8px;color:#94a3b8;margin-bottom:3px;'>" +
+                "    <span style='color:#6ee7b7;font-weight:700;'>" + uxEsc(it.home) + " " + hwCnt + "승</span>" +
+                (isSoccer || drCnt > 0 ? "<span>무승부 " + drCnt + "</span>" : "") +
+                "    <span style='color:#7dd3fc;font-weight:700;'>" + uxEsc(it.away) + " " + awCnt + "승</span>" +
+                "  </div>" +
+                "  <div style='display:flex;height:7px;border-radius:999px;overflow:hidden;background:#1e293b;'>" +
+                (hwPct > 0 ? "<div style='width:" + hwPct + "%;background:#10b981;'></div>" : "") +
+                (drPct > 0 ? "<div style='width:" + drPct + "%;background:#64748b;'></div>" : "") +
+                (awPct > 0 ? "<div style='width:" + awPct + "%;background:#38bdf8;'></div>" : "") +
+                "  </div>" +
+                "</div>"
+              );
+            }
+            var hLastStr = activeH2h.home_last || h2hExtra.home_last || "";
+            var aLastStr = activeH2h.away_last || h2hExtra.away_last || "";
+            var nextRemStr = activeH2h.next_rematch || h2hExtra.next_rematch || "";
+            var recentTeamHtml = (hLastStr || aLastStr)
+              ? ("<div style='font-size:11px;color:#94a3b8;margin-top:5px;border-top:1px dashed #1e293b;padding-top:5px;'>" +
+                 (hLastStr ? "<div>🏠 <strong>" + uxEsc(it.home) + " 최근:</strong> " + uxEsc(hLastStr) + "</div>" : "") +
+                 (aLastStr ? "<div style='margin-top:2px;'>✈️ <strong>" + uxEsc(it.away) + " 최근:</strong> " + uxEsc(aLastStr) + "</div>" : "") +
                  "</div>")
               : "";
-            var nextHtml = h2hObj.next_rematch
-              ? "<div style='font-size:11px;color:#7dd3fc;margin-top:4px;font-weight:700;'>📅 다음 맞대결: " + uxEsc(h2hObj.next_rematch) + "</div>"
+            var nextHtml = nextRemStr
+              ? "<div style='font-size:11px;color:#7dd3fc;margin-top:4px;font-weight:700;'>📅 다음 맞대결: " + uxEsc(nextRemStr) + "</div>"
               : "";
+            var h2hHdrTitle = (stData.h2h && stData.h2h === activeH2h)
+              ? "🆚 2026-2027 시즌 상대전적 & 최근 결과"
+              : "🆚 최근 공식 맞대결 흐름 & 직전 결과";
             h2hBlockHtml = (
-              "<div style='font-weight:800;color:#38bdf8;margin-bottom:5px;'>🆚 2026-2027 시즌 상대전적 & 최근 결과</div>" +
+              "<div style='font-weight:800;color:#38bdf8;margin-bottom:5px;'>" + h2hHdrTitle + "</div>" +
               "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;margin-bottom:10px;'>" +
-              "  <div style='font-weight:800;color:#fde68a;font-size:11.8px;'>" + uxEsc(h2hObj.summary || "시즌 맞대결 데이터") + "</div>" +
-              pastHtml + recentTeamHtml + nextHtml +
+              "  <div style='font-weight:800;color:#fde68a;font-size:11.8px;'>" + uxEsc(activeH2h.summary || "공식 맞대결 기록 요약") + "</div>" +
+              h2hBarHtml + pastHtml + recentTeamHtml + nextHtml +
+              "</div>"
+            );
+          } else {
+            // Grounded Matchup Momentum Card (for K리그1·2 / J1·2 / Cup / First-Meeting Clubs without external H2H archive)
+            var momHeadline = "";
+            var momLines = [];
+            if (hRow && aRow) {
+              var rkDiff = Math.abs(Number(hRow.rank || 0) - Number(aRow.rank || 0));
+              var hPtsN = Number(hRow.pts || 0);
+              var aPtsN = Number(aRow.pts || 0);
+              var ptGap = Math.abs(hPtsN - aPtsN);
+              if (isBballOrBase) {
+                momHeadline = "리그 #" + uxEsc(hRow.rank) + " vs #" + uxEsc(aRow.rank) + " 맞대결 · 최근 5경기 " + hFm.w + "승 vs " + aFm.w + "승 흐름";
+              } else {
+                momHeadline = "리그 #" + uxEsc(hRow.rank) + " vs #" + uxEsc(aRow.rank) + " (" + (ptGap === 0 ? "승점 동률" : ("승점 " + ptGap + "점 차")) + (rkDiff <= 3 ? " · 순위권 직접 경쟁" : "") + ")";
+              }
+              if (hFm.n > 0) {
+                momLines.push("🏠 " + it.home + " 최근 " + hFm.n + "경기: " + hFm.w + "승" + (isSoccer ? (" " + hFm.d + "무 ") : " ") + hFm.l + "패" + (isSoccer ? (" (폼 승점 " + hFm.pts + "점 · " + hFm.seq + ")") : (" (" + hFm.seq + ")")));
+              }
+              if (aFm.n > 0) {
+                momLines.push("✈️ " + it.away + " 최근 " + aFm.n + "경기: " + aFm.w + "승" + (isSoccer ? (" " + aFm.d + "무 ") : " ") + aFm.l + "패" + (isSoccer ? (" (폼 승점 " + aFm.pts + "점 · " + aFm.seq + ")") : (" (" + aFm.seq + ")")));
+              }
+            } else {
+              var favSide = hp >= ap ? (it.home + " " + hp + "%") : (it.away + " " + ap + "%");
+              momHeadline = (it.league_full || it.league || "공식 대회") + " 매치업 · AI 예측 " + favSide + " 우위 흐름";
+            }
+            if (h2hExtra.home_last) momLines.push("📌 " + it.home + " 최근 일정: " + h2hExtra.home_last);
+            if (h2hExtra.away_last) momLines.push("📌 " + it.away + " 최근 일정: " + h2hExtra.away_last);
+            if (h2hExtra.next_rematch) momLines.push("📅 다음 맞대결: " + h2hExtra.next_rematch);
+            h2hBlockHtml = (
+              "<div style='font-weight:800;color:#38bdf8;margin-bottom:5px;'>🆚 양 팀 맞대결 구도 & 최근 경기 흐름</div>" +
+              "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:8px 10px;margin-bottom:10px;'>" +
+              "  <div style='font-weight:800;color:#fde68a;font-size:11.8px;'>" + uxEsc(momHeadline) + "</div>" +
+              momLines.map(function (ln) {
+                return "<div style='font-size:11.2px;color:#cbd5e1;margin-top:3px;'>• " + uxEsc(ln) + "</div>";
+              }).join("") +
               "</div>"
             );
           }
+
+          // 2) Core Matchup Comparison Summary Card (`📊 양 팀 핵심 전력 비교 요약 카드`)
+          function buildMetricBarRowV4649(lbl, leftTxt, rightTxt, leftVal, rightVal, invertBetter) {
+            var lv = Math.max(0.01, Number(leftVal) || 0.01);
+            var rv = Math.max(0.01, Number(rightVal) || 0.01);
+            var lPct = Math.max(15, Math.min(85, Math.round((lv / (lv + rv)) * 100)));
+            var rPct = 100 - lPct;
+            var lBetter = invertBetter ? (Number(leftVal) < Number(rightVal)) : (Number(leftVal) > Number(rightVal));
+            var rBetter = invertBetter ? (Number(rightVal) < Number(leftVal)) : (Number(rightVal) > Number(leftVal));
+            var lCol = lBetter ? "#6ee7b7" : "#e2e8f0";
+            var rCol = rBetter ? "#7dd3fc" : "#e2e8f0";
+            return (
+              "<div style='margin-bottom:6px;'>" +
+              "  <div style='display:flex;justify-content:space-between;align-items:center;font-size:11.1px;margin-bottom:2px;'>" +
+              "    <span style='color:" + lCol + ";font-weight:" + (lBetter ? "800" : "600") + ";font-variant-numeric:tabular-nums;'>" + uxEsc(leftTxt) + "</span>" +
+              "    <span style='color:#94a3b8;font-size:10.6px;font-weight:700;'>" + uxEsc(lbl) + "</span>" +
+              "    <span style='color:" + rCol + ";font-weight:" + (rBetter ? "800" : "600") + ";font-variant-numeric:tabular-nums;'>" + uxEsc(rightTxt) + "</span>" +
+              "  </div>" +
+              "  <div style='display:flex;height:6px;border-radius:999px;overflow:hidden;background:#1e293b;'>" +
+              "    <div style='width:" + lPct + "%;background:" + (lBetter ? "#10b981" : "#475569") + ";'></div>" +
+              "    <div style='width:" + rPct + "%;background:" + (rBetter ? "#38bdf8" : "#64748b") + ";'></div>" +
+              "  </div>" +
+              "</div>"
+            );
+          }
+
+          var rawOddsM = (it.ai && it.ai.odds) || it.odds || {};
+          var oddH = rawOddsM.home ? Number(rawOddsM.home).toFixed(2) : "-";
+          var oddD = rawOddsM.draw ? Number(rawOddsM.draw).toFixed(2) : "-";
+          var oddA = rawOddsM.away ? Number(rawOddsM.away).toFixed(2) : "-";
+          var compRowsHtml = "";
+
+          if (hRow && aRow) {
+            var hGp = Math.max(1, Number(hRow.gp || 1));
+            var aGp = Math.max(1, Number(aRow.gp || 1));
+            if (isBballOrBase) {
+              var hWinP = Number(hRow.w || 0) / hGp;
+              var aWinP = Number(aRow.w || 0) / aGp;
+              compRowsHtml += buildMetricBarRowV4649(
+                "시즌 승률 · 순위",
+                (hWinP * 100).toFixed(1) + "% (#" + hRow.rank + ")",
+                (aWinP * 100).toFixed(1) + "% (#" + aRow.rank + ")",
+                hWinP,
+                aWinP,
+                false
+              );
+            } else {
+              var hPpg = Number(hRow.pts || 0) / hGp;
+              var aPpg = Number(aRow.pts || 0) / aGp;
+              compRowsHtml += buildMetricBarRowV4649(
+                "경기당 승점 (순위)",
+                hPpg.toFixed(2) + "점 (#" + hRow.rank + ")",
+                aPpg.toFixed(2) + "점 (#" + aRow.rank + ")",
+                hPpg,
+                aPpg,
+                false
+              );
+            }
+
+            var hGf = Number(hRow.gf || 0);
+            var aGf = Number(aRow.gf || 0);
+            var hGa = Number(hRow.ga || 0);
+            var aGa = Number(aRow.ga || 0);
+            if (isVolley && (hRow.set_ratio || aRow.set_ratio)) {
+              var hSr = parseFloat(String(hRow.set_ratio || "1.0")) || 1.0;
+              var aSr = parseFloat(String(aRow.set_ratio || "1.0")) || 1.0;
+              compRowsHtml += buildMetricBarRowV4649(
+                "세트 득실률 비교",
+                String(hRow.set_ratio || hSr.toFixed(3)),
+                String(aRow.set_ratio || aSr.toFixed(3)),
+                hSr,
+                aSr,
+                false
+              );
+            } else if (hGf > 0 || aGf > 0) {
+              var unitLbl = isBballOrBase ? "점" : "골";
+              var hGpg = isBballOrBase ? (hGf > 180 ? (hGf / hGp) : hGf) : (hGf / hGp);
+              var aGpg = isBballOrBase ? (aGf > 180 ? (aGf / aGp) : aGf) : (aGf / aGp);
+              compRowsHtml += buildMetricBarRowV4649(
+                "경기당 득점 화력",
+                hGpg.toFixed(isBballOrBase ? 1 : 2) + unitLbl + (isBballOrBase ? "" : (" (총 " + hGf + ")")),
+                aGpg.toFixed(isBballOrBase ? 1 : 2) + unitLbl + (isBballOrBase ? "" : (" (총 " + aGf + ")")),
+                hGpg,
+                aGpg,
+                false
+              );
+              if (hGa > 0 || aGa > 0) {
+                var hGapg = isBballOrBase ? (hGa > 180 ? (hGa / hGp) : hGa) : (hGa / hGp);
+                var aGapg = isBballOrBase ? (aGa > 180 ? (aGa / aGp) : aGa) : (aGa / aGp);
+                var hGd = (hRow.gd != null) ? Number(hRow.gd) : (hGf - hGa);
+                var aGd = (aRow.gd != null) ? Number(aRow.gd) : (aGf - aGa);
+                compRowsHtml += buildMetricBarRowV4649(
+                  "경기당 실점 (득실차)",
+                  hGapg.toFixed(isBballOrBase ? 1 : 2) + " (" + (hGd >= 0 ? "+" : "") + hGd + ")",
+                  aGapg.toFixed(isBballOrBase ? 1 : 2) + " (" + (aGd >= 0 ? "+" : "") + aGd + ")",
+                  1.0 / Math.max(0.15, hGapg),
+                  1.0 / Math.max(0.15, aGapg),
+                  false
+                );
+              }
+            }
+          }
+
+          compRowsHtml += buildMetricBarRowV4649(
+            "AI 승률 · 공정배당",
+            hp + "% (배당 " + oddH + ")",
+            ap + "% (배당 " + oddA + ")",
+            hp,
+            ap,
+            false
+          );
+
+          var summaryEdgeLine = isSoccer
+            ? ("종합 요약: 홈승 " + hp + "% · 무승부 " + dp + "% (배당 " + oddD + ") · 원정승 " + ap + "% — " + (Math.abs(hp - ap) <= 6 ? "백중세 접전 구도" : ((hp > ap ? it.home : it.away) + " 전력 우세 구도")))
+            : ("종합 요약: " + it.home + " " + hp + "% vs " + it.away + " " + ap + "% — " + ((hp >= ap ? it.home : it.away) + " 매치업 우세 구도"));
+
+          var compSummaryHtml = (
+            "<div style='font-weight:800;color:#a78bfa;margin-bottom:5px;'>📊 양 팀 핵심 전력 비교 요약 카드</div>" +
+            "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:9px 11px;margin-bottom:10px;'>" +
+            "  <div style='display:flex;justify-content:space-between;font-size:11.3px;font-weight:900;color:#f8fafc;margin-bottom:6px;border-bottom:1px solid #1e293b;padding-bottom:4px;'>" +
+            "    <span style='color:#6ee7b7;'>🏠 " + uxEsc(it.home) + "</span>" +
+            "    <span style='color:#94a3b8;font-size:10.5px;'>핵심 지표 대조</span>" +
+            "    <span style='color:#7dd3fc;'>" + uxEsc(it.away) + " ✈️</span>" +
+            "  </div>" +
+            compRowsHtml +
+            "  <div style='font-size:11px;color:#fde68a;margin-top:5px;padding-top:4px;border-top:1px dashed #1e293b;font-weight:700;'>💡 " + uxEsc(summaryEdgeLine) + "</div>" +
+            "</div>"
+          );
+
           var teamInjs = (injData.items || []).filter(function (x) {
             var tmKo = localizeTeamKoJsV381(String(x.team || "")).replace(/\s+/g, "");
             var hClean = String(it.home || "").replace(/\s+/g, "");
@@ -14116,10 +14351,12 @@ _FRONTEND_V22_JS = r'''
                 return "<div style='font-size:11.5px;padding:4px 0;border-bottom:1px solid #1e293b;'>🏥 <strong>[" + uxEsc(localizeTeamKoJsV381(x.team)) + "] " + uxEsc(x.player) + "</strong> · " + uxEsc(x.reason) + " <span style='color:#fbbf24;'>(" + uxEsc(x.severity) + ")</span></div>";
               }).join("")
             : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>";
+
           box.innerHTML = (
             "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 순위 & 최근 흐름</div>" +
             "<div style='display:grid;gap:6px;margin-bottom:10px;'>" + fmtStanding(it.home, hRow) + fmtStanding(it.away, aRow) + "</div>" +
             h2hBlockHtml +
+            compSummaryHtml +
             "<div style='font-weight:800;color:#fca5a5;margin-bottom:4px;'>🏥 양 팀 주요 결장 · 로스터 체크</div>" + injHtml
           );
         });
@@ -30116,7 +30353,7 @@ def api_live_sources_diag_v4619(date_offset: int = 0):
     avg_chars = int(round(sum(len(str(p.get("body") or "")) for p in rss_posts) / max(1, len(rss_posts))))
     return {
         "ok": True,
-        "version": "v4.6.48",
+        "version": "v4.6.49",
         "global_espn_fast_wave_v4642": True,
         "stoppage_plus_clock_v4642": True,
         "flashscore_mobi_bridge_v4639": True,
@@ -30589,6 +30826,28 @@ def _install_fast_ko_collect_ls_v4648(dc_mod: Any) -> bool:
                 res["score_alerts"] = live_alerts
         return res
 
+    def _fast_dc_http_json_v4649(url: str, timeout: float = 2.6) -> Optional[Dict[str, Any]]:
+        web_u = str(url).replace("site.api.espn.com", "site.web.api.espn.com")
+        api_u = str(url).replace("site.web.api.espn.com", "site.api.espn.com")
+        cands = [web_u] if web_u == api_u else [web_u, api_u]
+        for idx_c, cu in enumerate(cands):
+            txt = _http_fetch_text_v4616(cu, timeout=(timeout if idx_c == 0 else 1.6))
+            if not txt:
+                continue
+            try:
+                obj = json.loads(txt)
+                if isinstance(obj, dict):
+                    return obj
+            except Exception:
+                continue
+        return None
+
+    dc_mod._http_json = _fast_dc_http_json_v4649
+    for _fn_nm in ("get_standings", "get_injuries", "get_transfers"):
+        _fn_ref = getattr(dc_mod, _fn_nm, None)
+        if callable(_fn_ref) and hasattr(_fn_ref, "__globals__"):
+            _fn_ref.__globals__["_http_json"] = _fast_dc_http_json_v4649
+
     dc_mod._collect_all_matches = _fast_collect_all_m_v4648
     dc_mod.collect_live_scores = _ko_collect_ls
     api_ls_fn = getattr(dc_mod, "api_live_scores", None)
@@ -30659,7 +30918,8 @@ def api_live_sources_diag_v4648(date_offset: int = 0):
     _patch_all_loaded_dc_modules_v4648()
     d = _ORIG_DIAG_V4619(date_offset=date_offset)
     if isinstance(d, dict):
-        d["version"] = "v4.6.48"
+        d["version"] = "v4.6.49"
+        d["soccer_h2h_and_matchup_card_v4649"] = True
         d["zero_hop_scoreboard_v4648"] = True
         d["all_alias_dc_patcher_v4648"] = True
         d["global_aware_is_rich_v4648"] = True
@@ -30667,3 +30927,346 @@ def api_live_sources_diag_v4648(date_offset: int = 0):
 
 
 api_live_sources_diag_v4619 = api_live_sources_diag_v4648
+
+
+# ==============================================================================
+# v4.6.49: Real Match H2H & Recent Fixture Extractor (`/api/member/match-h2h-v4649`)
+#          for 프랑스 리그 1, EPL, 라리가, 분데스리가, 세리에 A, UCL, K리그1·2, J1·2, NBA, NHL
+# ==============================================================================
+_MATCH_H2H_CACHE_V4649: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_MATCH_H2H_LOCK_V4649 = threading.Lock()
+
+_ESPN_SUMMARY_PATH_MAP_V4649: Dict[str, str] = {
+    "EPL": "soccer/eng.1",
+    "LALIGA": "soccer/esp.1",
+    "BUNDESLIGA": "soccer/ger.1",
+    "SERIEA": "soccer/ita.1",
+    "LIGUE1": "soccer/fra.1",
+    "UCL": "soccer/uefa.champions",
+    "UEL": "soccer/uefa.europa",
+    "UNL": "soccer/uefa.nations",
+    "WC2026": "soccer/fifa.world",
+    "MLS": "soccer/usa.1",
+    "ALEAGUE": "soccer/aus.1",
+    "KLEAGUE": "soccer/kor.1",
+    "JLEAGUE": "soccer/jpn.1",
+    "SOCCER_ALL": "soccer/all",
+    "NBA": "basketball/nba",
+    "WNBA": "basketball/wnba",
+    "NHL": "hockey/nhl",
+    "MLB": "baseball/mlb",
+}
+
+
+def _find_espn_event_id_v4649(match_id: str, sport: str, home: str, away: str) -> str:
+    m_num = re.search(r"(?:^|[-_])(\d{5,})$", str(match_id or "").strip())
+    if m_num:
+        return m_num.group(1)
+    sp = str(sport or "soccer").lower()
+    ch = _canon_team_key_v4616(home, sp)
+    ca = _canon_team_key_v4616(away, sp)
+    if not ch or not ca:
+        return ""
+    target_pair = frozenset([ch, ca])
+    with _ESPN_GLOBAL_LOCK_V4642:
+        buckets = [v[1] for v in _ESPN_GLOBAL_CACHE_V4642.values()] + list(_ESPN_GLOBAL_LAST_GOOD_V4642.values())
+    for items in buckets:
+        for it in items:
+            if str(it.get("sport") or "").lower() != sp:
+                continue
+            ih = _canon_team_key_v4616(str(it.get("home") or ""), sp)
+            ia = _canon_team_key_v4616(str(it.get("away") or ""), sp)
+            if frozenset([ih, ia]) == target_pair:
+                m2 = re.search(r"(?:^|[-_])(\d{5,})$", str(it.get("id") or ""))
+                if m2:
+                    return m2.group(1)
+    return ""
+
+
+def _parse_espn_summary_h2h_v4649(
+    js: Dict[str, Any],
+    ev_id: str,
+    sport: str,
+    modal_home: str,
+    modal_away: str,
+) -> Tuple[Optional[Dict[str, Any]], str, str, List[Dict[str, Any]]]:
+    sp = str(sport or "soccer").lower()
+    ch_modal = _canon_team_key_v4616(modal_home, sp)
+    ca_modal = _canon_team_key_v4616(modal_away, sp)
+
+    past_games: List[str] = []
+    seen_ev_keys: Set[str] = set()
+    hw, dr, aw = 0, 0, 0
+
+    for blk in (js.get("headToHeadGames") or []):
+        if not isinstance(blk, dict):
+            continue
+        anchor_tm = blk.get("team") or {}
+        anchor_id = str(anchor_tm.get("id") or "")
+        anchor_raw = str(anchor_tm.get("shortDisplayName") or anchor_tm.get("displayName") or modal_home).strip()
+        for ev in (blk.get("events") or []):
+            if not isinstance(ev, dict):
+                continue
+            gid = str(ev.get("id") or "").strip()
+            if gid and gid == ev_id:
+                continue
+            opp_tm = ev.get("opponent") or {}
+            opp_raw = str(opp_tm.get("shortDisplayName") or opp_tm.get("displayName") or modal_away).strip()
+            at_vs = str(ev.get("atVs") or "vs").strip().lower()
+            h_id = str(ev.get("homeTeamId") or "")
+            if (anchor_id and h_id == anchor_id) or (not h_id and at_vs in ("vs", "vs.", "v")):
+                ev_h_raw, ev_a_raw = anchor_raw, opp_raw
+            else:
+                ev_h_raw, ev_a_raw = opp_raw, anchor_raw
+
+            hs_v = ev.get("homeTeamScore")
+            as_v = ev.get("awayTeamScore")
+            if hs_v is None or as_v is None or str(hs_v) == "" or str(as_v) == "":
+                sc_m = re.search(r"(\d+)\s*[-:]\s*(\d+)", str(ev.get("score") or ""))
+                if not sc_m:
+                    continue
+                hs_i, as_i = int(sc_m.group(1)), int(sc_m.group(2))
+            else:
+                try:
+                    hs_i, as_i = int(float(hs_v)), int(float(as_v))
+                except Exception:
+                    continue
+
+            dt_k = _parse_espn_iso_kst_v4616(str(ev.get("gameDate") or ev.get("date") or ""))
+            dt_str = f"{dt_k.year}.{dt_k.month:02d}.{dt_k.day:02d}" if dt_k else ""
+            dedup_k = gid or f"{dt_str}:{hs_i}:{as_i}"
+            if dedup_k in seen_ev_keys:
+                continue
+            seen_ev_keys.add(dedup_k)
+
+            ev_h_ko = _localize_team_ko_v37(ev_h_raw, sp)
+            ev_a_ko = _localize_team_ko_v37(ev_a_raw, sp)
+            lg_lbl = str(ev.get("leagueAbbreviation") or ev.get("leagueName") or "").strip()
+            line = f"{dt_str + ' · ' if dt_str else ''}{ev_h_ko} {hs_i} : {as_i} {ev_a_ko}"
+            if lg_lbl and len(lg_lbl) <= 18:
+                line += f" ({lg_lbl})"
+            past_games.append(line)
+
+            c_ev_h = _canon_team_key_v4616(ev_h_ko, sp)
+            if hs_i == as_i:
+                dr += 1
+            elif (hs_i > as_i and c_ev_h == ch_modal) or (as_i > hs_i and c_ev_h == ca_modal):
+                hw += 1
+            else:
+                aw += 1
+            if len(past_games) >= 5:
+                break
+        if len(past_games) >= 5:
+            break
+
+    home_last = ""
+    away_last = ""
+    for f_blk in ((js.get("boxscore") or {}).get("form") or []):
+        if not isinstance(f_blk, dict):
+            continue
+        f_tm = f_blk.get("team") or {}
+        f_nm_ko = _localize_team_ko_v37(str(f_tm.get("shortDisplayName") or f_tm.get("displayName") or ""), sp)
+        c_ftm = _canon_team_key_v4616(f_nm_ko, sp)
+        for fev in (f_blk.get("events") or []):
+            if not isinstance(fev, dict):
+                continue
+            fgid = str(fev.get("id") or "")
+            if fgid and fgid == ev_id:
+                continue
+            f_sc = str(fev.get("score") or "").strip()
+            if not re.search(r"\d+\s*[-:]\s*\d+", f_sc):
+                h_ts, a_ts = fev.get("homeTeamScore"), fev.get("awayTeamScore")
+                if h_ts is not None and a_ts is not None and str(h_ts) != "" and str(a_ts) != "":
+                    f_sc = f"{h_ts}:{a_ts}"
+                else:
+                    continue
+            f_opp = _localize_team_ko_v37(str(((fev.get("opponent") or {}).get("shortDisplayName")) or ((fev.get("opponent") or {}).get("displayName")) or ""), sp)
+            f_dt = _parse_espn_iso_kst_v4616(str(fev.get("gameDate") or ""))
+            f_mmdd = f"{f_dt.month:02d}.{f_dt.day:02d} " if f_dt else ""
+            f_res = str(fev.get("gameResult") or "").upper()
+            f_tag = {"W": "승", "D": "무", "L": "패"}.get(f_res, "")
+            rec_s = f"{f_mmdd}vs {f_opp} ({f_sc}{' ' + f_tag if f_tag else ''})".strip()
+            if c_ftm == ch_modal and not home_last:
+                home_last = rec_s
+            elif c_ftm == ca_modal and not away_last:
+                away_last = rec_s
+            break
+
+    # Extract embedded standings rows if present in summary payload (helpful for SOCCER_ALL / UEL / Cup leagues!)
+    st_rows_out: List[Dict[str, Any]] = []
+    for grp in ((js.get("standings") or {}).get("groups") or []):
+        entries = ((grp.get("standings") or {}).get("entries")) if isinstance(grp, dict) else None
+        if not isinstance(entries, list):
+            continue
+        for idx_e, ent in enumerate(entries[:30]):
+            if not isinstance(ent, dict):
+                continue
+            tm_o = ent.get("team") or {}
+            tm_nm = _localize_team_ko_v37(str(tm_o.get("shortDisplayName") or tm_o.get("displayName") or tm_o.get("name") or ""), sp)
+            smap = {str(s.get("name") or s.get("abbreviation") or ""): s.get("value", s.get("displayValue", 0)) for s in (ent.get("stats") or []) if isinstance(s, dict)}
+            try:
+                gp = int(float(smap.get("gamesPlayed", 0) or 0))
+                w = int(float(smap.get("wins", 0) or 0))
+                d = int(float(smap.get("ties", 0) or 0))
+                l = int(float(smap.get("losses", 0) or 0))
+                gf = int(float(smap.get("pointsFor", 0) or 0))
+                ga = int(float(smap.get("pointsAgainst", 0) or 0))
+                gd = int(float(smap.get("pointDifferential", gf - ga) or (gf - ga)))
+                pts = int(float(smap.get("points", w * 3 + d) or 0))
+                rk = int(float(smap.get("rank", idx_e + 1) or (idx_e + 1)))
+            except Exception:
+                continue
+            st_rows_out.append({
+                "rank": rk, "team": tm_nm, "gp": gp or (w + d + l),
+                "w": w, "d": d, "l": l, "gf": gf, "ga": ga, "gd": gd,
+                "pts": pts, "pts_label": str(pts), "form": [],
+            })
+
+    if past_games:
+        tot = hw + dr + aw
+        if sp == "soccer" or dr > 0:
+            summary_s = f"최근 공식 맞대결 {tot}전: {modal_home} {hw}승 · {dr}무 · {modal_away} {aw}승"
+        else:
+            summary_s = f"최근 공식 맞대결 {tot}전: {modal_home} {hw}승 · {modal_away} {aw}승"
+        return (
+            {
+                "summary": summary_s,
+                "past_games": past_games,
+                "home_wins": hw,
+                "draws": dr,
+                "away_wins": aw,
+                "home_last": home_last,
+                "away_last": away_last,
+            },
+            home_last,
+            away_last,
+            st_rows_out,
+        )
+    return None, home_last, away_last, st_rows_out
+
+
+@router.get("/api/member/match-h2h-v4649")
+def api_member_match_h2h_v4649(
+    sport: str = "soccer",
+    league: str = "EPL",
+    match_id: str = "",
+    home: str = "",
+    away: str = "",
+) -> Dict[str, Any]:
+    sp = str(sport or "soccer").strip().lower()
+    lg = str(league or "EPL").strip().upper()
+    h_ko = _localize_team_ko_v37(str(home or "").strip(), sp)
+    a_ko = _localize_team_ko_v37(str(away or "").strip(), sp)
+    ck = f"{sp}:{lg}:{match_id}:{h_ko}:{a_ko}"
+    now_m = time.monotonic()
+
+    with _MATCH_H2H_LOCK_V4649:
+        cached = _MATCH_H2H_CACHE_V4649.get(ck)
+        if cached and (now_m - cached[0]) < 1800.0:
+            return dict(cached[1])
+
+    h2h_obj: Optional[Dict[str, Any]] = None
+    home_last = ""
+    away_last = ""
+    next_rematch = ""
+    extra_standings: List[Dict[str, Any]] = []
+
+    ev_id = _find_espn_event_id_v4649(match_id, sp, h_ko, a_ko)
+    sp_path = _ESPN_SUMMARY_PATH_MAP_V4649.get(lg) or ("soccer/all" if sp == "soccer" else "")
+    if ev_id and sp_path:
+        sum_url = f"https://site.web.api.espn.com/apis/site/v2/sports/{sp_path}/summary?event={ev_id}"
+        try:
+            fut = _ESPN_POOL_V4645.submit(_fetch_espn_web_cdn_v4648, sum_url, 2.2)
+            txt = _http_fetch_text_v4616(sum_url, timeout=2.2) if fut is None else ""
+        except Exception:
+            fut = None
+            txt = ""
+        js_sum: Optional[Dict[str, Any]] = None
+        if fut is not None:
+            try:
+                # Note: summary payload has `header`/`headToHeadGames` (not `events`), so fetch JSON directly
+                raw_txt = _ESPN_POOL_V4645.submit(_http_fetch_text_v4616, sum_url, 2.2).result(timeout=2.5)
+                if raw_txt:
+                    js_sum = json.loads(raw_txt)
+            except Exception:
+                js_sum = None
+        if isinstance(js_sum, dict):
+            h2h_obj, home_last, away_last, extra_standings = _parse_espn_summary_h2h_v4649(
+                js_sum, ev_id, sp, h_ko, a_ko
+            )
+
+    # Scan multi-day real scoreboard cache (`-5..+5`) for recent/upcoming matches of `home` & `away` (including K리그1·2 / J1·2!)
+    ch = _canon_team_key_v4616(h_ko, sp)
+    ca = _canon_team_key_v4616(a_ko, sp)
+    pair_set = frozenset([ch, ca])
+    with _RT_V4616_LOCK:
+        all_cached_lists = [v[1] for v in _RT_V4616_CACHE.values()] + [list(d.values()) for d in _SAME_DAY_STICKY_V4642.values()]
+
+    seen_scan_ids: Set[str] = set()
+    cached_h2h_lines: List[str] = []
+    c_hw, c_dr, c_aw = 0, 0, 0
+    for item_list in all_cached_lists:
+        for it in item_list:
+            if not isinstance(it, dict):
+                continue
+            iid = str(it.get("id") or "")
+            if not iid or iid == match_id or iid in seen_scan_ids:
+                continue
+            if str(it.get("sport") or "").lower() != sp:
+                continue
+            seen_scan_ids.add(iid)
+            ih_ko = _localize_team_ko_v37(str(it.get("home") or ""), sp)
+            ia_ko = _localize_team_ko_v37(str(it.get("away") or ""), sp)
+            cih = _canon_team_key_v4616(ih_ko, sp)
+            cia = _canon_team_key_v4616(ia_ko, sp)
+            st_it = str(it.get("state") or "")
+            dt_s = str(it.get("match_dt_kst") or "").strip()
+            hs_it = int(it.get("home_score") or 0)
+            as_it = int(it.get("away_score") or 0)
+
+            if frozenset([cih, cia]) == pair_set:
+                if st_it == "post":
+                    cached_h2h_lines.append(f"{dt_s} · {ih_ko} {hs_it} : {as_it} {ia_ko}")
+                    if hs_it == as_it:
+                        c_dr += 1
+                    elif (hs_it > as_it and cih == ch) or (as_it > hs_it and cih == ca):
+                        c_hw += 1
+                    else:
+                        c_aw += 1
+                elif st_it == "pre" and not next_rematch:
+                    next_rematch = f"{dt_s} · {ih_ko} vs {ia_ko}"
+            elif st_it == "post":
+                if (cih == ch or cia == ch) and not home_last:
+                    home_last = f"{dt_s} · {ih_ko} {hs_it}:{as_it} {ia_ko}"
+                if (cih == ca or cia == ca) and not away_last:
+                    away_last = f"{dt_s} · {ih_ko} {hs_it}:{as_it} {ia_ko}"
+
+    if h2h_obj is None and cached_h2h_lines:
+        tot_c = c_hw + c_dr + c_aw
+        h2h_obj = {
+            "summary": f"최근 맞대결 {tot_c}전: {h_ko} {c_hw}승 · {c_dr}무 · {a_ko} {c_aw}승" if (sp == "soccer" or c_dr > 0) else f"최근 맞대결 {tot_c}전: {h_ko} {c_hw}승 · {a_ko} {c_aw}승",
+            "past_games": cached_h2h_lines[:5],
+            "home_wins": c_hw,
+            "draws": c_dr,
+            "away_wins": c_aw,
+            "home_last": home_last,
+            "away_last": away_last,
+            "next_rematch": next_rematch,
+        }
+    elif h2h_obj is not None and next_rematch and not h2h_obj.get("next_rematch"):
+        h2h_obj["next_rematch"] = next_rematch
+
+    out_payload: Dict[str, Any] = {
+        "ok": True,
+        "version": "v4.6.49",
+        "h2h": h2h_obj,
+        "home_last": home_last,
+        "away_last": away_last,
+        "next_rematch": next_rematch,
+        "standings": extra_standings,
+    }
+    with _MATCH_H2H_LOCK_V4649:
+        if len(_MATCH_H2H_CACHE_V4649) > 400:
+            _MATCH_H2H_CACHE_V4649.clear()
+        _MATCH_H2H_CACHE_V4649[ck] = (time.monotonic(), dict(out_payload))
+    return out_payload
