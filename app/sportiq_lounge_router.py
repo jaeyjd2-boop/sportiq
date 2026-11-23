@@ -17569,16 +17569,78 @@ _FRONTEND_V22_JS = r'''
     injectKickoffBadgeCssV4657();
     harvestLocalDomKickoffsV4657();
 
-    // 1. Best Briefing TOP 3 cards
+    // 1. Best Briefing TOP 3 cards (v4.6.58: resilient to inline grid/flex wrappers)
     var bestBox = document.getElementById("sqBestTop3BoxV40");
-    if (bestBox) {
-      var bestCards = bestBox.querySelectorAll("article, [class*='grid'] > div");
-      for (var i = 0; i < bestCards.length && i < 6; i++) {
-        var bc = bestCards[i];
-        var bt = bc.textContent || "";
-        if (bt.indexOf("vs") !== -1 || bt.indexOf("VS") !== -1) {
-          decorateSingleCardV4657(bc);
+    if (!bestBox) {
+      var tabFeed = document.getElementById("tab-feed") || document.body;
+      var cands = tabFeed ? tabFeed.querySelectorAll("section, div") : [];
+      for (var ci = 0; ci < cands.length && ci < 160; ci++) {
+        var cTxt = cands[ci].textContent || "";
+        if (cTxt.indexOf("베스트 공감 브리핑 TOP 3") !== -1 && cTxt.length < 3500) {
+          bestBox = cands[ci];
+          break;
         }
+      }
+    }
+    if (bestBox) {
+      var foundBestCards = [];
+      var allNodes = bestBox.querySelectorAll("article, div");
+      for (var i = 0; i < allNodes.length && i < 240; i++) {
+        var el = allNodes[i];
+        var et = (el.textContent || "").replace(/\s+/g, " ").trim();
+        if (!et || et.length < 28 || et.length > 900) continue;
+        var hasBestTag = /BEST\s*[1-3]위/.test(et) || et.indexOf("마이팀 브리핑") !== -1;
+        var hasAction = et.indexOf("바로 공감") !== -1 || et.indexOf("본문 이동") !== -1;
+        var hasVs = /\bvs\.?\b/i.test(et);
+        if (!hasBestTag || !hasAction || !hasVs) continue;
+        // Skip wrapper that holds multiple BEST cards together
+        var bestMatches = et.match(/BEST\s*[1-3]위/g);
+        if (bestMatches && bestMatches.length > 1) continue;
+        // Skip if an inner child is already a matching card
+        var isOuter = false;
+        for (var j = 0; j < foundBestCards.length; j++) {
+          if (el.contains(foundBestCards[j])) { isOuter = true; break; }
+          if (foundBestCards[j].contains(el)) {
+            foundBestCards[j] = el;
+            isOuter = true;
+            break;
+          }
+        }
+        if (!isOuter) foundBestCards.push(el);
+      }
+      for (var bi = 0; bi < foundBestCards.length && bi < 6; bi++) {
+        var cardEl = foundBestCards[bi];
+        var revStrB = String(__sqKickoffIndexV4657.rev);
+        if (cardEl.getAttribute("data-sq-ko-rev-v4657") === revStrB) continue;
+        var fullTxtB = (cardEl.textContent || "").replace(/\s+/g, " ").trim();
+        // Find exact title node containing '마이팀 브리핑' or 'vs'
+        var tNode = cardEl.querySelector("h2, h3, h4, .sq-post-title, [class*='title']");
+        if (!tNode) {
+          var subNodes = cardEl.querySelectorAll("div, p, strong, span, a");
+          for (var si = 0; si < subNodes.length; si++) {
+            var st = (subNodes[si].textContent || "").replace(/\s+/g, " ").trim();
+            if (st.length >= 8 && st.length <= 140 && /\bvs\.?\b/i.test(st) && subNodes[si].children.length <= 2) {
+              tNode = subNodes[si];
+              break;
+            }
+          }
+        }
+        var pairB = extractMatchupPairV4657(tNode ? tNode.textContent : fullTxtB.slice(0, 180)) || extractMatchupPairV4657(fullTxtB.slice(0, 220));
+        if (!pairB) continue;
+        var infoB = lookupKickoffInIndexV4657(pairB);
+        if (!infoB) {
+          var parsedB = parseKickoffFromTextV4657(fullTxtB);
+          if (parsedB && parsedB.dt_label) infoB = { dt_label: parsedB.dt_label, venue: parsedB.venue || "", state: "pre" };
+        }
+        var oldB = cardEl.querySelector("[data-sq-ko-badge-v4657='1']");
+        if (oldB && oldB.parentNode) oldB.parentNode.removeChild(oldB);
+        var badgeB = buildKickoffBadgeElV4657(infoB);
+        if (tNode && tNode.parentNode) {
+          tNode.parentNode.insertBefore(badgeB, tNode.nextSibling);
+        } else {
+          cardEl.insertBefore(badgeB, cardEl.firstChild);
+        }
+        cardEl.setAttribute("data-sq-ko-rev-v4657", revStrB);
       }
     }
 
@@ -17643,7 +17705,16 @@ _FRONTEND_V22_JS = r'''
     if (bestBtn && !bestBtn.__sqKoBoundV4657) {
       bestBtn.__sqKoBoundV4657 = true;
       bestBtn.addEventListener("click", function () {
-        scheduleKickoffBadgePassV4657(140);
+        scheduleKickoffBadgePassV4657(80);
+        setTimeout(function () { scheduleKickoffBadgePassV4657(80); }, 220);
+      });
+    }
+    var bestBoxHdr = document.querySelector("#sqBestTop3BoxV40 [data-sq-best-hdr='1']");
+    if (bestBoxHdr && !bestBoxHdr.__sqKoBoundV4658) {
+      bestBoxHdr.__sqKoBoundV4658 = true;
+      bestBoxHdr.addEventListener("click", function () {
+        scheduleKickoffBadgePassV4657(90);
+        setTimeout(function () { scheduleKickoffBadgePassV4657(80); }, 240);
       });
     }
   }
@@ -19499,7 +19570,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46570_{int(time.time())}"
+_BOOT_VER_V30 = f"46580_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -34277,6 +34348,7 @@ _V4655_NEW_PATHS = {
     "/api/member/live-sources-diag-v4655",
     "/api/member/live-sources-diag-v4656",
     "/api/member/live-sources-diag-v4657",
+    "/api/member/live-sources-diag-v4658",
     "/api/member/feed-kickoff-index-v4657",
 }
 router.routes = [rt for rt in router.routes if getattr(rt, "path", "") not in _V4655_NEW_PATHS]
@@ -34457,11 +34529,13 @@ async def _async_api_feed_kickoff_index_v4657():
 @router.get("/api/member/live-sources-diag-v4655")
 @router.get("/api/member/live-sources-diag-v4656")
 @router.get("/api/member/live-sources-diag-v4657")
+@router.get("/api/member/live-sources-diag-v4658")
 async def _async_api_live_sources_diag_v4655(date_offset: int = 0):
     loop = _asyncio_v4652.get_running_loop()
     res = await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, api_live_sources_diag_v4648, date_offset)
     if isinstance(res, dict):
-        res["version"] = "v4.6.57"
+        res["version"] = "v4.6.58"
+        res["best_top3_kickoff_v4658"] = True
         res["client_antifreeze_v4656"] = True
         res["kickoff_badges_v4657"] = True
         res["h2h_and_presence_guards_v4657"] = True
