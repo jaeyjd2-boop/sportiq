@@ -102,16 +102,68 @@ def store_fixtures(items, chunk_size=200):
         count += len(batch)
     return count
 
-def collect_live():
-    # 라이브 전용 피드에서 반환된 fixture의 날짜를 모아 해당 날짜의 최신 일정을 재수집
-    client=FootballDataClient()
-    try: live=client.live()
-    finally: client.close()
-    days=sorted({str(((x.get("fixture") or {}).get("date") or ""))[:10] for x in live if (x.get("fixture") or {}).get("date")})
-    if not days:
-        return 0
-    # One range scan instead of one full catalog scan per day (quota).
-    return collect_fixtures(date.fromisoformat(days[0]), date.fromisoformat(days[-1]))
+LIVE_STATUSES = ("1H", "HT", "2H", "ET", "BT", "P", "LIVE")
+
+
+def collect_live(max_rechecks=3, recent_hours=12):
+    """Store the provider's live feed and close out matches that left it.
+
+    One request: /matches?status=LIVE, stored as-is via store_fixtures (it
+    no longer triggers a full catalog rescan, which cost ~14 requests).
+    Matches that were live in our DB at the previous poll but are missing
+    from this feed (usually just finished) are refetched with one
+    competition/date request each, at most ``max_rechecks`` per run, so the
+    final status and score land within one poll. Statuses always come from
+    the provider; nothing is inferred locally.
+    """
+    if not isinstance(max_rechecks, int) or not 0 <= max_rechecks <= 5:
+        raise ValueError("max_rechecks must be 0..5")
+    from datetime import datetime, timedelta, timezone
+    import logging
+    log = logging.getLogger("sportiq-worker")
+    client = FootballDataClient()
+    saved = 0
+    try:
+        live = [x for x in client.live()
+                if ((x.get("teams") or {}).get("home") or {}).get("id") is not None
+                and ((x.get("teams") or {}).get("away") or {}).get("id") is not None
+                and (x.get("fixture") or {}).get("date")]
+        live_ids = {str((x.get("fixture") or {}).get("id")) for x in live}
+        if live:
+            saved += store_fixtures(live)
+        now = datetime.now(timezone.utc)
+        with engine.connect() as c:
+            rows = c.execute(text("""
+                SELECT m.provider_match_id AS pid, m.start_time AS start, l.provider_league_id AS league
+                FROM matches m JOIN sports s ON s.id=m.sport_id JOIN leagues l ON l.id=m.league_id
+                WHERE s.code='football' AND m.provider_match_id LIKE 'fd:%'
+                  AND l.provider_league_id LIKE 'fd:%'
+                  AND m.status IN :live AND m.start_time >= :oldest
+                ORDER BY m.start_time
+            """).bindparams(bindparam("live", expanding=True)), {
+                "live": list(LIVE_STATUSES), "oldest": now - timedelta(hours=recent_hours),
+            }).mappings().all()
+        targets = []
+        for r in rows:
+            if str(r["pid"]) in live_ids:
+                continue
+            key = (str(r["league"]).removeprefix("fd:"), _as_date(r["start"]).isoformat())
+            if key not in targets:
+                targets.append(key)
+        if len(targets) > max_rechecks:
+            log.warning("live: %d competition/date rechecks needed, capped at %d (rest left to recheck_unfinished)",
+                        len(targets), max_rechecks)
+        for code, day in targets[:max_rechecks]:
+            try:
+                items = client.competition_fixtures_range(code, day, day)
+            except Exception:
+                log.exception("live: recheck competition %s %s failed", code, day)
+                continue
+            if items:
+                saved += store_fixtures(items)
+    finally:
+        client.close()
+    return saved
 
 
 FINAL_STATUSES = ("FT", "AET", "PEN", "AWD", "CANC", "PST")

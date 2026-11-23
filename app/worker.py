@@ -68,13 +68,34 @@ def fixture_window():
     return collect_fixtures(today - timedelta(days=1), end_day)
 
 
+LIVE_POLL_MIN_SECONDS = 120
+
+
+def live_poll_interval_seconds(configured=None):
+    """LIVE_POLL_SECONDS (render.yaml: 600), never below 120 s.
+
+    The old max(3600, ...) silently turned the 10-minute setting into an
+    hourly poll. One live poll costs 1 request (+ up to 3 for matches that
+    just left the live feed), against football-data's 10 req/min.
+    """
+    value = settings.live_poll_seconds if configured is None else configured
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        value = 600
+    return max(LIVE_POLL_MIN_SECONDS, value)
+
+
 scheduler = BlockingScheduler(timezone="UTC")
 scheduler.add_job(lambda: safe("forecast_snapshot", snapshot_forecasts), "interval", hours=6, id="forecast_snapshot", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("forecast_result_refresh", refresh_forecast_results), "interval", hours=3, id="forecast_result_refresh", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("forecast_evaluation", evaluate_forecasts), "interval", hours=1, id="forecast_evaluation", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("leagues", collect_leagues), "interval", hours=24, id="leagues", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("fixtures", fixture_window), "interval", hours=12, id="fixtures", max_instances=1, coalesce=True)
-scheduler.add_job(lambda: safe("live", collect_live), "interval", seconds=max(3600, settings.live_poll_seconds), id="live", max_instances=1, coalesce=True)
+# First run 1 min after start: every deploy restarts the worker, and an
+# interval job otherwise waits a full period before its first run.
+scheduler.add_job(lambda: safe("live", collect_live), "interval", seconds=live_poll_interval_seconds(), id="live", max_instances=1, coalesce=True,
+                  next_run_time=datetime.now(timezone.utc) + timedelta(minutes=1))
 # Matches past kickoff+2h that are still NS/LIVE are rechecked until the
 # provider reports a final status (bounded to the last 3 days).
 scheduler.add_job(lambda: safe("recheck_unfinished", recheck_unfinished), "interval", minutes=30, id="recheck_unfinished", max_instances=1, coalesce=True)
