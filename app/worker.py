@@ -7,7 +7,7 @@ from app.db import engine
 from app.collector import (collect_leagues, collect_fixtures, collect_live, refresh_forecast_results,
                            recheck_unfinished, collect_head_to_head)
 from app.forecast_tracking import snapshot_forecasts, evaluate_forecasts
-from app import multisport
+from app import multisport, multisport_backfill
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("sportiq-worker")
@@ -134,6 +134,11 @@ scheduler.add_job(lambda: safe_multisport("multisport_schedule", multisport.coll
 scheduler.add_job(lambda: safe_multisport("multisport_live", multisport.collect_live), "interval",
                   minutes=max(5, settings.multisport_live_minutes), id="multisport_live", max_instances=1, coalesce=True, misfire_grace_time=None,
                   next_run_time=datetime.now(timezone.utc) + timedelta(minutes=4))
+# History for /analysis: last 30 days of finished matches + team season schedules,
+# at most 25 ESPN requests per run; progress is kept in the DB across deploys.
+scheduler.add_job(lambda: safe_multisport("multisport_backfill", multisport_backfill.collect_backfill), "interval",
+                  minutes=10, id="multisport_backfill", max_instances=1, coalesce=True, misfire_grace_time=None,
+                  next_run_time=datetime.now(timezone.utc) + timedelta(minutes=15))
 
 if __name__ == "__main__":
     safe("leagues", collect_leagues)
