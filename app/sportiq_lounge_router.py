@@ -15895,8 +15895,8 @@ _FRONTEND_V22_JS = r'''
       ".sq-v55-pill:hover { border-color:#475569; color:#ffffff; background:#1e293b; }",
       ".sq-v55-pill.active { background:rgba(16,185,129,0.2); border-color:#10b981; color:#6ee7b7; box-shadow:0 0 0 1px rgba(16,185,129,0.25); }",
       ".sq-v55-pill.active-sky { background:rgba(56,189,248,0.18); border-color:#38bdf8; color:#bae6fd; }",
-      "#sqV55Viewport { position:relative; height:420px; border-radius:14px; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:12px; box-sizing:border-box; border:1px solid rgba(148,163,184,0.22); user-select:none; }",
-      "@media (max-width: 480px) { #sqV55Viewport { height:380px; } }",
+      "#sqV55Viewport { position:relative; min-height:468px; height:auto; border-radius:14px; overflow:visible; display:flex; flex-direction:column; justify-content:space-between; gap:6px; padding:11px 12px; box-sizing:border-box; border:1px solid rgba(148,163,184,0.22); user-select:none; }",
+      "@media (max-width: 480px) { #sqV55Viewport { min-height:430px; height:auto; } }",
       "@keyframes sqTacDashV55 { to { stroke-dashoffset: -36; } }",
       "@keyframes sqTacNodePulseV55 { 0%,100% { transform:scale(1); opacity:0.92; } 50% { transform:scale(1.18); opacity:1; } }",
       "@keyframes sqDanmakuFloatV55 { 0% { transform:translateY(14px) scale(0.85); opacity:0; } 15% { opacity:1; } 85% { opacity:0.95; } 100% { transform:translateY(-150px) scale(1.18); opacity:0; } }",
@@ -15976,7 +15976,7 @@ _FRONTEND_V22_JS = r'''
     if (sp === "basketball") {
       return {
         bg: "linear-gradient(180deg,#451a03 0%,#1e1b4b 58%,#090f1f 100%)",
-        svg: "<svg viewBox='0 0 280 226' style='width:100%;height:152px;opacity:0.96;'>" + defs +
+        svg: "<svg viewBox='0 0 280 226' style='width:100%;height:130px;opacity:0.96;'>" + defs +
              "<rect x='10' y='8' width='260' height='208' rx='10' fill='rgba(245,158,11,0.08)' stroke='rgba(251,191,36,0.38)' stroke-width='1.5'/>" +
              "<path d='M 40 216 A 100 94 0 0 1 240 216' fill='none' stroke='rgba(251,191,36,0.45)' stroke-width='1.5'/>" +
              "<rect x='102' y='128' width='76' height='88' fill='rgba(249,115,22,0.13)' stroke='rgba(251,191,36,0.4)' stroke-width='1.3'/>" +
@@ -16001,7 +16001,7 @@ _FRONTEND_V22_JS = r'''
     if (sp === "hockey") {
       return {
         bg: "linear-gradient(180deg,#0c4a6e 0%,#0f172a 62%,#020617 100%)",
-        svg: "<svg viewBox='0 0 280 226' style='width:100%;height:152px;opacity:0.96;'>" + defs +
+        svg: "<svg viewBox='0 0 280 226' style='width:100%;height:130px;opacity:0.96;'>" + defs +
              "<rect x='12' y='8' width='256' height='208' rx='28' fill='rgba(56,189,248,0.08)' stroke='rgba(125,211,252,0.42)' stroke-width='1.6'/>" +
              "<line x1='12' y1='84' x2='268' y2='84' stroke='rgba(56,189,248,0.52)' stroke-width='2'/>" +
              "<circle cx='78' cy='150' r='26' fill='none' stroke='rgba(244,63,94,0.42)' stroke-width='1.4'/>" +
@@ -16020,7 +16020,7 @@ _FRONTEND_V22_JS = r'''
     if (sp === "baseball") {
       return {
         bg: "linear-gradient(180deg,#1e3a8a 0%,#0f172a 62%,#020617 100%)",
-        svg: "<svg viewBox='0 0 280 226' style='width:100%;height:152px;opacity:0.96;'>" + defs +
+        svg: "<svg viewBox='0 0 280 226' style='width:100%;height:130px;opacity:0.96;'>" + defs +
              "<polygon points='140,22 232,114 140,204 48,114' fill='rgba(16,185,129,0.08)' stroke='rgba(148,163,184,0.4)' stroke-width='1.5'/>" +
              "<rect x='114' y='74' width='52' height='62' fill='rgba(56,189,248,0.12)' stroke='rgba(56,189,248,0.6)' stroke-width='1.5'/>" +
              "<path class='sq-v55-tac-line' d='M 140 34 Q 146 92 126 122' fill='none' stroke='#fb7185' stroke-width='2.7' marker-end='url(#sqArrRedV60)'/>" +
@@ -16035,7 +16035,7 @@ _FRONTEND_V22_JS = r'''
     }
     return {
       bg: "linear-gradient(180deg,#064e3b 0%,#022c22 60%,#041e19 100%)",
-      svg: "<svg viewBox='0 0 280 226' style='width:100%;height:152px;opacity:0.96;'>" + defs +
+      svg: "<svg viewBox='0 0 280 226' style='width:100%;height:130px;opacity:0.96;'>" + defs +
            "<rect x='12' y='8' width='256' height='208' rx='10' fill='rgba(16,185,129,0.08)' stroke='rgba(110,231,183,0.38)' stroke-width='1.5'/>" +
            "<line x1='12' y1='112' x2='268' y2='112' stroke='rgba(110,231,183,0.3)' stroke-width='1.3'/>" +
            "<circle cx='140' cy='112' r='26' fill='none' stroke='rgba(110,231,183,0.3)' stroke-width='1.3'/>" +
@@ -17906,6 +17906,153 @@ _FRONTEND_V22_JS = r'''
     }, ms);
   });
 
+
+  /* =====================================================================
+     v4.6.62: Global UI/UX Polishing (Zero-Freeze Safe)
+     - AI Lab No-Vig calculator input stack fix
+     - Overseas news filter bar wrap fix
+     - Sticky main 7-tab navigation bar + DataCenter smooth scroll
+     - Feed duplicate search deduplication + crisp body readability
+     - Standings table numeric alignment/contrast + bottom dock clearance
+     ===================================================================== */
+  function injectUiPolishCssV4662() {
+    if (document.getElementById("sqUiPolishCssV4662")) return;
+    var st = document.createElement("style");
+    st.id = "sqUiPolishCssV4662";
+    st.textContent = [
+      "body { padding-bottom: 84px !important; }",
+      /* Sticky main 7-tab navigation bar */
+      ".sq-main-tabbar-sticky-v4662 { position: sticky !important; top: 0 !important; z-index: 42 !important; background: rgba(9, 15, 31, 0.94) !important; backdrop-filter: blur(10px) !important; -webkit-backdrop-filter: blur(10px) !important; padding: 7px 6px !important; border-bottom: 1px solid rgba(56, 189, 248, 0.22) !important; box-shadow: 0 6px 18px rgba(2, 6, 23, 0.45) !important; border-radius: 12px !important; }",
+      /* AI Lab No-Vig Calculator: prevent 20px squished inputs */
+      ".sq-v42-calc-grid3 > div { display: flex !important; flex-direction: column !important; gap: 8px !important; min-width: 0 !important; }",
+      ".sq-v42-calc-grid3 > div > div { flex-wrap: wrap !important; gap: 6px !important; }",
+      ".sq-v42-calc-grid3 input, #tab-lab input[type='number'], #tab-lab input[type='text'] { min-width: 78px !important; min-height: 34px !important; padding: 6px 9px !important; font-size: 13px !important; font-variant-numeric: tabular-nums !important; box-sizing: border-box !important; }",
+      /* Overseas news filter bar wrap (fixes right-edge clipping of '종합') */
+      ".sq-news-filter-wrap-v4662 { display: flex !important; flex-wrap: wrap !important; overflow: visible !important; gap: 6px !important; }",
+      /* Feed body readability & softer secondary tag pills */
+      "#feedList article p, #feedList > div p { font-size: 13.8px !important; line-height: 1.66 !important; color: #e2e8f0 !important; letter-spacing: -0.005em !important; }",
+      "#feedList [class*='tag'], #feedList a[href*='#'] { opacity: 0.86; }",
+      /* DataCenter standings table numeric alignment & contrast */
+      "#dcMainHubSection table td:nth-child(n+3), #dcMainHubSection table th:nth-child(n+3) { text-align: right !important; font-variant-numeric: tabular-nums !important; padding-right: 10px !important; }",
+      "#dcMainHubSection table td:last-child { color: #7dd3fc !important; font-weight: 800 !important; }",
+      /* Shorts right-side emoji bar clean single row */
+      "#sqAutoShortsStudioV4655 [data-sq-v55-emo] { padding: 4px 7px !important; font-size: 11px !important; }"
+    ].join("\n");
+    (document.head || document.documentElement).appendChild(st);
+  }
+
+  function applyUiPolishDomV4662() {
+    injectUiPolishCssV4662();
+    try {
+      // 1. Make main 7-tab bar sticky & bind DataCenter tab smooth scroll
+      var tabBtns = document.querySelectorAll("button.tab-btn, [data-tab='feed']");
+      var mainBar = null;
+      for (var i = 0; i < tabBtns.length; i++) {
+        var txt = (tabBtns[i].textContent || "").trim();
+        if (txt.indexOf("실시간 분석 피드") !== -1) {
+          var p = tabBtns[i].parentElement;
+          if (p && p.children && p.children.length >= 5) {
+            mainBar = p;
+            break;
+          }
+        }
+      }
+      if (mainBar && !mainBar.classList.contains("sq-main-tabbar-sticky-v4662")) {
+        mainBar.classList.add("sq-main-tabbar-sticky-v4662");
+      }
+      if (mainBar) {
+        Array.prototype.forEach.call(mainBar.querySelectorAll("button, a"), function (btn) {
+          var bt = (btn.textContent || "").trim();
+          if (/데이터\s*센터/.test(bt) && !btn.__sqDcScrollV4662) {
+            btn.__sqDcScrollV4662 = true;
+            btn.addEventListener("click", function () {
+              setTimeout(function () {
+                var dcSec = document.getElementById("dcMainHubSection");
+                if (dcSec && dcSec.scrollIntoView) {
+                  dcSec.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+              }, 110);
+            });
+          }
+        });
+      }
+
+      // 2. Deduplicate stacked feed search inputs (keep the primary feed search bar, hide redundant duplicate)
+      var tabFeed = document.getElementById("tab-feed");
+      if (tabFeed) {
+        var searchInputs = [];
+        var inps = tabFeed.querySelectorAll("input[type='text'], input[type='search'], input:not([type])");
+        for (var si = 0; si < inps.length; si++) {
+          var ph = String(inps[si].getAttribute("placeholder") || "");
+          if (ph.indexOf("해시태그") !== -1 || ph.indexOf("팀명") !== -1 || ph.indexOf("제목") !== -1) {
+            if (inps[si].offsetParent !== null) searchInputs.push(inps[si]);
+          }
+        }
+        if (searchInputs.length >= 2) {
+          // Keep the one inside the filter row (with '팀명·리그·작성자') and hide the extra top bar input
+          for (var sj = 0; sj < searchInputs.length; sj++) {
+            var ph2 = String(searchInputs[sj].getAttribute("placeholder") || "");
+            if (ph2.indexOf("제목, 팀") !== -1) {
+              var wrapEl = searchInputs[sj].closest("div");
+              if (wrapEl && (wrapEl.textContent || "").length < 80) {
+                wrapEl.style.display = "none";
+                wrapEl.setAttribute("data-sq-dup-search-hidden-v4662", "1");
+              } else {
+                searchInputs[sj].style.display = "none";
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      // 3. Fix Overseas News filter bar right-edge clipping ('🌐 종합')
+      var newsBtns = document.querySelectorAll("button");
+      for (var ni = 0; ni < newsBtns.length && ni < 260; ni++) {
+        var nt = (newsBtns[ni].textContent || "").trim();
+        if (nt.indexOf("종합 (") !== -1 || nt.indexOf("🌐 종합") !== -1) {
+          var barEl = newsBtns[ni].parentElement;
+          if (barEl && barEl.children && barEl.children.length >= 4 && !barEl.classList.contains("sq-news-filter-wrap-v4662")) {
+            barEl.classList.add("sq-news-filter-wrap-v4662");
+          }
+          break;
+        }
+      }
+
+      // 4. Fix AI Lab No-Vig calculator card inner input row width
+      var labSec = document.getElementById("tab-lab") || document.body;
+      if (labSec) {
+        var hNodes = labSec.querySelectorAll("div, h3, h4, strong");
+        for (var hi = 0; hi < hNodes.length && hi < 240; hi++) {
+          var ht = (hNodes[hi].textContent || "").trim();
+          if (ht.indexOf("No-Vig") !== -1 && ht.length < 40) {
+            var cardC = hNodes[hi].closest("div");
+            if (cardC && cardC.parentElement && cardC.parentElement.querySelectorAll("input").length >= 2) {
+              var hostCard = cardC.parentElement;
+              hostCard.style.display = "flex";
+              hostCard.style.flexDirection = "column";
+              hostCard.style.gap = "8px";
+              var cInps = hostCard.querySelectorAll("input");
+              for (var ci = 0; ci < cInps.length; ci++) {
+                cInps[ci].style.minWidth = "84px";
+                cInps[ci].style.width = "100%";
+              }
+            }
+            break;
+          }
+        }
+      }
+    } catch (_ePol62) {}
+  }
+
+  [450, 1400, 3200].forEach(function (ms) {
+    setTimeout(applyUiPolishDomV4662, ms);
+  });
+  document.addEventListener("click", function (ev) {
+    var tgt = ev && ev.target && ev.target.closest ? ev.target.closest("button.tab-btn, [data-tab]") : null;
+    if (tgt) setTimeout(applyUiPolishDomV4662, 160);
+  });
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootMemberUxV22);
   } else {
@@ -19748,7 +19895,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46610_{int(time.time())}"
+_BOOT_VER_V30 = f"46620_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -34596,6 +34743,7 @@ _V4655_NEW_PATHS = {
     "/api/member/live-sources-diag-v4659",
     "/api/member/live-sources-diag-v4660",
     "/api/member/live-sources-diag-v4661",
+    "/api/member/live-sources-diag-v4662",
     "/api/member/feed-kickoff-index-v4657",
 }
 router.routes = [rt for rt in router.routes if getattr(rt, "path", "") not in _V4655_NEW_PATHS]
@@ -34780,11 +34928,13 @@ async def _async_api_feed_kickoff_index_v4657():
 @router.get("/api/member/live-sources-diag-v4659")
 @router.get("/api/member/live-sources-diag-v4660")
 @router.get("/api/member/live-sources-diag-v4661")
+@router.get("/api/member/live-sources-diag-v4662")
 async def _async_api_live_sources_diag_v4655(date_offset: int = 0):
     loop = _asyncio_v4652.get_running_loop()
     res = await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, api_live_sources_diag_v4648, date_offset)
     if isinstance(res, dict):
-        res["version"] = "v4.6.61"
+        res["version"] = "v4.6.62"
+        res["ui_polish_v4662"] = True
         res["shorts_broadcast_3cut_v4660"] = True
         res["clean_daily_labels_v4659"] = True
         res["best_top3_kickoff_v4658"] = True
