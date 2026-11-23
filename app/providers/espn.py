@@ -59,6 +59,8 @@ def _throttle():
 
 
 def _int(v):
+    if isinstance(v, dict):          # team-schedule payloads: {"value": 27.0, "displayValue": "27"}
+        v = v.get("value", v.get("displayValue"))
     try:
         return int(float(v))
     except (TypeError, ValueError):
@@ -206,19 +208,29 @@ class EspnClient:
         self.client = httpx.Client(base_url=BASE, timeout=TIMEOUT, transport=transport,
                                    headers={"User-Agent": "SportIQ-Collector/1.0"})
         self.requests = 0
+        self.last_ok = False
 
     def _get(self, path, params=None):
         _throttle()
         self.requests += 1
+        self.last_ok = False
         try:
             r = self.client.get(path, params=params)
             if r.status_code != 200:
                 log.warning("espn %s HTTP %s", path, r.status_code)
                 return None
-            return r.json()
+            data = r.json()
+            self.last_ok = isinstance(data, dict)
+            return data
         except (httpx.HTTPError, ValueError) as exc:
             log.warning("espn %s failed: %s", path, exc)
             return None
+
+    def day(self, league, d: date):
+        """One request for one ESPN (US) date; check last_ok to tell failure from an empty day."""
+        if league.mode == "dates":
+            return parse_scoreboard(self._get(f"/{league.slug}/scoreboard", {"dates": d.strftime("%Y%m%d"), "limit": 500}), league)
+        return self.date_range(league, d, d)
 
     def league_window(self, league, first: date, last: date):
         """Fixtures for first..last (UTC dates). 'dates' leagues: one request per day."""
@@ -241,6 +253,25 @@ class EspnClient:
                 seen.add(x["fixture"]["id"])
                 out.append(x)
         return out
+
+    def date_range(self, league, first: date, last: date):
+        """One request for first..last; ESPN accepts ranges for tennis/MMA scoreboards."""
+        rng = f"{first.strftime('%Y%m%d')}-{last.strftime('%Y%m%d')}"
+        return parse_scoreboard(self._get(f"/{league.slug}/scoreboard", {"dates": rng, "limit": 500}), league)
+
+    def team_ids(self, league):
+        """ESPN team ids for a team league (one request); [] on failure."""
+        data = self._get(f"/{league.slug}/teams", {"limit": 100})
+        try:
+            teams = data["sports"][0]["leagues"][0]["teams"]
+            return [str(t["team"]["id"]) for t in teams if (t.get("team") or {}).get("id")]
+        except (TypeError, KeyError, IndexError):
+            return []
+
+    def team_schedule(self, league, team_id, season=None):
+        """A team's season games (team-schedule endpoint), same fixture shape."""
+        params = {"season": season} if season else None
+        return parse_scoreboard(self._get(f"/{league.slug}/teams/{team_id}/schedule", params), league)
 
     def close(self):
         self.client.close()
