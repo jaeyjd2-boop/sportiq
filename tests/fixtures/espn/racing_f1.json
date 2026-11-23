@@ -1,0 +1,255 @@
+{
+ "events": [
+  {
+   "id": "600057449",
+   "date": "2026-11-20T00:30Z",
+   "name": "Heineken Las Vegas Grand Prix",
+   "status": {
+    "type": {
+     "state": "post",
+     "shortDetail": "Final"
+    }
+   },
+   "competitions": [
+    {
+     "id": "401839133",
+     "date": "2026-11-20T00:30Z",
+     "startDate": "2026-11-20T00:30Z",
+     "status": {
+      "type": {
+       "state": "post",
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "competitors": [
+      {
+       "id": "4472",
+       "order": 1,
+       "winner": false,
+       "athlete": {
+        "displayName": "Sergio Pérez",
+        "shortName": "S. Pérez"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "5799",
+       "order": 2,
+       "winner": false,
+       "athlete": {
+        "displayName": "Ryo Hirakawa",
+        "shortName": "R. Hirakawa"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "5912",
+       "order": 3,
+       "winner": false,
+       "athlete": {
+        "displayName": "Rafael Câmara",
+        "shortName": "R. Câmara"
+       },
+       "type": "athlete"
+      }
+     ],
+     "type": {
+      "abbreviation": "FP1"
+     }
+    },
+    {
+     "id": "401839134",
+     "date": "2026-11-20T04:00Z",
+     "startDate": "2026-11-20T04:00Z",
+     "status": {
+      "type": {
+       "state": "post",
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "competitors": [
+      {
+       "id": "5503",
+       "order": 1,
+       "winner": false,
+       "athlete": {
+        "displayName": "George Russell",
+        "shortName": "G. Russell"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "5501",
+       "order": 2,
+       "winner": false,
+       "athlete": {
+        "displayName": "Pierre Gasly",
+        "shortName": "P. Gasly"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "5498",
+       "order": 3,
+       "winner": false,
+       "athlete": {
+        "displayName": "Charles Leclerc",
+        "shortName": "C. Leclerc"
+       },
+       "type": "athlete"
+      }
+     ],
+     "type": {
+      "abbreviation": "FP2"
+     }
+    },
+    {
+     "id": "401839135",
+     "date": "2026-11-21T00:30Z",
+     "startDate": "2026-11-21T00:30Z",
+     "status": {
+      "type": {
+       "state": "post",
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "competitors": [
+      {
+       "id": "5503",
+       "order": 1,
+       "winner": false,
+       "athlete": {
+        "displayName": "George Russell",
+        "shortName": "G. Russell"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "5829",
+       "order": 2,
+       "winner": false,
+       "athlete": {
+        "displayName": "Kimi Antonelli",
+        "shortName": "K. Antonelli"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "5579",
+       "order": 3,
+       "winner": false,
+       "athlete": {
+        "displayName": "Lando Norris",
+        "shortName": "L. Norris"
+       },
+       "type": "athlete"
+      }
+     ],
+     "type": {
+      "abbreviation": "FP3"
+     }
+    },
+    {
+     "id": "401839136",
+     "date": "2026-11-21T04:00Z",
+     "startDate": "2026-11-21T04:00Z",
+     "status": {
+      "type": {
+       "state": "post",
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "competitors": [
+      {
+       "id": "5829",
+       "order": 1,
+       "winner": false,
+       "athlete": {
+        "displayName": "Kimi Antonelli",
+        "shortName": "K. Antonelli"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "4665",
+       "order": 2,
+       "winner": false,
+       "athlete": {
+        "displayName": "Max Verstappen",
+        "shortName": "M. Verstappen"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "5503",
+       "order": 3,
+       "winner": false,
+       "athlete": {
+        "displayName": "George Russell",
+        "shortName": "G. Russell"
+       },
+       "type": "athlete"
+      }
+     ],
+     "type": {
+      "abbreviation": "Qual"
+     }
+    },
+    {
+     "id": "401839137",
+     "date": "2026-11-22T04:00Z",
+     "startDate": "2026-11-22T04:00Z",
+     "status": {
+      "type": {
+       "state": "post",
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "competitors": [
+      {
+       "id": "4665",
+       "order": 1,
+       "winner": true,
+       "athlete": {
+        "displayName": "Max Verstappen",
+        "shortName": "M. Verstappen"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "5579",
+       "order": 2,
+       "winner": false,
+       "athlete": {
+        "displayName": "Lando Norris",
+        "shortName": "L. Norris"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "5752",
+       "order": 3,
+       "winner": false,
+       "athlete": {
+        "displayName": "Oscar Piastri",
+        "shortName": "O. Piastri"
+       },
+       "type": "athlete"
+      }
+     ],
+     "type": {
+      "abbreviation": "Race"
+     }
+    }
+   ],
+   "circuit": {
+    "fullName": "Las Vegas Street Circuit"
+   }
+  }
+ ]
+}

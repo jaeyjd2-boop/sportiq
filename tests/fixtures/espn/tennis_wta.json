@@ -1,0 +1,550 @@
+{
+ "events": [
+  {
+   "id": "904-2026",
+   "date": "2026-11-15T05:00Z",
+   "name": "LP Open by IND",
+   "status": {
+    "type": {
+     "state": "post",
+     "shortDetail": "Final"
+    }
+   },
+   "groupings": [
+    {
+     "grouping": {
+      "displayName": "Women's Singles"
+     },
+     "competitions": [
+      {
+       "id": "187535",
+       "date": "2026-11-15T16:00Z",
+       "startDate": "2026-11-15T16:00Z",
+       "status": {
+        "type": {
+         "state": "post",
+         "shortDetail": "Final",
+         "description": "Final"
+        }
+       },
+       "venue": {
+        "fullName": "Colina, Chile"
+       },
+       "competitors": [
+        {
+         "id": "4484",
+         "homeAway": "away",
+         "order": 2,
+         "winner": false,
+         "linescores": [
+          {
+           "value": 2.0,
+           "winner": false
+          },
+          {
+           "value": 2.0,
+           "winner": false
+          }
+         ],
+         "athlete": {
+          "displayName": "Alexandra Osborne",
+          "shortName": "A. Osborne"
+         },
+         "type": "athlete"
+        },
+        {
+         "id": "11455",
+         "homeAway": "home",
+         "order": 1,
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          }
+         ],
+         "athlete": {
+          "displayName": "Diletta Cherubini",
+          "shortName": "D. Cherubini"
+         },
+         "type": "athlete"
+        }
+       ],
+       "type": {
+        "abbreviation": null
+       }
+      },
+      {
+       "id": "187534",
+       "date": "2026-11-15T17:25Z",
+       "startDate": "2026-11-15T17:25Z",
+       "status": {
+        "type": {
+         "state": "post",
+         "shortDetail": "Final",
+         "description": "Final"
+        }
+       },
+       "venue": {
+        "fullName": "Colina, Chile"
+       },
+       "competitors": [
+        {
+         "id": "19373",
+         "homeAway": "away",
+         "order": 2,
+         "winner": false,
+         "linescores": [
+          {
+           "value": 1.0,
+           "winner": false
+          },
+          {
+           "value": 0.0,
+           "winner": false
+          }
+         ],
+         "athlete": {
+          "displayName": "Samantha Alvarez",
+          "shortName": "S. Alvarez"
+         },
+         "type": "athlete"
+        },
+        {
+         "id": "1374",
+         "homeAway": "home",
+         "order": 1,
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          }
+         ],
+         "athlete": {
+          "displayName": "Martina Trevisan",
+          "shortName": "M. Trevisan"
+         },
+         "type": "athlete"
+        }
+       ],
+       "type": {
+        "abbreviation": null
+       }
+      }
+     ]
+    },
+    {
+     "grouping": {
+      "displayName": "Women's Doubles"
+     },
+     "competitions": [
+      {
+       "id": "187538",
+       "date": "2026-11-17T17:40Z",
+       "startDate": "2026-11-17T17:40Z",
+       "status": {
+        "type": {
+         "state": "post",
+         "shortDetail": "Final",
+         "description": "Final"
+        }
+       },
+       "venue": {
+        "fullName": "Colina, Chile"
+       },
+       "competitors": [
+        {
+         "id": "14562-6769",
+         "homeAway": "away",
+         "order": 2,
+         "winner": false,
+         "linescores": [
+          {
+           "value": 2.0,
+           "winner": false
+          },
+          {
+           "value": 4.0,
+           "winner": false
+          }
+         ],
+         "roster": {
+          "displayName": "Sofia Costoulas / Darja Semenistaja",
+          "shortDisplayName": "S. Costoulas / D. Semenistaja",
+          "athletes": [
+           {
+            "displayName": "Sofia Costoulas",
+            "shortName": "S. Costoulas"
+           },
+           {
+            "displayName": "Darja Semenistaja",
+            "shortName": "D. Semenistaja"
+           }
+          ]
+         },
+         "type": "team"
+        },
+        {
+         "id": "5168-12957",
+         "homeAway": "home",
+         "order": 1,
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          }
+         ],
+         "roster": {
+          "displayName": "Nuria Brancaccio / Guiomar Maristany Zuleta De Reales",
+          "shortDisplayName": "N. Brancaccio / G. Maristany Zuleta De Reales",
+          "athletes": [
+           {
+            "displayName": "Nuria Brancaccio",
+            "shortName": "N. Brancaccio"
+           },
+           {
+            "displayName": "Guiomar Maristany Zuleta De Reales",
+            "shortName": "G. Maristany Zuleta De Reales"
+           }
+          ]
+         },
+         "type": "team"
+        }
+       ],
+       "type": {
+        "abbreviation": null
+       }
+      },
+      {
+       "id": "187537",
+       "date": "2026-11-18T14:40Z",
+       "startDate": "2026-11-18T14:40Z",
+       "status": {
+        "type": {
+         "state": "post",
+         "shortDetail": "Final",
+         "description": "Final"
+        }
+       },
+       "venue": {
+        "fullName": "Colina, Chile"
+       },
+       "competitors": [
+        {
+         "id": "4546-6209",
+         "homeAway": "away",
+         "order": 2,
+         "winner": false,
+         "linescores": [
+          {
+           "value": 1.0,
+           "winner": false
+          },
+          {
+           "value": 4.0,
+           "winner": false
+          }
+         ],
+         "roster": {
+          "displayName": "Irene Burillo / Anastasia Zolotareva",
+          "shortDisplayName": "I. Burillo / A. Zolotareva",
+          "athletes": [
+           {
+            "displayName": "Irene Burillo",
+            "shortName": "I. Burillo"
+           },
+           {
+            "displayName": "Anastasia Zolotareva",
+            "shortName": "A. Zolotareva"
+           }
+          ]
+         },
+         "type": "team"
+        },
+        {
+         "id": "3042-5626",
+         "homeAway": "home",
+         "order": 1,
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          }
+         ],
+         "roster": {
+          "displayName": "Valeriya Strakhova / Anastasia Tikhonova",
+          "shortDisplayName": "V. Strakhova / A. Tikhonova",
+          "athletes": [
+           {
+            "displayName": "Valeriya Strakhova",
+            "shortName": "V. Strakhova"
+           },
+           {
+            "displayName": "Anastasia Tikhonova",
+            "shortName": "A. Tikhonova"
+           }
+          ]
+         },
+         "type": "team"
+        }
+       ],
+       "type": {
+        "abbreviation": null
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "867-2026",
+   "date": "2026-11-22T05:00Z",
+   "name": "IEB+ Argentina Open",
+   "status": {
+    "type": {
+     "state": "post",
+     "shortDetail": "Final"
+    }
+   },
+   "groupings": [
+    {
+     "grouping": {
+      "displayName": "Women's Singles"
+     },
+     "competitions": [
+      {
+       "id": "187580",
+       "date": "2026-11-22T15:05Z",
+       "startDate": "2026-11-22T15:05Z",
+       "status": {
+        "type": {
+         "state": "post",
+         "shortDetail": "Final",
+         "description": "Final"
+        }
+       },
+       "venue": {
+        "fullName": "Buenos Aires, Argentina"
+       },
+       "competitors": [
+        {
+         "id": "19457",
+         "homeAway": "away",
+         "order": 2,
+         "winner": false,
+         "linescores": [
+          {
+           "value": 1.0,
+           "winner": false
+          },
+          {
+           "value": 0.0,
+           "winner": false
+          }
+         ],
+         "athlete": {
+          "displayName": "Camila Markus",
+          "shortName": "C. Markus"
+         },
+         "type": "athlete"
+        },
+        {
+         "id": "11997",
+         "homeAway": "home",
+         "order": 1,
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          }
+         ],
+         "athlete": {
+          "displayName": "Josefina Estevez",
+          "shortName": "J. Estevez"
+         },
+         "type": "athlete"
+        }
+       ],
+       "type": {
+        "abbreviation": null
+       }
+      },
+      {
+       "id": "187579",
+       "date": "2026-11-22T15:05Z",
+       "startDate": "2026-11-22T15:05Z",
+       "status": {
+        "type": {
+         "state": "post",
+         "shortDetail": "Final",
+         "description": "Final"
+        }
+       },
+       "venue": {
+        "fullName": "Buenos Aires, Argentina"
+       },
+       "competitors": [
+        {
+         "id": "4484",
+         "homeAway": "away",
+         "order": 2,
+         "winner": false,
+         "linescores": [
+          {
+           "value": 4.0,
+           "winner": false
+          },
+          {
+           "value": 4.0,
+           "winner": false
+          }
+         ],
+         "athlete": {
+          "displayName": "Alexandra Osborne",
+          "shortName": "A. Osborne"
+         },
+         "type": "athlete"
+        },
+        {
+         "id": "17328",
+         "homeAway": "home",
+         "order": 1,
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          }
+         ],
+         "athlete": {
+          "displayName": "Abigail Rencheli",
+          "shortName": "A. Rencheli"
+         },
+         "type": "athlete"
+        }
+       ],
+       "type": {
+        "abbreviation": null
+       }
+      }
+     ]
+    },
+    {
+     "grouping": {
+      "displayName": "Women's Doubles"
+     },
+     "competitions": [
+      {
+       "id": "186850",
+       "date": "2026-11-25T05:00Z",
+       "startDate": "2026-11-25T05:00Z",
+       "status": {
+        "type": {
+         "state": "pre",
+         "shortDetail": "TBD",
+         "description": "Scheduled"
+        }
+       },
+       "venue": {
+        "fullName": "Buenos Aires, Argentina"
+       },
+       "competitors": [
+        {
+         "id": "-4",
+         "homeAway": "away",
+         "order": 2,
+         "athlete": {
+          "displayName": "TBD",
+          "shortName": "TBD"
+         },
+         "type": "athlete"
+        },
+        {
+         "id": "-3",
+         "homeAway": "home",
+         "order": 1,
+         "athlete": {
+          "displayName": "TBD",
+          "shortName": "TBD"
+         },
+         "type": "athlete"
+        }
+       ],
+       "type": {
+        "abbreviation": null
+       }
+      },
+      {
+       "id": "186846",
+       "date": "2026-11-25T05:00Z",
+       "startDate": "2026-11-25T05:00Z",
+       "status": {
+        "type": {
+         "state": "pre",
+         "shortDetail": "TBD",
+         "description": "Scheduled"
+        }
+       },
+       "venue": {
+        "fullName": "Buenos Aires, Argentina"
+       },
+       "competitors": [
+        {
+         "id": "-4",
+         "homeAway": "away",
+         "order": 2,
+         "athlete": {
+          "displayName": "TBD",
+          "shortName": "TBD"
+         },
+         "type": "athlete"
+        },
+        {
+         "id": "-3",
+         "homeAway": "home",
+         "order": 1,
+         "athlete": {
+          "displayName": "TBD",
+          "shortName": "TBD"
+         },
+         "type": "athlete"
+        }
+       ],
+       "type": {
+        "abbreviation": null
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

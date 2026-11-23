@@ -1,0 +1,121 @@
+{
+ "events": [
+  {
+   "id": "401908046",
+   "date": "2026-10-29T00:00Z",
+   "name": "Milwaukee Brewers at Tampa Bay Rays",
+   "status": {
+    "type": {
+     "state": "post",
+     "shortDetail": "Final"
+    }
+   },
+   "competitions": [
+    {
+     "id": "401908046",
+     "date": "2026-10-29T00:00Z",
+     "startDate": "2026-10-29T00:00Z",
+     "status": {
+      "type": {
+       "state": "post",
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "venue": {
+      "fullName": "Tropicana Field"
+     },
+     "competitors": [
+      {
+       "id": "30",
+       "homeAway": "home",
+       "order": 0,
+       "winner": false,
+       "score": "1",
+       "linescores": [
+        {
+         "value": 0.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 1.0
+        }
+       ],
+       "team": {
+        "id": "30",
+        "displayName": "Tampa Bay Rays",
+        "shortDisplayName": "Rays"
+       },
+       "type": "team"
+      },
+      {
+       "id": "8",
+       "homeAway": "away",
+       "order": 1,
+       "winner": true,
+       "score": "4",
+       "linescores": [
+        {
+         "value": 0.0
+        },
+        {
+         "value": 1.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 1.0
+        },
+        {
+         "value": 2.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 0.0
+        }
+       ],
+       "team": {
+        "id": "8",
+        "displayName": "Milwaukee Brewers",
+        "shortDisplayName": "Brewers"
+       },
+       "type": "team"
+      }
+     ],
+     "type": {
+      "abbreviation": "FINAL"
+     }
+    }
+   ]
+  }
+ ]
+}

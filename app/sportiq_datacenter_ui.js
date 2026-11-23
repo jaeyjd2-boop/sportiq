@@ -130,6 +130,7 @@
     {id:'baseball',lbl:'⚾ 야구',cntKey:'baseball'},
     {id:'basketball',lbl:'🏀 농구',cntKey:'basketball'},{id:'volleyball',lbl:'🏐 배구(V-리그)',cntKey:'volleyball'},
     {id:'hockey',lbl:'🏒 하키',cntKey:'hockey'},
+    {id:'american_football',lbl:'🏈 NFL',cntKey:'american_football'},
     {id:'esports',lbl:'🎮 LCK',cntKey:'esports'},{id:'ufc',lbl:'🥊 UFC',cntKey:'ufc'},{id:'tennis',lbl:'🎾 테니스',cntKey:'tennis'},{id:'f1',lbl:'🏎️ F1',cntKey:'f1'}
   ];
   var LEAGUES18=['all','EPL','LALIGA','BUNDESLIGA','SERIEA','LIGUE1','KLEAGUE','JLEAGUE','MLS','UCL','UNL','WC2026','KBO','MLB','NPB','NBA','WNBA','VLEAGUE_M','VLEAGUE_W','NHL','LCK','UFC','ATP','WTA','F1'];
@@ -160,7 +161,8 @@
       +'<div style="font-size:15px;font-weight:700">'+dcEsc(m.away)+'</div>'
       +'</div>'
       +'<div style="font-size:12px;color:#cbd5e1;margin-bottom:8px">📊 세부 점수: '+dcEsc(pstr)+'</div>'
-      +'<div class="dc-airow" style="margin-bottom:12px">🎯 AI 승무패 확률: 홈 '+dcEsc(ai.home_pct)+'% / 무 '+dcEsc(ai.draw_pct)+'% / 원정 '+dcEsc(ai.away_pct)+'% · 배당 ('+dcEsc(odds.home)+' / '+dcEsc(odds.draw)+' / '+dcEsc(odds.away)+')</div>'
+      +(m.is_sample?'<div style="font-size:12px;color:#fbbf24;margin-bottom:8px">⚠️ 예시 경기입니다(실제 일정·점수 아님).</div>':'')
+      +(m.ai?'<div class="dc-airow" style="margin-bottom:12px">🎯 AI 승무패 확률(예시): 홈 '+dcEsc(ai.home_pct)+'% / 무 '+dcEsc(ai.draw_pct)+'% / 원정 '+dcEsc(ai.away_pct)+'% · 배당 ('+dcEsc(odds.home)+' / '+dcEsc(odds.draw)+' / '+dcEsc(odds.away)+')</div>':'')
       +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
       +'<button class="dc-btn dc-btn-primary" id="dcGoStandingsBtn">🔢 '+dcEsc(hasLeague)+' 순위표 보기</button>'
       +'<button class="dc-btn" id="dcGoInjuriesBtn">🏥 '+dcEsc(hasLeague)+' 부상자 보기</button>'
@@ -304,11 +306,11 @@
         var ai=x.ai||{};
         var odds=ai.odds||{};var oddsTxt=Number(odds.draw)>0?(dcEsc(odds.home)+'/'+dcEsc(odds.draw)+'/'+dcEsc(odds.away)):(dcEsc(odds.home)+' / '+dcEsc(odds.away));var dropB=x.drop_badge?'<span style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:800;background:linear-gradient(135deg,rgba(245,158,11,0.22),rgba(239,68,68,0.25));color:#fbbf24;border:1px solid rgba(245,158,11,0.55);">'+dcEsc(x.drop_badge)+'</span>':'';
         html+='<div class="dc-mcard" data-midx="'+k+'">'
-          +'<div class="dc-mcard-top"><span class="dc-lbadge">'+dcEsc(x.league_code||x.league)+'</span>'+dropB+'<span>📅 '+dcEsc(x.match_dt_kst)+'</span><span class="dc-sbadge '+stCls+'">'+dcEsc(stTxt)+'</span></div>'
+          +'<div class="dc-mcard-top"><span class="dc-lbadge">'+dcEsc(x.league_code||x.league)+'</span>'+(x.is_sample?'<span style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:800;background:rgba(245,158,11,0.18);color:#fbbf24;border:1px solid rgba(245,158,11,0.5);">예시</span>':'')+dropB+'<span>📅 '+dcEsc(x.match_dt_kst)+'</span><span class="dc-sbadge '+stCls+'">'+dcEsc(stTxt)+'</span></div>'
           +'<div class="dc-trow"><span>'+dcEsc(x.home)+'</span><span class="dc-score">'+dcEsc(x.home_score)+'</span></div>'
           +'<div class="dc-trow"><span>'+dcEsc(x.away)+'</span><span class="dc-score">'+dcEsc(x.away_score)+'</span></div>'
           +'<div class="dc-periods">📊 '+dcEsc(pstr)+'</div>'
-          +'<div class="dc-airow">🎯 AI '+dcEsc(ai.home_pct)+'% / '+dcEsc(ai.draw_pct)+'% / '+dcEsc(ai.away_pct)+'% · 배당 '+oddsTxt+'</div>'
+          +(x.ai?'<div class="dc-airow">🎯 AI(예시) '+dcEsc(ai.home_pct)+'% / '+dcEsc(ai.draw_pct)+'% / '+dcEsc(ai.away_pct)+'% · 배당 '+oddsTxt+'</div>':'')
           +'</div>';
       }
       track.innerHTML=html;

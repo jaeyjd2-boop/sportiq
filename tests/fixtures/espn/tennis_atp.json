@@ -1,0 +1,335 @@
+{
+ "events": [
+  {
+   "id": "339-2026",
+   "date": "2026-11-15T05:00Z",
+   "name": "Nitto ATP Finals",
+   "status": {
+    "type": {
+     "state": "post",
+     "shortDetail": "Final"
+    }
+   },
+   "groupings": [
+    {
+     "grouping": {
+      "displayName": "Men's Doubles"
+     },
+     "competitions": [
+      {
+       "id": "187517",
+       "date": "2026-11-15T10:40Z",
+       "startDate": "2026-11-15T10:40Z",
+       "status": {
+        "type": {
+         "state": "post",
+         "shortDetail": "Final",
+         "description": "Final"
+        }
+       },
+       "venue": {
+        "fullName": "Turin, Italy"
+       },
+       "competitors": [
+        {
+         "id": "2725-2434",
+         "homeAway": "away",
+         "order": 2,
+         "winner": false,
+         "linescores": [
+          {
+           "value": 3.0,
+           "winner": false
+          },
+          {
+           "value": 7.0,
+           "winner": true
+          },
+          {
+           "value": 0.0,
+           "winner": false
+          }
+         ],
+         "roster": {
+          "displayName": "Orlando Luz / Rafael Matos",
+          "shortDisplayName": "O. Luz / R. Matos",
+          "athletes": [
+           {
+            "displayName": "Orlando Luz",
+            "shortName": "O. Luz"
+           },
+           {
+            "displayName": "Rafael Matos",
+            "shortName": "R. Matos"
+           }
+          ]
+         },
+         "type": "team"
+        },
+        {
+         "id": "3540-10685",
+         "homeAway": "home",
+         "order": 1,
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 5.0,
+           "winner": false
+          },
+          {
+           "value": 1.0,
+           "winner": true
+          }
+         ],
+         "roster": {
+          "displayName": "Harri Heliovaara / Henry Patten",
+          "shortDisplayName": "H. Heliovaara / H. Patten",
+          "athletes": [
+           {
+            "displayName": "Harri Heliovaara",
+            "shortName": "H. Heliovaara"
+           },
+           {
+            "displayName": "Henry Patten",
+            "shortName": "H. Patten"
+           }
+          ]
+         },
+         "type": "team"
+        }
+       ],
+       "type": {
+        "abbreviation": null
+       }
+      },
+      {
+       "id": "187518",
+       "date": "2026-11-15T17:10Z",
+       "startDate": "2026-11-15T17:10Z",
+       "status": {
+        "type": {
+         "state": "post",
+         "shortDetail": "Final",
+         "description": "Final"
+        }
+       },
+       "venue": {
+        "fullName": "Turin, Italy"
+       },
+       "competitors": [
+        {
+         "id": "10882-1965",
+         "homeAway": "away",
+         "order": 2,
+         "winner": false,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": false
+          },
+          {
+           "value": 4.0,
+           "winner": false
+          }
+         ],
+         "roster": {
+          "displayName": "Theo Arribage / Albano Olivetti",
+          "shortDisplayName": "T. Arribage / A. Olivetti",
+          "athletes": [
+           {
+            "displayName": "Theo Arribage",
+            "shortName": "T. Arribage"
+           },
+           {
+            "displayName": "Albano Olivetti",
+            "shortName": "A. Olivetti"
+           }
+          ]
+         },
+         "type": "team"
+        },
+        {
+         "id": "1343-1790",
+         "homeAway": "home",
+         "order": 1,
+         "winner": true,
+         "linescores": [
+          {
+           "value": 7.0,
+           "winner": true
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          }
+         ],
+         "roster": {
+          "displayName": "Marcelo Arevalo / Mate Pavic",
+          "shortDisplayName": "M. Arevalo / M. Pavic",
+          "athletes": [
+           {
+            "displayName": "Marcelo Arevalo",
+            "shortName": "M. Arevalo"
+           },
+           {
+            "displayName": "Mate Pavic",
+            "shortName": "M. Pavic"
+           }
+          ]
+         },
+         "type": "team"
+        }
+       ],
+       "type": {
+        "abbreviation": null
+       }
+      }
+     ]
+    },
+    {
+     "grouping": {
+      "displayName": "Men's Singles"
+     },
+     "competitions": [
+      {
+       "id": "187505",
+       "date": "2026-11-15T13:25Z",
+       "startDate": "2026-11-15T13:25Z",
+       "status": {
+        "type": {
+         "state": "post",
+         "shortDetail": "Final",
+         "description": "Final"
+        }
+       },
+       "venue": {
+        "fullName": "Turin, Italy"
+       },
+       "competitors": [
+        {
+         "id": "12657",
+         "homeAway": "away",
+         "order": 2,
+         "winner": false,
+         "linescores": [
+          {
+           "value": 4.0,
+           "winner": false
+          },
+          {
+           "value": 4.0,
+           "winner": false
+          }
+         ],
+         "athlete": {
+          "displayName": "Rafael Jodar",
+          "shortName": "R. Jodar"
+         },
+         "type": "athlete"
+        },
+        {
+         "id": "2375",
+         "homeAway": "home",
+         "order": 1,
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          }
+         ],
+         "athlete": {
+          "displayName": "Alexander Zverev",
+          "shortName": "A. Zverev"
+         },
+         "type": "athlete"
+        }
+       ],
+       "type": {
+        "abbreviation": null
+       }
+      },
+      {
+       "id": "187506",
+       "date": "2026-11-15T19:40Z",
+       "startDate": "2026-11-15T19:40Z",
+       "status": {
+        "type": {
+         "state": "post",
+         "shortDetail": "Final",
+         "description": "Final"
+        }
+       },
+       "venue": {
+        "fullName": "Turin, Italy"
+       },
+       "competitors": [
+        {
+         "id": "10052",
+         "homeAway": "away",
+         "order": 2,
+         "winner": false,
+         "linescores": [
+          {
+           "value": 2.0,
+           "winner": false
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 3.0,
+           "winner": false
+          }
+         ],
+         "athlete": {
+          "displayName": "Arthur Fils",
+          "shortName": "A. Fils"
+         },
+         "type": "athlete"
+        },
+        {
+         "id": "9250",
+         "homeAway": "home",
+         "order": 1,
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 3.0,
+           "winner": false
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          }
+         ],
+         "athlete": {
+          "displayName": "Ben Shelton",
+          "shortName": "B. Shelton"
+         },
+         "type": "athlete"
+        }
+       ],
+       "type": {
+        "abbreviation": null
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
