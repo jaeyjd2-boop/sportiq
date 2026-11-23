@@ -1,0 +1,147 @@
+{
+ "events": [
+  {
+   "id": "600061665",
+   "date": "2026-11-21T15:00Z",
+   "name": "UFC Fight Night: Procházka vs. Stirling",
+   "status": {
+    "type": {
+     "state": "post",
+     "shortDetail": "Final"
+    }
+   },
+   "competitions": [
+    {
+     "id": "401935762",
+     "date": "2026-11-21T15:00Z",
+     "startDate": "2026-11-21T15:00Z",
+     "status": {
+      "type": {
+       "state": "post",
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "venue": {
+      "fullName": "ABHA Arena"
+     },
+     "competitors": [
+      {
+       "id": "4712356",
+       "order": 1,
+       "winner": false,
+       "athlete": {
+        "displayName": "Shoaib Yousaf",
+        "shortName": "S. Yousaf"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "5080723",
+       "order": 2,
+       "winner": true,
+       "athlete": {
+        "displayName": "John Mitchell",
+        "shortName": "J. Mitchell"
+       },
+       "type": "athlete"
+      }
+     ],
+     "type": {
+      "abbreviation": "Lightweight"
+     }
+    },
+    {
+     "id": "401934356",
+     "date": "2026-11-21T15:00Z",
+     "startDate": "2026-11-21T15:00Z",
+     "status": {
+      "type": {
+       "state": "post",
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "venue": {
+      "fullName": "ABHA Arena"
+     },
+     "competitors": [
+      {
+       "id": "5213352",
+       "order": 1,
+       "winner": true,
+       "athlete": {
+        "displayName": "Diyar Nurgozhay",
+        "shortName": "D. Nurgozhay"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "5220971",
+       "order": 2,
+       "winner": false,
+       "athlete": {
+        "displayName": "Alik Lorenz",
+        "shortName": "A. Lorenz"
+       },
+       "type": "athlete"
+      }
+     ],
+     "type": {
+      "abbreviation": "Light Heavyweight"
+     }
+    },
+    {
+     "id": "401934355",
+     "date": "2026-11-21T15:00Z",
+     "startDate": "2026-11-21T15:00Z",
+     "status": {
+      "type": {
+       "state": "post",
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "venue": {
+      "fullName": "ABHA Arena"
+     },
+     "competitors": [
+      {
+       "id": "3897242",
+       "order": 1,
+       "winner": false,
+       "linescores": [
+        {
+         "value": 79.0
+        }
+       ],
+       "athlete": {
+        "displayName": "Nikolas Motta",
+        "shortName": "N. Motta"
+       },
+       "type": "athlete"
+      },
+      {
+       "id": "5157806",
+       "order": 2,
+       "winner": true,
+       "linescores": [
+        {
+         "value": 89.0
+        }
+       ],
+       "athlete": {
+        "displayName": "Dom Mar Fan",
+        "shortName": "D. Mar Fan"
+       },
+       "type": "athlete"
+      }
+     ],
+     "type": {
+      "abbreviation": "Lightweight"
+     }
+    }
+   ]
+  }
+ ]
+}

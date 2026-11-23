@@ -1,0 +1,158 @@
+{
+ "events": [
+  {
+   "id": "401873077",
+   "date": "2026-11-23T01:20Z",
+   "name": "Minnesota Vikings at San Francisco 49ers",
+   "status": {
+    "type": {
+     "state": "in",
+     "shortDetail": "1:13 - 1st"
+    }
+   },
+   "competitions": [
+    {
+     "id": "401873077",
+     "date": "2026-11-23T01:20Z",
+     "startDate": "2026-11-23T01:20Z",
+     "status": {
+      "type": {
+       "state": "in",
+       "shortDetail": "1:13 - 1st",
+       "description": "In Progress"
+      }
+     },
+     "venue": {
+      "fullName": "Estadio Banorte"
+     },
+     "competitors": [
+      {
+       "id": "25",
+       "homeAway": "home",
+       "order": 0,
+       "score": "7",
+       "linescores": [
+        {
+         "value": 7.0
+        }
+       ],
+       "team": {
+        "id": "25",
+        "displayName": "San Francisco 49ers",
+        "shortDisplayName": "49ers"
+       },
+       "type": "team"
+      },
+      {
+       "id": "16",
+       "homeAway": "away",
+       "order": 1,
+       "score": "7",
+       "linescores": [
+        {
+         "value": 7.0
+        }
+       ],
+       "team": {
+        "id": "16",
+        "displayName": "Minnesota Vikings",
+        "shortDisplayName": "Vikings"
+       },
+       "type": "team"
+      }
+     ],
+     "type": {
+      "abbreviation": "STD"
+     }
+    }
+   ]
+  },
+  {
+   "id": "401873070",
+   "date": "2026-11-22T18:00Z",
+   "name": "Miami Dolphins at Buffalo Bills",
+   "status": {
+    "type": {
+     "state": "post",
+     "shortDetail": "Final"
+    }
+   },
+   "competitions": [
+    {
+     "id": "401873070",
+     "date": "2026-11-22T18:00Z",
+     "startDate": "2026-11-22T18:00Z",
+     "status": {
+      "type": {
+       "state": "post",
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "venue": {
+      "fullName": "Highmark Stadium"
+     },
+     "competitors": [
+      {
+       "id": "2",
+       "homeAway": "home",
+       "order": 0,
+       "winner": true,
+       "score": "26",
+       "linescores": [
+        {
+         "value": 6.0
+        },
+        {
+         "value": 14.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 6.0
+        }
+       ],
+       "team": {
+        "id": "2",
+        "displayName": "Buffalo Bills",
+        "shortDisplayName": "Bills"
+       },
+       "type": "team"
+      },
+      {
+       "id": "15",
+       "homeAway": "away",
+       "order": 1,
+       "winner": false,
+       "score": "9",
+       "linescores": [
+        {
+         "value": 0.0
+        },
+        {
+         "value": 6.0
+        },
+        {
+         "value": 3.0
+        },
+        {
+         "value": 0.0
+        }
+       ],
+       "team": {
+        "id": "15",
+        "displayName": "Miami Dolphins",
+        "shortDisplayName": "Dolphins"
+       },
+       "type": "team"
+      }
+     ],
+     "type": {
+      "abbreviation": "STD"
+     }
+    }
+   ]
+  }
+ ]
+}

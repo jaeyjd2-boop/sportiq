@@ -44,6 +44,7 @@ LEAGUE_CONFIG = {
     "NBA": ("basketball", "basketball/nba", "미국 프로농구 (NBA)"),
     "WNBA": ("basketball", "basketball/wnba", "미국 여자프로농구 (WNBA)"),
     "NHL": ("hockey", "hockey/nhl", "북미 아이스하키 (NHL)"),
+    "NFL": ("american_football", "football/nfl", "미국 프로풋볼 (NFL)"),
     "LCK": ("esports", None, "LCK (리그 오브 레전드)"),
     "VLEAGUE_M": ("volleyball", None, "도드람 V-리그 남자부"),
     "VLEAGUE_W": ("volleyball", None, "도드람 V-리그 여자부"),
@@ -182,6 +183,12 @@ def _parse_period_scores(sport, home_comp, away_comp):
                 hs = sum(int(h_ls[j].get("value", 0)) for j in range(s_idx, min(e_idx, len(h_ls))))
                 as_ = sum(int(a_ls[j].get("value", 0)) for j in range(s_idx, min(e_idx, len(a_ls))))
                 periods.append(f"{lbl} {hs}:{as_}")
+    elif sport == "american_football":
+        for i in range(max_len):
+            lbl = f"{i + 1}Q" if i < 4 else "OT"
+            hv = h_ls[i].get("value", 0) if i < len(h_ls) else 0
+            av = a_ls[i].get("value", 0) if i < len(a_ls) else 0
+            periods.append(f"{lbl} {int(hv)}:{int(av)}")
     elif sport == "hockey":
         for i in range(max_len):
             lbl = f"{i + 1}P" if i < 3 else "OT"
@@ -189,6 +196,181 @@ def _parse_period_scores(sport, home_comp, away_comp):
             av = a_ls[i].get("value", 0) if i < len(a_ls) else 0
             periods.append(f"{lbl} {int(hv)}:{int(av)}")
     return periods
+
+
+def _espn_competitor_name(c):
+    """Team, athlete or doubles-pair name; ESPN uses different shapes per sport."""
+    c = c or {}
+    team = c.get("team") or {}
+    ath = c.get("athlete") or {}
+    roster = c.get("roster") or {}
+    for v in (team.get("shortDisplayName"), team.get("displayName"),
+              ath.get("shortName"), ath.get("displayName"),
+              roster.get("shortDisplayName"), roster.get("displayName")):
+        if v:
+            return str(v)
+    athletes = roster.get("athletes") or c.get("athletes") or []
+    names = []
+    for x in athletes:
+        if isinstance(x, dict):
+            a = x.get("athlete") or x
+            n = a.get("shortName") or a.get("displayName")
+            if n:
+                names.append(str(n))
+    return " / ".join(names)
+
+
+def _espn_int(v):
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return None
+
+
+def _espn_state(status_obj):
+    st_type = (status_obj or {}).get("type") or {}
+    state = st_type.get("state", "pre")
+    if state not in ("in", "pre", "post"):
+        state = "pre"
+    badge = st_type.get("shortDetail") or st_type.get("description") or (
+        "진행중" if state == "in" else ("종료" if state == "post" else "예정"))
+    return state, badge
+
+
+def _espn_competitions(ev, sport):
+    """Return (competition, group label) pairs for one ESPN event.
+
+    Team sports: one competition per event. MMA: each bout is a competition.
+    Tennis: matches are nested under event.groupings[].competitions.
+    Racing: sessions (practice/qualifying/race); only the race, or the
+    latest session, is shown.
+    """
+    comps = [c for c in (ev.get("competitions") or []) if isinstance(c, dict)]
+    if sport == "tennis":
+        out = []
+        for g in ev.get("groupings") or []:
+            gname = ((g.get("grouping") or {}).get("displayName")) or ""
+            for c in g.get("competitions") or []:
+                if isinstance(c, dict):
+                    out.append((c, gname))
+        out.extend((c, "") for c in comps)
+        return out
+    if sport == "f1":
+        if not comps:
+            return []
+        race = [c for c in comps if str(((c.get("type") or {}).get("abbreviation")) or "").lower() == "race"]
+        return [(race[-1] if race else comps[-1], "")]
+    if sport == "ufc":
+        return [(c, "") for c in comps]
+    return [(comps[0], "")] if comps else []
+
+
+def _parse_espn_scoreboard_events(data, league_code, sport, league_full):
+    """Parse an ESPN site-API scoreboard payload; unknown shapes yield []."""
+    if not isinstance(data, dict):
+        return []
+    matches = []
+    for ev in data.get("events") or []:
+        if not isinstance(ev, dict):
+            continue
+        try:
+            pairs = _espn_competitions(ev, sport)
+        except Exception:
+            continue
+        for comp, group_label in pairs:
+            try:
+                item = _parse_espn_competition(ev, comp, group_label, league_code, sport, league_full)
+            except Exception:
+                item = None
+            if item:
+                matches.append(item)
+    return matches
+
+
+def _tennis_sets_won(me, opp):
+    won = 0
+    for a, b in zip(me.get("linescores") or [], opp.get("linescores") or []):
+        if a.get("winner") is True:
+            won += 1
+            continue
+        if a.get("winner") is False:
+            continue
+        av, bv = _espn_int(a.get("value")), _espn_int(b.get("value"))
+        if av is not None and bv is not None and av > bv and av >= 6:
+            won += 1
+    return won
+
+
+def _parse_espn_competition(ev, comp, group_label, league_code, sport, league_full):
+    comps = [c for c in (comp.get("competitors") or []) if isinstance(c, dict)]
+    if len(comps) < 2:
+        return None
+    state, badge = _espn_state(comp.get("status") or ev.get("status"))
+    dt_kst = _parse_iso_to_kst(comp.get("date") or comp.get("startDate") or ev.get("date"))
+    venue = ((comp.get("venue") or {}).get("fullName")) or ((ev.get("circuit") or {}).get("fullName")) or league_full
+    if sport == "f1":
+        ranked = sorted(comps, key=lambda c: _espn_int(c.get("order")) or 999)
+        home_c, away_c = ranked[0], ranked[1]
+        h_score = a_score = ""
+        period_scores = [] if state == "pre" else [
+            f"{i + 1}위 {_espn_competitor_name(c)}" for i, c in enumerate(ranked[:3])]
+        sess = ((comp.get("type") or {}).get("abbreviation")) or ""
+        badge = f"{sess} {badge}".strip() if sess else badge
+    else:
+        home_c = next((c for c in comps if c.get("homeAway") == "home"), None)
+        away_c = next((c for c in comps if c.get("homeAway") == "away"), None)
+        if home_c is None or away_c is None:
+            ordered = sorted(comps, key=lambda c: _espn_int(c.get("order")) or 999)
+            home_c, away_c = ordered[0], ordered[1]
+        if sport == "tennis":
+            h_score, a_score = _tennis_sets_won(home_c, away_c), _tennis_sets_won(away_c, home_c)
+            period_scores = []
+            for i, (a, b) in enumerate(zip(home_c.get("linescores") or [], away_c.get("linescores") or [])):
+                av, bv = _espn_int(a.get("value")), _espn_int(b.get("value"))
+                if av is not None and bv is not None:
+                    period_scores.append(f"{i + 1}세트 {av}-{bv}")
+        elif sport == "ufc":
+            # Bouts have no score: show the result instead of an invented number.
+            h_score = a_score = ""
+            period_scores = []
+            if home_c.get("winner") is True:
+                period_scores = [f"승: {_espn_competitor_name(home_c)}"]
+            elif away_c.get("winner") is True:
+                period_scores = [f"승: {_espn_competitor_name(away_c)}"]
+        else:
+            h_score = _espn_int(home_c.get("score"))
+            a_score = _espn_int(away_c.get("score"))
+            h_score = 0 if h_score is None else h_score
+            a_score = 0 if a_score is None else a_score
+            period_scores = _parse_period_scores(sport, home_c, away_c)
+    h_name = _espn_competitor_name(home_c)
+    a_name = _espn_competitor_name(away_c)
+    if not h_name or not a_name:
+        return None
+    raw_id = (comp.get("id") if sport in ("tennis", "ufc") else ev.get("id")) or comp.get("id") or ev.get("id")
+    if not raw_id:
+        return None
+    return {
+        "id": f"{league_code}-{raw_id}",
+        "espn_event_id": str(ev.get("id") or raw_id),
+        "sport": sport,
+        "league": league_code,
+        "league_code": league_code,
+        "league_full": f"{league_full} · {group_label}" if group_label else league_full,
+        "state": state,
+        "status_badge": badge,
+        "match_dt_kst": _fmt_short_kst(dt_kst),
+        "match_dt_full_kst": _fmt_kst(dt_kst),
+        "start_kst_iso": dt_kst.isoformat(),
+        "home": h_name,
+        "away": a_name,
+        "home_score": h_score,
+        "away_score": a_score,
+        "period_scores": period_scores,
+        "venue": venue,
+        "source": "ESPN",
+        "is_sample": False,
+    }
 
 
 def _fetch_espn_scoreboard(league_code, date_offset=0):
@@ -202,60 +384,63 @@ def _fetch_espn_scoreboard(league_code, date_offset=0):
     data = _fetch_json(url, timeout=5)
     if not data:
         return []
-    events = data.get("events") or []
-    matches = []
-    for ev in events:
-        try:
-            comp = (ev.get("competitions") or [{}])[0]
-            comps = comp.get("competitors") or []
-            home_c = next((c for c in comps if c.get("homeAway") == "home"), comps[0] if comps else {})
-            away_c = next((c for c in comps if c.get("homeAway") == "away"), comps[1] if len(comps) > 1 else {})
-            status_obj = comp.get("status") or ev.get("status") or {}
-            st_type = status_obj.get("type") or {}
-            state = st_type.get("state", "pre")
-            if state not in ("in", "pre", "post"):
-                state = "pre"
-            badge = st_type.get("shortDetail") or st_type.get("description") or ("진행중" if state == "in" else ("종료" if state == "post" else "예정"))
-            dt_kst = _parse_iso_to_kst(ev.get("date"))
-            h_name = (home_c.get("team") or {}).get("shortDisplayName") or (home_c.get("team") or {}).get("displayName") or "Home"
-            a_name = (away_c.get("team") or {}).get("shortDisplayName") or (away_c.get("team") or {}).get("displayName") or "Away"
-            if h_name == "Home":
-                h_name = (home_c.get("athlete") or {}).get("shortName") or (home_c.get("athlete") or {}).get("displayName") or "Home"
-            if a_name == "Away":
-                a_name = (away_c.get("athlete") or {}).get("shortName") or (away_c.get("athlete") or {}).get("displayName") or "Away"
-            try:
-                h_score = int(float(home_c.get("score", 0) or 0))
-            except Exception:
-                h_score = 0
-            try:
-                a_score = int(float(away_c.get("score", 0) or 0))
-            except Exception:
-                a_score = 0
-            venue = ((comp.get("venue") or {}).get("fullName")) or league_full
-            mid = str(ev.get("id") or f"{league_code}_{h_name}_{a_name}")
-            matches.append({
-                "id": mid,
-                "sport": sport,
-                "league": league_code,
-                "league_code": league_code,
-                "league_full": league_full,
-                "state": state,
-                "status_badge": badge,
-                "match_dt_kst": _fmt_short_kst(dt_kst),
-                "match_dt_full_kst": _fmt_kst(dt_kst),
-                "home": h_name,
-                "away": a_name,
-                "home_score": h_score,
-                "away_score": a_score,
-                "period_scores": _parse_period_scores(sport, home_c, away_c),
-                "venue": venue,
-                "ai": _calc_ai_probs(mid, sport, h_score, a_score, state),
-                "source": "ESPN",
-                "is_sample": False,
-            })
-        except Exception:
+    try:
+        return _parse_espn_scoreboard_events(data, league_code, sport, league_full)
+    except Exception:
+        return []
+
+
+# Sports the lounge's scoreboard collector (which replaces _collect_all_matches
+# at runtime) does not cover or cannot parse. get_live_scores adds them from
+# ESPN directly, so they survive the lounge override.
+_SUPPLEMENT_LEAGUES = ("NFL", "MLB", "UFC", "ATP", "WTA", "F1")
+
+
+def _supplement_espn_matches(matches, date_offset=0):
+    key = f"espn_supplement_{date_offset}"
+    extra = _cache_get(key, 45)
+    if extra is None:
+        extra = []
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            futs = [ex.submit(_fetch_espn_scoreboard, lg, date_offset) for lg in _SUPPLEMENT_LEAGUES]
+            for fut in as_completed(futs):
+                try:
+                    extra.extend(fut.result() or [])
+                except Exception:
+                    pass
+        _cache_set(key, extra)
+    # ESPN's default scoreboard for tennis/UFC/F1 is the latest *event*, which
+    # can be days old; keep only items around the requested KST day (or live).
+    center = (_now_kst() + timedelta(days=date_offset)).replace(hour=12, minute=0, second=0, microsecond=0)
+    extra = [m for m in extra if m.get("state") == "in" or _within_day_window(m.get("start_kst_iso"), center)]
+    seen = set()
+    for m in matches:
+        mid = str(m.get("id") or "")
+        seen.add(mid)
+        tail = mid.rsplit("-", 1)[-1]
+        if tail.isdigit():
+            seen.add(tail)
+        seen.add((m.get("sport"), str(m.get("home")), str(m.get("away"))))
+    out = list(matches)
+    for m in extra:
+        tail = str(m["id"]).rsplit("-", 1)[-1]
+        if m["id"] in seen or tail in seen or (m["sport"], m["home"], m["away"]) in seen:
             continue
-    return matches
+        seen.add(m["id"])
+        out.append(dict(m))
+    return out
+
+
+def _within_day_window(iso_str, center, hours=18):
+    try:
+        dt = datetime.fromisoformat(str(iso_str))
+    except (TypeError, ValueError):
+        return False
+    return abs((dt - center).total_seconds()) <= hours * 3600
+
+
+def _is_sample_match(m):
+    return m.get("is_sample") is True or str(m.get("source") or "").lower() == "sample"
 
 
 def _korean_schedule_matches(date_offset=0):
@@ -432,51 +617,37 @@ def get_live_scores(
     date_offset: int = Query(0),
 ):
     try:
-        matches = _collect_all_matches(date_offset)
-        counts = {
-            "all": len(matches),
-            "live": sum(1 for m in matches if m["state"] == "in"),
-            "soccer": sum(1 for m in matches if m["sport"] == "soccer"),
-            "baseball": sum(1 for m in matches if m["sport"] == "baseball"),
-            "basketball": sum(1 for m in matches if m["sport"] == "basketball"),
-            "hockey": sum(1 for m in matches if m["sport"] == "hockey"),
-            "esports": sum(1 for m in matches if m["sport"] == "esports"),
-            "volleyball": sum(1 for m in matches if m["sport"] == "volleyball"),
-            "ufc": sum(1 for m in matches if m["sport"] == "ufc"),
-            "tennis": sum(1 for m in matches if m["sport"] == "tennis"),
-            "f1": sum(1 for m in matches if m["sport"] == "f1"),
-        }
+        # Copy: the collected list is cached (and, in production, built by the
+        # lounge router's override of _collect_all_matches).
+        matches = [dict(m) for m in (_collect_all_matches(date_offset) or []) if isinstance(m, dict)]
+        matches = _supplement_espn_matches(matches, date_offset)
+        for m in matches:
+            # "ai" was a seeded random number (or a name hash), not a model or
+            # bookmaker figure, and drop_badge came from invented odds moves.
+            m.pop("ai", None)
+            m.pop("drop_badge", None)
+            m["is_sample"] = _is_sample_match(m)
+        counts = _live_score_counts(matches)
         filtered = matches
         if sport and sport.strip().lower() != "all":
             if sport == "live":
-                filtered = [m for m in filtered if m["state"] == "in"]
+                filtered = [m for m in filtered if m.get("state") == "in" and not m["is_sample"]]
             else:
-                filtered = [m for m in filtered if m["sport"] == sport]
+                filtered = [m for m in filtered if m.get("sport") == sport]
         if league and league.strip().lower() != "all":
-            filtered = [m for m in filtered if m["league"] == league.upper()]
-        odds_data = _build_dropping_odds(matches, sport="all", min_drop=5.0)
-        drop_map = {it["id"]: f"📉 {it['drop_pct']}%" for it in odds_data.get("items", []) if it.get("drop_pct", 0) <= -8.0}
-        for m in filtered:
-            if m.get("id") in drop_map:
-                m["drop_badge"] = drop_map[m["id"]]
-        odds_alerts = [
-            {
-                "id": f"oa_{it['id']}",
-                "ts_kst": it["detected_kst"].replace(" KST", ""),
-                "sport": it["sport"],
-                "league": it["league"],
-                "text": f"📉 [드롭오즈 경보] [{it['league']}] {it['home']} {it['target_pick'].replace(' 급락', '')} 배당 {it['open_odds']} → {it['curr_odds']} ({it['drop_pct']}% 급락!)",
-                "is_sample": True,
-            }
-            for it in odds_data.get("items", [])[:5]
-        ]
+            filtered = [m for m in filtered if str(m.get("league") or "") == league.upper()]
         return {
             "ok": True,
             "server_now_kst": _fmt_kst(_now_kst()),
             "counts": counts,
+            "counts_exclude_samples": True,
+            "sample_matches_count": sum(1 for m in matches if m["is_sample"]),
             "score_alerts": list(_SCORE_ALERTS[:15]),
-            "odds_alerts": odds_alerts,
+            # Dropping-odds alerts are invented examples; they stay on the
+            # sample-only /dropping-odds endpoint and are not mixed in here.
+            "odds_alerts": [],
             "odds_alerts_is_sample": True,
+            "ai_probs_removed": True,
             "matches": filtered,
         }
     except Exception as e:
@@ -484,10 +655,24 @@ def get_live_scores(
             "ok": False,
             "error": str(e),
             "server_now_kst": _fmt_kst(_now_kst()),
-            "counts": {"all": 0, "live": 0, "soccer": 0, "baseball": 0, "basketball": 0, "hockey": 0, "esports": 0},
+            "counts": _live_score_counts([]),
             "score_alerts": [],
+            "odds_alerts": [],
             "matches": [],
         }
+
+
+_COUNT_SPORTS = ("soccer", "baseball", "basketball", "hockey", "american_football", "esports",
+                 "volleyball", "ufc", "tennis", "f1")
+
+
+def _live_score_counts(matches):
+    """Per-sport counts of real (non-sample) matches only."""
+    real = [m for m in matches if not _is_sample_match(m)]
+    counts = {"all": len(real), "live": sum(1 for m in real if m.get("state") == "in")}
+    for sp in _COUNT_SPORTS:
+        counts[sp] = sum(1 for m in real if m.get("sport") == sp)
+    return counts
 
 def _build_dropping_odds(matches, sport="all", min_drop=5.0):
     items = []
