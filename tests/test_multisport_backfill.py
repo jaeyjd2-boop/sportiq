@@ -29,8 +29,13 @@ def sched_event(eid, when, home, away, hs, as_, state="post", name="STATUS_FINAL
         ]}]}
 
 
-def team_schedule(team_id):
-    # Six finished meetings of teams 1 and 2 plus one future game.
+def team_schedule(team_id, season=None):
+    if season:
+        # Previous season: eight older meetings of teams 1 and 2.
+        evs = [sched_event(800 + i, (NOW - timedelta(days=400 - 10 * i)).strftime("%Y-%m-%dT%H:%MZ"),
+                           "2" if i % 2 else "1", "1" if i % 2 else "2", 90 + i, 95) for i in range(8)]
+        return {"events": evs}
+    # Current season: six finished meetings of teams 1 and 2 plus one future game.
     evs = [sched_event(900 + i, (NOW - timedelta(days=60 - 7 * i)).strftime("%Y-%m-%dT%H:%MZ"),
                        "1" if i % 2 else "2", "2" if i % 2 else "1", 100 + i, 98) for i in range(6)]
     evs.append(sched_event(999, (NOW + timedelta(days=3)).strftime("%Y-%m-%dT%H:%MZ"), "1", "2", 0, 0, "pre", "STATUS_SCHEDULED"))
@@ -51,7 +56,10 @@ class FakeEspn:
         if rest == "teams":
             return httpx.Response(200, json={"sports": [{"leagues": [{"teams": [{"team": {"id": t}} for t in TEAMS]}]}]})
         if rest.startswith("teams/") and rest.endswith("/schedule"):
-            return httpx.Response(200, json=team_schedule(rest.split("/")[1]))
+            season = dict(request.url.params).get("season")
+            if lg.key == "MLB" and season == "2026":
+                season = None          # MLB's "current" (just finished) season in the fake
+            return httpx.Response(200, json=team_schedule(rest.split("/")[1], season))
         return httpx.Response(200, json=load(FIXTURE_FOR[lg.key]))
 
 
@@ -87,8 +95,9 @@ class BackfillTests(unittest.TestCase):
                 break
         self.assertTrue(all(n <= 25 for n in runs), runs)
         self.assertGreater(len(runs), 1)
-        # 5 date leagues x 29 days (2..30 days ago) + 3 event ranges + 4 team lists + 4 x 2 team schedules
-        self.assertEqual(sum(runs), 5 * 29 + 3 + 4 + 8)
+        # 5 date leagues x 29 days (2..30 days ago) + 3 event ranges + 4 team lists
+        # + 4 leagues x 2 teams x 2 seasons (current, previous)
+        self.assertEqual(sum(runs), 5 * 29 + 3 + 4 + 16)
         self.assertTrue(self.statuses() <= set(bf.FINISHED))     # finished matches only
 
         # Done tasks are never fetched again (e.g. after a redeploy).
@@ -106,10 +115,20 @@ class BackfillTests(unittest.TestCase):
         for _ in range(20):
             if self.run_bf(fake)["progress"]["tasks_left"] == 0:
                 break
-        mlb = [p for path, p in fake.requests if path.startswith("baseball/mlb/teams/") and path.endswith("/schedule")]
-        nfl = [p for path, p in fake.requests if path.startswith("football/nfl/teams/") and path.endswith("/schedule")]
-        self.assertTrue(mlb and all(p.get("season") == "2026" for p in mlb))
-        self.assertTrue(nfl and all("season" not in p for p in nfl))
+        def seasons(prefix):
+            return sorted(p.get("season") or "default" for path, p in fake.requests
+                          if path.startswith(prefix) and path.endswith("/schedule"))
+        # Labels are start years (2026 = current); ESPN wants end years for NBA/NHL.
+        self.assertEqual(seasons("baseball/mlb/teams/"), ["2025", "2025", "2026", "2026"])
+        self.assertEqual(seasons("football/nfl/teams/"), ["2025", "2025", "default", "default"])
+        self.assertEqual(seasons("basketball/nba/teams/"), ["2026", "2026", "default", "default"])
+        self.assertEqual(seasons("hockey/nhl/teams/"), ["2026", "2026", "default", "default"])
+
+    def test_season_param_format(self):
+        self.assertEqual(bf.espn_season_param("NBA", "2025"), "2026")
+        self.assertEqual(bf.espn_season_param("NHL", "2026"), "2027")
+        self.assertEqual(bf.espn_season_param("NFL", "2025"), "2025")
+        self.assertEqual(bf.espn_season_param("MLB", "2025"), "2025")
 
     def test_failed_request_is_retried_later(self):
         fake = FakeEspn(fail={"NBA"})
@@ -139,7 +158,12 @@ class BackfillTests(unittest.TestCase):
         self.assertEqual(an["match"]["sport"], "basketball")
         self.assertEqual(len(an["home"]["recent"]), 5)
         self.assertEqual(len(an["away"]["recent"]), 5)
-        self.assertEqual(len(an["head_to_head"]), 6)
+        # 6 meetings this season + 8 last season = 14; the existing cap keeps the 10 newest.
+        h2h = an["head_to_head"]
+        self.assertEqual(len(h2h), 10)
+        dates = [str(x["start_time"])[:10] for x in h2h]
+        self.assertEqual(dates, sorted(dates, reverse=True))
+        self.assertTrue(any(d < (NOW - timedelta(days=300)).date().isoformat() for d in dates))  # last season included
         self.assertEqual(an["home"]["form"]["played"], 5)
 
     def test_football_analysis_unchanged(self):
