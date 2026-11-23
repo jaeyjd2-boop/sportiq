@@ -19748,7 +19748,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46600_{int(time.time())}"
+_BOOT_VER_V30 = f"46610_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -34317,6 +34317,10 @@ def _hydrate_auto_shorts_for_actor_v4655(actor_key: str = "", nickname: str = ""
             "thumb_url": it.get("thumb_url", ""),
             "time_badge": it.get("time_badge", ""),
             "sort_ts": float(it.get("sort_ts") or 0),
+            "feed_rank": int(it.get("feed_rank", 9999)) if it.get("feed_rank") is not None else 9999,
+            "match_meta": it.get("match_meta"),
+            "key_stats": list(it.get("key_stats") or []),
+            "storyboard": list(it.get("storyboard") or []),
             "likes": max(0, int(it.get("base_likes") or 50) + lk_delta),
             "votes_a": max(1, int(it.get("base_votes_a") or 40) + va_delta),
             "votes_b": max(1, int(it.get("base_votes_b") or 30) + vb_delta),
@@ -34332,7 +34336,7 @@ def _hydrate_auto_shorts_for_actor_v4655(actor_key: str = "", nickname: str = ""
 
     return {
         "ok": True,
-        "version": "v4.6.55",
+        "version": "v4.6.61",
         "autoplay_default": True,
         "cycle_minutes": 30,
         "updated_at_kst": snap.get("updated_at_kst") or datetime.now(KST).strftime("%m.%d %H:%M KST"),
@@ -34591,6 +34595,7 @@ _V4655_NEW_PATHS = {
     "/api/member/live-sources-diag-v4658",
     "/api/member/live-sources-diag-v4659",
     "/api/member/live-sources-diag-v4660",
+    "/api/member/live-sources-diag-v4661",
     "/api/member/feed-kickoff-index-v4657",
 }
 router.routes = [rt for rt in router.routes if getattr(rt, "path", "") not in _V4655_NEW_PATHS]
@@ -34774,11 +34779,12 @@ async def _async_api_feed_kickoff_index_v4657():
 @router.get("/api/member/live-sources-diag-v4658")
 @router.get("/api/member/live-sources-diag-v4659")
 @router.get("/api/member/live-sources-diag-v4660")
+@router.get("/api/member/live-sources-diag-v4661")
 async def _async_api_live_sources_diag_v4655(date_offset: int = 0):
     loop = _asyncio_v4652.get_running_loop()
     res = await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, api_live_sources_diag_v4648, date_offset)
     if isinstance(res, dict):
-        res["version"] = "v4.6.60"
+        res["version"] = "v4.6.61"
         res["shorts_broadcast_3cut_v4660"] = True
         res["clean_daily_labels_v4659"] = True
         res["best_top3_kickoff_v4658"] = True
