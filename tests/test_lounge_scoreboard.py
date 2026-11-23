@@ -84,5 +84,38 @@ class FrontEndSourceTests(unittest.TestCase):
             self.assertIn(marker, SRC, marker)
 
 
+
+class NoInventedBettingNumbersTests(unittest.TestCase):
+    def test_value_odds_has_no_kelly_or_value_numbers(self):
+        from app import sportiq_autonomous_sec as au
+        res = au.get_value_odds()
+        self.assertEqual(res["items"], [])
+        self.assertFalse(res["data_available"])
+        self.assertIn("켈리", res["notice"])
+
+    def test_ask_ai_does_not_quote_hash_odds(self):
+        from app import sportiq_autonomous_sec as au
+        fake = [{"matchup": "Arsenal vs Chelsea", "league": "EPL", "schedule_venue": "11.23", "ai_prob_pct": 61.2,
+                 "no_vig_prob_pct": 50.0, "edge_pct": 11.2, "current_odds": 1.9, "drop_pct": 3.0,
+                 "kelly_pct": 7.5, "is_value_bet": True}]
+        with patch.object(au, "_compute_value_odds_list", return_value=fake), \
+                patch.object(au, "_init_autonomous_db"):
+            for q in ("arsenal 분석", "오늘 밸류 픽 추천"):
+                ans = au.ask_sportiq_scoby(au.AskAIRequest(question=q))["answer"]
+                self.assertNotIn("7.5", ans)
+                self.assertNotIn("61.2", ans)
+                self.assertIn("표시하지 않습니다", ans)
+
+    def test_match_detail_hides_example_ai(self):
+        self.assertIn("var aiRealV51 = (ai.is_sample === false);", SRC)
+        self.assertIn('(aiRealV51 ? [', SRC)
+        self.assertIn("if (aiRealV51) {\n              compRowsHtml += buildMetricBarRowV4650(", SRC)
+        self.assertIn("예시 전술 그림입니다", SRC)
+        self.assertIn("주도권 비교·예상 득점치를 표시하지 않습니다", SRC)
+        self.assertIn('" 매치업" + (aiRealV51 ? (" · AI 예측 "', SRC)
+        html = (Path(lr.__file__).parent / "sportiq_community.html").read_text(encoding="utf-8")
+        self.assertIn("escHtml(valueOddsNotice||", html)
+
+
 if __name__ == "__main__":
     unittest.main()

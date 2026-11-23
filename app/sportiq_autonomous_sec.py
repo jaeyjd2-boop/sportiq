@@ -812,17 +812,26 @@ def _compute_value_odds_list() -> List[Dict[str, Any]]:
     return results
 
 
+VALUE_ODDS_UNAVAILABLE_NOTE = (
+    "실제 배당·AI 모델 데이터가 연동되지 않아 배당·밸류·켈리(권장 베팅 비중) 수치를 표시하지 않습니다."
+)
+
+
 @router.get("/value-odds")
 def get_value_odds() -> Dict[str, Any]:
-    items = _compute_value_odds_list()
-    value_bets = [x for x in items if x["is_value_bet"]]
-    sharp_drops = [x for x in items if x["is_sharp_drop"]]
+    # _stable_match_metrics derives odds, "AI" probability, edge and Kelly stake
+    # from a hash of the match key; none of it is market or model data. A
+    # stake recommendation must not be shown from invented numbers, so the
+    # list is empty until a real odds/model source exists.
     return {
-        "total": len(items),
-        "value_bet_count": len(value_bets),
-        "sharp_drop_count": len(sharp_drops),
+        "total": 0,
+        "value_bet_count": 0,
+        "sharp_drop_count": 0,
         "updated_at_kst": _now_kst_str(),
-        "items": items,
+        "items": [],
+        "data_available": False,
+        "is_sample": True,
+        "notice": VALUE_ODDS_UNAVAILABLE_NOTE,
     }
 
 
@@ -861,22 +870,14 @@ def ask_sportiq_scoby(payload: AskAIRequest) -> Dict[str, Any]:
 
     if matched_team:
         t = matched_team[0]
+        # Odds/AI/Kelly figures in value_items are hash-generated examples; do not quote them.
         answer = (
-            f"[SportIQ AI 스코비] 요청하신 '{t['matchup']}' ({t['league']} · {t['schedule_venue']}) 분석입니다. "
-            f"AI 모델 승률은 {t['ai_prob_pct']}%, 시장 공정 확률(No-Vig)은 {t['no_vig_prob_pct']}%로 "
-            f"밸류 엣지 {t['edge_pct']:+.2f}%p, 현재 배당 {t['current_odds']} (오픈 대비 변동 {t['drop_pct']:+.2f}%), "
-            f"권장 켈리 비중은 {t['kelly_pct']}%입니다."
+            f"[SportIQ AI 스코비] '{t['matchup']}' ({t['league']} · {t['schedule_venue']}) 경기입니다. "
+            + VALUE_ODDS_UNAVAILABLE_NOTE
         )
         intent = "team_lookup"
     elif any(k in q_low for k in ("밸류", "픽", "추천", "배당", "켈리", "고확신")):
-        top_picks = sorted([x for x in value_items if x["is_value_bet"]], key=lambda x: x["edge_pct"], reverse=True)[:3]
-        if not top_picks:
-            top_picks = sorted(value_items, key=lambda x: x["edge_pct"], reverse=True)[:3]
-        lines = [
-            f"• {p['matchup']} ({p['league']}) — AI {p['ai_prob_pct']}% vs 시장 {p['no_vig_prob_pct']}% (엣지 {p['edge_pct']:+.2f}%p, 켈리 {p['kelly_pct']}%)"
-            for p in top_picks
-        ]
-        answer = "[SportIQ AI 스코비] 현재 +5%p 기준 고확신 밸류 픽 TOP 3입니다:\n" + ("\n".join(lines) if lines else "현재 대기 중인 경기가 없습니다.")
+        answer = "[SportIQ AI 스코비] " + VALUE_ODDS_UNAVAILABLE_NOTE
         intent = "value_picks"
     elif any(k in q_low for k in ("적중", "성적", "수익", "성적표", "스코어카드")):
         answer = (

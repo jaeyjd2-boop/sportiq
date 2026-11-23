@@ -13877,6 +13877,10 @@ _FRONTEND_V22_JS = r'''
     var mktA = invSum > 0 && oa > 0 ? Math.round(((1 / oa) / invSum) * 1000) / 10 : ap;
     var edgeH = Math.round((hp - mktH) * 10) / 10;
     var edgeA = Math.round((ap - mktA) * 10) / 10;
+    // Only bookmaker-odds-based numbers are real; name-hash values and the
+    // 45%/94-p defaults above are examples and must not look like data.
+    var aiRealV51 = (ai.is_sample === false);
+    var aiNoticeV51 = "<div style='background:rgba(148,163,184,.08);border:1px dashed rgba(148,163,184,.4);border-radius:9px;padding:8px 10px;font-size:11.4px;color:#cbd5e1;margin-bottom:8px;'>ℹ️ 이 경기는 실제 배당·AI 모델 데이터가 연동되지 않아 AI 승률·배당 비교를 표시하지 않습니다.</div>";
     var verdict = evaluateAiVerdictV30(it);
     var tacMeta = getSportTacticalViewV33(it, hp, ap);
 
@@ -13945,6 +13949,7 @@ _FRONTEND_V22_JS = r'''
           ? (uxEsc(it.home) + " 측 AI 확률(" + hp + "%)이 배당 내재확률(" + mktH + "%) 대비 <strong style='color:" + (edgeH >= 0 ? "#34d399" : "#fbbf24") + ";'>" + (edgeH >= 0 ? "+" : "") + edgeH + "%p</strong> 차이를 보입니다.")
           : (uxEsc(it.away) + " 측 AI 확률(" + ap + "%)이 배당 내재확률(" + mktA + "%) 대비 <strong style='color:" + (edgeA >= 0 ? "#34d399" : "#fbbf24") + ";'>" + (edgeA >= 0 ? "+" : "") + edgeA + "%p</strong> 차이를 보입니다.");
         box.innerHTML = [
+          (aiRealV51 ? [
           "<div style='display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:5px;'>" +
           "  <span style='font-weight:800;color:#6ee7b7;font-size:11.8px;'>🤖 AI 승률 vs 시장 배당 비교</span>" +
           "  <span style='font-size:10.8px;color:#cbd5e1;'>배당 " + uxEsc(odds.home || "-") + (dp > 0 ? " / " + uxEsc(odds.draw || "-") : "") + " / " + uxEsc(odds.away || "-") + "</span>" +
@@ -13959,7 +13964,8 @@ _FRONTEND_V22_JS = r'''
           (dp > 0 ? "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:6px 5px;min-width:0;'><div style='color:#94a3b8;font-size:10.5px;'>⚖️ 무승부</div><strong style='color:#cbd5e1;font-size:13.5px;'>AI " + dp + "%</strong><div style='color:#64748b;font-size:10px;'>시장 " + mktD + "%</div></div>" : ""),
           "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:6px 5px;min-width:0;'><div style='color:#94a3b8;font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>✈️ " + uxEsc(it.away) + "</div><strong style='color:#38bdf8;font-size:13.5px;'>AI " + ap + "%</strong><div style='color:#64748b;font-size:10px;'>시장 " + mktA + "%</div></div>",
           "</div>",
-          "<div style='background:rgba(16,185,129,.08);border:1px solid rgba(52,211,153,.28);border-radius:9px;padding:7px 10px;font-size:11.4px;color:#e2e8f0;margin-bottom:8px;word-break:keep-all;'>💡 " + edgeNote + "</div>",
+          "<div style='background:rgba(16,185,129,.08);border:1px solid rgba(52,211,153,.28);border-radius:9px;padding:7px 10px;font-size:11.4px;color:#e2e8f0;margin-bottom:8px;word-break:keep-all;'>💡 " + edgeNote + "</div>"
+          ].join("") : aiNoticeV51),
           "<div id='sqMatchFanVoteCardV32' style='background:linear-gradient(145deg,rgba(15,23,42,.96),rgba(2,6,23,.96));border:1px solid rgba(56,189,248,.38);border-radius:11px;padding:10px 12px;'>",
           "  <div style='display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;'>",
           "    <div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;'>",
@@ -13982,9 +13988,9 @@ _FRONTEND_V22_JS = r'''
           if (!grid || !gWrap) return;
 
           var myP = String((vd && vd.my_pick) || "");
-          var fHp = vd ? Number(vd.home_pct || 0) : hp;
-          var fDp = (vd && hasDrawVote) ? Number(vd.draw_pct || 0) : (hasDrawVote ? dp : 0);
-          var fAp = vd ? Number(vd.away_pct || 0) : ap;
+          var fHp = vd ? Number(vd.home_pct || 0) : (aiRealV51 ? hp : 0);
+          var fDp = (vd && hasDrawVote) ? Number(vd.draw_pct || 0) : ((hasDrawVote && aiRealV51) ? dp : 0);
+          var fAp = vd ? Number(vd.away_pct || 0) : (aiRealV51 ? ap : 0);
           var hv = vd ? Number(vd.home_votes || 0) : 0;
           var dv = (vd && hasDrawVote) ? Number(vd.draw_votes || 0) : 0;
           var av = vd ? Number(vd.away_votes || 0) : 0;
@@ -14029,7 +14035,9 @@ _FRONTEND_V22_JS = r'''
           grid.innerHTML = btns.join("");
 
           var diffHome = fHp - hp;
-          var sentimentTxt = Math.abs(diffHome) <= 3
+          var sentimentTxt = !aiRealV51
+            ? "AI 예측 데이터가 연동되지 않아 팬 투표 결과만 표시합니다."
+            : Math.abs(diffHome) <= 3
             ? "AI 예측(" + hp + "%)과 팬 투표 여론(" + fHp + "%)이 거의 일치합니다."
             : (diffHome > 0
                 ? (uxEsc(it.home) + " 쪽으로 팬 여론(" + fHp + "%)이 AI(" + hp + "%)보다 <strong style='color:#34d399;'>+" + diffHome + "%p</strong> 높게 쏠려 있습니다.")
@@ -14041,7 +14049,7 @@ _FRONTEND_V22_JS = r'''
             (hasDrawVote ? "  <div style='width:" + fDp + "%;background:#64748b;transition:width .25s ease;'></div>" : ""),
             "  <div style='width:" + fAp + "%;background:#38bdf8;transition:width .25s ease;'></div>",
             "</div>",
-            "<div style='font-size:11px;color:#94a3b8;'>📊 <strong>AI vs 팬 민심:</strong> " + sentimentTxt + "</div>"
+            "<div style='font-size:11px;color:#94a3b8;'>📊 <strong>" + (aiRealV51 ? "AI vs 팬 민심:" : "팬 민심:") + "</strong> " + sentimentTxt + "</div>"
           ].join("");
 
           grid.querySelectorAll("[data-sq-v32-pick]").forEach(function (vb) {
@@ -14123,6 +14131,7 @@ _FRONTEND_V22_JS = r'''
           "  <div style='color:#94a3b8;font-size:11px;'>전·후반 / 쿼터 / 이닝 / 세트 / 라운드 기록</div>",
           "  <div style='color:#f8fafc;font-weight:700;margin-top:2px;'>" + uxEsc(it.period_scores || "킥오프·경기 시작 이후 실시간 세부 스코어가 자동 집계됩니다.") + "</div>",
           "</div>",
+          (!aiRealV51 ? "<div style='font-size:11.4px;color:#cbd5e1;'>ℹ️ 실제 AI 모델 데이터가 연동되지 않아 주도권 비교·예상 득점치를 표시하지 않습니다.</div>" : [
           "<div style='margin-bottom:8px;'>",
           "  <div style='display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;'><span>" + uxEsc(it.home) + " " + domH + "%</span><span style='color:#94a3b8;'>" + tacMeta.statLabel + "</span><span>" + domA + "% " + uxEsc(it.away) + "</span></div>",
           "  <div style='display:flex;height:8px;border-radius:999px;overflow:hidden;background:#1e293b;'><div style='width:" + domH + "%;background:#10b981;'></div><div style='width:" + domA + "%;background:#38bdf8;'></div></div>",
@@ -14131,6 +14140,7 @@ _FRONTEND_V22_JS = r'''
           "  <div style='display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;'><span style='font-weight:800;color:#6ee7b7;'>" + tacMeta.expHome + "</span><span style='color:#94a3b8;'>" + tacMeta.expTitle + "</span><span style='font-weight:800;color:#7dd3fc;'>" + tacMeta.expAway + "</span></div>",
           "  <div style='display:flex;height:8px;border-radius:999px;overflow:hidden;background:#1e293b;'><div style='width:" + Math.round((hp / Math.max(1, hp + ap)) * 100) + "%;background:#34d399;'></div><div style='flex:1;background:#60a5fa;'></div></div>",
           "</div>"
+          ].join(""))
         ].join("");
       } else if (tabKey === "h2h") {
         box.innerHTML = "<div style='color:#94a3b8;'>⚔️ 양 팀 실시간 리그 순위·맞대결 흐름 및 핵심 비교 지표를 조회 중입니다...</div>";
@@ -14347,7 +14357,7 @@ _FRONTEND_V22_JS = r'''
                 }
               } else {
                 var favSide = hp >= ap ? (it.home + " " + hp + "%") : (it.away + " " + ap + "%");
-                momHeadline = (it.league_full || it.league || "공식 대회") + " 매치업 · AI 예측 " + favSide + " 우위 흐름";
+                momHeadline = (it.league_full || it.league || "공식 대회") + " 매치업" + (aiRealV51 ? (" · AI 예측 " + favSide + " 우위 흐름") : "");
               }
               if (h2hExtra.home_last) momLines.push("📌 " + it.home + " 최근 결과: " + h2hExtra.home_last);
               if (h2hExtra.away_last) momLines.push("📌 " + it.away + " 최근 결과: " + h2hExtra.away_last);
@@ -14460,15 +14470,19 @@ _FRONTEND_V22_JS = r'''
               }
             }
 
-            compRowsHtml += buildMetricBarRowV4650(
-              "AI 승률 · 공정배당",
-              hp + "% (배당 " + oddH + ")",
-              ap + "% (배당 " + oddA + ")",
-              hp,
-              ap
-            );
+            if (aiRealV51) {
+              compRowsHtml += buildMetricBarRowV4650(
+                "AI 승률 · 공정배당",
+                hp + "% (배당 " + oddH + ")",
+                ap + "% (배당 " + oddA + ")",
+                hp,
+                ap
+              );
+            }
 
-            var summaryEdgeLine = isSoccer
+            var summaryEdgeLine = !aiRealV51
+              ? "종합 요약: 위 순위·득실 지표만 비교합니다(실제 배당·AI 모델 데이터 미연동)."
+              : isSoccer
               ? ("종합 요약: 홈승 " + hp + "% · 무승부 " + dp + "% (배당 " + oddD + ") · 원정승 " + ap + "% — " + (Math.abs(hp - ap) <= 6 ? "백중세 접전 구도" : ((hp > ap ? it.home : it.away) + " 전력 우세 구도")))
               : ("종합 요약: " + it.home + " " + hp + "% vs " + it.away + " " + ap + "% — " + ((hp >= ap ? it.home : it.away) + " 매치업 우세 구도"));
 
@@ -14511,16 +14525,17 @@ _FRONTEND_V22_JS = r'''
               "<div style='font-weight:800;color:#fca5a5;margin-bottom:4px;'>🏥 양 팀 주요 결장 · 로스터 체크</div>" + injHtml
             );
           } catch (_errH2h) {
-            box.innerHTML = "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:10px 12px;color:#e2e8f0;'><strong>" + uxEsc(it.home) + " vs " + uxEsc(it.away) + "</strong> · AI 예측 " + hp + "% : " + (dp ? (dp + "% : ") : "") + ap + "%</div>";
+            box.innerHTML = "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:10px 12px;color:#e2e8f0;'><strong>" + uxEsc(it.home) + " vs " + uxEsc(it.away) + "</strong>" + (aiRealV51 ? (" · AI 예측 " + hp + "% : " + (dp ? (dp + "% : ") : "") + ap + "%") : "") + "</div>";
           }
         });
       } else if (tabKey === "lineup") {
         box.innerHTML = [
+          "<div style='font-size:11px;color:#fbbf24;margin-bottom:6px;'>⚠️ 예시 전술 그림입니다(실제 라인업·포메이션 데이터가 아님).</div>",
           "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;'>",
           "  <span style='font-weight:800;color:#6ee7b7;'>" + tacMeta.hdrTitle + "</span>",
           "  <span style='font-size:11px;color:#94a3b8;'>" + tacMeta.hdrSub + "</span>",
           "</div>",
-          tacMeta.svgHtml,
+          (aiRealV51 ? tacMeta.svgHtml : String(tacMeta.svgHtml || "").replace(/AI 우세율 \d+% · /g, "")),
           "<div style='font-size:11.5px;color:#cbd5e1;margin-top:8px;'>" + tacMeta.footNote + "</div>"
         ].join("");
       } else if (tabKey === "talk") {
@@ -32320,6 +32335,11 @@ def _parse_espn_summary_h2h_v4650(
             if not isinstance(ent, dict):
                 continue
             tm_o = ent.get("team") or {}
+            if isinstance(tm_o, str):
+                # ESPN summary standings sometimes give the team as a plain name string.
+                tm_o = {"displayName": tm_o}
+            elif not isinstance(tm_o, dict):
+                continue
             tm_nm = _localize_team_ko_v37(str(tm_o.get("shortDisplayName") or tm_o.get("displayName") or tm_o.get("name") or ""), sp)
             smap = {str(s.get("name") or s.get("abbreviation") or ""): s.get("value", s.get("displayValue", 0)) for s in (ent.get("stats") or []) if isinstance(s, dict)}
             try:
