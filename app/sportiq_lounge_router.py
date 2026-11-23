@@ -226,7 +226,7 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
           ? "<span style='background:#dc2626;color:#fff;padding:1px 6px;border-radius:5px;font-size:10.5px;font-weight:800;'>LIVE " + esc(it.home_score + ":" + it.away_score) + "</span>"
           : (!isPre
               ? "<span style='background:#334155;color:#e2e8f0;padding:1px 6px;border-radius:5px;font-size:10.5px;font-weight:800;'>" + esc(it.home_score + ":" + it.away_score) + " 종료</span>"
-              : "<span style='color:#6ee7b7;font-size:11px;font-weight:800;'>AI " + esc(aiO.home_pct || 50) + "%:" + esc(aiO.away_pct || 50) + "%</span> <span style='color:#94a3b8;font-size:10.5px;'>(배당 " + esc(oddsO.home || "-") + "/" + esc(oddsO.away || "-") + ")</span>");
+              : "<span style='color:#6ee7b7;font-size:11px;font-weight:800;'>" + (aiO.is_sample !== false ? "AI 예시 " : "AI ") + esc(aiO.home_pct || 50) + "%:" + esc(aiO.away_pct || 50) + "%</span> <span style='color:#94a3b8;font-size:10.5px;'>(배당 " + esc(oddsO.home || "-") + "/" + esc(oddsO.away || "-") + ")</span>");
         return (
           "<div" + hideExtraQa + "justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;background:rgba(2,6,23,.65);border:1px solid rgba(51,65,85,.75);border-radius:9px;flex-wrap:wrap;'>" +
           "  <div style='display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0;'>" +
@@ -5222,6 +5222,7 @@ _FRONTEND_V22_JS = r'''
     if (s === "basketball" || s === "nba" || s === "wnba" || /\b(NBA|WNBA|KBL|WKBL)\b/.test(u)) return "basketball";
     if (s === "baseball" || s === "mlb" || s === "kbo" || s === "npb" || /\b(KBO|MLB|NPB|ABL)\b/.test(u)) return "baseball";
     if (s === "hockey" || s === "nhl" || /\bNHL\b|하키/.test(u)) return "hockey";
+    if (s === "american_football" || s === "nfl" || /\bNFL\b/.test(u)) return "american_football";
     if (s === "soccer" || s === "football") return "soccer";
     return "soccer";
   }
@@ -6374,7 +6375,7 @@ _FRONTEND_V22_JS = r'''
 
           var countBase = mergedPool.length > 0 ? mergedPool : curItems;
           var cObj = (dcJson.counts && typeof dcJson.counts === "object") ? dcJson.counts : {};
-          var sportKeys9 = ["soccer", "baseball", "basketball", "volleyball", "hockey", "esports", "ufc", "tennis", "f1"];
+          var sportKeys9 = ["soccer", "baseball", "basketball", "volleyball", "hockey", "esports", "ufc", "tennis", "f1", "american_football"];
           sportKeys9.forEach(function (k) { cObj[k] = 0; });
           var liveTotal = 0;
           countBase.forEach(function (it) {
@@ -7026,7 +7027,9 @@ _FRONTEND_V22_JS = r'''
         home_pct: Math.round(hp),
         draw_pct: Math.round(dp),
         away_pct: Math.round(ap),
-        odds: { home: String(oh), draw: od ? String(od) : "", away: String(oa) }
+        odds: { home: String(oh), draw: od ? String(od) : "", away: String(oa) },
+        // Only bookmaker-odds numbers are real; name-hash values and the defaults above are examples.
+        is_sample: !(rawAi.basis === "bookmaker_odds" && rawAi.is_sample === false)
       }
     };
   }
@@ -7142,8 +7145,9 @@ _FRONTEND_V22_JS = r'''
           : (isPre ? (it.status_badge || "예정") : (isPostPendingScore ? (it.status_badge || "종료·집계중") : "종료"));
         var ai = it.ai || {};
         var odds = ai.odds || {};
-        var probTxt = ai.draw_pct ? ("AI " + ai.home_pct + ":" + ai.draw_pct + ":" + ai.away_pct + "%") : ("AI " + ai.home_pct + ":" + ai.away_pct + "%");
-        var oddsTxt = odds.home ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
+        var aiReal = !ai.is_sample && ai.home_pct != null;
+        var probTxt = !aiReal ? "" : (ai.draw_pct ? ("AI " + ai.home_pct + ":" + ai.draw_pct + ":" + ai.away_pct + "%") : ("AI " + ai.home_pct + ":" + ai.away_pct + "%"));
+        var oddsTxt = (aiReal && odds.home) ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
         var fk = matchFavKeyV30(it);
         var isFav = Boolean(v30ScoreState.favMap[fk]);
         var hLead = !isPre && !isPostPendingScore && !isLiveUnscoredFallback && !isNaN(hsNum) && !isNaN(asNum) && hsNum > asNum;
@@ -7831,6 +7835,7 @@ _FRONTEND_V22_JS = r'''
     var as = Number(it.away_score);
     if (isNaN(hs) || isNaN(as)) return null;
     var ai = it.ai || {};
+    if (ai.is_sample || ai.home_pct == null) return null;
     var hp = Number(ai.home_pct || 50);
     var dp = Number(ai.draw_pct || 0);
     var ap = Number(ai.away_pct || 50);
@@ -7863,7 +7868,7 @@ _FRONTEND_V22_JS = r'''
   }
 
   function sportEmojiV30(sp) {
-    var m = { soccer: "⚽", baseball: "⚾", basketball: "🏀", volleyball: "🏐", hockey: "🏒", esports: "🎮", lck: "🎮", ufc: "🥊", mma: "🥊", tennis: "🎾", f1: "🏎️" };
+    var m = { soccer: "⚽", baseball: "⚾", basketball: "🏀", volleyball: "🏐", hockey: "🏒", esports: "🎮", lck: "🎮", ufc: "🥊", mma: "🥊", tennis: "🎾", f1: "🏎️", american_football: "🏈" };
     return m[String(sp || "").toLowerCase()] || "🏟️";
   }
 
@@ -8148,7 +8153,7 @@ _FRONTEND_V22_JS = r'''
     var stBg = isLive ? "#dc2626" : (it.state === "post" ? "#475569" : "#1d4ed8");
     var ai = it.ai || {};
     var odds = ai.odds || {};
-    var probTxt = "AI " + (ai.home_pct || 50) + "% / 0% / " + (ai.away_pct || 50) + "%";
+    var probTxt = (ai.is_sample !== false ? "AI 예시 " : "AI ") + (ai.home_pct || 50) + "% / 0% / " + (ai.away_pct || 50) + "%";
     var oddsTxt = odds.home ? ("배당 " + odds.home + " / " + odds.away) : "";
     return [
       "<div style='display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:11px;margin-bottom:5px;flex-wrap:nowrap;'>",
@@ -8362,7 +8367,8 @@ _FRONTEND_V22_JS = r'''
             var stBg = isLive ? "#dc2626" : (it.state === "post" ? "#475569" : "#1d4ed8");
             var ai = it.ai || {};
             var odds = ai.odds || {};
-            var probTxt = ai.draw_pct ? ("AI " + ai.home_pct + "% / " + ai.draw_pct + "% / " + ai.away_pct + "%") : ("AI " + ai.home_pct + "% / " + ai.away_pct + "%");
+            var aiLblV50 = ai.is_sample !== false ? "AI 예시 " : "AI ";
+            var probTxt = ai.draw_pct ? (aiLblV50 + ai.home_pct + "% / " + ai.draw_pct + "% / " + ai.away_pct + "%") : (aiLblV50 + ai.home_pct + "% / " + ai.away_pct + "%");
             var oddsTxt = odds.home ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
             var fk = matchFavKeyV30(it);
             var fbCard = document.createElement("div");
@@ -8721,7 +8727,8 @@ _FRONTEND_V22_JS = r'''
       "ATP": "tennis", "WTA": "tennis",
       "UFC": "ufc",
       "LCK": "esports", "LOL": "esports",
-      "F1": "f1"
+      "F1": "f1",
+      "NFL": "american_football"
     };
 
     var koLabelByLeagueCodeV4621 = {
@@ -8857,7 +8864,7 @@ _FRONTEND_V22_JS = r'''
     }
     var optAll = document.createElement("option");
     optAll.value = "all";
-    var spKoMap = { soccer: "축구", basketball: "농구", volleyball: "배구", hockey: "하키", baseball: "야구", tennis: "테니스", ufc: "UFC", esports: "e스포츠", f1: "F1" };
+    var spKoMap = { soccer: "축구", basketball: "농구", volleyball: "배구", hockey: "하키", baseball: "야구", tennis: "테니스", ufc: "UFC", esports: "e스포츠", f1: "F1", american_football: "NFL" };
     optAll.textContent = (spNorm === "all")
       ? ("전체 " + filtered.length + "개 리그")
       : ((spKoMap[spNorm] || spNorm) + " 전체 리그 (" + filtered.length + ")");
@@ -8917,7 +8924,8 @@ _FRONTEND_V22_JS = r'''
       { key: "tennis", icon: "🎾", label: "테니스", always: false },
       { key: "ufc", icon: "🥊", label: "UFC", always: false },
       { key: "esports", icon: "🎮", label: "e스포츠", always: false },
-      { key: "f1", icon: "🏎️", label: "F1", always: false }
+      { key: "f1", icon: "🏎️", label: "F1", always: false },
+      { key: "american_football", icon: "🏈", label: "NFL", always: false }
     ];
 
     var activeTabs = coreTabs.filter(function (t) {
@@ -9244,6 +9252,14 @@ _FRONTEND_V22_JS = r'''
 
     var parentBox = track.parentElement;
     var items = v30ScoreState.items || [];
+
+    // 로딩 중 대체 track이 툴바·달력·표 래퍼 안쪽 요소로 잡히면 insertBefore가
+    // HierarchyRequestError(새 자식이 부모를 포함)를 던진다. 이번 회차는 건너뛰고 실제 track이 마운트되면 다시 배치한다.
+    var guardIds = ["sqV30ScoreToolbar", "sqV31DateCalendarBar", "sqV30ScoreboardTableWrap"];
+    for (var gi = 0; gi < guardIds.length; gi++) {
+      var gEl = document.getElementById(guardIds[gi]);
+      if (gEl && (gEl === track || gEl.contains(parentBox))) return;
+    }
 
     var bar = document.getElementById("sqV30ScoreToolbar");
     if (!bar) {
@@ -11682,7 +11698,7 @@ _FRONTEND_V22_JS = r'''
                 "<div style='font-size:11px;color:#94a3b8;margin-top:2px;'>🕒 " + uxEsc(dtTxt + vnTxt) + "</div>" +
               "</div>" +
               "<div style='text-align:right;flex-shrink:0;'>" +
-                "<div style='font-size:11px;font-weight:800;color:#fde68a;'>AI " + hp + "% : " + ap + "%</div>" +
+                "<div style='font-size:11px;font-weight:800;color:#fde68a;'>" + ((m.ai && m.ai.is_sample === false) ? "AI " : "AI 예시 ") + hp + "% : " + ap + "%</div>" +
                 "<button type='button' data-sq-mt-detail-btn='1' style='display:inline-block;margin-top:3px;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:800;color:#7dd3fc;background:rgba(14,165,233,0.15);border:1px solid rgba(56,189,248,0.45);cursor:pointer;'>상세 ↗</button>" +
               "</div>" +
             "</div>";
@@ -13045,7 +13061,7 @@ _FRONTEND_V22_JS = r'''
     var resArea = document.getElementById("sqAiIqResultArea") || aiModal.querySelector("[id*='Result'], [id*='result']");
     if (resArea) {
       var rtx = String(resArea.textContent || "").replace(/\s+/g, " ").trim();
-      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
+      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|검색창에\s*입력|추천\s*키워드를\s*눌러|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
         return "dom::" + rtx.slice(0, 48);
       }
     }
@@ -14479,10 +14495,16 @@ _FRONTEND_V22_JS = r'''
               ? teamInjs.map(function (x) {
                   return "<div style='font-size:11.5px;padding:4px 0;border-bottom:1px solid #1e293b;'>🏥 <strong>[" + uxEsc(localizeTeamKoJsV381(x.team)) + "] " + uxEsc(x.player) + "</strong> · " + uxEsc(x.reason) + " <span style='color:#fbbf24;'>(" + uxEsc(x.severity) + ")</span></div>";
                 }).join("")
-              : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>";
+              : (injData && injData.is_sample
+                  ? "<div style='font-size:11.5px;color:#94a3b8;'>" + uxEsc(injData.sample_note || "부상자 데이터가 아직 연동되지 않았습니다.") + "</div>"
+                  : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>");
+            // 하드코딩 예시 순위표(K리그·J리그 등)는 실제 데이터처럼 보이지 않도록 안내를 붙인다.
+            var stSampleHtml = (stData && stData.is_sample)
+              ? "<div style='font-size:11px;color:#fbbf24;margin-bottom:6px;'>⚠️ " + uxEsc(stData.sample_note || "예시 데이터입니다(실시간 연동 아님).") + "</div>"
+              : "";
 
             box.innerHTML = (
-              "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 순위 & 최근 흐름</div>" +
+              "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 순위 & 최근 흐름</div>" + stSampleHtml +
               "<div style='display:grid;gap:6px;margin-bottom:10px;'>" + fmtStanding(it.home, hRow) + fmtStanding(it.away, aRow) + "</div>" +
               h2hBlockHtml +
               compSummaryHtml +
@@ -19192,7 +19214,7 @@ def _build_comment_sig_v4612(post_id: str, user_label: str, comment_text: str) -
 
 @router.get("/api/posts")
 def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[str] = ""):
-    _ensure_tactical_posts_seeded_v22()
+    # 조회 요청에서는 예시 게시글을 시드하지 않는다(시드는 시작 시 테이블 초기화에서만).
     _primary, actor_keys = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
@@ -19299,6 +19321,8 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
                     "comments": comments_by_post.get(pid, []),
                     "isMemberServerPost": True,
                     "hasPin": bool(r["pin_hash"]),
+                    # 운영자가 넣은 예시 글(실제 회원 글 아님)
+                    "is_sample": str(pid).startswith("mp_seed_"),
                 }
             )
 
@@ -21849,6 +21873,10 @@ def _build_kr_jp_soccer_meta_v4640(kind: str, lg_raw: str) -> Dict[str, Any]:
             "items": [],
             "total": 0,
             "summary": {"total": 0, "out": 0, "doubtful": 0},
+            # 실제 부상자 데이터 연동이 없다. 0명은 '부상자 없음'이 아니라 '데이터 없음'이다.
+            "source": "부상자 데이터 미연동",
+            "is_sample": True,
+            "sample_note": "K리그·J리그 부상자 데이터는 아직 연동되지 않았습니다.",
         }
     rows_out: List[Dict[str, Any]] = []
     for rk, (tm, gp, w, d, l, gf, ga, pts, fm) in enumerate(_KR_JP_SOCCER_STANDINGS_V4640[cu], start=1):
@@ -21872,7 +21900,10 @@ def _build_kr_jp_soccer_meta_v4640(kind: str, lg_raw: str) -> Dict[str, Any]:
         "ok": True,
         "league": cu,
         "league_name": lg_full_map[cu],
-        "source": "2026 시즌 공식 순위표",
+        # 하드코딩된 순위표(실시간 연동 아님)이므로 공식 순위처럼 표시하지 않는다.
+        "source": "SportiQ 예시 데이터 (하드코딩 순위표)",
+        "is_sample": True,
+        "sample_note": "K리그·J리그 순위·최근 폼은 실시간 연동이 아닌 예시 데이터입니다.",
         "standings": rows_out,
     }
 
@@ -22261,7 +22292,7 @@ def _format_fan_vote_payload_v32(
     tot = max(1, hv + dv + av)
     h_pct = int(round((hv / tot) * 100))
     d_pct = int(round((dv / tot) * 100)) if has_draw else 0
-    a_pct = max(0, 100 - h_pct - d_pct)
+    a_pct = max(0, 100 - h_pct - d_pct) if (hv + dv + av) > 0 else 0
     out: Dict[str, Any] = {
         "ok": True,
         "match_key": match_key,
@@ -22278,6 +22309,8 @@ def _format_fan_vote_payload_v32(
         "draw_pct": d_pct,
         "away_pct": a_pct,
         "message": message,
+        # 예전 버전이 만든 집계 행에는 기본 시드 투표(24~56표)가 섞여 있을 수 있다.
+        "votes_include_seed_baseline": True,
     }
     if points is not None:
         out["points"] = int(points)
@@ -22303,18 +22336,14 @@ def get_match_fan_vote_v32(
     _, actor_candidates = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
-        now = time.time()
-        with _smu_db_session(write=True) as conn:
+        # 조회 전용: 집계가 없으면 0표로 응답하고 DB에 아무것도 쓰지 않는다(가짜 기본 투표 생성 제거).
+        with _smu_db_session(write=False) as conn:
             t_row = conn.execute(
                 "SELECT home_votes, draw_votes, away_votes FROM match_fan_vote_totals_v32 WHERE match_key = ?",
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, hp, dp, ap)
-                conn.execute(
-                    "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
-                    (mk, hv, dv, av, now),
-                )
+                hv, dv, av = 0, 0, 0
             else:
                 hv = int(t_row["home_votes"] or 0)
                 dv = int(t_row["draw_votes"] or 0) if hd else 0
@@ -22360,7 +22389,7 @@ def submit_match_fan_vote_v32(payload: MatchFanVoteIn):
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, int(payload.hp or 45), int(payload.dp or 25), int(payload.ap or 30))
+                hv, dv, av = 0, 0, 0  # 실제 투표만 집계한다(기본 시드 투표 없음).
                 conn.execute(
                     "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
                     (mk, hv, dv, av, now),
@@ -22504,10 +22533,7 @@ def _xml_safe_cdata_v4636(val: Any) -> str:
 
 
 def _collect_indexable_posts_v38(limit: int = 60) -> List[Dict[str, Any]]:
-    try:
-        _ensure_tactical_posts_seeded_v22()
-    except Exception:
-        pass
+    # sitemap/RSS 조회 중에는 DB에 쓰지 않는다.
     now_ts = time.time()
     items: List[Dict[str, Any]] = []
     seen_ids: Set[str] = set()
@@ -25886,16 +25912,46 @@ def get_global_matches():
                 for i, r in enumerate(rows)
             ]
 
-    return {"matches": run_with_db_retry(_op)}
+    # votes/buzz_score는 초기 시드 기준값에 실제 투표가 더해진 값이다(실측 팬 수가 아님).
+    return {"matches": run_with_db_retry(_op), "votes_include_seed_baseline": True}
+
+
+_GM_VOTE_DEDUPE_LOCK = threading.Lock()
+_GM_VOTE_DEDUPE: Dict[str, float] = {}
+_GM_VOTE_DEDUPE_TTL_SEC = 12 * 3600.0
+
+
+def _gm_vote_already_cast(request: Optional[Request], match_id: int) -> bool:
+    """같은 접속자(IP 해시)가 같은 경기에 12시간 안에 다시 투표하면 True. 원본 IP는 저장하지 않는다."""
+    ip_raw = _client_ip_v4615(request)
+    salt = os.environ.get("SPORTIQ_VOTE_HASH_SALT", "sportiq-gm-vote")
+    key = hashlib.sha256(f"{salt}:{ip_raw}:{match_id}".encode("utf-8", errors="ignore")).hexdigest()
+    now_ep = time.time()
+    with _GM_VOTE_DEDUPE_LOCK:
+        if len(_GM_VOTE_DEDUPE) > 20000:
+            for k in [k for k, ts in _GM_VOTE_DEDUPE.items() if (now_ep - ts) >= _GM_VOTE_DEDUPE_TTL_SEC]:
+                _GM_VOTE_DEDUPE.pop(k, None)
+        last = _GM_VOTE_DEDUPE.get(key)
+        if last is not None and (now_ep - last) < _GM_VOTE_DEDUPE_TTL_SEC:
+            return True
+        _GM_VOTE_DEDUPE[key] = now_ep
+        return False
 
 
 @router.post("/api/rankings/global-matches/{match_id}/vote")
-def vote_global_match(match_id: int):
+def vote_global_match(match_id: int, request: Request):
+    already_voted = _gm_vote_already_cast(request, match_id)
+
     def _op() -> tuple[Optional[dict], list[dict]]:
-        with _db_session(write=True) as conn:
-            cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
-            if cur.rowcount == 0:
-                raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
+        with _db_session(write=not already_voted) as conn:
+            if already_voted:
+                exists = conn.execute("SELECT 1 FROM global_match_rankings WHERE id = ?", (match_id,)).fetchone()
+                if not exists:
+                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
+            else:
+                cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
+                if cur.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
             rows = conn.execute(
                 "SELECT id, match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC"
             ).fetchall()
@@ -25919,12 +25975,19 @@ def vote_global_match(match_id: int):
             return voted, items
 
     voted, items = run_with_db_retry(_op)
-    try:
-        from app.sportiq_auto_analyst import _backup_tables_to_pg
-        _backup_tables_to_pg("global_match_rankings")
-    except Exception:
-        pass
-    return {"ok": True, "match": voted, "matches": items}
+    if not already_voted:
+        try:
+            from app.sportiq_auto_analyst import _backup_tables_to_pg
+            _backup_tables_to_pg("global_match_rankings")
+        except Exception:
+            pass
+    return {
+        "ok": True,
+        "already_voted": already_voted,
+        "votes_include_seed_baseline": True,
+        "match": voted,
+        "matches": items,
+    }
 
 
 _DC_KO_WRAPPER_INSTALLED_V381 = False
@@ -26189,7 +26252,10 @@ def _ai_probs_with_real_odds_v4616(
                     "draw": round(od, 2) if dp > 0 else 0.0,
                     "away": round(oa, 2),
                 },
+                "basis": "bookmaker_odds",
+                "is_sample": False,
             }
+    # 아래 값은 팀 이름 해시로 만든 예시값이다(모델 확률·실제 배당 아님). 화면은 is_sample이면 숨기거나 '예시'로 표시한다.
     h_seed = sum(ord(c) for c in f"{home}:{away}:{sport}")
     bh = 46 + ((h_seed * 17) % 25) - 11
     if has_draw:
@@ -26202,6 +26268,8 @@ def _ai_probs_with_real_odds_v4616(
             "draw_pct": dr,
             "away_pct": aw,
             "odds": {"home": round(94.5 / hm, 2), "draw": round(94.5 / dr, 2), "away": round(94.5 / aw, 2)},
+            "basis": "name_hash",
+            "is_sample": True,
         }
     hm = max(28, min(72, bh + 5))
     aw = 100 - hm
@@ -26210,6 +26278,8 @@ def _ai_probs_with_real_odds_v4616(
         "draw_pct": 0,
         "away_pct": aw,
         "odds": {"home": round(94.5 / hm, 2), "draw": 0.0, "away": round(94.5 / aw, 2)},
+        "basis": "name_hash",
+        "is_sample": True,
     }
 
 
@@ -30798,7 +30868,7 @@ def _filter_official_matches_only_v4615(items: Any, expected_mmdd: Optional[str]
 
 
 def _recompute_sport_counts_v4615(items: List[Dict[str, Any]], prev_counts: Any = None) -> Dict[str, int]:
-    base_keys = ["soccer", "baseball", "basketball", "volleyball", "hockey", "esports", "ufc", "tennis", "f1"]
+    base_keys = ["soccer", "baseball", "basketball", "volleyball", "hockey", "esports", "ufc", "tennis", "f1", "american_football"]
     counts: Dict[str, int] = {}
     if isinstance(prev_counts, dict):
         for k in prev_counts:
@@ -31759,6 +31829,8 @@ def _sync_collect_offset_v4648(target_k: datetime, off_i: int) -> List[Dict[str,
         deduped.sort(key=lambda x: (ord_st_v53.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
         for _d_clean in deduped:
             _d_clean["_localized_ko_v53"] = True
+        # ESPN sports this collector lacks (NFL/MLB/UFC/tennis/F1), same source as /api/datacenter/live-scores.
+        deduped = _with_espn_supplement_v50(deduped, off_i)
 
         now_k_fin = datetime.now(KST)
         wd_fin = ["월", "화", "수", "목", "금", "토", "일"]
@@ -31868,6 +31940,40 @@ def _fast_api_member_scoreboard_v4648(date_offset: int = 0) -> Dict[str, Any]:
         "total": len(raw_items),
         "items": raw_items,
     }
+
+
+def _with_espn_supplement_v50(items: List[Dict[str, Any]], off_i: int) -> List[Dict[str, Any]]:
+    """Add ESPN sports this collector lacks (NFL, MLB, UFC, tennis, F1).
+
+    Uses sportiq_datacenter._supplement_espn_matches, the same source as
+    /api/datacenter/live-scores. Items carry no AI numbers: ai.is_sample tells
+    the cards to show none instead of a front-end default.
+    """
+    try:
+        from app import sportiq_datacenter as _dc_v50
+        merged = _dc_v50._supplement_espn_matches(list(items or []), off_i)
+    except Exception:
+        return list(items or [])
+    known = {id(x) for x in (items or [])}
+    out: List[Dict[str, Any]] = []
+    for it in merged:
+        if id(it) in known:
+            out.append(it)
+            continue
+        it = dict(it)
+        ps = it.get("period_scores")
+        if isinstance(ps, list):
+            it["period_scores"] = " · ".join(str(x) for x in ps if x)
+        it["home_score"] = it.get("home_score") if it.get("home_score") not in ("", None) else 0
+        it["away_score"] = it.get("away_score") if it.get("away_score") not in ("", None) else 0
+        it["ai"] = {"basis": "none", "is_sample": True}
+        it["verified_official"] = True
+        it["_espn_verified_v4615"] = True
+        it["_localized_ko_v53"] = True
+        out.append(it)
+    ord_sb = {"in": 0, "pre": 1, "post": 2}
+    out.sort(key=lambda x: (ord_sb.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
+    return out
 
 
 api_member_scoreboard_v30 = _fast_api_member_scoreboard_v4648
