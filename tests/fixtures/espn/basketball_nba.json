@@ -1,0 +1,280 @@
+{
+ "events": [
+  {
+   "id": "401910029",
+   "date": "2026-11-22T20:30Z",
+   "name": "Detroit Pistons at Atlanta Hawks",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    }
+   },
+   "competitions": [
+    {
+     "id": "401910029",
+     "date": "2026-11-22T20:30Z",
+     "startDate": "2026-11-22T20:30Z",
+     "status": {
+      "type": {
+       "name": "STATUS_FINAL",
+       "state": "post",
+       "completed": true,
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "venue": {
+      "fullName": "State Farm Arena"
+     },
+     "competitors": [
+      {
+       "id": "1",
+       "homeAway": "home",
+       "order": 0,
+       "winner": true,
+       "score": "107",
+       "linescores": [
+        {
+         "value": 29.0
+        },
+        {
+         "value": 22.0
+        },
+        {
+         "value": 23.0
+        },
+        {
+         "value": 33.0
+        }
+       ],
+       "team": {
+        "id": "1",
+        "displayName": "Atlanta Hawks",
+        "shortDisplayName": "Hawks",
+        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/atl.png"
+       }
+      },
+      {
+       "id": "8",
+       "homeAway": "away",
+       "order": 1,
+       "winner": false,
+       "score": "97",
+       "linescores": [
+        {
+         "value": 26.0
+        },
+        {
+         "value": 26.0
+        },
+        {
+         "value": 33.0
+        },
+        {
+         "value": 12.0
+        }
+       ],
+       "team": {
+        "id": "8",
+        "displayName": "Detroit Pistons",
+        "shortDisplayName": "Pistons",
+        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/det.png"
+       }
+      }
+     ],
+     "type": {
+      "id": "1",
+      "abbreviation": "STD"
+     }
+    }
+   ]
+  },
+  {
+   "id": "401910030",
+   "date": "2026-11-22T23:00Z",
+   "name": "Oklahoma City Thunder at Miami Heat",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    }
+   },
+   "competitions": [
+    {
+     "id": "401910030",
+     "date": "2026-11-22T23:00Z",
+     "startDate": "2026-11-22T23:00Z",
+     "status": {
+      "type": {
+       "name": "STATUS_FINAL",
+       "state": "post",
+       "completed": true,
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "venue": {
+      "fullName": "Kaseya Center"
+     },
+     "competitors": [
+      {
+       "id": "14",
+       "homeAway": "home",
+       "order": 0,
+       "winner": true,
+       "score": "123",
+       "linescores": [
+        {
+         "value": 36.0
+        },
+        {
+         "value": 31.0
+        },
+        {
+         "value": 28.0
+        },
+        {
+         "value": 28.0
+        }
+       ],
+       "team": {
+        "id": "14",
+        "displayName": "Miami Heat",
+        "shortDisplayName": "Heat",
+        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/mia.png"
+       }
+      },
+      {
+       "id": "25",
+       "homeAway": "away",
+       "order": 1,
+       "winner": false,
+       "score": "113",
+       "linescores": [
+        {
+         "value": 24.0
+        },
+        {
+         "value": 30.0
+        },
+        {
+         "value": 26.0
+        },
+        {
+         "value": 33.0
+        }
+       ],
+       "team": {
+        "id": "25",
+        "displayName": "Oklahoma City Thunder",
+        "shortDisplayName": "Thunder",
+        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/okc.png"
+       }
+      }
+     ],
+     "type": {
+      "id": "1",
+      "abbreviation": "STD"
+     }
+    }
+   ]
+  },
+  {
+   "id": "401910031",
+   "date": "2026-11-23T00:00Z",
+   "name": "Orlando Magic at Washington Wizards",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    }
+   },
+   "competitions": [
+    {
+     "id": "401910031",
+     "date": "2026-11-23T00:00Z",
+     "startDate": "2026-11-23T00:00Z",
+     "status": {
+      "type": {
+       "name": "STATUS_FINAL",
+       "state": "post",
+       "completed": true,
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "venue": {
+      "fullName": "Capital One Arena"
+     },
+     "competitors": [
+      {
+       "id": "27",
+       "homeAway": "home",
+       "order": 0,
+       "winner": true,
+       "score": "116",
+       "linescores": [
+        {
+         "value": 38.0
+        },
+        {
+         "value": 25.0
+        },
+        {
+         "value": 34.0
+        },
+        {
+         "value": 19.0
+        }
+       ],
+       "team": {
+        "id": "27",
+        "displayName": "Washington Wizards",
+        "shortDisplayName": "Wizards",
+        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/wsh.png"
+       }
+      },
+      {
+       "id": "19",
+       "homeAway": "away",
+       "order": 1,
+       "winner": false,
+       "score": "96",
+       "linescores": [
+        {
+         "value": 21.0
+        },
+        {
+         "value": 30.0
+        },
+        {
+         "value": 26.0
+        },
+        {
+         "value": 19.0
+        }
+       ],
+       "team": {
+        "id": "19",
+        "displayName": "Orlando Magic",
+        "shortDisplayName": "Magic",
+        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/orl.png"
+       }
+      }
+     ],
+     "type": {
+      "id": "1",
+      "abbreviation": "STD"
+     }
+    }
+   ]
+  }
+ ]
+}

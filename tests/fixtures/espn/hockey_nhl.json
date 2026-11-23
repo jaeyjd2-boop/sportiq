@@ -1,0 +1,274 @@
+{
+ "events": [
+  {
+   "id": "401892768",
+   "date": "2026-11-22T17:30Z",
+   "name": "Carolina Hurricanes at New York Rangers",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    }
+   },
+   "competitions": [
+    {
+     "id": "401892768",
+     "date": "2026-11-22T17:30Z",
+     "startDate": "2026-11-22T17:30Z",
+     "status": {
+      "type": {
+       "name": "STATUS_FINAL",
+       "state": "post",
+       "completed": true,
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "venue": {
+      "fullName": "Madison Square Garden"
+     },
+     "competitors": [
+      {
+       "id": "13",
+       "homeAway": "home",
+       "order": 0,
+       "winner": false,
+       "score": "2",
+       "linescores": [
+        {
+         "value": 1.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 1.0
+        }
+       ],
+       "team": {
+        "id": "13",
+        "displayName": "New York Rangers",
+        "shortDisplayName": "Rangers",
+        "logo": "https://a.espncdn.com/i/teamlogos/nhl/500/scoreboard/nyr.png"
+       }
+      },
+      {
+       "id": "7",
+       "homeAway": "away",
+       "order": 1,
+       "winner": true,
+       "score": "5",
+       "linescores": [
+        {
+         "value": 1.0
+        },
+        {
+         "value": 3.0
+        },
+        {
+         "value": 1.0
+        }
+       ],
+       "team": {
+        "id": "7",
+        "displayName": "Carolina Hurricanes",
+        "shortDisplayName": "Hurricanes",
+        "logo": "https://a.espncdn.com/i/teamlogos/nhl/500/scoreboard/car.png"
+       }
+      }
+     ],
+     "type": {
+      "id": "1",
+      "abbreviation": "STD"
+     }
+    }
+   ]
+  },
+  {
+   "id": "401892769",
+   "date": "2026-11-22T22:00Z",
+   "name": "Buffalo Sabres at Tampa Bay Lightning",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    }
+   },
+   "competitions": [
+    {
+     "id": "401892769",
+     "date": "2026-11-22T22:00Z",
+     "startDate": "2026-11-22T22:00Z",
+     "status": {
+      "type": {
+       "name": "STATUS_FINAL",
+       "state": "post",
+       "completed": true,
+       "shortDetail": "Final",
+       "description": "Final"
+      }
+     },
+     "venue": {
+      "fullName": "Benchmark International Arena"
+     },
+     "competitors": [
+      {
+       "id": "20",
+       "homeAway": "home",
+       "order": 0,
+       "winner": false,
+       "score": "2",
+       "linescores": [
+        {
+         "value": 1.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 1.0
+        }
+       ],
+       "team": {
+        "id": "20",
+        "displayName": "Tampa Bay Lightning",
+        "shortDisplayName": "Lightning",
+        "logo": "https://a.espncdn.com/i/teamlogos/nhl/500/scoreboard/tb.png"
+       }
+      },
+      {
+       "id": "2",
+       "homeAway": "away",
+       "order": 1,
+       "winner": true,
+       "score": "6",
+       "linescores": [
+        {
+         "value": 1.0
+        },
+        {
+         "value": 3.0
+        },
+        {
+         "value": 2.0
+        }
+       ],
+       "team": {
+        "id": "2",
+        "displayName": "Buffalo Sabres",
+        "shortDisplayName": "Sabres",
+        "logo": "https://a.espncdn.com/i/teamlogos/nhl/500/scoreboard/buf.png"
+       }
+      }
+     ],
+     "type": {
+      "id": "1",
+      "abbreviation": "STD"
+     }
+    }
+   ]
+  },
+  {
+   "id": "401892770",
+   "date": "2026-11-23T00:00Z",
+   "name": "Edmonton Oilers at St. Louis Blues",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final/SO"
+    }
+   },
+   "competitions": [
+    {
+     "id": "401892770",
+     "date": "2026-11-23T00:00Z",
+     "startDate": "2026-11-23T00:00Z",
+     "status": {
+      "type": {
+       "name": "STATUS_FINAL",
+       "state": "post",
+       "completed": true,
+       "shortDetail": "Final/SO",
+       "description": "Final"
+      }
+     },
+     "venue": {
+      "fullName": "Enterprise Center"
+     },
+     "competitors": [
+      {
+       "id": "19",
+       "homeAway": "home",
+       "order": 0,
+       "winner": true,
+       "score": "5",
+       "linescores": [
+        {
+         "value": 0.0
+        },
+        {
+         "value": 1.0
+        },
+        {
+         "value": 3.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 1.0
+        }
+       ],
+       "team": {
+        "id": "19",
+        "displayName": "St. Louis Blues",
+        "shortDisplayName": "Blues",
+        "logo": "https://a.espncdn.com/i/teamlogos/nhl/500/scoreboard/stl.png"
+       }
+      },
+      {
+       "id": "6",
+       "homeAway": "away",
+       "order": 1,
+       "winner": false,
+       "score": "4",
+       "linescores": [
+        {
+         "value": 1.0
+        },
+        {
+         "value": 2.0
+        },
+        {
+         "value": 1.0
+        },
+        {
+         "value": 0.0
+        },
+        {
+         "value": 0.0
+        }
+       ],
+       "team": {
+        "id": "6",
+        "displayName": "Edmonton Oilers",
+        "shortDisplayName": "Oilers",
+        "logo": "https://a.espncdn.com/i/teamlogos/nhl/500/scoreboard/edm.png"
+       }
+      }
+     ],
+     "type": {
+      "id": "1",
+      "abbreviation": "STD"
+     }
+    }
+   ]
+  }
+ ]
+}

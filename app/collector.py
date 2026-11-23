@@ -21,11 +21,12 @@ def collect_fixtures(day:date, end_day=None):
     return store_fixtures(items)
 
 
-def store_fixtures(items, chunk_size=200):
+def store_fixtures(items, chunk_size=200, sport_code="football"):
     """Persist fixtures with cached league/team lookups and batched match upserts.
 
     Each chunk commits atomically. Invalid records are rejected rather than
     inventing provider IDs; any failed chunk raises for caller retry.
+    sport_code picks the sports row (default football, unchanged behaviour).
     """
     if not isinstance(chunk_size, int) or chunk_size < 1 or chunk_size > 1000:
         raise ValueError("chunk_size must be between 1 and 1000")
@@ -55,7 +56,7 @@ def store_fixtures(items, chunk_size=200):
     entries = list(unique.values())
     count = 0
     with engine.connect() as conn:
-        sid = conn.execute(text("SELECT id FROM sports WHERE code='football'")).scalar_one()
+        sid = conn.execute(text("SELECT id FROM sports WHERE code=:code"), {"code": sport_code}).scalar_one()
     for offset in range(0, len(entries), chunk_size):
         batch = entries[offset:offset + chunk_size]
         with engine.begin() as conn:

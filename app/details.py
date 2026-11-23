@@ -1,14 +1,14 @@
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 from app.db import engine
-from app.match_status import with_stale_flag
+from app.match_status import SOURCE_SQL, with_stale_flag
 
 router = APIRouter(prefix="/v1/matches", tags=["analysis"])
 
 @router.get("/{match_id}/analysis")
 def analysis(match_id: int):
     with engine.connect() as c:
-        m = c.execute(text("""SELECT m.id,m.home_team_id,m.away_team_id,m.start_time,m.status,m.status_detail,m.home_score,m.away_score,m.updated_at,l.name AS league,l.logo_url AS league_logo_url,ht.name AS home_team,ht.logo_url AS home_team_logo_url,at.name AS away_team,at.logo_url AS away_team_logo_url FROM matches m LEFT JOIN leagues l ON l.id=m.league_id LEFT JOIN teams ht ON ht.id=m.home_team_id LEFT JOIN teams at ON at.id=m.away_team_id WHERE m.id=:id"""),{"id":match_id}).mappings().first()
+        m = c.execute(text("""SELECT m.id,s.code AS sport,m.home_team_id,m.away_team_id,m.start_time,m.status,m.status_detail,m.home_score,m.away_score,m.updated_at,""" + SOURCE_SQL + """ AS source,l.name AS league,l.logo_url AS league_logo_url,ht.name AS home_team,ht.logo_url AS home_team_logo_url,at.name AS away_team,at.logo_url AS away_team_logo_url FROM matches m JOIN sports s ON s.id=m.sport_id LEFT JOIN leagues l ON l.id=m.league_id LEFT JOIN teams ht ON ht.id=m.home_team_id LEFT JOIN teams at ON at.id=m.away_team_id WHERE m.id=:id"""),{"id":match_id}).mappings().first()
         if not m: raise HTTPException(404,"match not found")
         recent_sql = text("""SELECT m.id,m.start_time,m.status,m.home_score,m.away_score,m.home_team_id,m.away_team_id,ht.name AS home_team,at.name AS away_team FROM matches m LEFT JOIN teams ht ON ht.id=m.home_team_id LEFT JOIN teams at ON at.id=m.away_team_id WHERE (m.home_team_id=:team OR m.away_team_id=:team) AND m.status IN ('FT','AET','PEN') AND m.id<>:id ORDER BY m.start_time DESC,m.id DESC LIMIT 5""")
         home = c.execute(recent_sql,{"team":m["home_team_id"],"id":match_id}).mappings().all() if m["home_team_id"] else []
@@ -37,11 +37,15 @@ def forecast(match_id: int):
     from math import exp, factorial
     with engine.connect() as c:
         match = c.execute(text("""
-            SELECT id, home_team_id, away_team_id, start_time, status
-            FROM matches WHERE id=:id
+            SELECT m.id, m.home_team_id, m.away_team_id, m.start_time, m.status, s.code AS sport
+            FROM matches m JOIN sports s ON s.id=m.sport_id WHERE m.id=:id
         """), {"id": match_id}).mappings().first()
         if not match:
             raise HTTPException(404, "match not found")
+        if match["sport"] != "football":
+            # The Poisson goal model only makes sense for football.
+            return {"match_id": match_id, "available": False, "sport": match["sport"],
+                    "reason": "Forecast model covers football only"}
         if not match["home_team_id"] or not match["away_team_id"]:
             raise HTTPException(422, "team identifiers unavailable")
         rows = c.execute(text("""
