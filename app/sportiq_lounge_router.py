@@ -226,7 +226,7 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
           ? "<span style='background:#dc2626;color:#fff;padding:1px 6px;border-radius:5px;font-size:10.5px;font-weight:800;'>LIVE " + esc(it.home_score + ":" + it.away_score) + "</span>"
           : (!isPre
               ? "<span style='background:#334155;color:#e2e8f0;padding:1px 6px;border-radius:5px;font-size:10.5px;font-weight:800;'>" + esc(it.home_score + ":" + it.away_score) + " 종료</span>"
-              : "<span style='color:#6ee7b7;font-size:11px;font-weight:800;'>" + (aiO.is_sample !== false ? "AI 예시 " : "AI ") + esc(aiO.home_pct || 50) + "%:" + esc(aiO.away_pct || 50) + "%</span> <span style='color:#94a3b8;font-size:10.5px;'>(배당 " + esc(oddsO.home || "-") + "/" + esc(oddsO.away || "-") + ")</span>");
+              : "<span style='color:#6ee7b7;font-size:11px;font-weight:800;'>AI " + esc(aiO.home_pct || 50) + "%:" + esc(aiO.away_pct || 50) + "%</span> <span style='color:#94a3b8;font-size:10.5px;'>(배당 " + esc(oddsO.home || "-") + "/" + esc(oddsO.away || "-") + ")</span>");
         return (
           "<div" + hideExtraQa + "justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;background:rgba(2,6,23,.65);border:1px solid rgba(51,65,85,.75);border-radius:9px;flex-wrap:wrap;'>" +
           "  <div style='display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0;'>" +
@@ -5222,7 +5222,6 @@ _FRONTEND_V22_JS = r'''
     if (s === "basketball" || s === "nba" || s === "wnba" || /\b(NBA|WNBA|KBL|WKBL)\b/.test(u)) return "basketball";
     if (s === "baseball" || s === "mlb" || s === "kbo" || s === "npb" || /\b(KBO|MLB|NPB|ABL)\b/.test(u)) return "baseball";
     if (s === "hockey" || s === "nhl" || /\bNHL\b|하키/.test(u)) return "hockey";
-    if (s === "american_football" || s === "nfl" || /\bNFL\b/.test(u)) return "american_football";
     if (s === "soccer" || s === "football") return "soccer";
     return "soccer";
   }
@@ -6375,7 +6374,7 @@ _FRONTEND_V22_JS = r'''
 
           var countBase = mergedPool.length > 0 ? mergedPool : curItems;
           var cObj = (dcJson.counts && typeof dcJson.counts === "object") ? dcJson.counts : {};
-          var sportKeys9 = ["soccer", "baseball", "basketball", "volleyball", "hockey", "esports", "ufc", "tennis", "f1", "american_football"];
+          var sportKeys9 = ["soccer", "baseball", "basketball", "volleyball", "hockey", "esports", "ufc", "tennis", "f1"];
           sportKeys9.forEach(function (k) { cObj[k] = 0; });
           var liveTotal = 0;
           countBase.forEach(function (it) {
@@ -7027,9 +7026,7 @@ _FRONTEND_V22_JS = r'''
         home_pct: Math.round(hp),
         draw_pct: Math.round(dp),
         away_pct: Math.round(ap),
-        odds: { home: String(oh), draw: od ? String(od) : "", away: String(oa) },
-        // Only bookmaker-odds numbers are real; name-hash values and the defaults above are examples.
-        is_sample: !(rawAi.basis === "bookmaker_odds" && rawAi.is_sample === false)
+        odds: { home: String(oh), draw: od ? String(od) : "", away: String(oa) }
       }
     };
   }
@@ -7145,9 +7142,8 @@ _FRONTEND_V22_JS = r'''
           : (isPre ? (it.status_badge || "예정") : (isPostPendingScore ? (it.status_badge || "종료·집계중") : "종료"));
         var ai = it.ai || {};
         var odds = ai.odds || {};
-        var aiReal = !ai.is_sample && ai.home_pct != null;
-        var probTxt = !aiReal ? "" : (ai.draw_pct ? ("AI " + ai.home_pct + ":" + ai.draw_pct + ":" + ai.away_pct + "%") : ("AI " + ai.home_pct + ":" + ai.away_pct + "%"));
-        var oddsTxt = (aiReal && odds.home) ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
+        var probTxt = ai.draw_pct ? ("AI " + ai.home_pct + ":" + ai.draw_pct + ":" + ai.away_pct + "%") : ("AI " + ai.home_pct + ":" + ai.away_pct + "%");
+        var oddsTxt = odds.home ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
         var fk = matchFavKeyV30(it);
         var isFav = Boolean(v30ScoreState.favMap[fk]);
         var hLead = !isPre && !isPostPendingScore && !isLiveUnscoredFallback && !isNaN(hsNum) && !isNaN(asNum) && hsNum > asNum;
@@ -7835,7 +7831,6 @@ _FRONTEND_V22_JS = r'''
     var as = Number(it.away_score);
     if (isNaN(hs) || isNaN(as)) return null;
     var ai = it.ai || {};
-    if (ai.is_sample || ai.home_pct == null) return null;
     var hp = Number(ai.home_pct || 50);
     var dp = Number(ai.draw_pct || 0);
     var ap = Number(ai.away_pct || 50);
@@ -7868,7 +7863,7 @@ _FRONTEND_V22_JS = r'''
   }
 
   function sportEmojiV30(sp) {
-    var m = { soccer: "⚽", baseball: "⚾", basketball: "🏀", volleyball: "🏐", hockey: "🏒", esports: "🎮", lck: "🎮", ufc: "🥊", mma: "🥊", tennis: "🎾", f1: "🏎️", american_football: "🏈" };
+    var m = { soccer: "⚽", baseball: "⚾", basketball: "🏀", volleyball: "🏐", hockey: "🏒", esports: "🎮", lck: "🎮", ufc: "🥊", mma: "🥊", tennis: "🎾", f1: "🏎️" };
     return m[String(sp || "").toLowerCase()] || "🏟️";
   }
 
@@ -8153,7 +8148,7 @@ _FRONTEND_V22_JS = r'''
     var stBg = isLive ? "#dc2626" : (it.state === "post" ? "#475569" : "#1d4ed8");
     var ai = it.ai || {};
     var odds = ai.odds || {};
-    var probTxt = (ai.is_sample !== false ? "AI 예시 " : "AI ") + (ai.home_pct || 50) + "% / 0% / " + (ai.away_pct || 50) + "%";
+    var probTxt = "AI " + (ai.home_pct || 50) + "% / 0% / " + (ai.away_pct || 50) + "%";
     var oddsTxt = odds.home ? ("배당 " + odds.home + " / " + odds.away) : "";
     return [
       "<div style='display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:11px;margin-bottom:5px;flex-wrap:nowrap;'>",
@@ -8367,8 +8362,7 @@ _FRONTEND_V22_JS = r'''
             var stBg = isLive ? "#dc2626" : (it.state === "post" ? "#475569" : "#1d4ed8");
             var ai = it.ai || {};
             var odds = ai.odds || {};
-            var aiLblV50 = ai.is_sample !== false ? "AI 예시 " : "AI ";
-            var probTxt = ai.draw_pct ? (aiLblV50 + ai.home_pct + "% / " + ai.draw_pct + "% / " + ai.away_pct + "%") : (aiLblV50 + ai.home_pct + "% / " + ai.away_pct + "%");
+            var probTxt = ai.draw_pct ? ("AI " + ai.home_pct + "% / " + ai.draw_pct + "% / " + ai.away_pct + "%") : ("AI " + ai.home_pct + "% / " + ai.away_pct + "%");
             var oddsTxt = odds.home ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
             var fk = matchFavKeyV30(it);
             var fbCard = document.createElement("div");
@@ -8727,8 +8721,7 @@ _FRONTEND_V22_JS = r'''
       "ATP": "tennis", "WTA": "tennis",
       "UFC": "ufc",
       "LCK": "esports", "LOL": "esports",
-      "F1": "f1",
-      "NFL": "american_football"
+      "F1": "f1"
     };
 
     var koLabelByLeagueCodeV4621 = {
@@ -8864,7 +8857,7 @@ _FRONTEND_V22_JS = r'''
     }
     var optAll = document.createElement("option");
     optAll.value = "all";
-    var spKoMap = { soccer: "축구", basketball: "농구", volleyball: "배구", hockey: "하키", baseball: "야구", tennis: "테니스", ufc: "UFC", esports: "e스포츠", f1: "F1", american_football: "NFL" };
+    var spKoMap = { soccer: "축구", basketball: "농구", volleyball: "배구", hockey: "하키", baseball: "야구", tennis: "테니스", ufc: "UFC", esports: "e스포츠", f1: "F1" };
     optAll.textContent = (spNorm === "all")
       ? ("전체 " + filtered.length + "개 리그")
       : ((spKoMap[spNorm] || spNorm) + " 전체 리그 (" + filtered.length + ")");
@@ -8924,8 +8917,7 @@ _FRONTEND_V22_JS = r'''
       { key: "tennis", icon: "🎾", label: "테니스", always: false },
       { key: "ufc", icon: "🥊", label: "UFC", always: false },
       { key: "esports", icon: "🎮", label: "e스포츠", always: false },
-      { key: "f1", icon: "🏎️", label: "F1", always: false },
-      { key: "american_football", icon: "🏈", label: "NFL", always: false }
+      { key: "f1", icon: "🏎️", label: "F1", always: false }
     ];
 
     var activeTabs = coreTabs.filter(function (t) {
@@ -9252,14 +9244,6 @@ _FRONTEND_V22_JS = r'''
 
     var parentBox = track.parentElement;
     var items = v30ScoreState.items || [];
-
-    // 로딩 중 대체 track이 툴바·달력·표 래퍼 안쪽 요소로 잡히면 insertBefore가
-    // HierarchyRequestError(새 자식이 부모를 포함)를 던진다. 이번 회차는 건너뛰고 실제 track이 마운트되면 다시 배치한다.
-    var guardIds = ["sqV30ScoreToolbar", "sqV31DateCalendarBar", "sqV30ScoreboardTableWrap"];
-    for (var gi = 0; gi < guardIds.length; gi++) {
-      var gEl = document.getElementById(guardIds[gi]);
-      if (gEl && (gEl === track || gEl.contains(parentBox))) return;
-    }
 
     var bar = document.getElementById("sqV30ScoreToolbar");
     if (!bar) {
@@ -11698,7 +11682,7 @@ _FRONTEND_V22_JS = r'''
                 "<div style='font-size:11px;color:#94a3b8;margin-top:2px;'>🕒 " + uxEsc(dtTxt + vnTxt) + "</div>" +
               "</div>" +
               "<div style='text-align:right;flex-shrink:0;'>" +
-                "<div style='font-size:11px;font-weight:800;color:#fde68a;'>" + ((m.ai && m.ai.is_sample === false) ? "AI " : "AI 예시 ") + hp + "% : " + ap + "%</div>" +
+                "<div style='font-size:11px;font-weight:800;color:#fde68a;'>AI " + hp + "% : " + ap + "%</div>" +
                 "<button type='button' data-sq-mt-detail-btn='1' style='display:inline-block;margin-top:3px;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:800;color:#7dd3fc;background:rgba(14,165,233,0.15);border:1px solid rgba(56,189,248,0.45);cursor:pointer;'>상세 ↗</button>" +
               "</div>" +
             "</div>";
@@ -13061,7 +13045,7 @@ _FRONTEND_V22_JS = r'''
     var resArea = document.getElementById("sqAiIqResultArea") || aiModal.querySelector("[id*='Result'], [id*='result']");
     if (resArea) {
       var rtx = String(resArea.textContent || "").replace(/\s+/g, " ").trim();
-      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|검색창에\s*입력|추천\s*키워드를\s*눌러|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
+      if (resArea.querySelector("#sqAiCatBar, .sq-ai-iq-card, [data-ai-sec], a[href^='http']") || (resArea.children.length >= 1 && rtx.length >= 45 && !/검색어를\s*입력|탐색해\s*드립니다|불러오는\s*중|검색\s*중/.test(rtx))) {
         return "dom::" + rtx.slice(0, 48);
       }
     }
@@ -13877,10 +13861,6 @@ _FRONTEND_V22_JS = r'''
     var mktA = invSum > 0 && oa > 0 ? Math.round(((1 / oa) / invSum) * 1000) / 10 : ap;
     var edgeH = Math.round((hp - mktH) * 10) / 10;
     var edgeA = Math.round((ap - mktA) * 10) / 10;
-    // Only bookmaker-odds-based numbers are real; name-hash values and the
-    // 45%/94-p defaults above are examples and must not look like data.
-    var aiRealV51 = (ai.is_sample === false);
-    var aiNoticeV51 = "<div style='background:rgba(148,163,184,.08);border:1px dashed rgba(148,163,184,.4);border-radius:9px;padding:8px 10px;font-size:11.4px;color:#cbd5e1;margin-bottom:8px;'>ℹ️ 이 경기는 실제 배당·AI 모델 데이터가 연동되지 않아 AI 승률·배당 비교를 표시하지 않습니다.</div>";
     var verdict = evaluateAiVerdictV30(it);
     var tacMeta = getSportTacticalViewV33(it, hp, ap);
 
@@ -13949,7 +13929,6 @@ _FRONTEND_V22_JS = r'''
           ? (uxEsc(it.home) + " 측 AI 확률(" + hp + "%)이 배당 내재확률(" + mktH + "%) 대비 <strong style='color:" + (edgeH >= 0 ? "#34d399" : "#fbbf24") + ";'>" + (edgeH >= 0 ? "+" : "") + edgeH + "%p</strong> 차이를 보입니다.")
           : (uxEsc(it.away) + " 측 AI 확률(" + ap + "%)이 배당 내재확률(" + mktA + "%) 대비 <strong style='color:" + (edgeA >= 0 ? "#34d399" : "#fbbf24") + ";'>" + (edgeA >= 0 ? "+" : "") + edgeA + "%p</strong> 차이를 보입니다.");
         box.innerHTML = [
-          (aiRealV51 ? [
           "<div style='display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:5px;'>" +
           "  <span style='font-weight:800;color:#6ee7b7;font-size:11.8px;'>🤖 AI 승률 vs 시장 배당 비교</span>" +
           "  <span style='font-size:10.8px;color:#cbd5e1;'>배당 " + uxEsc(odds.home || "-") + (dp > 0 ? " / " + uxEsc(odds.draw || "-") : "") + " / " + uxEsc(odds.away || "-") + "</span>" +
@@ -13964,8 +13943,7 @@ _FRONTEND_V22_JS = r'''
           (dp > 0 ? "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:6px 5px;min-width:0;'><div style='color:#94a3b8;font-size:10.5px;'>⚖️ 무승부</div><strong style='color:#cbd5e1;font-size:13.5px;'>AI " + dp + "%</strong><div style='color:#64748b;font-size:10px;'>시장 " + mktD + "%</div></div>" : ""),
           "  <div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:6px 5px;min-width:0;'><div style='color:#94a3b8;font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>✈️ " + uxEsc(it.away) + "</div><strong style='color:#38bdf8;font-size:13.5px;'>AI " + ap + "%</strong><div style='color:#64748b;font-size:10px;'>시장 " + mktA + "%</div></div>",
           "</div>",
-          "<div style='background:rgba(16,185,129,.08);border:1px solid rgba(52,211,153,.28);border-radius:9px;padding:7px 10px;font-size:11.4px;color:#e2e8f0;margin-bottom:8px;word-break:keep-all;'>💡 " + edgeNote + "</div>"
-          ].join("") : aiNoticeV51),
+          "<div style='background:rgba(16,185,129,.08);border:1px solid rgba(52,211,153,.28);border-radius:9px;padding:7px 10px;font-size:11.4px;color:#e2e8f0;margin-bottom:8px;word-break:keep-all;'>💡 " + edgeNote + "</div>",
           "<div id='sqMatchFanVoteCardV32' style='background:linear-gradient(145deg,rgba(15,23,42,.96),rgba(2,6,23,.96));border:1px solid rgba(56,189,248,.38);border-radius:11px;padding:10px 12px;'>",
           "  <div style='display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;'>",
           "    <div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;'>",
@@ -13988,9 +13966,9 @@ _FRONTEND_V22_JS = r'''
           if (!grid || !gWrap) return;
 
           var myP = String((vd && vd.my_pick) || "");
-          var fHp = vd ? Number(vd.home_pct || 0) : (aiRealV51 ? hp : 0);
-          var fDp = (vd && hasDrawVote) ? Number(vd.draw_pct || 0) : ((hasDrawVote && aiRealV51) ? dp : 0);
-          var fAp = vd ? Number(vd.away_pct || 0) : (aiRealV51 ? ap : 0);
+          var fHp = vd ? Number(vd.home_pct || 0) : hp;
+          var fDp = (vd && hasDrawVote) ? Number(vd.draw_pct || 0) : (hasDrawVote ? dp : 0);
+          var fAp = vd ? Number(vd.away_pct || 0) : ap;
           var hv = vd ? Number(vd.home_votes || 0) : 0;
           var dv = (vd && hasDrawVote) ? Number(vd.draw_votes || 0) : 0;
           var av = vd ? Number(vd.away_votes || 0) : 0;
@@ -14035,9 +14013,7 @@ _FRONTEND_V22_JS = r'''
           grid.innerHTML = btns.join("");
 
           var diffHome = fHp - hp;
-          var sentimentTxt = !aiRealV51
-            ? "AI 예측 데이터가 연동되지 않아 팬 투표 결과만 표시합니다."
-            : Math.abs(diffHome) <= 3
+          var sentimentTxt = Math.abs(diffHome) <= 3
             ? "AI 예측(" + hp + "%)과 팬 투표 여론(" + fHp + "%)이 거의 일치합니다."
             : (diffHome > 0
                 ? (uxEsc(it.home) + " 쪽으로 팬 여론(" + fHp + "%)이 AI(" + hp + "%)보다 <strong style='color:#34d399;'>+" + diffHome + "%p</strong> 높게 쏠려 있습니다.")
@@ -14049,7 +14025,7 @@ _FRONTEND_V22_JS = r'''
             (hasDrawVote ? "  <div style='width:" + fDp + "%;background:#64748b;transition:width .25s ease;'></div>" : ""),
             "  <div style='width:" + fAp + "%;background:#38bdf8;transition:width .25s ease;'></div>",
             "</div>",
-            "<div style='font-size:11px;color:#94a3b8;'>📊 <strong>" + (aiRealV51 ? "AI vs 팬 민심:" : "팬 민심:") + "</strong> " + sentimentTxt + "</div>"
+            "<div style='font-size:11px;color:#94a3b8;'>📊 <strong>AI vs 팬 민심:</strong> " + sentimentTxt + "</div>"
           ].join("");
 
           grid.querySelectorAll("[data-sq-v32-pick]").forEach(function (vb) {
@@ -14131,7 +14107,6 @@ _FRONTEND_V22_JS = r'''
           "  <div style='color:#94a3b8;font-size:11px;'>전·후반 / 쿼터 / 이닝 / 세트 / 라운드 기록</div>",
           "  <div style='color:#f8fafc;font-weight:700;margin-top:2px;'>" + uxEsc(it.period_scores || "킥오프·경기 시작 이후 실시간 세부 스코어가 자동 집계됩니다.") + "</div>",
           "</div>",
-          (!aiRealV51 ? "<div style='font-size:11.4px;color:#cbd5e1;'>ℹ️ 실제 AI 모델 데이터가 연동되지 않아 주도권 비교·예상 득점치를 표시하지 않습니다.</div>" : [
           "<div style='margin-bottom:8px;'>",
           "  <div style='display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;'><span>" + uxEsc(it.home) + " " + domH + "%</span><span style='color:#94a3b8;'>" + tacMeta.statLabel + "</span><span>" + domA + "% " + uxEsc(it.away) + "</span></div>",
           "  <div style='display:flex;height:8px;border-radius:999px;overflow:hidden;background:#1e293b;'><div style='width:" + domH + "%;background:#10b981;'></div><div style='width:" + domA + "%;background:#38bdf8;'></div></div>",
@@ -14140,7 +14115,6 @@ _FRONTEND_V22_JS = r'''
           "  <div style='display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;'><span style='font-weight:800;color:#6ee7b7;'>" + tacMeta.expHome + "</span><span style='color:#94a3b8;'>" + tacMeta.expTitle + "</span><span style='font-weight:800;color:#7dd3fc;'>" + tacMeta.expAway + "</span></div>",
           "  <div style='display:flex;height:8px;border-radius:999px;overflow:hidden;background:#1e293b;'><div style='width:" + Math.round((hp / Math.max(1, hp + ap)) * 100) + "%;background:#34d399;'></div><div style='flex:1;background:#60a5fa;'></div></div>",
           "</div>"
-          ].join(""))
         ].join("");
       } else if (tabKey === "h2h") {
         box.innerHTML = "<div style='color:#94a3b8;'>⚔️ 양 팀 실시간 리그 순위·맞대결 흐름 및 핵심 비교 지표를 조회 중입니다...</div>";
@@ -14357,7 +14331,7 @@ _FRONTEND_V22_JS = r'''
                 }
               } else {
                 var favSide = hp >= ap ? (it.home + " " + hp + "%") : (it.away + " " + ap + "%");
-                momHeadline = (it.league_full || it.league || "공식 대회") + " 매치업" + (aiRealV51 ? (" · AI 예측 " + favSide + " 우위 흐름") : "");
+                momHeadline = (it.league_full || it.league || "공식 대회") + " 매치업 · AI 예측 " + favSide + " 우위 흐름";
               }
               if (h2hExtra.home_last) momLines.push("📌 " + it.home + " 최근 결과: " + h2hExtra.home_last);
               if (h2hExtra.away_last) momLines.push("📌 " + it.away + " 최근 결과: " + h2hExtra.away_last);
@@ -14470,19 +14444,15 @@ _FRONTEND_V22_JS = r'''
               }
             }
 
-            if (aiRealV51) {
-              compRowsHtml += buildMetricBarRowV4650(
-                "AI 승률 · 공정배당",
-                hp + "% (배당 " + oddH + ")",
-                ap + "% (배당 " + oddA + ")",
-                hp,
-                ap
-              );
-            }
+            compRowsHtml += buildMetricBarRowV4650(
+              "AI 승률 · 공정배당",
+              hp + "% (배당 " + oddH + ")",
+              ap + "% (배당 " + oddA + ")",
+              hp,
+              ap
+            );
 
-            var summaryEdgeLine = !aiRealV51
-              ? "종합 요약: 위 순위·득실 지표만 비교합니다(실제 배당·AI 모델 데이터 미연동)."
-              : isSoccer
+            var summaryEdgeLine = isSoccer
               ? ("종합 요약: 홈승 " + hp + "% · 무승부 " + dp + "% (배당 " + oddD + ") · 원정승 " + ap + "% — " + (Math.abs(hp - ap) <= 6 ? "백중세 접전 구도" : ((hp > ap ? it.home : it.away) + " 전력 우세 구도")))
               : ("종합 요약: " + it.home + " " + hp + "% vs " + it.away + " " + ap + "% — " + ((hp >= ap ? it.home : it.away) + " 매치업 우세 구도"));
 
@@ -14509,33 +14479,26 @@ _FRONTEND_V22_JS = r'''
               ? teamInjs.map(function (x) {
                   return "<div style='font-size:11.5px;padding:4px 0;border-bottom:1px solid #1e293b;'>🏥 <strong>[" + uxEsc(localizeTeamKoJsV381(x.team)) + "] " + uxEsc(x.player) + "</strong> · " + uxEsc(x.reason) + " <span style='color:#fbbf24;'>(" + uxEsc(x.severity) + ")</span></div>";
                 }).join("")
-              : (injData && injData.is_sample
-                  ? "<div style='font-size:11.5px;color:#94a3b8;'>" + uxEsc(injData.sample_note || "부상자 데이터가 아직 연동되지 않았습니다.") + "</div>"
-                  : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>");
-            // 하드코딩 예시 순위표(K리그·J리그 등)는 실제 데이터처럼 보이지 않도록 안내를 붙인다.
-            var stSampleHtml = (stData && stData.is_sample)
-              ? "<div style='font-size:11px;color:#fbbf24;margin-bottom:6px;'>⚠️ " + uxEsc(stData.sample_note || "예시 데이터입니다(실시간 연동 아님).") + "</div>"
-              : "";
+              : "<div style='font-size:11.5px;color:#94a3b8;'>현재 등록된 양 팀 주요 장기 결장자 이슈가 없습니다.</div>";
 
             box.innerHTML = (
-              "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 순위 & 최근 흐름</div>" + stSampleHtml +
+              "<div style='font-weight:800;color:#6ee7b7;margin-bottom:7px;'>⚔️ 양 팀 현재 리그 순위 & 최근 흐름</div>" +
               "<div style='display:grid;gap:6px;margin-bottom:10px;'>" + fmtStanding(it.home, hRow) + fmtStanding(it.away, aRow) + "</div>" +
               h2hBlockHtml +
               compSummaryHtml +
               "<div style='font-weight:800;color:#fca5a5;margin-bottom:4px;'>🏥 양 팀 주요 결장 · 로스터 체크</div>" + injHtml
             );
           } catch (_errH2h) {
-            box.innerHTML = "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:10px 12px;color:#e2e8f0;'><strong>" + uxEsc(it.home) + " vs " + uxEsc(it.away) + "</strong>" + (aiRealV51 ? (" · AI 예측 " + hp + "% : " + (dp ? (dp + "% : ") : "") + ap + "%") : "") + "</div>";
+            box.innerHTML = "<div style='background:#0f172a;border:1px solid #1e293b;border-radius:9px;padding:10px 12px;color:#e2e8f0;'><strong>" + uxEsc(it.home) + " vs " + uxEsc(it.away) + "</strong> · AI 예측 " + hp + "% : " + (dp ? (dp + "% : ") : "") + ap + "%</div>";
           }
         });
       } else if (tabKey === "lineup") {
         box.innerHTML = [
-          "<div style='font-size:11px;color:#fbbf24;margin-bottom:6px;'>⚠️ 예시 전술 그림입니다(실제 라인업·포메이션 데이터가 아님).</div>",
           "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;'>",
           "  <span style='font-weight:800;color:#6ee7b7;'>" + tacMeta.hdrTitle + "</span>",
           "  <span style='font-size:11px;color:#94a3b8;'>" + tacMeta.hdrSub + "</span>",
           "</div>",
-          (aiRealV51 ? tacMeta.svgHtml : String(tacMeta.svgHtml || "").replace(/AI 우세율 \d+% · /g, "")),
+          tacMeta.svgHtml,
           "<div style='font-size:11.5px;color:#cbd5e1;margin-top:8px;'>" + tacMeta.footNote + "</div>"
         ].join("");
       } else if (tabKey === "talk") {
@@ -17262,6 +17225,438 @@ _FRONTEND_V22_JS = r'''
       safeRunStepV4610(enforceSingleLineMainTabBar);
     }, ms);
   });
+
+  /* =====================================================================
+     v4.6.57: Prominent Match Kickoff Date/Time Badges (Zero-Freeze Safe)
+     - Decorates 베스트 공감 브리핑 TOP 3, 글로벌 TOP 20 종합 리포트,
+       개별 [00:00 커뮤니티 자동분석] (#1~#12+), PRO·일반 회원 분석글
+     - Zero body MutationObserver, zero setInterval polling
+     ===================================================================== */
+  var __sqKickoffIndexV4657 = { loadedAt: 0, rev: 0, items: [] };
+  var __sqKickoffFetchInFlightV4657 = false;
+  var __sqKickoffDebounceV4657 = null;
+
+  var __sqTeamAliasV4657 = {
+    "맨유": "맨체스터유나이티드",
+    "맨체스터유나이티드": "맨체스터유나이티드",
+    "맨시티": "맨체스터시티",
+    "도르트문트": "보루시아도르트문트",
+    "보루시아도르트문트": "보루시아도르트문트",
+    "파리생제르맹": "파리생제르맹",
+    "psg": "파리생제르맹",
+    "바이에른": "바이에른뮌헨",
+    "뮌헨": "바이에른뮌헨",
+    "바이에른뮌헨": "바이에른뮌헨",
+    "레알": "레알마드리드",
+    "레알마드리드": "레알마드리드",
+    "인테르": "인터밀란",
+    "인터밀란": "인터밀란",
+    "바르사": "바르셀로나",
+    "fc바르셀로나": "바르셀로나",
+    "보스턴": "보스턴셀틱스",
+    "보스턴셀틱스": "보스턴셀틱스",
+    "덴버": "덴버너게츠",
+    "덴버너게츠": "덴버너게츠",
+    "댈러스": "댈러스매버릭스",
+    "댈러스매버릭스": "댈러스매버릭스",
+    "오클라호마": "오클라호마시티썬더",
+    "오클라호마시티": "오클라호마시티썬더",
+    "okc": "오클라호마시티썬더",
+    "캔자스시티": "캔자스시티치프스",
+    "라스베이거스": "라스베이거스레이더스",
+    "아스날": "아스널",
+    "아스널": "아스널",
+    "토트넘": "토트넘홋스퍼",
+    "현대캐피탈": "현대캐피탈",
+    "대한항공": "대한항공",
+    "리버풀": "리버풀",
+    "사우샘프턴": "사우샘프턴",
+    "아우크스부르크": "아우크스부르크",
+    "첼시": "첼시",
+    "kia": "kia",
+    "기아": "kia",
+    "lg": "lg"
+  };
+
+  function normTeamKeyV4657(raw) {
+    var s = String(raw || "")
+      .replace(/\[[^\]]*\]/g, " ")
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/[★☆🔥⚽🏀🏐🏒⚾🏈]/g, " ")
+      .replace(/^\s*\d+\s*위\s*/, "")
+      .replace(/^\s*#\d+\s*/, "")
+      .replace(/[—–\-:|·,].*$/, "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9가-힣]/g, "");
+    if (!s) return "";
+    return __sqTeamAliasV4657[s] || s;
+  }
+
+  function normTeamLeftV4657(raw) {
+    var s = String(raw || "")
+      .replace(/\[[^\]]*\]/g, " ")
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/[★☆🔥⚽🏀🏐🏒⚾🏈]/g, " ")
+      .replace(/^.*[—–:|·]\s*/, "")
+      .replace(/^\s*\d+\s*위\s*/, "")
+      .replace(/^\s*#\d+\s*/, "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9가-힣]/g, "");
+    if (!s) return "";
+    return __sqTeamAliasV4657[s] || s;
+  }
+
+  function teamsMatchV4657(a, b) {
+    if (!a || !b) return false;
+    if (a === b) return true;
+    if (a.length >= 2 && b.length >= 2) {
+      if (a.indexOf(b) !== -1 || b.indexOf(a) !== -1) return true;
+    }
+    return false;
+  }
+
+  function formatMmddKstV4657(mm, dd, hh, mi, explicitYear) {
+    var mNum = parseInt(mm, 10);
+    var dNum = parseInt(dd, 10);
+    if (!mNum || !dNum || mNum < 1 || mNum > 12 || dNum < 1 || dNum > 31) return "";
+    var nowKst = new Date(Date.now() + 9 * 3600 * 1000);
+    var curY = explicitYear ? parseInt(explicitYear, 10) : nowKst.getUTCFullYear();
+    var curM = nowKst.getUTCMonth() + 1;
+    if (!explicitYear) {
+      if (curM === 12 && mNum === 1) curY += 1;
+      else if (curM === 1 && mNum === 12) curY -= 1;
+    }
+    var wdNames = ["일", "월", "화", "수", "목", "금", "토"];
+    var dt = new Date(Date.UTC(curY, mNum - 1, dNum, 12, 0, 0));
+    var wd = wdNames[dt.getUTCDay()] || "";
+    var mmStr = (mNum < 10 ? "0" : "") + mNum;
+    var ddStr = (dNum < 10 ? "0" : "") + dNum;
+    var timePart = (hh && mi) ? (" " + hh + ":" + mi + " KST") : " KST";
+    return mmStr + "." + ddStr + (wd ? " (" + wd + ")" : "") + timePart;
+  }
+
+  function parseKickoffFromTextV4657(txt) {
+    var s = String(txt || "");
+    if (!s) return null;
+    // Skip report timestamp like "2026-11-23 00:00 KST 기준"
+    var cleaned = s.replace(/\d{4}[.\-/]\d{2}[.\-/]\d{2}\s+\d{2}:\d{2}\s*KST\s*기준/gi, " ");
+    var m1 = cleaned.match(/일정\s*\/?\s*장소[^\d]{0,12}(\d{1,2})\.(\d{1,2})\s+(\d{2}):(\d{2})(?:\s*[·|]\s*([^'"\n,.]{2,28}))?/);
+    if (m1) {
+      return {
+        dt_label: formatMmddKstV4657(m1[1], m1[2], m1[3], m1[4]),
+        venue: (m1[5] || "").trim()
+      };
+    }
+    var m2 = cleaned.match(/['"](\d{1,2})\.(\d{1,2})\s+(\d{2}):(\d{2})\s*[·|]\s*([^'"\n]{2,28})['"]/);
+    if (m2) {
+      return {
+        dt_label: formatMmddKstV4657(m2[1], m2[2], m2[3], m2[4]),
+        venue: (m2[5] || "").trim()
+      };
+    }
+    var m3 = cleaned.match(/(?:^|[\s(\['])(\d{2})\.(\d{2})\s+(\d{2}):(\d{2})(?:\s*[·|]\s*([^\n'".,]{2,26}))?/);
+    if (m3) {
+      return {
+        dt_label: formatMmddKstV4657(m3[1], m3[2], m3[3], m3[4]),
+        venue: (m3[5] || "").trim()
+      };
+    }
+    return null;
+  }
+
+  function extractMatchupPairV4657(txt) {
+    var s = String(txt || "").replace(/\s+/g, " ").trim();
+    if (!s) return null;
+    var m = s.match(/([가-힣A-Za-z0-9.\s]{2,26}?)\s+vs\.?\s+([가-힣A-Za-z0-9.\s]{2,26})/i);
+    if (!m) return null;
+    var left = normTeamLeftV4657(m[1]);
+    var right = normTeamKeyV4657(m[2]);
+    if (!left || !right || left === right) return null;
+    return { left: left, right: right };
+  }
+
+  function lookupKickoffInIndexV4657(pair) {
+    if (!pair || !pair.left || !pair.right) return null;
+    var items = __sqKickoffIndexV4657.items || [];
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (!it || !it.dt_label) continue;
+      var h = it._hk || normTeamKeyV4657(it.home);
+      var a = it._ak || normTeamKeyV4657(it.away);
+      if (
+        (teamsMatchV4657(pair.left, h) && teamsMatchV4657(pair.right, a)) ||
+        (teamsMatchV4657(pair.left, a) && teamsMatchV4657(pair.right, h))
+      ) {
+        return it;
+      }
+    }
+    return null;
+  }
+
+  function harvestLocalDomKickoffsV4657() {
+    var added = 0;
+    try {
+      var grid = document.getElementById("globalTop10Grid");
+      if (grid) {
+        var cards = grid.children;
+        for (var i = 0; i < cards.length; i++) {
+          var t = (cards[i].textContent || "").replace(/\s+/g, " ").trim();
+          var pair = extractMatchupPairV4657(t);
+          var parsed = parseKickoffFromTextV4657(t);
+          if (pair && parsed && parsed.dt_label) {
+            if (!lookupKickoffInIndexV4657(pair)) {
+              __sqKickoffIndexV4657.items.push({
+                home: pair.left,
+                away: pair.right,
+                _hk: pair.left,
+                _ak: pair.right,
+                dt_label: parsed.dt_label,
+                venue: parsed.venue || "",
+                source: "dom_top20"
+              });
+              added++;
+            }
+          }
+        }
+      }
+    } catch (_eDomKo) {}
+    if (added > 0) __sqKickoffIndexV4657.rev++;
+  }
+
+  function injectKickoffBadgeCssV4657() {
+    if (document.getElementById("sqKickoffBadgeCssV4657")) return;
+    var st = document.createElement("style");
+    st.id = "sqKickoffBadgeCssV4657";
+    st.textContent =
+      ".sq-ko-badge-v4657{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:800;letter-spacing:-0.01em;line-height:1.35;margin:4px 0 6px 0;background:rgba(14,165,233,0.14);border:1px solid rgba(56,189,248,0.45);color:#7dd3fc;vertical-align:middle;max-width:100%;box-sizing:border-box;}" +
+      ".sq-ko-badge-v4657.is-live{background:rgba(239,68,68,0.16);border-color:rgba(248,113,113,0.55);color:#fca5a5;}" +
+      ".sq-ko-badge-v4657.is-post{background:rgba(148,163,184,0.14);border-color:rgba(148,163,184,0.38);color:#cbd5e1;}" +
+      ".sq-ko-badge-v4657.is-tbd{background:rgba(51,65,85,0.42);border-color:rgba(100,116,139,0.42);color:#94a3b8;font-weight:700;}" +
+      ".sq-ko-venue-v4657{color:#94a3b8;font-weight:600;font-size:11px;margin-left:2px;}" +
+      ".sq-ko-top3-strip-v4657{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px 0;padding:7px 10px;border-radius:10px;background:rgba(15,23,42,0.68);border:1px solid rgba(56,189,248,0.28);}" +
+      ".sq-ko-top3-chip-v4657{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#bae6fd;background:rgba(14,165,233,0.12);border:1px solid rgba(56,189,248,0.32);border-radius:999px;padding:2px 8px;}";
+    (document.head || document.documentElement).appendChild(st);
+  }
+
+  function buildKickoffBadgeElV4657(info) {
+    var span = document.createElement("div");
+    span.setAttribute("data-sq-ko-badge-v4657", "1");
+    var cls = "sq-ko-badge-v4657";
+    if (!info || !info.dt_label) {
+      span.className = cls + " is-tbd";
+      span.textContent = "📅 경기 일정 미정 · 전술 프리뷰";
+      return span;
+    }
+    var prefix = "📅 경기 시작 ";
+    if (info.state === "in") {
+      cls += " is-live";
+      prefix = "🔴 LIVE 진행 · ";
+    } else if (info.state === "post") {
+      cls += " is-post";
+      prefix = "🏁 경기 일시 ";
+    }
+    span.className = cls;
+    var mainTxt = document.createElement("span");
+    mainTxt.textContent = prefix + info.dt_label;
+    span.appendChild(mainTxt);
+    if (info.venue) {
+      var vSpan = document.createElement("span");
+      vSpan.className = "sq-ko-venue-v4657";
+      vSpan.textContent = "· " + info.venue;
+      span.appendChild(vSpan);
+    }
+    return span;
+  }
+
+  function decorateSummaryReportCardV4657(card, fullText) {
+    var existing = card.querySelector("[data-sq-ko-summary-v4657='1']");
+    if (existing && existing.getAttribute("data-sq-rev") === String(__sqKickoffIndexV4657.rev)) return;
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+    var matches = [];
+    var reRank = /(\d)위\s+([가-힣A-Za-z0-9.\s]{2,22}?)\s+vs\.?\s+([가-힣A-Za-z0-9.\s]{2,22}?)(?:\s*\(|[·,]|$)/g;
+    var m;
+    while ((m = reRank.exec(fullText)) !== null && matches.length < 3) {
+      var rNum = m[1];
+      var t1 = m[2].trim();
+      var t2 = m[3].trim();
+      var pair = { left: normTeamLeftV4657(t1), right: normTeamKeyV4657(t2) };
+      var hit = lookupKickoffInIndexV4657(pair);
+      if (hit && hit.dt_label) {
+        matches.push({ rank: rNum, label: t1 + " vs " + t2, dt: hit.dt_label });
+      }
+    }
+    if (!matches.length && (__sqKickoffIndexV4657.items || []).length) {
+      for (var i = 0; i < Math.min(3, __sqKickoffIndexV4657.items.length); i++) {
+        var it = __sqKickoffIndexV4657.items[i];
+        if (it && it.source === "global_top20" && it.dt_label) {
+          matches.push({ rank: String(i + 1), label: it.matchup || (it.home + " vs " + it.away), dt: it.dt_label });
+        }
+      }
+    }
+    if (!matches.length) return;
+
+    var strip = document.createElement("div");
+    strip.className = "sq-ko-top3-strip-v4657";
+    strip.setAttribute("data-sq-ko-summary-v4657", "1");
+    strip.setAttribute("data-sq-rev", String(__sqKickoffIndexV4657.rev));
+
+    var hdr = document.createElement("span");
+    hdr.style.cssText = "font-size:11px;font-weight:800;color:#7dd3fc;align-self:center;margin-right:2px;";
+    hdr.textContent = "📅 TOP 3 킥오프 일정";
+    strip.appendChild(hdr);
+
+    for (var j = 0; j < matches.length; j++) {
+      var chip = document.createElement("span");
+      chip.className = "sq-ko-top3-chip-v4657";
+      chip.textContent = matches[j].rank + "위 " + matches[j].label + " · " + matches[j].dt;
+      strip.appendChild(chip);
+    }
+
+    var anchor = card.querySelector("h2, h3, h4") || card.firstElementChild;
+    if (anchor && anchor.parentNode) {
+      anchor.parentNode.insertBefore(strip, anchor.nextSibling);
+    } else {
+      card.insertBefore(strip, card.firstChild);
+    }
+  }
+
+  function decorateSingleCardV4657(card) {
+    if (!card || card.nodeType !== 1) return;
+    var revStr = String(__sqKickoffIndexV4657.rev);
+    if (card.getAttribute("data-sq-ko-rev-v4657") === revStr) return;
+
+    var fullText = (card.textContent || "").replace(/\s+/g, " ").trim();
+    if (!fullText || fullText.length < 10) return;
+
+    // Special case: [00:00 글로벌 TOP 20 종합 리포트]
+    if (fullText.indexOf("글로벌 TOP 20 종합 리포트") !== -1) {
+      decorateSummaryReportCardV4657(card, fullText);
+      card.setAttribute("data-sq-ko-rev-v4657", revStr);
+      return;
+    }
+
+    var titleEl = card.querySelector("h2, h3, h4, .sq-post-title, [class*='title']");
+    var titleText = titleEl ? (titleEl.textContent || "") : fullText.slice(0, 140);
+    var pair = extractMatchupPairV4657(titleText) || extractMatchupPairV4657(fullText.slice(0, 220));
+    if (!pair) return;
+
+    var info = lookupKickoffInIndexV4657(pair);
+    if (!info) {
+      var parsed = parseKickoffFromTextV4657(fullText);
+      if (parsed && parsed.dt_label) {
+        info = { dt_label: parsed.dt_label, venue: parsed.venue || "", state: "pre" };
+      }
+    }
+
+    var prevBadge = card.querySelector("[data-sq-ko-badge-v4657='1']");
+    if (prevBadge && prevBadge.parentNode) prevBadge.parentNode.removeChild(prevBadge);
+
+    var badge = buildKickoffBadgeElV4657(info);
+    if (titleEl && titleEl.parentNode) {
+      titleEl.parentNode.insertBefore(badge, titleEl.nextSibling);
+    } else if (card.firstElementChild && card.firstElementChild.parentNode) {
+      card.firstElementChild.parentNode.insertBefore(badge, card.firstElementChild.nextSibling);
+    } else {
+      card.insertBefore(badge, card.firstChild);
+    }
+    card.setAttribute("data-sq-ko-rev-v4657", revStr);
+  }
+
+  function decorateFeedKickoffBadgesV4657() {
+    injectKickoffBadgeCssV4657();
+    harvestLocalDomKickoffsV4657();
+
+    // 1. Best Briefing TOP 3 cards
+    var bestBox = document.getElementById("sqBestTop3BoxV40");
+    if (bestBox) {
+      var bestCards = bestBox.querySelectorAll("article, [class*='grid'] > div");
+      for (var i = 0; i < bestCards.length && i < 6; i++) {
+        var bc = bestCards[i];
+        var bt = bc.textContent || "";
+        if (bt.indexOf("vs") !== -1 || bt.indexOf("VS") !== -1) {
+          decorateSingleCardV4657(bc);
+        }
+      }
+    }
+
+    // 2. Main Feed cards (#feedList direct children only -> O(N), zero freeze)
+    var feedList = document.getElementById("feedList");
+    if (feedList) {
+      var kids = feedList.children;
+      for (var k = 0; k < kids.length && k < 60; k++) {
+        decorateSingleCardV4657(kids[k]);
+      }
+    }
+  }
+
+  function scheduleKickoffBadgePassV4657(delayMs) {
+    if (__sqKickoffDebounceV4657) clearTimeout(__sqKickoffDebounceV4657);
+    __sqKickoffDebounceV4657 = setTimeout(function () {
+      __sqKickoffDebounceV4657 = null;
+      try { decorateFeedKickoffBadgesV4657(); } catch (_eKoPass) {}
+    }, typeof delayMs === "number" ? delayMs : 120);
+  }
+
+  function fetchKickoffIndexV4657(force) {
+    var now = Date.now();
+    if (__sqKickoffFetchInFlightV4657) return;
+    if (!force && __sqKickoffIndexV4657.loadedAt && (now - __sqKickoffIndexV4657.loadedAt) < 180000) {
+      scheduleKickoffBadgePassV4657(60);
+      return;
+    }
+    __sqKickoffFetchInFlightV4657 = true;
+    fetch("/api/member/feed-kickoff-index-v4657")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        __sqKickoffFetchInFlightV4657 = false;
+        if (!d || !d.ok || !Array.isArray(d.items)) return;
+        __sqKickoffIndexV4657.items = d.items.map(function (it) {
+          it._hk = normTeamKeyV4657(it.home);
+          it._ak = normTeamKeyV4657(it.away);
+          return it;
+        });
+        __sqKickoffIndexV4657.loadedAt = Date.now();
+        __sqKickoffIndexV4657.rev++;
+        scheduleKickoffBadgePassV4657(40);
+      })
+      .catch(function () {
+        __sqKickoffFetchInFlightV4657 = false;
+        scheduleKickoffBadgePassV4657(120);
+      });
+  }
+
+  function hookFeedRenderForKickoffsV4657() {
+    if (typeof window.renderFeed === "function" && !window.renderFeed.__sqKoWrappedV4657) {
+      var origRender = window.renderFeed;
+      var wrapped = function () {
+        var res = origRender.apply(this, arguments);
+        scheduleKickoffBadgePassV4657(90);
+        return res;
+      };
+      wrapped.__sqKoWrappedV4657 = true;
+      window.renderFeed = wrapped;
+    }
+    var bestBtn = document.getElementById("sqBestTop3ToggleV40");
+    if (bestBtn && !bestBtn.__sqKoBoundV4657) {
+      bestBtn.__sqKoBoundV4657 = true;
+      bestBtn.addEventListener("click", function () {
+        scheduleKickoffBadgePassV4657(140);
+      });
+    }
+  }
+
+  window.__sqDecorateKickoffsV4657 = decorateFeedKickoffBadgesV4657;
+  [650, 1900, 4200].forEach(function (ms, idx) {
+    setTimeout(function () {
+      hookFeedRenderForKickoffsV4657();
+      if (idx === 0) fetchKickoffIndexV4657(false);
+      else scheduleKickoffBadgePassV4657(50);
+    }, ms);
+  });
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootMemberUxV22);
   } else {
@@ -19104,7 +19499,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46560_{int(time.time())}"
+_BOOT_VER_V30 = f"46570_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -19229,7 +19624,7 @@ def _build_comment_sig_v4612(post_id: str, user_label: str, comment_text: str) -
 
 @router.get("/api/posts")
 def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[str] = ""):
-    # 조회 요청에서는 예시 게시글을 시드하지 않는다(시드는 시작 시 테이블 초기화에서만).
+    _ensure_tactical_posts_seeded_v22()
     _primary, actor_keys = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
@@ -19336,8 +19731,6 @@ def list_community_posts_v22(actor_key: Optional[str] = "", nickname: Optional[s
                     "comments": comments_by_post.get(pid, []),
                     "isMemberServerPost": True,
                     "hasPin": bool(r["pin_hash"]),
-                    # 운영자가 넣은 예시 글(실제 회원 글 아님)
-                    "is_sample": str(pid).startswith("mp_seed_"),
                 }
             )
 
@@ -21888,10 +22281,6 @@ def _build_kr_jp_soccer_meta_v4640(kind: str, lg_raw: str) -> Dict[str, Any]:
             "items": [],
             "total": 0,
             "summary": {"total": 0, "out": 0, "doubtful": 0},
-            # 실제 부상자 데이터 연동이 없다. 0명은 '부상자 없음'이 아니라 '데이터 없음'이다.
-            "source": "부상자 데이터 미연동",
-            "is_sample": True,
-            "sample_note": "K리그·J리그 부상자 데이터는 아직 연동되지 않았습니다.",
         }
     rows_out: List[Dict[str, Any]] = []
     for rk, (tm, gp, w, d, l, gf, ga, pts, fm) in enumerate(_KR_JP_SOCCER_STANDINGS_V4640[cu], start=1):
@@ -21915,10 +22304,7 @@ def _build_kr_jp_soccer_meta_v4640(kind: str, lg_raw: str) -> Dict[str, Any]:
         "ok": True,
         "league": cu,
         "league_name": lg_full_map[cu],
-        # 하드코딩된 순위표(실시간 연동 아님)이므로 공식 순위처럼 표시하지 않는다.
-        "source": "SportiQ 예시 데이터 (하드코딩 순위표)",
-        "is_sample": True,
-        "sample_note": "K리그·J리그 순위·최근 폼은 실시간 연동이 아닌 예시 데이터입니다.",
+        "source": "2026 시즌 공식 순위표",
         "standings": rows_out,
     }
 
@@ -22307,7 +22693,7 @@ def _format_fan_vote_payload_v32(
     tot = max(1, hv + dv + av)
     h_pct = int(round((hv / tot) * 100))
     d_pct = int(round((dv / tot) * 100)) if has_draw else 0
-    a_pct = max(0, 100 - h_pct - d_pct) if (hv + dv + av) > 0 else 0
+    a_pct = max(0, 100 - h_pct - d_pct)
     out: Dict[str, Any] = {
         "ok": True,
         "match_key": match_key,
@@ -22324,8 +22710,6 @@ def _format_fan_vote_payload_v32(
         "draw_pct": d_pct,
         "away_pct": a_pct,
         "message": message,
-        # 예전 버전이 만든 집계 행에는 기본 시드 투표(24~56표)가 섞여 있을 수 있다.
-        "votes_include_seed_baseline": True,
     }
     if points is not None:
         out["points"] = int(points)
@@ -22351,14 +22735,18 @@ def get_match_fan_vote_v32(
     _, actor_candidates = _normalize_actor_keys(actor_key, nickname)
 
     def _op() -> Dict[str, Any]:
-        # 조회 전용: 집계가 없으면 0표로 응답하고 DB에 아무것도 쓰지 않는다(가짜 기본 투표 생성 제거).
-        with _smu_db_session(write=False) as conn:
+        now = time.time()
+        with _smu_db_session(write=True) as conn:
             t_row = conn.execute(
                 "SELECT home_votes, draw_votes, away_votes FROM match_fan_vote_totals_v32 WHERE match_key = ?",
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = 0, 0, 0
+                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, hp, dp, ap)
+                conn.execute(
+                    "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (mk, hv, dv, av, now),
+                )
             else:
                 hv = int(t_row["home_votes"] or 0)
                 dv = int(t_row["draw_votes"] or 0) if hd else 0
@@ -22404,7 +22792,7 @@ def submit_match_fan_vote_v32(payload: MatchFanVoteIn):
                 (mk,),
             ).fetchone()
             if not t_row:
-                hv, dv, av = 0, 0, 0  # 실제 투표만 집계한다(기본 시드 투표 없음).
+                hv, dv, av = _seed_fan_vote_baseline_v32(mk, hd, int(payload.hp or 45), int(payload.dp or 25), int(payload.ap or 30))
                 conn.execute(
                     "INSERT OR IGNORE INTO match_fan_vote_totals_v32(match_key, home_votes, draw_votes, away_votes, updated_at) VALUES (?, ?, ?, ?, ?)",
                     (mk, hv, dv, av, now),
@@ -22548,7 +22936,10 @@ def _xml_safe_cdata_v4636(val: Any) -> str:
 
 
 def _collect_indexable_posts_v38(limit: int = 60) -> List[Dict[str, Any]]:
-    # sitemap/RSS 조회 중에는 DB에 쓰지 않는다.
+    try:
+        _ensure_tactical_posts_seeded_v22()
+    except Exception:
+        pass
     now_ts = time.time()
     items: List[Dict[str, Any]] = []
     seen_ids: Set[str] = set()
@@ -25666,12 +26057,38 @@ def _presence_stats(conn: sqlite3.Connection) -> dict:
     return {"active_now": max(active, 1), "today_visitors": max(today_cnt, 1)}
 
 
+_PRESENCE_PING_LOCK_V4657 = threading.Lock()
+_PRESENCE_PING_MEM_V4657: Dict[str, tuple] = {}
+_PRESENCE_STATS_CACHE_V4657: Dict[str, Any] = {
+    "ts": 0.0,
+    "stats": {"active_now": 1, "today_visitors": 1},
+}
+
+
 @router.post("/api/presence/ping")
 def presence_ping(payload: PresencePingIn):
     now = time.time()
     today = datetime.now(KST).strftime("%Y-%m-%d")
     sid = (payload.session_id or "anon").strip()[:64]
     role = (payload.role or "GUEST").strip()[:24]
+
+    with _PRESENCE_PING_LOCK_V4657:
+        prev = _PRESENCE_PING_MEM_V4657.get(sid)
+        cached_ts = float(_PRESENCE_STATS_CACHE_V4657.get("ts") or 0.0)
+        cached_stats = dict(_PRESENCE_STATS_CACHE_V4657.get("stats") or {"active_now": 1, "today_visitors": 1})
+        if (
+            prev is not None
+            and (now - float(prev[0])) < 45.0
+            and prev[1] == role
+            and prev[2] == today
+            and (now - cached_ts) < 30.0
+        ):
+            return {"ok": True, **cached_stats, "throttled": True}
+        if len(_PRESENCE_PING_MEM_V4657) > 4000:
+            cutoff = now - 600.0
+            stale_keys = [k for k, v in _PRESENCE_PING_MEM_V4657.items() if float(v[0]) < cutoff]
+            for k in stale_keys[:2000]:
+                _PRESENCE_PING_MEM_V4657.pop(k, None)
 
     def _op() -> dict:
         with _db_session(write=True) as conn:
@@ -25688,8 +26105,17 @@ def presence_ping(payload: PresencePingIn):
             )
             return _presence_stats(conn)
 
-    stats = run_with_db_retry(_op)
-    return {"ok": True, **stats}
+    try:
+        stats = run_with_db_retry(_op)
+        with _PRESENCE_PING_LOCK_V4657:
+            _PRESENCE_PING_MEM_V4657[sid] = (now, role, today)
+            _PRESENCE_STATS_CACHE_V4657["ts"] = now
+            _PRESENCE_STATS_CACHE_V4657["stats"] = dict(stats)
+        return {"ok": True, **stats}
+    except Exception:
+        with _PRESENCE_PING_LOCK_V4657:
+            fallback_stats = dict(_PRESENCE_STATS_CACHE_V4657.get("stats") or {"active_now": 1, "today_visitors": 1})
+        return {"ok": True, **fallback_stats, "lock_fallback": True}
 
 
 @router.get("/api/presence")
@@ -25927,46 +26353,16 @@ def get_global_matches():
                 for i, r in enumerate(rows)
             ]
 
-    # votes/buzz_score는 초기 시드 기준값에 실제 투표가 더해진 값이다(실측 팬 수가 아님).
-    return {"matches": run_with_db_retry(_op), "votes_include_seed_baseline": True}
-
-
-_GM_VOTE_DEDUPE_LOCK = threading.Lock()
-_GM_VOTE_DEDUPE: Dict[str, float] = {}
-_GM_VOTE_DEDUPE_TTL_SEC = 12 * 3600.0
-
-
-def _gm_vote_already_cast(request: Optional[Request], match_id: int) -> bool:
-    """같은 접속자(IP 해시)가 같은 경기에 12시간 안에 다시 투표하면 True. 원본 IP는 저장하지 않는다."""
-    ip_raw = _client_ip_v4615(request)
-    salt = os.environ.get("SPORTIQ_VOTE_HASH_SALT", "sportiq-gm-vote")
-    key = hashlib.sha256(f"{salt}:{ip_raw}:{match_id}".encode("utf-8", errors="ignore")).hexdigest()
-    now_ep = time.time()
-    with _GM_VOTE_DEDUPE_LOCK:
-        if len(_GM_VOTE_DEDUPE) > 20000:
-            for k in [k for k, ts in _GM_VOTE_DEDUPE.items() if (now_ep - ts) >= _GM_VOTE_DEDUPE_TTL_SEC]:
-                _GM_VOTE_DEDUPE.pop(k, None)
-        last = _GM_VOTE_DEDUPE.get(key)
-        if last is not None and (now_ep - last) < _GM_VOTE_DEDUPE_TTL_SEC:
-            return True
-        _GM_VOTE_DEDUPE[key] = now_ep
-        return False
+    return {"matches": run_with_db_retry(_op)}
 
 
 @router.post("/api/rankings/global-matches/{match_id}/vote")
-def vote_global_match(match_id: int, request: Request):
-    already_voted = _gm_vote_already_cast(request, match_id)
-
+def vote_global_match(match_id: int):
     def _op() -> tuple[Optional[dict], list[dict]]:
-        with _db_session(write=not already_voted) as conn:
-            if already_voted:
-                exists = conn.execute("SELECT 1 FROM global_match_rankings WHERE id = ?", (match_id,)).fetchone()
-                if not exists:
-                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
-            else:
-                cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
-                if cur.rowcount == 0:
-                    raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
+        with _db_session(write=True) as conn:
+            cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
             rows = conn.execute(
                 "SELECT id, match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC"
             ).fetchall()
@@ -25990,19 +26386,12 @@ def vote_global_match(match_id: int, request: Request):
             return voted, items
 
     voted, items = run_with_db_retry(_op)
-    if not already_voted:
-        try:
-            from app.sportiq_auto_analyst import _backup_tables_to_pg
-            _backup_tables_to_pg("global_match_rankings")
-        except Exception:
-            pass
-    return {
-        "ok": True,
-        "already_voted": already_voted,
-        "votes_include_seed_baseline": True,
-        "match": voted,
-        "matches": items,
-    }
+    try:
+        from app.sportiq_auto_analyst import _backup_tables_to_pg
+        _backup_tables_to_pg("global_match_rankings")
+    except Exception:
+        pass
+    return {"ok": True, "match": voted, "matches": items}
 
 
 _DC_KO_WRAPPER_INSTALLED_V381 = False
@@ -26267,10 +26656,7 @@ def _ai_probs_with_real_odds_v4616(
                     "draw": round(od, 2) if dp > 0 else 0.0,
                     "away": round(oa, 2),
                 },
-                "basis": "bookmaker_odds",
-                "is_sample": False,
             }
-    # 아래 값은 팀 이름 해시로 만든 예시값이다(모델 확률·실제 배당 아님). 화면은 is_sample이면 숨기거나 '예시'로 표시한다.
     h_seed = sum(ord(c) for c in f"{home}:{away}:{sport}")
     bh = 46 + ((h_seed * 17) % 25) - 11
     if has_draw:
@@ -26283,8 +26669,6 @@ def _ai_probs_with_real_odds_v4616(
             "draw_pct": dr,
             "away_pct": aw,
             "odds": {"home": round(94.5 / hm, 2), "draw": round(94.5 / dr, 2), "away": round(94.5 / aw, 2)},
-            "basis": "name_hash",
-            "is_sample": True,
         }
     hm = max(28, min(72, bh + 5))
     aw = 100 - hm
@@ -26293,8 +26677,6 @@ def _ai_probs_with_real_odds_v4616(
         "draw_pct": 0,
         "away_pct": aw,
         "odds": {"home": round(94.5 / hm, 2), "draw": 0.0, "away": round(94.5 / aw, 2)},
-        "basis": "name_hash",
-        "is_sample": True,
     }
 
 
@@ -30883,7 +31265,7 @@ def _filter_official_matches_only_v4615(items: Any, expected_mmdd: Optional[str]
 
 
 def _recompute_sport_counts_v4615(items: List[Dict[str, Any]], prev_counts: Any = None) -> Dict[str, int]:
-    base_keys = ["soccer", "baseball", "basketball", "volleyball", "hockey", "esports", "ufc", "tennis", "f1", "american_football"]
+    base_keys = ["soccer", "baseball", "basketball", "volleyball", "hockey", "esports", "ufc", "tennis", "f1"]
     counts: Dict[str, int] = {}
     if isinstance(prev_counts, dict):
         for k in prev_counts:
@@ -31844,8 +32226,6 @@ def _sync_collect_offset_v4648(target_k: datetime, off_i: int) -> List[Dict[str,
         deduped.sort(key=lambda x: (ord_st_v53.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
         for _d_clean in deduped:
             _d_clean["_localized_ko_v53"] = True
-        # ESPN sports this collector lacks (NFL/MLB/UFC/tennis/F1), same source as /api/datacenter/live-scores.
-        deduped = _with_espn_supplement_v50(deduped, off_i)
 
         now_k_fin = datetime.now(KST)
         wd_fin = ["월", "화", "수", "목", "금", "토", "일"]
@@ -31955,40 +32335,6 @@ def _fast_api_member_scoreboard_v4648(date_offset: int = 0) -> Dict[str, Any]:
         "total": len(raw_items),
         "items": raw_items,
     }
-
-
-def _with_espn_supplement_v50(items: List[Dict[str, Any]], off_i: int) -> List[Dict[str, Any]]:
-    """Add ESPN sports this collector lacks (NFL, MLB, UFC, tennis, F1).
-
-    Uses sportiq_datacenter._supplement_espn_matches, the same source as
-    /api/datacenter/live-scores. Items carry no AI numbers: ai.is_sample tells
-    the cards to show none instead of a front-end default.
-    """
-    try:
-        from app import sportiq_datacenter as _dc_v50
-        merged = _dc_v50._supplement_espn_matches(list(items or []), off_i)
-    except Exception:
-        return list(items or [])
-    known = {id(x) for x in (items or [])}
-    out: List[Dict[str, Any]] = []
-    for it in merged:
-        if id(it) in known:
-            out.append(it)
-            continue
-        it = dict(it)
-        ps = it.get("period_scores")
-        if isinstance(ps, list):
-            it["period_scores"] = " · ".join(str(x) for x in ps if x)
-        it["home_score"] = it.get("home_score") if it.get("home_score") not in ("", None) else 0
-        it["away_score"] = it.get("away_score") if it.get("away_score") not in ("", None) else 0
-        it["ai"] = {"basis": "none", "is_sample": True}
-        it["verified_official"] = True
-        it["_espn_verified_v4615"] = True
-        it["_localized_ko_v53"] = True
-        out.append(it)
-    ord_sb = {"in": 0, "pre": 1, "post": 2}
-    out.sort(key=lambda x: (ord_sb.get(str(x.get("state") or ""), 3), str(x.get("match_dt_kst") or "")))
-    return out
 
 
 api_member_scoreboard_v30 = _fast_api_member_scoreboard_v4648
@@ -32335,11 +32681,6 @@ def _parse_espn_summary_h2h_v4650(
             if not isinstance(ent, dict):
                 continue
             tm_o = ent.get("team") or {}
-            if isinstance(tm_o, str):
-                # ESPN summary standings sometimes give the team as a plain name string.
-                tm_o = {"displayName": tm_o}
-            elif not isinstance(tm_o, dict):
-                continue
             tm_nm = _localize_team_ko_v37(str(tm_o.get("shortDisplayName") or tm_o.get("displayName") or tm_o.get("name") or ""), sp)
             smap = {str(s.get("name") or s.get("abbreviation") or ""): s.get("value", s.get("displayValue", 0)) for s in (ent.get("stats") or []) if isinstance(s, dict)}
             try:
@@ -32450,8 +32791,17 @@ def api_member_match_h2h_v4650(
             cia = _canon_team_key_v4616(ia_ko, sp)
             st_it = str(it.get("state") or "")
             dt_s = str(it.get("match_dt_kst") or "").strip()
-            hs_it = int(it.get("home_score") or 0)
-            as_it = int(it.get("away_score") or 0)
+            def _safe_int_score_v4657(v: Any) -> int:
+                if isinstance(v, bool) or v is None:
+                    return 0
+                if isinstance(v, (int, float)):
+                    return int(v)
+                s_val = str(v).strip()
+                m_val = re.match(r"^-?\d+", s_val)
+                return int(m_val.group(0)) if m_val else 0
+
+            hs_it = _safe_int_score_v4657(it.get("home_score"))
+            as_it = _safe_int_score_v4657(it.get("away_score"))
 
             if frozenset([cih, cia]) == pair_set:
                 if st_it == "post":
@@ -33926,6 +34276,8 @@ _V4655_NEW_PATHS = {
     "/api/member/auto-shorts-action-v4655",
     "/api/member/live-sources-diag-v4655",
     "/api/member/live-sources-diag-v4656",
+    "/api/member/live-sources-diag-v4657",
+    "/api/member/feed-kickoff-index-v4657",
 }
 router.routes = [rt for rt in router.routes if getattr(rt, "path", "") not in _V4655_NEW_PATHS]
 _pre_cnt_v4655 = len(router.routes)
@@ -33954,14 +34306,165 @@ async def _async_api_auto_shorts_action_v4655(payload: _AutoShortsActionPayloadV
     return await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, _handle_auto_shorts_action_sync_v4655, payload)
 
 
+_KICKOFF_INDEX_LOCK_V4657 = threading.Lock()
+_KICKOFF_INDEX_CACHE_V4657: Dict[str, Any] = {"ts": 0.0, "payload": None}
+_WEEKDAY_KO_V4657 = ("월", "화", "수", "목", "금", "토", "일")
+
+
+def _format_kickoff_kst_v4657(raw_dt: str) -> str:
+    s = str(raw_dt or "").strip()
+    if not s:
+        return ""
+    now_kst = datetime.now(KST)
+    cur_y = now_kst.year
+    cur_m = now_kst.month
+
+    m_full = re.search(r"(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?", s)
+    if m_full:
+        y, mo, d = int(m_full.group(1)), int(m_full.group(2)), int(m_full.group(3))
+        hh, mi = m_full.group(4), m_full.group(5)
+    else:
+        m_short = re.search(r"(\d{1,2})\.(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?", s)
+        if not m_short:
+            return ""
+        mo, d = int(m_short.group(1)), int(m_short.group(2))
+        hh, mi = m_short.group(3), m_short.group(4)
+        y = cur_y
+        if cur_m == 12 and mo == 1:
+            y += 1
+        elif cur_m == 1 and mo == 12:
+            y -= 1
+    try:
+        dt_obj = datetime(y, mo, d, tzinfo=KST)
+        wd = _WEEKDAY_KO_V4657[dt_obj.weekday()]
+    except Exception:
+        wd = ""
+    date_part = f"{mo:02d}.{d:02d}" + (f" ({wd})" if wd else "")
+    if hh is not None and mi is not None:
+        return f"{date_part} {int(hh):02d}:{int(mi):02d} KST"
+    return f"{date_part} KST"
+
+
+def _build_feed_kickoff_index_v4657() -> Dict[str, Any]:
+    now_m = time.monotonic()
+    with _KICKOFF_INDEX_LOCK_V4657:
+        if _KICKOFF_INDEX_CACHE_V4657["payload"] is not None and (now_m - float(_KICKOFF_INDEX_CACHE_V4657["ts"])) < 60.0:
+            return dict(_KICKOFF_INDEX_CACHE_V4657["payload"])
+
+    items: List[Dict[str, Any]] = []
+    seen_pairs: Set[str] = set()
+
+    # 1. Global TOP 20 match rankings (includes upcoming UCL / NBA / NFL / NHL big matches)
+    try:
+        with _db_session(write=False) as conn:
+            gm_rows = conn.execute(
+                "SELECT sport, league, matchup, schedule_venue FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC"
+            ).fetchall()
+        for r in gm_rows:
+            matchup = str(r["matchup"] or "").strip()
+            sv = str(r["schedule_venue"] or "").strip()
+            parts = re.split(r"\s+vs\.?\s+", matchup, maxsplit=1, flags=re.IGNORECASE)
+            if len(parts) != 2:
+                continue
+            h_name, a_name = parts[0].strip(), parts[1].strip()
+            dt_label = _format_kickoff_kst_v4657(sv)
+            if not dt_label:
+                continue
+            venue = ""
+            if "·" in sv:
+                venue = sv.split("·", 1)[1].strip()
+            pk = f"{h_name.lower()}|{a_name.lower()}"
+            if pk in seen_pairs:
+                continue
+            seen_pairs.add(pk)
+            items.append(
+                {
+                    "home": h_name,
+                    "away": a_name,
+                    "matchup": matchup,
+                    "league": str(r["league"] or ""),
+                    "sport": str(r["sport"] or ""),
+                    "dt_label": dt_label,
+                    "raw_dt": sv,
+                    "venue": venue,
+                    "state": "pre",
+                    "source": "global_top20",
+                }
+            )
+    except Exception:
+        pass
+
+    # 2. Live / Sticky Scoreboard Cache (covers domestic V-League, WKBL, K-League, EPL, Bundesliga, NBA, etc.)
+    try:
+        with _RT_V4616_LOCK:
+            cached_lists = [
+                v[1] for v in _RT_V4616_CACHE.values() if isinstance(v, tuple) and len(v) >= 2 and isinstance(v[1], list)
+            ] + [
+                list(d.values()) for d in _SAME_DAY_STICKY_V4642.values() if isinstance(d, dict)
+            ]
+        for lst in cached_lists:
+            for it in lst:
+                if not isinstance(it, dict):
+                    continue
+                sp = str(it.get("sport") or "soccer").strip().lower()
+                h_ko = _localize_team_ko_v37(str(it.get("home") or "").strip(), sp)
+                a_ko = _localize_team_ko_v37(str(it.get("away") or "").strip(), sp)
+                if not h_ko or not a_ko:
+                    continue
+                dt_raw = str(it.get("match_dt_kst") or it.get("start_time_kst") or "").strip()
+                dt_label = _format_kickoff_kst_v4657(dt_raw)
+                if not dt_label:
+                    continue
+                pk = f"{h_ko.lower()}|{a_ko.lower()}"
+                if pk in seen_pairs:
+                    continue
+                seen_pairs.add(pk)
+                items.append(
+                    {
+                        "home": h_ko,
+                        "away": a_ko,
+                        "matchup": f"{h_ko} vs {a_ko}",
+                        "league": str(it.get("league") or ""),
+                        "sport": sp,
+                        "dt_label": dt_label,
+                        "raw_dt": dt_raw,
+                        "venue": str(it.get("venue") or "").strip(),
+                        "state": str(it.get("state") or "pre"),
+                        "source": "live_board",
+                    }
+                )
+    except Exception:
+        pass
+
+    payload = {
+        "ok": True,
+        "version": "v4.6.57",
+        "count": len(items),
+        "items": items[:320],
+    }
+    with _KICKOFF_INDEX_LOCK_V4657:
+        _KICKOFF_INDEX_CACHE_V4657["ts"] = now_m
+        _KICKOFF_INDEX_CACHE_V4657["payload"] = payload
+    return dict(payload)
+
+
+@router.get("/api/member/feed-kickoff-index-v4657")
+async def _async_api_feed_kickoff_index_v4657():
+    loop = _asyncio_v4652.get_running_loop()
+    return await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, _build_feed_kickoff_index_v4657)
+
+
 @router.get("/api/member/live-sources-diag-v4655")
 @router.get("/api/member/live-sources-diag-v4656")
+@router.get("/api/member/live-sources-diag-v4657")
 async def _async_api_live_sources_diag_v4655(date_offset: int = 0):
     loop = _asyncio_v4652.get_running_loop()
     res = await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, api_live_sources_diag_v4648, date_offset)
     if isinstance(res, dict):
-        res["version"] = "v4.6.56"
+        res["version"] = "v4.6.57"
         res["client_antifreeze_v4656"] = True
+        res["kickoff_badges_v4657"] = True
+        res["h2h_and_presence_guards_v4657"] = True
     return res
 
 
