@@ -181,7 +181,9 @@ class FootballDataClient:
     def live(self):
         data = self.get("/matches", {"status": "LIVE"})
         return [self._normalize(x) for x in data.get("matches", [])
-                if x.get("id") is not None]
+                if x.get("id") is not None
+                and (x.get("homeTeam") or {}).get("id") is not None
+                and (x.get("awayTeam") or {}).get("id") is not None]
 
     def close(self):
         self.client.close()
