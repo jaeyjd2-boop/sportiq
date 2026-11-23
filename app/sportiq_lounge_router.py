@@ -15937,6 +15937,9 @@ _FRONTEND_V22_JS = r'''
         var ua = (a.source_type === "user_submit") ? 1 : 0;
         var ub = (b.source_type === "user_submit") ? 1 : 0;
         if (ub !== ua) return ub - ua;
+        var ra = (typeof a.feed_rank === "number") ? a.feed_rank : 9999;
+        var rb = (typeof b.feed_rank === "number") ? b.feed_rank : 9999;
+        if (ra !== rb) return ra - rb;
         return (Number(b.sort_ts || 0) - Number(a.sort_ts || 0)) || (Number(b.likes || 0) - Number(a.likes || 0));
       });
     }
@@ -15955,64 +15958,100 @@ _FRONTEND_V22_JS = r'''
 
   function buildTacticalSvgBoardV4655(clip) {
     var sp = String((clip && clip.sport) || "soccer");
+    var defs = "<defs>" +
+      "<marker id='sqArrSkyV60' viewBox='0 0 10 10' refX='8' refY='5' markerWidth='5' markerHeight='5' orient='auto-start-reverse'><path d='M 0 1 L 10 5 L 0 9 z' fill='#38bdf8'/></marker>" +
+      "<marker id='sqArrGrnV60' viewBox='0 0 10 10' refX='8' refY='5' markerWidth='5' markerHeight='5' orient='auto-start-reverse'><path d='M 0 1 L 10 5 L 0 9 z' fill='#34d399'/></marker>" +
+      "<marker id='sqArrGldV60' viewBox='0 0 10 10' refX='8' refY='5' markerWidth='5' markerHeight='5' orient='auto-start-reverse'><path d='M 0 1 L 10 5 L 0 9 z' fill='#fde047'/></marker>" +
+      "<marker id='sqArrRedV60' viewBox='0 0 10 10' refX='8' refY='5' markerWidth='5' markerHeight='5' orient='auto-start-reverse'><path d='M 0 1 L 10 5 L 0 9 z' fill='#fb7185'/></marker>" +
+      "</defs>";
+    function svgTagPill(x, y, txt, bgCol, txtCol) {
+      var w = Math.max(44, txt.length * 9 + 14);
+      var lx = Math.max(14, Math.min(266 - w, x - w / 2));
+      var ly = Math.max(12, Math.min(200, y));
+      return "<g>" +
+        "<rect x='" + lx.toFixed(0) + "' y='" + ly.toFixed(0) + "' width='" + w + "' height='16' rx='8' fill='" + bgCol + "' stroke='rgba(255,255,255,0.28)' stroke-width='0.9'/>" +
+        "<text x='" + (lx + w / 2).toFixed(0) + "' y='" + (ly + 11.5).toFixed(0) + "' text-anchor='middle' fill='" + txtCol + "' font-size='8.8' font-weight='800' font-family='Pretendard,sans-serif'>" + txt + "</text>" +
+        "</g>";
+    }
     if (sp === "basketball") {
       return {
         bg: "linear-gradient(180deg,#451a03 0%,#1e1b4b 58%,#090f1f 100%)",
-        svg: "<svg viewBox='0 0 280 230' style='width:100%;height:168px;opacity:0.92;'>" +
-             "<rect x='10' y='8' width='260' height='212' rx='10' fill='rgba(245,158,11,0.08)' stroke='rgba(251,191,36,0.38)' stroke-width='1.5'/>" +
-             "<path d='M 40 220 A 100 95 0 0 1 240 220' fill='none' stroke='rgba(251,191,36,0.45)' stroke-width='1.5'/>" +
-             "<rect x='102' y='132' width='76' height='88' fill='rgba(249,115,22,0.12)' stroke='rgba(251,191,36,0.4)' stroke-width='1.3'/>" +
-             "<circle cx='140' cy='132' r='26' fill='none' stroke='rgba(251,191,36,0.35)' stroke-width='1.2'/>" +
-             "<path class='sq-v55-tac-line' d='M 140 78 L 195 112 L 236 168' fill='none' stroke='#38bdf8' stroke-width='2.6'/>" +
-             "<path class='sq-v55-tac-line' d='M 195 112 L 140 186' fill='none' stroke='#34d399' stroke-width='2.4'/>" +
-             "<circle class='sq-v55-tac-node' cx='140' cy='78' r='7' fill='#f97316' stroke='#fff' stroke-width='1.6'/>" +
-             "<circle class='sq-v55-tac-node' cx='195' cy='112' r='7' fill='#38bdf8' stroke='#fff' stroke-width='1.6'/>" +
-             "<circle class='sq-v55-tac-node' cx='236' cy='168' r='7' fill='#10b981' stroke='#fff' stroke-width='1.6'/>" +
-             "<circle cx='140' cy='198' r='6' fill='none' stroke='#fb7185' stroke-width='2.2'/>" +
+        svg: "<svg viewBox='0 0 280 226' style='width:100%;height:152px;opacity:0.96;'>" + defs +
+             "<rect x='10' y='8' width='260' height='208' rx='10' fill='rgba(245,158,11,0.08)' stroke='rgba(251,191,36,0.38)' stroke-width='1.5'/>" +
+             "<path d='M 40 216 A 100 94 0 0 1 240 216' fill='none' stroke='rgba(251,191,36,0.45)' stroke-width='1.5'/>" +
+             "<rect x='102' y='128' width='76' height='88' fill='rgba(249,115,22,0.13)' stroke='rgba(251,191,36,0.4)' stroke-width='1.3'/>" +
+             "<circle cx='140' cy='128' r='26' fill='none' stroke='rgba(251,191,36,0.35)' stroke-width='1.2'/>" +
+             "<path class='sq-v55-tac-line' d='M 140 68 L 190 104' fill='none' stroke='#38bdf8' stroke-width='2.5' marker-end='url(#sqArrSkyV60)'/>" +
+             "<path class='sq-v55-tac-line' d='M 195 108 L 232 158' fill='none' stroke='#38bdf8' stroke-width='2.5' marker-end='url(#sqArrSkyV60)'/>" +
+             "<path class='sq-v55-tac-line' d='M 192 112 L 146 180' fill='none' stroke='#34d399' stroke-width='2.5' marker-end='url(#sqArrGrnV60)'/>" +
+             "<circle class='sq-v55-tac-node' cx='140' cy='68' r='7.5' fill='#f97316' stroke='#fff' stroke-width='1.6'/>" +
+             "<text x='140' y='71' text-anchor='middle' fill='#fff' font-size='8' font-weight='900'>1</text>" +
+             "<circle class='sq-v55-tac-node' cx='195' cy='108' r='7.5' fill='#38bdf8' stroke='#fff' stroke-width='1.6'/>" +
+             "<text x='195' y='111' text-anchor='middle' fill='#020617' font-size='8' font-weight='900'>2</text>" +
+             "<circle class='sq-v55-tac-node' cx='236' cy='166' r='7.5' fill='#10b981' stroke='#fff' stroke-width='1.6'/>" +
+             "<text x='236' y='169' text-anchor='middle' fill='#020617' font-size='8' font-weight='900'>3</text>" +
+             "<circle cx='140' cy='192' r='6.5' fill='rgba(251,113,133,0.22)' stroke='#fb7185' stroke-width='2.2'/>" +
+             svgTagPill(140, 38, "PG 볼핸들러", "rgba(249,115,22,0.86)", "#fff") +
+             svgTagPill(218, 80, "스크린·픽", "rgba(14,165,233,0.86)", "#fff") +
+             svgTagPill(222, 182, "코너 3점", "rgba(16,185,129,0.88)", "#022c22") +
+             svgTagPill(92, 184, "림 어택", "rgba(244,63,94,0.85)", "#fff") +
              "</svg>"
       };
     }
     if (sp === "hockey") {
       return {
         bg: "linear-gradient(180deg,#0c4a6e 0%,#0f172a 62%,#020617 100%)",
-        svg: "<svg viewBox='0 0 280 230' style='width:100%;height:168px;opacity:0.92;'>" +
-             "<rect x='12' y='8' width='256' height='212' rx='28' fill='rgba(56,189,248,0.08)' stroke='rgba(125,211,252,0.42)' stroke-width='1.6'/>" +
-             "<line x1='12' y1='88' x2='268' y2='88' stroke='rgba(56,189,248,0.5)' stroke-width='2'/>" +
-             "<circle cx='78' cy='154' r='26' fill='none' stroke='rgba(244,63,94,0.42)' stroke-width='1.4'/>" +
-             "<circle cx='202' cy='154' r='26' fill='none' stroke='rgba(244,63,94,0.42)' stroke-width='1.4'/>" +
-             "<path class='sq-v55-tac-line' d='M 78 96 L 202 146 L 140 196' fill='none' stroke='#38bdf8' stroke-width='2.8'/>" +
-             "<circle class='sq-v55-tac-node' cx='78' cy='96' r='7' fill='#38bdf8' stroke='#fff' stroke-width='1.6'/>" +
-             "<circle class='sq-v55-tac-node' cx='202' cy='146' r='7' fill='#10b981' stroke='#fff' stroke-width='1.6'/>" +
-             "<rect x='124' y='196' width='32' height='12' rx='3' fill='rgba(244,63,94,0.3)' stroke='#fb7185' stroke-width='1.5'/>" +
+        svg: "<svg viewBox='0 0 280 226' style='width:100%;height:152px;opacity:0.96;'>" + defs +
+             "<rect x='12' y='8' width='256' height='208' rx='28' fill='rgba(56,189,248,0.08)' stroke='rgba(125,211,252,0.42)' stroke-width='1.6'/>" +
+             "<line x1='12' y1='84' x2='268' y2='84' stroke='rgba(56,189,248,0.52)' stroke-width='2'/>" +
+             "<circle cx='78' cy='150' r='26' fill='none' stroke='rgba(244,63,94,0.42)' stroke-width='1.4'/>" +
+             "<circle cx='202' cy='150' r='26' fill='none' stroke='rgba(244,63,94,0.42)' stroke-width='1.4'/>" +
+             "<path class='sq-v55-tac-line' d='M 78 92 L 194 140' fill='none' stroke='#38bdf8' stroke-width='2.7' marker-end='url(#sqArrSkyV60)'/>" +
+             "<path class='sq-v55-tac-line' d='M 202 144 L 146 188' fill='none' stroke='#34d399' stroke-width='2.7' marker-end='url(#sqArrGrnV60)'/>" +
+             "<circle class='sq-v55-tac-node' cx='78' cy='92' r='7.5' fill='#38bdf8' stroke='#fff' stroke-width='1.6'/>" +
+             "<circle class='sq-v55-tac-node' cx='202' cy='144' r='7.5' fill='#10b981' stroke='#fff' stroke-width='1.6'/>" +
+             "<rect x='124' y='192' width='32' height='12' rx='3' fill='rgba(244,63,94,0.34)' stroke='#fb7185' stroke-width='1.5'/>" +
+             svgTagPill(84, 58, "블루라인 전개", "rgba(14,165,233,0.88)", "#fff") +
+             svgTagPill(212, 114, "원타이머", "rgba(16,185,129,0.88)", "#022c22") +
+             svgTagPill(140, 170, "슬롯 마무리", "rgba(244,63,94,0.86)", "#fff") +
              "</svg>"
       };
     }
     if (sp === "baseball") {
       return {
         bg: "linear-gradient(180deg,#1e3a8a 0%,#0f172a 62%,#020617 100%)",
-        svg: "<svg viewBox='0 0 280 230' style='width:100%;height:168px;opacity:0.92;'>" +
-             "<polygon points='140,26 232,118 140,206 48,118' fill='rgba(16,185,129,0.08)' stroke='rgba(148,163,184,0.4)' stroke-width='1.5'/>" +
-             "<rect x='116' y='74' width='48' height='60' fill='rgba(56,189,248,0.10)' stroke='rgba(56,189,248,0.55)' stroke-width='1.5'/>" +
-             "<path class='sq-v55-tac-line' d='M 140 34 Q 146 96 124 128' fill='none' stroke='#f43f5e' stroke-width='2.8'/>" +
-             "<path class='sq-v55-tac-line' d='M 140 34 Q 148 96 156 116' fill='none' stroke='#38bdf8' stroke-width='2.5'/>" +
-             "<circle class='sq-v55-tac-node' cx='124' cy='128' r='6.5' fill='#f43f5e' stroke='#fff' stroke-width='1.5'/>" +
+        svg: "<svg viewBox='0 0 280 226' style='width:100%;height:152px;opacity:0.96;'>" + defs +
+             "<polygon points='140,22 232,114 140,204 48,114' fill='rgba(16,185,129,0.08)' stroke='rgba(148,163,184,0.4)' stroke-width='1.5'/>" +
+             "<rect x='114' y='74' width='52' height='62' fill='rgba(56,189,248,0.12)' stroke='rgba(56,189,248,0.6)' stroke-width='1.5'/>" +
+             "<path class='sq-v55-tac-line' d='M 140 34 Q 146 92 126 122' fill='none' stroke='#fb7185' stroke-width='2.7' marker-end='url(#sqArrRedV60)'/>" +
+             "<path class='sq-v55-tac-line' d='M 140 34 Q 148 92 155 112' fill='none' stroke='#38bdf8' stroke-width='2.5' marker-end='url(#sqArrSkyV60)'/>" +
+             "<circle class='sq-v55-tac-node' cx='124' cy='126' r='6.5' fill='#f43f5e' stroke='#fff' stroke-width='1.5'/>" +
              "<circle class='sq-v55-tac-node' cx='156' cy='116' r='6.5' fill='#38bdf8' stroke='#fff' stroke-width='1.5'/>" +
+             svgTagPill(140, 14, "동일 릴리스", "rgba(30,41,59,0.92)", "#e2e8f0") +
+             svgTagPill(76, 134, "스플리터", "rgba(244,63,94,0.88)", "#fff") +
+             svgTagPill(208, 110, "하이포심", "rgba(14,165,233,0.88)", "#fff") +
              "</svg>"
       };
     }
     return {
       bg: "linear-gradient(180deg,#064e3b 0%,#022c22 60%,#041e19 100%)",
-      svg: "<svg viewBox='0 0 280 230' style='width:100%;height:168px;opacity:0.93;'>" +
-           "<rect x='12' y='8' width='256' height='212' rx='10' fill='rgba(16,185,129,0.07)' stroke='rgba(110,231,183,0.38)' stroke-width='1.5'/>" +
-           "<line x1='12' y1='114' x2='268' y2='114' stroke='rgba(110,231,183,0.3)' stroke-width='1.3'/>" +
-           "<circle cx='140' cy='114' r='28' fill='none' stroke='rgba(110,231,183,0.3)' stroke-width='1.3'/>" +
-           "<rect x='84' y='8' width='112' height='44' fill='none' stroke='rgba(110,231,183,0.36)' stroke-width='1.3'/>" +
-           "<path class='sq-v55-tac-line' d='M 74 166 L 138 118 L 198 76 L 144 28' fill='none' stroke='#fde047' stroke-width='2.7'/>" +
-           "<path class='sq-v55-tac-line' d='M 198 152 L 198 76' fill='none' stroke='#38bdf8' stroke-width='2.2'/>" +
-           "<circle class='sq-v55-tac-node' cx='74' cy='166' r='7' fill='#10b981' stroke='#fff' stroke-width='1.6'/>" +
-           "<circle class='sq-v55-tac-node' cx='138' cy='118' r='7' fill='#38bdf8' stroke='#fff' stroke-width='1.6'/>" +
+      svg: "<svg viewBox='0 0 280 226' style='width:100%;height:152px;opacity:0.96;'>" + defs +
+           "<rect x='12' y='8' width='256' height='208' rx='10' fill='rgba(16,185,129,0.08)' stroke='rgba(110,231,183,0.38)' stroke-width='1.5'/>" +
+           "<line x1='12' y1='112' x2='268' y2='112' stroke='rgba(110,231,183,0.3)' stroke-width='1.3'/>" +
+           "<circle cx='140' cy='112' r='26' fill='none' stroke='rgba(110,231,183,0.3)' stroke-width='1.3'/>" +
+           "<rect x='84' y='8' width='112' height='42' fill='none' stroke='rgba(110,231,183,0.38)' stroke-width='1.3'/>" +
+           "<path class='sq-v55-tac-line' d='M 74 168 L 132 122' fill='none' stroke='#fde047' stroke-width='2.6' marker-end='url(#sqArrGldV60)'/>" +
+           "<path class='sq-v55-tac-line' d='M 138 118 L 192 80' fill='none' stroke='#fde047' stroke-width='2.6' marker-end='url(#sqArrGldV60)'/>" +
+           "<path class='sq-v55-tac-line' d='M 198 76 L 150 32' fill='none' stroke='#fb7185' stroke-width='2.6' marker-end='url(#sqArrRedV60)'/>" +
+           "<path class='sq-v55-tac-line' d='M 198 152 L 198 84' fill='none' stroke='#38bdf8' stroke-width='2.2' marker-end='url(#sqArrSkyV60)'/>" +
+           "<circle class='sq-v55-tac-node' cx='74' cy='168' r='7.5' fill='#10b981' stroke='#fff' stroke-width='1.6'/>" +
+           "<circle class='sq-v55-tac-node' cx='138' cy='118' r='7.5' fill='#38bdf8' stroke='#fff' stroke-width='1.6'/>" +
            "<circle class='sq-v55-tac-node' cx='198' cy='76' r='7.5' fill='#f59e0b' stroke='#fff' stroke-width='1.6'/>" +
-           "<circle cx='144' cy='24' r='6' fill='#ef4444' stroke='#fff' stroke-width='1.4'/>" +
+           "<circle cx='144' cy='24' r='6.5' fill='#ef4444' stroke='#fff' stroke-width='1.5'/>" +
+           svgTagPill(74, 182, "빌드업 기점", "rgba(16,185,129,0.88)", "#022c22") +
+           svgTagPill(96, 94, "전환 패스", "rgba(14,165,233,0.88)", "#fff") +
+           svgTagPill(222, 54, "하프스페이스", "rgba(245,158,11,0.90)", "#020617") +
+           svgTagPill(144, 34, "컷백 슈팅", "rgba(239,68,68,0.88)", "#fff") +
            "</svg>"
     };
   }
@@ -16170,27 +16209,62 @@ _FRONTEND_V22_JS = r'''
     };
   }
 
+  function getStoryboardCutInfoV4660(clip, sec) {
+    var s = Number(sec) || 0;
+    var cutIdx = s < 7 ? 0 : (s < 14 ? 1 : 2);
+    var sb = (clip && Array.isArray(clip.storyboard) && clip.storyboard.length >= 3) ? clip.storyboard : null;
+    if (sb) {
+      return { idx: cutIdx, stage: sb[cutIdx].stage || "", headline: sb[cutIdx].headline || "", detail: sb[cutIdx].detail || "" };
+    }
+    var cmts = (clip && Array.isArray(clip.comments)) ? clip.comments : [];
+    var fallbackSteps = [
+      { stage: "① 매치 하이라이트", headline: (clip && clip.title) || "실시간 전술 브리핑", detail: (clip && clip.kicker) || "" },
+      { stage: "② 핵심 전술 포인트", headline: (clip && clip.subtitle) || "공간 점유 및 전환 타이밍 분석", detail: cmts[0] ? cmts[0].text : "전광판 · 공식 채널 데이터 연동" },
+      { stage: "③ 승부처 팬 투표", headline: (clip && clip.var_q) || "승부를 가른 결정적 변수", detail: ((clip && clip.var_a) || "전술 우세") + " vs " + ((clip && clip.var_b) || "개인 기량") }
+    ];
+    return { idx: cutIdx, stage: fallbackSteps[cutIdx].stage, headline: fallbackSteps[cutIdx].headline, detail: fallbackSteps[cutIdx].detail };
+  }
+
   function updateViewportTimerDomOnlyV4655() {
+    var sec = Number(_sqShortsStateV4655.secElapsed) || 0;
     var tEl = document.getElementById("sqV55TimeLabel");
-    var pEl = document.getElementById("sqV55ProgBar");
     var tsInput = document.getElementById("sqV55CurTsBadge");
     if (tEl) {
-      tEl.textContent = formatSecV55(_sqShortsStateV4655.secElapsed) + " / 00:20";
-    }
-    if (pEl) {
-      var pct = Math.max(0, Math.min(100, (_sqShortsStateV4655.secElapsed / 20.0) * 100.0));
-      pEl.style.width = pct.toFixed(1) + "%";
+      tEl.textContent = formatSecV55(sec) + " / 00:20";
     }
     if (tsInput) {
-      tsInput.textContent = formatSecV55(_sqShortsStateV4655.secElapsed);
+      tsInput.textContent = formatSecV55(sec);
+    }
+    // Update 3-segment Reels/Shorts progress bars (0-7s, 7-14s, 14-20s)
+    var bounds = [[0, 7], [7, 14], [14, 20]];
+    for (var bi = 0; bi < 3; bi++) {
+      var segEl = document.getElementById("sqV60Seg" + bi);
+      if (!segEl) continue;
+      var stB = bounds[bi][0], enB = bounds[bi][1];
+      var segPct = sec <= stB ? 0 : (sec >= enB ? 100 : ((sec - stB) / (enB - stB)) * 100);
+      segEl.style.width = segPct.toFixed(1) + "%";
     }
     var filtered = getFilteredClipsV4655();
     var clip = getActiveClipObjV4655(filtered);
-    var tkEl = document.getElementById("sqV55TopDanmakuTicker");
-    if (tkEl && clip && Array.isArray(clip.comments) && clip.comments.length > 0) {
-      var cIdx = Math.floor(_sqShortsStateV4655.secElapsed / 5) % clip.comments.length;
-      var cm = clip.comments[cIdx];
-      tkEl.textContent = "[" + (cm.ts || "00:05") + " " + (cm.author || "팬") + "] " + (cm.text || "");
+    var cut = getStoryboardCutInfoV4660(clip, sec);
+    var stgTag = document.getElementById("sqV60StageTag");
+    var stgHead = document.getElementById("sqV60StageHeadline");
+    var stgDet = document.getElementById("sqV60StageDetail");
+    if (stgTag) stgTag.textContent = cut.stage;
+    if (stgHead) stgHead.textContent = cut.headline;
+    if (stgDet) stgDet.textContent = cut.detail;
+    for (var pi = 0; pi < 3; pi++) {
+      var pill = document.getElementById("sqV60CutPill" + pi);
+      if (!pill) continue;
+      if (pi === cut.idx) {
+        pill.style.background = "rgba(16,185,129,0.28)";
+        pill.style.borderColor = "#34d399";
+        pill.style.color = "#ecfdf5";
+      } else {
+        pill.style.background = "rgba(15,23,42,0.72)";
+        pill.style.borderColor = "rgba(148,163,184,0.28)";
+        pill.style.color = "#94a3b8";
+      }
     }
   }
 
@@ -16299,22 +16373,60 @@ _FRONTEND_V22_JS = r'''
           "</div>"
         ].join("");
       }
-      var pctInit = Math.max(0, Math.min(100, (_sqShortsStateV4655.secElapsed / 20.0) * 100.0));
+      var secNowV60 = Number(_sqShortsStateV4655.secElapsed) || 0;
+      var cutInitV60 = getStoryboardCutInfoV4660(clip, secNowV60);
+      var mmV60 = clip.match_meta || null;
+      var scoreBarHtmlV60 = "";
+      if (mmV60 && mmV60.home && mmV60.away) {
+        var isLiveM = mmV60.state === "in";
+        var scoreTxt = (mmV60.state === "in" || mmV60.state === "post")
+          ? (escHtmlShortsV55(mmV60.home) + " <span style='color:#fde047;font-size:13px;'>" + escHtmlShortsV55(mmV60.home_score) + " : " + escHtmlShortsV55(mmV60.away_score) + "</span> " + escHtmlShortsV55(mmV60.away))
+          : (escHtmlShortsV55(mmV60.home) + " <span style='color:#7dd3fc;'>vs</span> " + escHtmlShortsV55(mmV60.away));
+        scoreBarHtmlV60 = "<div style='margin-top:6px;padding:5px 9px;border-radius:9px;background:rgba(2,6,23,0.78);border:1px solid " + (isLiveM ? "rgba(248,113,113,0.55)" : "rgba(56,189,248,0.38)") + ";display:flex;align-items:center;justify-content:space-between;gap:6px;'>" +
+          "<span style='font-size:11.5px;font-weight:900;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" + scoreTxt + "</span>" +
+          "<span style='font-size:10px;font-weight:800;padding:1.5px 6px;border-radius:999px;background:" + (isLiveM ? "rgba(239,68,68,0.28)" : "rgba(14,165,233,0.22)") + ";color:" + (isLiveM ? "#fca5a5" : "#7dd3fc") + ";flex-shrink:0;'>" + escHtmlShortsV55(mmV60.time_badge || clip.time_badge || "") + "</span>" +
+          "</div>";
+      } else {
+        scoreBarHtmlV60 = "<div style='margin-top:6px;padding:5px 9px;border-radius:9px;background:rgba(2,6,23,0.74);border:1px solid rgba(248,113,113,0.38);display:flex;align-items:center;justify-content:space-between;gap:6px;'>" +
+          "<span style='font-size:11px;font-weight:800;color:#fecaca;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>📺 " + escHtmlShortsV55(clip.channel_name || "공식 스포츠 채널") + "</span>" +
+          "<span style='font-size:10px;font-weight:800;color:#fde68a;flex-shrink:0;'>" + escHtmlShortsV55(clip.time_badge || "NEW") + "</span>" +
+          "</div>";
+      }
+      var statChipsArrV60 = Array.isArray(clip.key_stats) && clip.key_stats.length ? clip.key_stats : [clip.league || "실시간", clip.time_badge || "최신", clip.source_type === "youtube_rss" ? "공식 영상" : "전술 보드"];
+      var statChipsHtmlV60 = "<div style='display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;'>" +
+        statChipsArrV60.slice(0, 3).map(function (stTxt) {
+          return "<span style='font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;background:rgba(14,165,233,0.16);border:1px solid rgba(56,189,248,0.35);color:#bae6fd;'>" + escHtmlShortsV55(stTxt) + "</span>";
+        }).join("") + "</div>";
+      var segBoundsV60 = [[0, 7], [7, 14], [14, 20]];
+      var segBarsHtmlV60 = "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:5px;'>" +
+        segBoundsV60.map(function (b, bi) {
+          var w = secNowV60 <= b[0] ? 0 : (secNowV60 >= b[1] ? 100 : ((secNowV60 - b[0]) / (b[1] - b[0])) * 100);
+          return "<div style='height:3.5px;border-radius:999px;background:rgba(255,255,255,0.2);overflow:hidden;'><div id='sqV60Seg" + bi + "' style='height:100%;width:" + w.toFixed(1) + "%;background:linear-gradient(90deg,#34d399,#38bdf8);transition:width .35s linear;'></div></div>";
+        }).join("") + "</div>";
+      var cutLabelsV60 = ["① 상황", "② 전술", "③ 결론"];
+      var cutPillsHtmlV60 = "<div style='display:flex;gap:4px;margin-top:5px;'>" +
+        cutLabelsV60.map(function (cl, ci) {
+          var actC = ci === cutInitV60.idx;
+          return "<button type='button' id='sqV60CutPill" + ci + "' data-sq-v60-cut='" + ci + "' style='flex:1;padding:2.5px 4px;border-radius:999px;font-size:10px;font-weight:800;cursor:pointer;border:1px solid " + (actC ? "#34d399" : "rgba(148,163,184,0.28)") + ";background:" + (actC ? "rgba(16,185,129,0.28)" : "rgba(15,23,42,0.72)") + ";color:" + (actC ? "#ecfdf5" : "#94a3b8") + ";'>" + cl + "</button>";
+        }).join("") + "</div>";
+
       viewportInnerHtml = [
         "<div>",
         "  <div style='display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800;'>",
-        "    <span style='background:rgba(2,6,23,0.68);padding:3px 9px;border-radius:999px;color:#6ee7b7;border:1px solid rgba(110,231,183,0.3);'>" + escHtmlShortsV55(clip.badge || "⚽ 축구 TACTICAL") + "</span>",
-        "    <span id='sqV55TimeLabel' style='background:rgba(2,6,23,0.68);padding:2.5px 8px;border-radius:999px;color:#f8fafc;font-variant-numeric:tabular-nums;'>" + formatSecV55(_sqShortsStateV4655.secElapsed) + " / 00:20</span>",
+        "    <span style='background:rgba(2,6,23,0.72);padding:3px 9px;border-radius:999px;color:#6ee7b7;border:1px solid rgba(110,231,183,0.34);'>" + escHtmlShortsV55(clip.badge || "⚽ 축구 TACTICAL") + "</span>",
+        "    <span id='sqV55TimeLabel' style='background:rgba(2,6,23,0.72);padding:2.5px 8px;border-radius:999px;color:#f8fafc;font-variant-numeric:tabular-nums;'>" + formatSecV55(secNowV60) + " / 00:20</span>",
         "  </div>",
-        "  <div class='sq-v55-progress-track'><div id='sqV55ProgBar' class='sq-v55-progress-bar' style='width:" + pctInit.toFixed(1) + "%;'></div></div>",
-        "  <div id='sqV55TopDanmakuTicker' style='margin-top:7px;padding:4px 9px;border-radius:8px;background:rgba(2,6,23,0.62);border:1px solid rgba(148,163,184,0.2);font-size:11px;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>[" + escHtmlShortsV55(firstCmt.ts || "00:04") + " " + escHtmlShortsV55(firstCmt.author || "팬") + "] " + escHtmlShortsV55(firstCmt.text || "") + "</div>",
+        segBarsHtmlV60,
+        scoreBarHtmlV60,
+        cutPillsHtmlV60,
         "</div>",
         "<div style='margin:2px 0;'>" + boardSpec.svg + "</div>",
-        "<div style='background:linear-gradient(180deg,rgba(2,6,23,0.15),rgba(2,6,23,0.88));padding:8px 10px;border-radius:11px;border:1px solid rgba(148,163,184,0.18);'>",
+        "<div style='background:linear-gradient(180deg,rgba(2,6,23,0.35),rgba(2,6,23,0.92));padding:8px 10px;border-radius:11px;border:1px solid rgba(148,163,184,0.22);'>",
         thumbOverlay,
-        "  <div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;'>" + srcTagHtml + "<span style='font-size:10.8px;color:#fde68a;font-weight:800;'>" + escHtmlShortsV55(clip.kicker || "") + "</span></div>",
-        "  <div style='font-size:14.5px;font-weight:900;line-height:1.32;color:#ffffff;margin-bottom:3px;'>" + escHtmlShortsV55(clip.title || "") + "</div>",
-        "  <div style='font-size:11.3px;color:#cbd5e1;line-height:1.38;'>" + escHtmlShortsV55(clip.subtitle || "") + "</div>",
+        statChipsHtmlV60,
+        "  <div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;'>" + srcTagHtml + "<span id='sqV60StageTag' style='font-size:10.5px;color:#6ee7b7;font-weight:900;'>" + escHtmlShortsV55(cutInitV60.stage) + "</span></div>",
+        "  <div id='sqV60StageHeadline' style='font-size:13.5px;font-weight:900;line-height:1.32;color:#ffffff;margin-bottom:2px;'>" + escHtmlShortsV55(cutInitV60.headline) + "</div>",
+        "  <div id='sqV60StageDetail' style='font-size:11px;color:#cbd5e1;line-height:1.36;'>" + escHtmlShortsV55(cutInitV60.detail) + "</div>",
         "</div>"
       ].join("");
     }
@@ -16501,6 +16613,13 @@ _FRONTEND_V22_JS = r'''
         renderAutoShortsStudioV4655();
       };
     }
+    host.querySelectorAll("[data-sq-v60-cut]").forEach(function (cb) {
+      cb.onclick = function () {
+        var ci = parseInt(cb.getAttribute("data-sq-v60-cut") || "0", 10);
+        _sqShortsStateV4655.secElapsed = ci === 0 ? 0.5 : (ci === 1 ? 7.5 : 14.5);
+        updateViewportTimerDomOnlyV4655();
+      };
+    });
     host.querySelectorAll("[data-sq-v55-spd]").forEach(function (b) {
       b.onclick = function () {
         _sqShortsStateV4655.speed = parseFloat(b.getAttribute("data-sq-v55-spd") || "1") || 1.0;
@@ -19629,7 +19748,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46590_{int(time.time())}"
+_BOOT_VER_V30 = f"46600_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -33881,6 +34000,44 @@ def _build_match_tactical_clips_v4655(yt_clips: List[Dict[str, Any]]) -> List[Di
         cid = "mt55_" + hashlib.md5(raw_key.encode("utf-8")).hexdigest()[:10]
         h_seed = int(hashlib.md5(cid.encode("utf-8")).hexdigest()[:6], 16)
         qv = _default_quiz_and_var_for_sport_v4655(sp_raw, title_ko, h_ko, a_ko)
+        _stat_chips_v60 = []
+        if st in ("in", "post"):
+            _diff_v60 = abs(int(hs) - int(as_)) if (str(hs).isdigit() and str(as_).isdigit()) else 0
+            _lead_v60 = h_ko if (str(hs).isdigit() and str(as_).isdigit() and int(hs) > int(as_)) else (a_ko if (str(hs).isdigit() and str(as_).isdigit() and int(as_) > int(hs)) else "동점 접전")
+            _stat_chips_v60 = [
+                f"스코어 {hs}:{as_}",
+                f"격차 {_diff_v60}점 · {_lead_v60}" if _diff_v60 > 0 else "팽팽한 접전",
+                per_det if per_det else (venue_ko if venue_ko else lg_disp),
+            ]
+        else:
+            _stat_chips_v60 = [
+                f"일정 {time_badge}",
+                venue_ko if venue_ko else lg_disp,
+                "AI 전술 시뮬레이션",
+            ]
+        _tac_focus_v60 = {
+            "basketball": "볼핸들러 픽앤롤 후 코너 3점·림 어택 이지선다",
+            "soccer": "측면 하프스페이스 침투 및 페널티박스 컷백 패턴",
+            "hockey": "블루라인 크로스 패스 후 슬롯 원타이머 마무리",
+            "baseball": "하이패스트볼·스플리터 동일 릴리스 피치터널 공략",
+        }.get(sp_raw, "중원 압박 전환과 결정적 공간 침투 패턴")
+        _storyboard_v60 = [
+            {
+                "stage": "① 상황 브리핑",
+                "headline": f"{h_ko} {hs}:{as_} {a_ko} ({time_badge})" if st in ("in", "post") else f"{h_ko} vs {a_ko} ({time_badge})",
+                "detail": f"{lg_disp}" + (f" · {venue_ko}" if venue_ko else "") + " 실경기 전광판 데이터 자동 연동",
+            },
+            {
+                "stage": "② 핵심 전술",
+                "headline": _tac_focus_v60,
+                "detail": " · ".join([x for x in _stat_chips_v60 if x][:3]),
+            },
+            {
+                "stage": "③ 승부처 결론",
+                "headline": qv["var_q"],
+                "detail": f"팬 투표 참여: {qv['var_a']} vs {qv['var_b']} (하단 바로 투표 가능)",
+            },
+        ]
         clips.append({
             "id": cid,
             "source_type": "match_tactical",
@@ -33891,6 +34048,18 @@ def _build_match_tactical_clips_v4655(yt_clips: List[Dict[str, Any]]) -> List[Di
             "channel_name": matched_ch,
             "title": title_ko,
             "subtitle": sub_ko,
+            "match_meta": {
+                "home": h_ko,
+                "away": a_ko,
+                "home_score": str(hs) if st in ("in", "post") else "-",
+                "away_score": str(as_) if st in ("in", "post") else "-",
+                "state": st,
+                "time_badge": time_badge,
+                "league": lg_disp,
+                "venue": venue_ko,
+            },
+            "key_stats": _stat_chips_v60,
+            "storyboard": _storyboard_v60,
             "video_id": matched_vid,
             "youtube_url": matched_yt_url,
             "thumb_url": matched_thumb,
@@ -33992,9 +34161,21 @@ def _sync_collect_auto_shorts_base_v4655(force: bool = False) -> Dict[str, Any]:
     # 2. Synthesize real-time tactical briefings from today's & yesterday's live scoreboard
     match_clips = _build_match_tactical_clips_v4655(yt_kept)
 
-    # 3. Merge & sort newest first
-    merged_base = yt_kept + match_clips
-    merged_base.sort(key=lambda x: float(x.get("sort_ts") or 0), reverse=True)
+    # 3. Video-first 2:1 interleaving (v4.6.60: 2 official YouTube clips -> 1 rich tactical card)
+    yt_sorted = sorted(yt_kept, key=lambda x: float(x.get("sort_ts") or 0), reverse=True)
+    mt_sorted = sorted(match_clips, key=lambda x: float(x.get("sort_ts") or 0), reverse=True)
+    merged_base: List[Dict[str, Any]] = []
+    yi, mi = 0, 0
+    while yi < len(yt_sorted) or mi < len(mt_sorted):
+        for _ in range(2):
+            if yi < len(yt_sorted):
+                merged_base.append(yt_sorted[yi])
+                yi += 1
+        if mi < len(mt_sorted):
+            merged_base.append(mt_sorted[mi])
+            mi += 1
+    for _rk_i, _it_m in enumerate(merged_base):
+        _it_m["feed_rank"] = _rk_i
 
     now_kst_str = datetime.now(KST).strftime("%m.%d %H:%M KST")
     with _AUTO_SHORTS_LOCK_V4655:
@@ -34409,6 +34590,7 @@ _V4655_NEW_PATHS = {
     "/api/member/live-sources-diag-v4657",
     "/api/member/live-sources-diag-v4658",
     "/api/member/live-sources-diag-v4659",
+    "/api/member/live-sources-diag-v4660",
     "/api/member/feed-kickoff-index-v4657",
 }
 router.routes = [rt for rt in router.routes if getattr(rt, "path", "") not in _V4655_NEW_PATHS]
@@ -34591,11 +34773,13 @@ async def _async_api_feed_kickoff_index_v4657():
 @router.get("/api/member/live-sources-diag-v4657")
 @router.get("/api/member/live-sources-diag-v4658")
 @router.get("/api/member/live-sources-diag-v4659")
+@router.get("/api/member/live-sources-diag-v4660")
 async def _async_api_live_sources_diag_v4655(date_offset: int = 0):
     loop = _asyncio_v4652.get_running_loop()
     res = await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, api_live_sources_diag_v4648, date_offset)
     if isinstance(res, dict):
-        res["version"] = "v4.6.59"
+        res["version"] = "v4.6.60"
+        res["shorts_broadcast_3cut_v4660"] = True
         res["clean_daily_labels_v4659"] = True
         res["best_top3_kickoff_v4658"] = True
         res["client_antifreeze_v4656"] = True
