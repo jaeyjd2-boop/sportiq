@@ -9532,7 +9532,7 @@ _FRONTEND_V22_JS = r'''
           }
         }
 
-        if (!document.getElementById("sqAutoEngineBarV40") && bTxt.indexOf("00:00 KST 글로벌 TOP 20 커뮤니티 자동 분석 엔진") !== -1 && blk.children.length <= 5) {
+        if (!document.getElementById("sqAutoEngineBarV40") && (bTxt.indexOf("00:00 KST 글로벌 TOP 20 커뮤니티 자동 분석 엔진") !== -1 || bTxt.indexOf("데일리 글로벌 TOP 20 AI 자동 분석 엔진") !== -1) && blk.children.length <= 5) {
           blk.id = "sqAutoEngineBarV40";
         }
       }
@@ -17565,9 +17565,68 @@ _FRONTEND_V22_JS = r'''
     card.setAttribute("data-sq-ko-rev-v4657", revStr);
   }
 
+  function polishTextNodesInContainerV4659(rootEl, isBanner) {
+    if (!rootEl) return;
+    try {
+      var walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, null, false);
+      var node;
+      while ((node = walker.nextNode())) {
+        var v = node.nodeValue;
+        if (!v || v.indexOf("00:00") === -1 && v.indexOf("마지막 자동 탐색") === -1) continue;
+        var nv = v;
+        if (isBanner) {
+          nv = nv
+            .replace(/00:00\s*KST\s*글로벌\s*TOP\s*20\s*커뮤니티\s*자동\s*분석\s*엔진/g, "데일리 글로벌 TOP 20 AI 자동 분석 엔진")
+            .replace(/마지막\s*자동\s*탐색\s*:/g, "최근 자동 갱신:")
+            .replace(/오늘\s*00:00\s*KST/g, "오늘 자정 (KST)")
+            .replace(/내일\s*00:00\s*KST/g, "내일 자정 (KST)")
+            .replace(/00:00\s*KST/g, "매일 자정 (KST)");
+        } else {
+          nv = nv
+            .replace(/\[00:00\s*글로벌\s*TOP\s*20\s*종합\s*리포트\]/g, "[데일리 글로벌 TOP 20 종합 리포트]")
+            .replace(/00:00\s*KST\s*글로벌\s*TOP\s*20\s*종합\s*리포트/g, "데일리 글로벌 TOP 20 종합 리포트")
+            .replace(/\[00:00\s*커뮤니티\s*자동분석\]/g, "[AI 데일리 자동분석]")
+            .replace(/00:00\s*커뮤니티\s*자동분석/g, "AI 데일리 자동분석")
+            .replace(/SportIQ\s*00:00\s*자동분석\s*AI/g, "SportIQ 데일리 자동분석 AI")
+            .replace(/(\d{4}-\d{2}-\d{2})\s+00:00\s*KST\s*기준/g, "$1 자정 집계 기준");
+        }
+        if (nv !== v) node.nodeValue = nv;
+      }
+    } catch (_ePol) {}
+  }
+
+  function polishAutoAnalysisLabelsV4659() {
+    // 1. Auto-analysis status banner in feed tab
+    var engBar = document.getElementById("sqAutoEngineBarV40");
+    if (!engBar) {
+      var tf = document.getElementById("tab-feed") || document.body;
+      var blocks = tf ? tf.querySelectorAll("div, section") : [];
+      for (var i = 0; i < blocks.length && i < 160; i++) {
+        var t = blocks[i].textContent || "";
+        if (t.indexOf("00:00 KST 글로벌 TOP 20 커뮤니티 자동 분석 엔진") !== -1 && t.length < 600) {
+          engBar = blocks[i];
+          break;
+        }
+      }
+    }
+    if (engBar) polishTextNodesInContainerV4659(engBar, true);
+
+    // 2. Feed cards (#feedList direct children)
+    var fl = document.getElementById("feedList");
+    if (fl) {
+      var kids = fl.children;
+      for (var k = 0; k < kids.length && k < 60; k++) {
+        if ((kids[k].textContent || "").indexOf("00:00") !== -1) {
+          polishTextNodesInContainerV4659(kids[k], false);
+        }
+      }
+    }
+  }
+
   function decorateFeedKickoffBadgesV4657() {
     injectKickoffBadgeCssV4657();
     harvestLocalDomKickoffsV4657();
+    polishAutoAnalysisLabelsV4659();
 
     // 1. Best Briefing TOP 3 cards (v4.6.58: resilient to inline grid/flex wrappers)
     var bestBox = document.getElementById("sqBestTop3BoxV40");
@@ -19570,7 +19629,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46580_{int(time.time())}"
+_BOOT_VER_V30 = f"46590_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -34349,6 +34408,7 @@ _V4655_NEW_PATHS = {
     "/api/member/live-sources-diag-v4656",
     "/api/member/live-sources-diag-v4657",
     "/api/member/live-sources-diag-v4658",
+    "/api/member/live-sources-diag-v4659",
     "/api/member/feed-kickoff-index-v4657",
 }
 router.routes = [rt for rt in router.routes if getattr(rt, "path", "") not in _V4655_NEW_PATHS]
@@ -34530,11 +34590,13 @@ async def _async_api_feed_kickoff_index_v4657():
 @router.get("/api/member/live-sources-diag-v4656")
 @router.get("/api/member/live-sources-diag-v4657")
 @router.get("/api/member/live-sources-diag-v4658")
+@router.get("/api/member/live-sources-diag-v4659")
 async def _async_api_live_sources_diag_v4655(date_offset: int = 0):
     loop = _asyncio_v4652.get_running_loop()
     res = await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, api_live_sources_diag_v4648, date_offset)
     if isinstance(res, dict):
-        res["version"] = "v4.6.58"
+        res["version"] = "v4.6.59"
+        res["clean_daily_labels_v4659"] = True
         res["best_top3_kickoff_v4658"] = True
         res["client_antifreeze_v4656"] = True
         res["kickoff_badges_v4657"] = True
