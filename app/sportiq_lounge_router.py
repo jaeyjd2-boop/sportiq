@@ -17922,13 +17922,15 @@ _FRONTEND_V22_JS = r'''
     st.textContent = [
       "body { padding-bottom: 84px !important; }",
       /* Sticky main 7-tab navigation bar */
-      ".sq-main-tabbar-sticky-v4662 { position: sticky !important; top: 0 !important; z-index: 42 !important; background: rgba(9, 15, 31, 0.94) !important; backdrop-filter: blur(10px) !important; -webkit-backdrop-filter: blur(10px) !important; padding: 7px 6px !important; border-bottom: 1px solid rgba(56, 189, 248, 0.22) !important; box-shadow: 0 6px 18px rgba(2, 6, 23, 0.45) !important; border-radius: 12px !important; }",
+      ".sq-main-tabbar-sticky-v4662 { transition: box-shadow .18s ease; }",
+      ".sq-main-tabbar-fixed-v4663 { position: fixed !important; top: 0 !important; left: 50% !important; transform: translateX(-50%) !important; width: min(1280px, calc(100vw - 16px)) !important; z-index: 80 !important; background: rgba(9, 15, 31, 0.96) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; padding: 7px 10px !important; border: 1px solid rgba(56, 189, 248, 0.28) !important; border-top: 0 !important; border-radius: 0 0 14px 14px !important; box-shadow: 0 8px 24px rgba(2, 6, 23, 0.65) !important; margin: 0 !important; box-sizing: border-box !important; }",
       /* AI Lab No-Vig Calculator: prevent 20px squished inputs */
       ".sq-v42-calc-grid3 > div { display: flex !important; flex-direction: column !important; gap: 8px !important; min-width: 0 !important; }",
       ".sq-v42-calc-grid3 > div > div { flex-wrap: wrap !important; gap: 6px !important; }",
       ".sq-v42-calc-grid3 input, #tab-lab input[type='number'], #tab-lab input[type='text'] { min-width: 78px !important; min-height: 34px !important; padding: 6px 9px !important; font-size: 13px !important; font-variant-numeric: tabular-nums !important; box-sizing: border-box !important; }",
       /* Overseas news filter bar wrap (fixes right-edge clipping of '종합') */
-      ".sq-news-filter-wrap-v4662 { display: flex !important; flex-wrap: wrap !important; overflow: visible !important; gap: 6px !important; }",
+      ".sq-news-filter-wrap-v4662 { display: flex !important; flex-wrap: wrap !important; overflow: visible !important; overflow-x: visible !important; white-space: normal !important; max-width: 100% !important; gap: 6px !important; padding-right: 4px !important; }",
+      ".sq-news-filter-wrap-v4662 > button { flex-shrink: 0 !important; padding: 5px 10px !important; font-size: 12px !important; }",
       /* Feed body readability & softer secondary tag pills */
       "#feedList article p, #feedList > div p { font-size: 13.8px !important; line-height: 1.66 !important; color: #e2e8f0 !important; letter-spacing: -0.005em !important; }",
       "#feedList [class*='tag'], #feedList a[href*='#'] { opacity: 0.86; }",
@@ -17957,8 +17959,36 @@ _FRONTEND_V22_JS = r'''
           }
         }
       }
-      if (mainBar && !mainBar.classList.contains("sq-main-tabbar-sticky-v4662")) {
+      if (mainBar && !mainBar.__sqFixedScrollBoundV4663) {
+        mainBar.__sqFixedScrollBoundV4663 = true;
         mainBar.classList.add("sq-main-tabbar-sticky-v4662");
+        var spacer = document.createElement("div");
+        spacer.id = "sqMainTabbarSpacerV4663";
+        spacer.style.cssText = "display:none;width:100%;pointer-events:none;";
+        if (mainBar.parentNode) mainBar.parentNode.insertBefore(spacer, mainBar);
+        var updateFixedBarV4663 = function () {
+          try {
+            var isFixed = mainBar.classList.contains("sq-main-tabbar-fixed-v4663");
+            var anchorEl = isFixed ? spacer : mainBar;
+            var rect = anchorEl.getBoundingClientRect();
+            if (rect.top <= 0 && (window.scrollY || window.pageYOffset || 0) > 120) {
+              if (!isFixed) {
+                var h = Math.max(44, Math.round(mainBar.getBoundingClientRect().height || 48));
+                spacer.style.height = h + "px";
+                spacer.style.display = "block";
+                mainBar.classList.add("sq-main-tabbar-fixed-v4663");
+              }
+            } else {
+              if (isFixed) {
+                mainBar.classList.remove("sq-main-tabbar-fixed-v4663");
+                spacer.style.display = "none";
+              }
+            }
+          } catch (_eFx) {}
+        };
+        window.addEventListener("scroll", updateFixedBarV4663, { passive: true });
+        window.addEventListener("resize", updateFixedBarV4663, { passive: true });
+        updateFixedBarV4663();
       }
       if (mainBar) {
         Array.prototype.forEach.call(mainBar.querySelectorAll("button, a"), function (btn) {
@@ -18006,16 +18036,20 @@ _FRONTEND_V22_JS = r'''
         }
       }
 
-      // 3. Fix Overseas News filter bar right-edge clipping ('🌐 종합')
+      // 3. Fix Overseas News filter bar right-edge clipping ('🌐 종합 (1)') — uncapped scan + parent/wrapper unlock
       var newsBtns = document.querySelectorAll("button");
-      for (var ni = 0; ni < newsBtns.length && ni < 260; ni++) {
+      for (var ni = 0; ni < newsBtns.length; ni++) {
         var nt = (newsBtns[ni].textContent || "").trim();
         if (nt.indexOf("종합 (") !== -1 || nt.indexOf("🌐 종합") !== -1) {
           var barEl = newsBtns[ni].parentElement;
-          if (barEl && barEl.children && barEl.children.length >= 4 && !barEl.classList.contains("sq-news-filter-wrap-v4662")) {
+          if (barEl && barEl.children && barEl.children.length >= 4) {
             barEl.classList.add("sq-news-filter-wrap-v4662");
+            barEl.style.flexWrap = "wrap";
+            barEl.style.overflowX = "visible";
+            if (barEl.parentElement && barEl.parentElement !== document.body) {
+              barEl.parentElement.style.overflowX = "visible";
+            }
           }
-          break;
         }
       }
 
@@ -18050,7 +18084,11 @@ _FRONTEND_V22_JS = r'''
   });
   document.addEventListener("click", function (ev) {
     var tgt = ev && ev.target && ev.target.closest ? ev.target.closest("button.tab-btn, [data-tab]") : null;
-    if (tgt) setTimeout(applyUiPolishDomV4662, 160);
+    if (tgt) {
+      setTimeout(applyUiPolishDomV4662, 140);
+      setTimeout(applyUiPolishDomV4662, 520);
+      setTimeout(applyUiPolishDomV4662, 1200);
+    }
   });
 
   if (document.readyState === "loading") {
@@ -19895,7 +19933,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46620_{int(time.time())}"
+_BOOT_VER_V30 = f"46630_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -34744,6 +34782,7 @@ _V4655_NEW_PATHS = {
     "/api/member/live-sources-diag-v4660",
     "/api/member/live-sources-diag-v4661",
     "/api/member/live-sources-diag-v4662",
+    "/api/member/live-sources-diag-v4663",
     "/api/member/feed-kickoff-index-v4657",
 }
 router.routes = [rt for rt in router.routes if getattr(rt, "path", "") not in _V4655_NEW_PATHS]
@@ -34929,11 +34968,13 @@ async def _async_api_feed_kickoff_index_v4657():
 @router.get("/api/member/live-sources-diag-v4660")
 @router.get("/api/member/live-sources-diag-v4661")
 @router.get("/api/member/live-sources-diag-v4662")
+@router.get("/api/member/live-sources-diag-v4663")
 async def _async_api_live_sources_diag_v4655(date_offset: int = 0):
     loop = _asyncio_v4652.get_running_loop()
     res = await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, api_live_sources_diag_v4648, date_offset)
     if isinstance(res, dict):
-        res["version"] = "v4.6.62"
+        res["version"] = "v4.6.63"
+        res["fixed_nav_and_news_wrap_v4663"] = True
         res["ui_polish_v4662"] = True
         res["shorts_broadcast_3cut_v4660"] = True
         res["clean_daily_labels_v4659"] = True
