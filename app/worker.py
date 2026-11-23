@@ -124,12 +124,15 @@ scheduler.add_job(lambda: safe("recheck_unfinished", recheck_unfinished), "inter
 scheduler.add_job(lambda: safe("head_to_head", collect_head_to_head), "interval", hours=24, id="head_to_head", max_instances=1, coalesce=True,
                   next_run_time=datetime.now(timezone.utc) + timedelta(minutes=10))
 
+# misfire_grace_time=None: the startup football scan takes minutes, so the
+# first scheduled run is usually "missed"; run it late instead of skipping
+# to the next interval (otherwise other sports wait an hour after deploy).
 # Non-football sports (ESPN, or API-SPORTS once API_SPORTS_KEY is set).
 scheduler.add_job(lambda: safe_multisport("multisport_schedule", multisport.collect_schedule), "interval",
-                  minutes=max(30, settings.multisport_schedule_minutes), id="multisport_schedule", max_instances=1, coalesce=True,
+                  minutes=max(30, settings.multisport_schedule_minutes), id="multisport_schedule", max_instances=1, coalesce=True, misfire_grace_time=None,
                   next_run_time=datetime.now(timezone.utc) + timedelta(minutes=2))
 scheduler.add_job(lambda: safe_multisport("multisport_live", multisport.collect_live), "interval",
-                  minutes=max(5, settings.multisport_live_minutes), id="multisport_live", max_instances=1, coalesce=True,
+                  minutes=max(5, settings.multisport_live_minutes), id="multisport_live", max_instances=1, coalesce=True, misfire_grace_time=None,
                   next_run_time=datetime.now(timezone.utc) + timedelta(minutes=4))
 
 if __name__ == "__main__":
