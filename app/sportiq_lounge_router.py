@@ -2776,21 +2776,24 @@ _FRONTEND_V22_JS = r'''
         bar.classList.remove("sq-mobile-bottom-nav-bar", "flex-wrap", "grid", "grid-cols-2", "grid-cols-3", "grid-cols-6");
         bar.classList.add("sq-main-tabbar-row");
       }
+      var _setPropDiff56 = function (el, p, v) {
+        if (el && el.style && el.style.getPropertyValue(p) !== v) el.style.setProperty(p, v, "important");
+      };
       if (bar.tagName !== "HEADER") {
-        bar.style.setProperty("position", "static", "important");
+        _setPropDiff56(bar, "position", "static");
       }
-      bar.style.setProperty("display", "flex", "important");
-      bar.style.setProperty("grid-template-columns", "none", "important");
-      bar.style.setProperty("flex-direction", "row", "important");
-      bar.style.setProperty("flex-wrap", "nowrap", "important");
-      bar.style.setProperty("align-items", "center", "important");
-      bar.style.setProperty("justify-content", "flex-start", "important");
-      bar.style.setProperty("gap", "5px", "important");
-      bar.style.setProperty("width", "100%", "important");
-      bar.style.setProperty("max-width", "100%", "important");
-      bar.style.setProperty("min-width", "0", "important");
-      bar.style.setProperty("overflow-x", "auto", "important");
-      bar.style.setProperty("overflow-y", "hidden", "important");
+      _setPropDiff56(bar, "display", "flex");
+      _setPropDiff56(bar, "grid-template-columns", "none");
+      _setPropDiff56(bar, "flex-direction", "row");
+      _setPropDiff56(bar, "flex-wrap", "nowrap");
+      _setPropDiff56(bar, "align-items", "center");
+      _setPropDiff56(bar, "justify-content", "flex-start");
+      _setPropDiff56(bar, "gap", "5px");
+      _setPropDiff56(bar, "width", "100%");
+      _setPropDiff56(bar, "max-width", "100%");
+      _setPropDiff56(bar, "min-width", "0");
+      _setPropDiff56(bar, "overflow-x", "auto");
+      _setPropDiff56(bar, "overflow-y", "hidden");
 
       // Unwrap any intermediate multi-tab <div> wrapper inside `bar` so all 7 tabs sit as direct flex children!
       Array.prototype.slice.call(bar.children).forEach(function (ch) {
@@ -2809,6 +2812,8 @@ _FRONTEND_V22_JS = r'''
       Array.prototype.forEach.call(bar.children, function (ch) {
         if (!ch || !ch.style) return;
         if (ch.getAttribute("data-sq-empty-tab-wrap") === "1") return;
+        if (ch.getAttribute("data-sq-7tab-child-locked-v56") === "1" && ch.style.getPropertyValue("display") === "inline-flex") return;
+        ch.setAttribute("data-sq-7tab-child-locked-v56", "1");
         ch.style.setProperty("display", "inline-flex", "important");
         ch.style.setProperty("align-items", "center", "important");
         ch.style.setProperty("justify-content", "center", "important");
@@ -4696,10 +4701,15 @@ _FRONTEND_V22_JS = r'''
     var obsTarget = document.getElementById("dcHubCollapsible") || document.getElementById("dcMainHubSection") || body;
     if (obsTarget && typeof MutationObserver !== "undefined" && !obsTarget.__sqDcMutObsV28) {
       obsTarget.__sqDcMutObsV28 = true;
+      var _dcMutTimer56 = 0;
       var obs = new MutationObserver(function () {
-        unblindDataCenterSubtreeV28();
+        if (_dcMutTimer56) return;
+        _dcMutTimer56 = setTimeout(function () {
+          _dcMutTimer56 = 0;
+          unblindDataCenterSubtreeV28();
+        }, 160);
       });
-      obs.observe(obsTarget, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-sq-seed-archive"] });
+      obs.observe(obsTarget, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-sq-seed-archive"] });
     }
 
     unblindDataCenterSubtreeV28();
@@ -5788,14 +5798,15 @@ _FRONTEND_V22_JS = r'''
     window.__sqDomInjHeartbeatV4635 = true;
     setInterval(function () {
       try {
+        if (typeof document !== "undefined" && document.hidden) return;
         var hb = document.getElementById("dcHubBody") || document.getElementById("dcMainHubSection");
-        if (hb && window.getComputedStyle && window.getComputedStyle(hb).display === "none") return;
-        var domLg = detectActiveDcDomesticLeagueFromDomV4635(hb || document.body);
+        if (!hb || hb.offsetParent === null) return;
+        var domLg = detectActiveDcDomesticLeagueFromDomV4635(hb);
         if (domLg) {
-          repairDcHubDomTablesAndUndefinedV4633(hb || document.body);
+          repairDcHubDomTablesAndUndefinedV4633(hb);
         }
       } catch (eHb) {}
-    }, 600);
+    }, 3500);
   }
   installDomInjuryHeartbeatV4635();
 
@@ -6462,8 +6473,9 @@ _FRONTEND_V22_JS = r'''
         }
       });
       bootObs.observe(document.body, { childList: true, subtree: true });
-      setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 150);
-      setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 600);
+      setTimeout(function () { try { bootObs.disconnect(); } catch (e) {} }, 6000);
+      setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 250);
+      setTimeout(syncDcHubDomesticPillsAndHighlightV4625, 900);
     }
   }
 
@@ -10423,9 +10435,13 @@ _FRONTEND_V22_JS = r'''
       }
 
       if (!labSec.__sqLabKellyObserverV4629 && typeof MutationObserver !== "undefined") {
+        var _labObsTimer56 = 0;
         labSec.__sqLabKellyObserverV4629 = new MutationObserver(function () {
-          if (_inLabPolishGuardV4629) return;
-          polishKellyMonitorDomAndFiltersV4629();
+          if (_inLabPolishGuardV4629 || _labObsTimer56) return;
+          _labObsTimer56 = setTimeout(function () {
+            _labObsTimer56 = 0;
+            if (!_inLabPolishGuardV4629) polishKellyMonitorDomAndFiltersV4629();
+          }, 180);
         });
         labSec.__sqLabKellyObserverV4629.observe(labSec, { childList: true, subtree: true });
       }
@@ -11355,14 +11371,18 @@ _FRONTEND_V22_JS = r'''
       }
 
       if (!matchSec.__sqSchedObsV4630 && typeof MutationObserver !== "undefined") {
+        var _schedObsTimer56 = 0;
         matchSec.__sqSchedObsV4630 = new MutationObserver(function () {
-          if (_inSchedulePolishGuardV4630) return;
-          polishScheduleSectionDomV4630();
-          // Re-apply 2-col grid, medals, injury toggle, and 6/18 cap (`_v43MatchesShowAll` preserved!) after vote/fav re-render
-          _inSchedulePolishGuardV4630 = true;
-          try { organizeScheduleAndShortsTabsV43(); } catch (eS) {} finally { _inSchedulePolishGuardV4630 = false; }
+          if (_inSchedulePolishGuardV4630 || _schedObsTimer56) return;
+          _schedObsTimer56 = setTimeout(function () {
+            _schedObsTimer56 = 0;
+            if (_inSchedulePolishGuardV4630) return;
+            polishScheduleSectionDomV4630();
+            _inSchedulePolishGuardV4630 = true;
+            try { organizeScheduleAndShortsTabsV43(); } catch (eS) {} finally { _inSchedulePolishGuardV4630 = false; }
+          }, 180);
         });
-        matchSec.__sqSchedObsV4630.observe(matchSec, { childList: true, subtree: true, characterData: true });
+        matchSec.__sqSchedObsV4630.observe(matchSec, { childList: true, subtree: true });
       }
     } finally {
       _inSchedulePolishGuardV4630 = false;
@@ -11443,7 +11463,12 @@ _FRONTEND_V22_JS = r'''
 
   function installShortsPanelObserverV4630(shortsSec) {
     if (!shortsSec || shortsSec.__sqShortsObsV4630 || typeof MutationObserver === "undefined") return;
+    if (shortsSec.getAttribute("data-sq-v4655-managed") === "1") return;
     shortsSec.__sqShortsObsV4630 = new MutationObserver(function () {
+      if (shortsSec.getAttribute("data-sq-v4655-managed") === "1") {
+        try { shortsSec.__sqShortsObsV4630.disconnect(); } catch (e) {}
+        return;
+      }
       if (_inShortsPolishGuardV4630) return;
       _inShortsPolishGuardV4630 = true;
       try {
@@ -13430,13 +13455,17 @@ _FRONTEND_V22_JS = r'''
     mountOrUpdateV30ScoreToolbar();
     renderScoreboardTableV30(items);
     localizeScoreStripDomV381();
-    try { organizeBelowScoreboardSectionsV40(); } catch (eV40) {}
-    try { organizeSidebarAndIssuesTabV41(); } catch (eV41) {}
-    try { organizeRankingAndLabTabsV42(); } catch (eV42) {}
-    try { enforceSingleLineMainTabBar(); } catch (eV4610) {}
-    try { organizeScheduleAndShortsTabsV43(); } catch (eV43) {}
-    try { if (window.__organizeModalsAndMemberHubV44) window.__organizeModalsAndMemberHubV44(); } catch (eV44) {}
-    try { installToastNonOverlapAndPartnerCloseFixV4631(); syncDrawerButtonsVisualStateV4631(); } catch (eV4631) {}
+    var _nowOrg56 = Date.now();
+    if (!window.__sqLastSecOrgTsV4656 || (_nowOrg56 - window.__sqLastSecOrgTsV4656) >= 2500) {
+      window.__sqLastSecOrgTsV4656 = _nowOrg56;
+      try { organizeBelowScoreboardSectionsV40(); } catch (eV40) {}
+      try { organizeSidebarAndIssuesTabV41(); } catch (eV41) {}
+      try { organizeRankingAndLabTabsV42(); } catch (eV42) {}
+      try { enforceSingleLineMainTabBar(); } catch (eV4610) {}
+      try { organizeScheduleAndShortsTabsV43(); } catch (eV43) {}
+      try { if (window.__organizeModalsAndMemberHubV44) window.__organizeModalsAndMemberHubV44(); } catch (eV44) {}
+      try { installToastNonOverlapAndPartnerCloseFixV4631(); syncDrawerButtonsVisualStateV4631(); } catch (eV4631) {}
+    }
   }
 
   function getSportTacticalViewV33(it, hp, ap) {
@@ -15757,16 +15786,21 @@ _FRONTEND_V22_JS = r'''
 
     // Observe body for `#sqAdminRaffleModal` creation & authBox updates
     if (typeof MutationObserver !== "undefined") {
+      var _admObsTimer56 = 0;
       var bodyObs = new MutationObserver(function () {
-        if (document.getElementById("sqAdminRaffleModal")) {
-          ensureAdminModalTabsMountedV4612();
-        }
-        var admHubBtn = document.getElementById("sqOpenAdminRaffleBtn");
-        if (admHubBtn && admHubBtn.textContent.indexOf("관리") !== -1 && admHubBtn.textContent.indexOf("글관리") === -1) {
-          admHubBtn.textContent = "👑 추첨 · 글관리";
-        }
+        if (_admObsTimer56) return;
+        _admObsTimer56 = setTimeout(function () {
+          _admObsTimer56 = 0;
+          if (document.getElementById("sqAdminRaffleModal")) {
+            ensureAdminModalTabsMountedV4612();
+          }
+          var admHubBtn = document.getElementById("sqOpenAdminRaffleBtn");
+          if (admHubBtn && admHubBtn.textContent.indexOf("관리") !== -1 && admHubBtn.textContent.indexOf("글관리") === -1) {
+            admHubBtn.textContent = "👑 추첨 · 글관리";
+          }
+        }, 180);
       });
-      bodyObs.observe(document.body, { childList: true, subtree: true });
+      bodyObs.observe(document.body, { childList: true, subtree: false });
     }
   }
 
@@ -16163,8 +16197,9 @@ _FRONTEND_V22_JS = r'''
   function ensureShortsTimerLoopV4655() {
     if (_sqShortsStateV4655.tickTimer) return;
     _sqShortsStateV4655.tickTimer = setInterval(function () {
+      if (typeof document !== "undefined" && document.hidden) return;
       var shortsSec = document.getElementById("tab-shorts");
-      if (!shortsSec || shortsSec.classList.contains("hidden") || shortsSec.style.display === "none") return;
+      if (!shortsSec || shortsSec.classList.contains("hidden") || shortsSec.style.display === "none" || shortsSec.offsetParent === null) return;
       if (_sqShortsStateV4655.paused || _sqShortsStateV4655.ytEmbedOpen) return;
       if (!_sqShortsStateV4655.items || !_sqShortsStateV4655.items.length) return;
       _sqShortsStateV4655.secElapsed += 0.5 * (_sqShortsStateV4655.speed || 1.0);
@@ -16760,7 +16795,7 @@ _FRONTEND_V22_JS = r'''
       }
     });
 
-    [80, 220, 420, 750, 1150, 1850, 2800].forEach(function (ms) {
+    [120, 650, 1800].forEach(function (ms) {
       setTimeout(function () {
         safeRunStepV4610(enforceSingleLineMainTabBar);
         safeRunStepV4610(refreshScoreboardSuiteV30);
@@ -16782,8 +16817,8 @@ _FRONTEND_V22_JS = r'''
       }, ms);
     });
     setInterval(function () {
-      safeRunStepV4610(enforceSingleLineMainTabBar);
       if (typeof document !== "undefined" && document.hidden) return;
+      safeRunStepV4610(enforceSingleLineMainTabBar);
       safeRunStepV4610(stabilizeHofLaunchCardV29);
       safeRunStepV4610(dedupLabKellyMonitorV36);
       safeRunStepV4610(polishModalsAndCloseIconsV29);
@@ -16803,7 +16838,7 @@ _FRONTEND_V22_JS = r'''
           fb.classList.remove("sq-seed-archive-card", "hidden");
         }
       }
-    }, 1000);
+    }, 5000);
   }
 
   // Unconditional pre-boot registration: runs even before DOMContentLoaded and completely immune to any error elsewhere!
@@ -16858,9 +16893,15 @@ _FRONTEND_V22_JS = r'''
       document.getElementById("dcMatchDetailModal")
     ];
 
-    // Universal scan for ANY visible `position: fixed` modal/drawer/dialog (`실시간 알림 센터`, dynamic post/alert modals, etc.)
+    // v4.6.56 Anti-Freeze: ONLY scan direct body children + explicit [role='dialog'] (O(20) instead of 2,500+ divs!)
     if (document.body) {
-      var fixedCandNodes = document.body.querySelectorAll("div, section, aside, [role='dialog']");
+      var fixedCandNodes = [];
+      Array.prototype.forEach.call(document.body.children || [], function (chB) {
+        if (chB && chB.nodeType === 1) fixedCandNodes.push(chB);
+      });
+      Array.prototype.forEach.call(document.body.querySelectorAll("[role='dialog']"), function (dlgB) {
+        if (dlgB && fixedCandNodes.indexOf(dlgB) === -1) fixedCandNodes.push(dlgB);
+      });
       var vw = window.innerWidth || 1280;
       var vh = window.innerHeight || 800;
       for (var fi = 0; fi < fixedCandNodes.length; fi++) {
@@ -17022,14 +17063,17 @@ _FRONTEND_V22_JS = r'''
     if (typeof MutationObserver !== "undefined") {
       var bindObs = function () {
         if (!document.body || window.__sqModalBackObsV4637) return;
+        var _modalObsTimer56 = 0;
         window.__sqModalBackObsV4637 = new MutationObserver(function () {
-          syncModalHistoryGuardState();
+          if (_modalObsTimer56) return;
+          _modalObsTimer56 = setTimeout(function () {
+            _modalObsTimer56 = 0;
+            syncModalHistoryGuardState();
+          }, 140);
         });
         window.__sqModalBackObsV4637.observe(document.body, {
           childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ["class", "style"]
+          subtree: false
         });
       };
       if (document.body) bindObs();
@@ -19023,7 +19067,7 @@ class LoungeCheckinIn(BaseModel):
 
 
 
-_BOOT_VER_V30 = f"46380_{int(time.time())}"
+_BOOT_VER_V30 = f"46560_{int(time.time())}"
 
 
 @router.get("/api/member/p0p1-upgrade.js")
@@ -33755,6 +33799,7 @@ _V4655_NEW_PATHS = {
     "/api/member/auto-shorts-v4655",
     "/api/member/auto-shorts-action-v4655",
     "/api/member/live-sources-diag-v4655",
+    "/api/member/live-sources-diag-v4656",
 }
 router.routes = [rt for rt in router.routes if getattr(rt, "path", "") not in _V4655_NEW_PATHS]
 _pre_cnt_v4655 = len(router.routes)
@@ -33784,9 +33829,14 @@ async def _async_api_auto_shorts_action_v4655(payload: _AutoShortsActionPayloadV
 
 
 @router.get("/api/member/live-sources-diag-v4655")
+@router.get("/api/member/live-sources-diag-v4656")
 async def _async_api_live_sources_diag_v4655(date_offset: int = 0):
     loop = _asyncio_v4652.get_running_loop()
-    return await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, api_live_sources_diag_v4648, date_offset)
+    res = await loop.run_in_executor(_SCOREBOARD_EXEC_POOL_V4652, api_live_sources_diag_v4648, date_offset)
+    if isinstance(res, dict):
+        res["version"] = "v4.6.56"
+        res["client_antifreeze_v4656"] = True
+    return res
 
 
 router.routes = router.routes[_pre_cnt_v4655:] + router.routes[:_pre_cnt_v4655]
