@@ -9,7 +9,8 @@ matches in small steps:
   ("range" task), then single days.
 * "team" tasks (NFL, NBA, NHL, MLB): each team's season schedule, so
   head-to-head covers the whole current season (MLB: the 2026 season that
-  just ended). One request per team plus one for the team list.
+  just ended), then the previous season. One request per team per season
+  plus one for the team list.
 
 Every task is recorded in espn_backfill_progress once its request
 succeeded, so redeploys resume where they stopped and finished days are
@@ -57,10 +58,19 @@ def _mark(task, stored, detail=None):
 
 
 def season_label(league_key, today):
-    """Season the team-schedule task refers to (and the ?season= sent for MLB)."""
+    """Start year of the current season; used in task keys (team:<league>:<label>:<id>)."""
     if league_key == "MLB":            # March..October; ESPN's default in winter is next season
         return str(today.year if today.month >= 3 else today.year - 1)
     return str(today.year if today.month >= 7 else today.year - 1)
+
+
+# ESPN's ?season= is the year the season ends for NBA/NHL (2026-27 -> 2027)
+# and the start year for NFL/MLB (checked against team-schedule responses).
+_SEASON_PARAM_IS_END_YEAR = {"NBA", "NHL"}
+
+
+def espn_season_param(league_key, label):
+    return str(int(label) + 1) if league_key in _SEASON_PARAM_IS_END_YEAR else str(label)
 
 
 def plan(today, done):
@@ -102,6 +112,16 @@ def plan(today, done):
         for tid in [t for t in (done.get(list_key) or "").split(",") if t]:
             if f"team:{key}:{season}:{tid}" not in done:
                 tasks.append((f"team:{key}:{season}:{tid}", "team", lg, (tid, season)))
+    # Previous season (head-to-head across seasons), after the current one.
+    for key in TEAM_SCHEDULE_LEAGUES:
+        lg = leagues.get(key)
+        if lg is None:
+            continue
+        season = season_label(key, today)
+        prev = str(int(season) - 1)
+        for tid in [t for t in (done.get(f"teamlist:{key}:{season}") or "").split(",") if t]:
+            if f"team:{key}:{prev}:{tid}" not in done:
+                tasks.append((f"team:{key}:{prev}:{tid}", "team", lg, (tid, prev)))
     tasks += day_tasks(range(RECENT_FIRST_DAYS + 1, DAYS_BACK + 1))
     return tasks
 
@@ -138,7 +158,11 @@ def collect_backfill(espn_client=None, now=None, max_requests=MAX_REQUESTS_PER_R
                 items = client.date_range(lg, *arg)
             else:
                 tid, season = arg
-                items = client.team_schedule(lg, tid, season if lg.key == "MLB" else None)
+                current = season == season_label(lg.key, today)
+                # Current NFL/NBA/NHL season: ESPN's default. MLB (winter default is next
+                # season) and every previous season: explicit ?season=.
+                param = None if (current and lg.key != "MLB") else espn_season_param(lg.key, season)
+                items = client.team_schedule(lg, tid, param)
             if not client.last_ok:
                 continue                   # retried on a later run
             n = multisport._store(_finished(items), lg.sport, "espn:")
