@@ -42,3 +42,12 @@ def with_stale_flag(row, now=None):
     item = dict(row)
     item["status_stale"] = is_status_stale(item.get("start_time"), item.get("status"), now)
     return item
+
+
+# Provider of a stored match, from its provider id prefix (exposed as "source").
+SOURCE_SQL = (
+    "CASE WHEN m.provider_match_id LIKE 'espn:%' THEN 'ESPN' "
+    "WHEN m.provider_match_id LIKE 'as:%' THEN 'API-SPORTS' "
+    "WHEN m.provider_match_id LIKE 'fd:%' THEN 'football-data.org' "
+    "ELSE 'API-Football (legacy)' END"
+)

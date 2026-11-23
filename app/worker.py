@@ -7,6 +7,7 @@ from app.db import engine
 from app.collector import (collect_leagues, collect_fixtures, collect_live, refresh_forecast_results,
                            recheck_unfinished, collect_head_to_head)
 from app.forecast_tracking import snapshot_forecasts, evaluate_forecasts
+from app import multisport
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("sportiq-worker")
@@ -86,6 +87,25 @@ def live_poll_interval_seconds(configured=None):
     return max(LIVE_POLL_MIN_SECONDS, value)
 
 
+def safe_multisport(label, fn):
+    """Like safe() but without the football-data token requirement."""
+    if not settings.multisport_enabled:
+        return
+    try:
+        result = fn()
+        log.info("%s: %s", label, result)
+        try:
+            record_job(label, "success", result=sum(v for v in (result or {}).values() if isinstance(v, int)))
+        except Exception:
+            log.exception("%s monitoring write failed", label)
+    except Exception as exc:
+        log.exception("%s failed", label)
+        try:
+            record_job(label, "failed", error=exc)
+        except Exception:
+            log.exception("%s monitoring write failed", label)
+
+
 scheduler = BlockingScheduler(timezone="UTC")
 scheduler.add_job(lambda: safe("forecast_snapshot", snapshot_forecasts), "interval", hours=6, id="forecast_snapshot", max_instances=1, coalesce=True)
 scheduler.add_job(lambda: safe("forecast_result_refresh", refresh_forecast_results), "interval", hours=3, id="forecast_result_refresh", max_instances=1, coalesce=True)
@@ -103,6 +123,14 @@ scheduler.add_job(lambda: safe("recheck_unfinished", recheck_unfinished), "inter
 # plain 24h interval might never fire.
 scheduler.add_job(lambda: safe("head_to_head", collect_head_to_head), "interval", hours=24, id="head_to_head", max_instances=1, coalesce=True,
                   next_run_time=datetime.now(timezone.utc) + timedelta(minutes=10))
+
+# Non-football sports (ESPN, or API-SPORTS once API_SPORTS_KEY is set).
+scheduler.add_job(lambda: safe_multisport("multisport_schedule", multisport.collect_schedule), "interval",
+                  minutes=max(30, settings.multisport_schedule_minutes), id="multisport_schedule", max_instances=1, coalesce=True,
+                  next_run_time=datetime.now(timezone.utc) + timedelta(minutes=2))
+scheduler.add_job(lambda: safe_multisport("multisport_live", multisport.collect_live), "interval",
+                  minutes=max(5, settings.multisport_live_minutes), id="multisport_live", max_instances=1, coalesce=True,
+                  next_run_time=datetime.now(timezone.utc) + timedelta(minutes=4))
 
 if __name__ == "__main__":
     safe("leagues", collect_leagues)
