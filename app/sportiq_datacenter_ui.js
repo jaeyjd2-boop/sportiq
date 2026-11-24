@@ -134,7 +134,7 @@
     {id:'esports',lbl:'🎮 LCK',cntKey:'esports'},{id:'ufc',lbl:'🥊 UFC',cntKey:'ufc'},{id:'tennis',lbl:'🎾 테니스',cntKey:'tennis'},{id:'f1',lbl:'🏎️ F1',cntKey:'f1'}
   ];
   var LEAGUES18=['all','EPL','LALIGA','BUNDESLIGA','SERIEA','LIGUE1','KLEAGUE','JLEAGUE','MLS','UCL','UNL','WC2026','KBO','MLB','NPB','NBA','WNBA','VLEAGUE_M','VLEAGUE_W','NHL','LCK','UFC','ATP','WTA','F1'];
-  var LEAGUES11=['EPL','LALIGA','BUNDESLIGA','SERIEA','LIGUE1','KLEAGUE','NBA','KBO','MLB','NHL','LCK'];
+  var LEAGUES11=['EPL','LALIGA','BUNDESLIGA','SERIEA','LIGUE1','KLEAGUE','NBA','KBO','MLB','NHL','NFL','LCK'];
 
   var modal=document.createElement('div');
   modal.id='dcMatchModal';
@@ -462,6 +462,24 @@
       if(d.is_sample){h+='<div style="font-size:11px;color:#fbbf24;margin:0 0 10px">⚠️ 실시간 데이터 연동에 실패해 예시 데이터를 표시 중입니다(실제 기록과 다를 수 있음).</div>';}
       h+='<div class="dc-grid-2">';
       h+='<div class="dc-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">🏆 '+dcEsc(d.league_name||d.league)+' 실시간 순위 ('+dcEsc(d.updated_at_kst)+')</div>';
+      if(d.grouped){
+        // NBA/NHL/NFL: one table per conference, ranked inside the conference.
+        var isNhl=(d.league==='NHL'),isNfl=(d.league==='NFL');
+        var gl=d.groups||[];
+        for(var gi=0;gi<gl.length;gi++){
+          h+='<div style="font-size:12px;font-weight:800;color:#a5b4fc;margin:'+(gi?'14px':'2px')+' 0 6px">'+dcEsc(gl[gi])+(isNfl?'':' 컨퍼런스')+'</div>';
+          h+='<table class="dc-tbl"><thead><tr><th>#</th><th>구단</th><th>경기</th><th>승</th>'+(isNfl?'<th>무</th>':'')+'<th>패</th>'+(isNhl?'<th>연장패</th><th>승점</th>':'<th>승률</th><th>게임차</th>')+'</tr></thead><tbody>';
+          for(var gr=0;gr<rows.length;gr++){
+            var rr=rows[gr];if(rr.group!==gl[gi])continue;
+            var zcg=rr.zone==='PO'?'dc-zone-po':(rr.zone==='PI'?'dc-zone-uel':'');
+            var gbTxt=(rr.gb===null||rr.gb===undefined||Number(rr.gb)===0)?'-':dcEsc(rr.gb);
+            h+='<tr><td><span class="'+zcg+'">'+dcEsc(rr.rank)+'</span></td><td style="font-weight:600">'+dcEsc(rr.team)+'</td><td>'+dcEsc(rr.gp)+'</td><td>'+dcEsc(rr.w)+'</td>'+(isNfl?'<td>'+dcEsc(rr.d)+'</td>':'')+'<td>'+dcEsc(rr.l)+'</td>'+(isNhl?'<td>'+dcEsc(rr.otl)+'</td><td style="font-weight:700;color:#38bdf8">'+dcEsc(rr.pts)+'</td>':'<td style="font-weight:700;color:#38bdf8">'+dcEsc(rr.pts_label)+'</td><td>'+gbTxt+'</td>')+'</tr>';
+          }
+          h+='</tbody></table>';
+        }
+        h+='<div style="font-size:11px;color:#94a3b8;margin-top:6px">순위는 ESPN 시드(동률 규칙 포함) 기준'+(isNhl?' · 승점 = 승×2 + 연장패':'')+'</div>';
+        h+='</div>';
+      } else {
       h+='<table class="dc-tbl"><thead><tr><th>#</th><th>구단</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>최근5</th><th>승점/승률</th></tr></thead><tbody>';
       for(var i=0;i<rows.length;i++){
         var r=rows[i];
@@ -473,6 +491,7 @@
         h+='<tr><td><span class="'+zc+'">'+dcEsc(r.rank)+'</span></td><td style="font-weight:600">'+dcEsc(r.team)+'</td><td>'+dcEsc(r.gp)+'</td><td>'+dcEsc(r.w)+'</td><td>'+dcEsc(r.d)+'</td><td>'+dcEsc(r.l)+'</td><td>'+dcEsc(r.gd)+'</td><td>'+fm+'</td><td style="font-weight:700;color:#38bdf8">'+dcEsc(r.pts_label||r._pts||r.pts)+'</td></tr>';
       }
       h+='</tbody></table></div>';
+      }
 
       h+='<div style="display:flex;flex-direction:column;gap:12px">';
       h+='<div class="dc-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">👑 득점·핵심 타이틀 리더보드'+(d.leaders_is_sample?' <span style="font-size:11px;color:#fbbf24;font-weight:600">(예시)</span>':'')+'</div><table class="dc-tbl"><thead><tr><th>#</th><th>선수</th><th>구단</th><th>기록</th></tr></thead><tbody>';

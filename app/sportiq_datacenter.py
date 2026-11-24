@@ -1099,6 +1099,88 @@ def _zone_label(sport, rank, total):
     return ""
 
 
+# North-American leagues: ESPN splits standings into conferences (children);
+# the old single-table parser cut them to 20 rows, read gamesPlayed that NBA
+# and NFL do not send, and kept ESPN's unordered entry order.
+_US_GROUP_LEAGUES = {
+    "NBA": {"East": "동부", "West": "서부", "playoff": 6, "playin": 10, "mode": "pct"},
+    "WNBA": {"East": "동부", "West": "서부", "playoff": 4, "playin": 0, "mode": "pct"},
+    "NHL": {"East": "동부", "West": "서부", "playoff": 8, "playin": 0, "mode": "points"},
+    "NFL": {"AFC": "AFC", "NFC": "NFC", "playoff": 7, "playin": 0, "mode": "pct"},
+}
+
+
+def _us_group_rows(league_code, data):
+    """All teams, grouped by conference, ranked within the group.
+
+    rank: win percentage (NBA/NFL) or points (NHL), ties broken by ESPN's
+    playoffSeed. seed: ESPN's playoffSeed itself (NFL division winners take
+    seeds 1-4, so seed and rank can differ); zone (PO/PI) follows the seed.
+    gp = w + l (+ ties or OT losses) when ESPN omits gamesPlayed.
+    """
+    cfg = _US_GROUP_LEAGUES[league_code]
+    rows = []
+    for ch in data.get("children") or []:
+        abbr = str(ch.get("abbreviation") or ch.get("name") or "")
+        label = cfg.get(abbr) or abbr or "전체"
+        group_rows = []
+        for ent in ((ch.get("standings") or {}).get("entries") or []):
+            team = ent.get("team") or {}
+            name = team.get("displayName") or team.get("shortDisplayName")
+            if not name:
+                continue
+            st = {x.get("name"): x.get("value") for x in (ent.get("stats") or []) if isinstance(x, dict)}
+
+            def num(key, default=0):
+                v = st.get(key)
+                try:
+                    return float(v) if v is not None else default
+                except (TypeError, ValueError):
+                    return default
+            w, l = int(num("wins")), int(num("losses"))
+            ties = int(num("ties")) if league_code == "NFL" else 0
+            otl = int(num("otLosses", num("overtimeLosses"))) if league_code == "NHL" else None
+            gp = int(num("gamesPlayed", 0)) or (w + l + ties + (otl or 0))
+            pct = st.get("winPercent")
+            if pct is None and gp:
+                pct = (w + 0.5 * ties) / gp
+            gb = st.get("gamesBehind")
+            pts_val = int(num("points")) if league_code == "NHL" else None
+            gf, ga = int(num("pointsFor")), int(num("pointsAgainst"))
+            row = {
+                "group": label, "group_code": abbr, "group_name": ch.get("name"),
+                "team": name, "team_abbr": team.get("abbreviation"),
+                "gp": gp, "w": w, "d": ties, "l": l,
+                "gf": gf, "ga": ga, "gd": gf - ga,
+                "pct": round(float(pct), 3) if pct is not None else None,
+                "gb": round(float(gb), 1) if isinstance(gb, (int, float)) else None,
+                "form": [],
+                "_seed": int(num("playoffSeed", 0)) or None,
+            }
+            if league_code == "NHL":
+                row["otl"] = otl or 0
+                row["pts"] = pts_val
+                row["pts_label"] = f"{pts_val}점"
+                row["_pts"] = pts_val
+            else:
+                row["pts_label"] = f"{row['pct']:.3f}".lstrip("0") if row["pct"] is not None else f"{w}승"
+                row["_pts"] = w
+            group_rows.append(row)
+        if cfg["mode"] == "points":
+            order = lambda r: (-(r["pts"] or 0), r["gp"], r["_seed"] or 99, -r["w"])
+        else:
+            order = lambda r: (-(r["pct"] or 0), r["_seed"] or 99, -r["w"], r["l"])
+        group_rows.sort(key=order)
+        for i, r in enumerate(group_rows, start=1):
+            seed = r.pop("_seed", None)
+            r["rank"] = i
+            r["seed"] = seed
+            pos = seed or i
+            r["zone"] = "PO" if pos <= cfg["playoff"] else ("PI" if cfg["playin"] and pos <= cfg["playin"] else "")
+        rows.extend(group_rows)
+    return rows or None
+
+
 def _fetch_espn_standings(league_code):
     sport, slug, league_full = LEAGUE_CONFIG.get(league_code, ("soccer", None, league_code))
     if not slug:
@@ -1107,6 +1189,11 @@ def _fetch_espn_standings(league_code):
     data = _fetch_json(url, timeout=6)
     if not data:
         return None
+    if league_code in _US_GROUP_LEAGUES and data.get("children"):
+        try:
+            return _us_group_rows(league_code, data)
+        except Exception:
+            return None
     entries = []
     children = data.get("children") or []
     if children:
@@ -1252,6 +1339,12 @@ def get_standings(league: str = Query("EPL")):
         "standings": rows,
         "leaders": leaders,
     }
+    groups = list(dict.fromkeys(r["group"] for r in rows if r.get("group")))
+    if groups:
+        # Conference tables (NBA/NHL/NFL): rank is within "group".
+        res["grouped"] = True
+        res["groups"] = groups
+        res["rank_basis"] = "points" if lg == "NHL" else "win_pct"
     _cache_set(cache_key, res)
     return res
 
