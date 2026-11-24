@@ -441,7 +441,8 @@ def get_live_cheers() -> Dict[str, Any]:
 
 @router.post("/api/cheers/send")
 def send_live_cheer(payload: CheerSendRequest, request: Request) -> Dict[str, Any]:
-    client_ip = request.client.host if request.client else "unknown"
+    from app.sportiq_client_ip import client_ip as _sportiq_client_ip
+    client_ip = _sportiq_client_ip(request)
     rate_key = (payload.actor_key or "").strip() or f"ip:{client_ip}"
     now_ts = time.monotonic()
     last_ts = _CHEER_COOLDOWN.get(rate_key)

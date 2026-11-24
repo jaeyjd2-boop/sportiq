@@ -26,14 +26,75 @@ def req(xff=None, host="10.0.0.9"):
     return SimpleNamespace(headers=headers, client=SimpleNamespace(host=host))
 
 
+def req_h(headers, host="10.0.0.9"):
+    return SimpleNamespace(headers=headers, client=SimpleNamespace(host=host))
+
+
+OFF_RENDER = {"RENDER": "", "SPORTIQ_TRUST_CF_CONNECTING_IP": ""}
+ON_RENDER = {"RENDER": "true", "SPORTIQ_TRUST_CF_CONNECTING_IP": ""}
+
+
 class ClientIpTests(unittest.TestCase):
-    def test_rightmost_hop_not_client_supplied_leftmost(self):
-        self.assertEqual(lr._client_ip_v4615(req("6.6.6.6, 203.0.113.7")), "203.0.113.7")
-        self.assertEqual(lr._client_ip_v4615(req("1.1.1.1, 2.2.2.2, 203.0.113.7")), "203.0.113.7")
-        self.assertEqual(lr._client_ip_v4615(req("203.0.113.7")), "203.0.113.7")
-        self.assertEqual(lr._client_ip_v4615(req()), "10.0.0.9")
-        with patch.dict(os.environ, {"SPORTIQ_TRUSTED_PROXY_HOPS": "2"}):
-            self.assertEqual(lr._client_ip_v4615(req("6.6.6.6, 198.51.100.4, 172.16.0.1")), "198.51.100.4")
+    def test_rightmost_public_hop_not_client_supplied_leftmost(self):
+        with patch.dict(os.environ, OFF_RENDER):
+            self.assertEqual(lr._client_ip_v4615(req("6.6.6.6, 52.20.0.7")), "52.20.0.7")
+            self.assertEqual(lr._client_ip_v4615(req("1.2.3.4, 2.2.2.2, 52.20.0.7")), "52.20.0.7")
+            self.assertEqual(lr._client_ip_v4615(req("52.20.0.7")), "52.20.0.7")
+            self.assertEqual(lr._client_ip_v4615(req()), "10.0.0.9")
+
+    def test_proxy_hops_after_the_visitor_are_skipped(self):
+        # If Render's balancer appends the Cloudflare edge or an internal hop,
+        # every visitor must not collapse onto that one address.
+        with patch.dict(os.environ, OFF_RENDER):
+            self.assertEqual(lr._client_ip_v4615(req("6.6.6.6, 52.20.0.7, 172.70.1.2")), "52.20.0.7")
+            self.assertEqual(lr._client_ip_v4615(req("52.20.0.7, 162.158.3.4, 10.1.2.3")), "52.20.0.7")
+            self.assertEqual(lr._client_ip_v4615(req("52.20.0.7, 2606:4700::1")), "52.20.0.7")
+            self.assertEqual(lr._client_ip_v4615(req("52.20.0.8:4431, 10.1.2.3")), "52.20.0.8")
+            a = lr._client_ip_v4615(req("52.20.0.7, 172.70.1.2"))
+            b = lr._client_ip_v4615(req("34.90.0.1, 172.70.1.2"))
+            self.assertNotEqual(a, b)
+
+    def test_cf_connecting_ip_trusted_only_on_render(self):
+        h = {"cf-connecting-ip": "34.90.0.1", "x-forwarded-for": "6.6.6.6, 34.90.0.1, 172.70.1.2"}
+        with patch.dict(os.environ, ON_RENDER):
+            self.assertEqual(lr._client_ip_v4615(req_h(h)), "34.90.0.1")
+            # Cloudflare sets it to the connecting address; with XFF alone it also matches.
+            self.assertEqual(lr._client_ip_v4615(req_h({"cf-connecting-ip": "2001:4860::8"})), "2001:4860::8")
+            # Junk or internal values fall back to XFF.
+            self.assertEqual(lr._client_ip_v4615(req_h({"cf-connecting-ip": "nope", "x-forwarded-for": "34.90.0.1"})), "34.90.0.1")
+            self.assertEqual(lr._client_ip_v4615(req_h({"cf-connecting-ip": "10.0.0.1", "x-forwarded-for": "34.90.0.1"})), "34.90.0.1")
+        with patch.dict(os.environ, OFF_RENDER):
+            # Off Render the header is just something a client typed.
+            self.assertEqual(lr._client_ip_v4615(req_h({"cf-connecting-ip": "6.6.6.6", "x-forwarded-for": "34.90.0.1"})), "34.90.0.1")
+        with patch.dict(os.environ, {"RENDER": "true", "SPORTIQ_TRUST_CF_CONNECTING_IP": "0"}):
+            self.assertEqual(lr._client_ip_v4615(req_h(h)), "34.90.0.1")
+            self.assertEqual(lr._client_ip_v4615(req_h({"cf-connecting-ip": "6.6.6.6", "x-forwarded-for": "34.90.0.1"})), "34.90.0.1")
+
+    def test_all_hops_are_proxies(self):
+        with patch.dict(os.environ, OFF_RENDER):
+            self.assertEqual(lr._client_ip_v4615(req("10.0.0.5, 172.70.1.2")), "10.0.0.5")
+            self.assertEqual(lr._client_ip_v4615(req("garbage")), "10.0.0.9")
+
+    def test_shape_log_has_no_addresses(self):
+        from app import sportiq_client_ip as ci
+        ci._LOGGED[0] = False
+        with patch.dict(os.environ, ON_RENDER), self.assertLogs("sportiq.client_ip", "WARNING") as cm:
+            ci.client_ip(req_h({"cf-connecting-ip": "34.90.0.1", "x-forwarded-for": "34.90.0.1, 172.70.1.2"}))
+            ci.client_ip(req_h({"x-forwarded-for": "52.20.0.7"}))
+        self.assertEqual(len(cm.output), 1)
+        line = cm.output[0]
+        for addr in ("34.90.0.1", "172.70.1.2", "52.20.0.7"):
+            self.assertNotIn(addr, line)
+        self.assertIn("xff=[public,proxy]", line)
+        self.assertIn("chosen_from=cf-connecting-ip", line)
+
+    def test_other_ip_users_share_the_helper(self):
+        root = Path(lr.__file__).parent
+        main = (root / "main.py").read_text(encoding="utf-8")
+        self.assertNotIn('fwd.split(",")[0]', main)
+        self.assertIn("_sportiq_client_ip(request)", main)
+        for name in ("sportiq_auto_analyst.py", "sportiq_issues_ranking.py"):
+            self.assertIn("_sportiq_client_ip(request)", (root / name).read_text(encoding="utf-8"), name)
 
 
 class VoteDedupeTests(unittest.TestCase):
@@ -53,24 +114,24 @@ class VoteDedupeTests(unittest.TestCase):
 
     def test_spoofed_leftmost_values_do_not_add_votes(self):
         start = self.votes()
-        first = self.vote("9.9.9.1, 198.51.100.10").json()
+        first = self.vote("9.9.9.1, 52.10.0.10").json()
         self.assertFalse(first["already_voted"])
         for i in range(2, 6):
-            again = self.vote(f"9.9.9.{i}, 198.51.100.10").json()      # forged leftmost, same real client
+            again = self.vote(f"9.9.9.{i}, 52.10.0.10").json()      # forged leftmost, same real client
             self.assertTrue(again["already_voted"])
         self.assertEqual(self.votes(), start + 1)
-        self.assertFalse(self.vote("198.51.100.11").json()["already_voted"])   # a different client still counts
+        self.assertFalse(self.vote("52.10.0.11").json()["already_voted"])   # a different client still counts
         self.assertEqual(self.votes(), start + 2)
 
     def test_dedupe_survives_restart(self):
-        self.vote("198.51.100.20")
+        self.vote("52.10.0.20")
         lr._GM_VOTE_DEDUPE_READY[0] = False       # as after a worker/web restart
-        self.assertTrue(self.vote("198.51.100.20").json()["already_voted"])
+        self.assertTrue(self.vote("52.10.0.20").json()["already_voted"])
 
     def test_failed_vote_is_not_recorded(self):
-        r = self.client.post("/api/rankings/global-matches/999999/vote", headers={"x-forwarded-for": "198.51.100.30"})
+        r = self.client.post("/api/rankings/global-matches/999999/vote", headers={"x-forwarded-for": "52.10.0.30"})
         self.assertEqual(r.status_code, 404)
-        key = lr._gm_vote_key(req("198.51.100.30"), 999999)
+        key = lr._gm_vote_key(req("52.10.0.30"), 999999)
         with lr._db_session(write=False) as conn:
             row = conn.execute(f"SELECT 1 FROM {lr._GM_VOTE_DEDUPE_TABLE} WHERE vote_key = ?", (key,)).fetchone()
         self.assertIsNone(row)

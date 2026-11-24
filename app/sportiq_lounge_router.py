@@ -26231,21 +26231,12 @@ _NEW_ACCT_BY_IP_V4615: Dict[str, List[float]] = {}
 def _client_ip_v4615(request: Optional[Request]) -> str:
     """Client address for vote dedupe, admin lockout and rate limits.
 
-    The leftmost X-Forwarded-For entry is whatever the client sent, so a
-    changing value bypassed every per-IP guard. Proxies append the address
-    they saw, so the entry SPORTIQ_TRUSTED_PROXY_HOPS from the right (default
-    1: the one added by Render's edge) is the first one a client cannot forge.
+    See app/sportiq_client_ip.py: CF-Connecting-IP on Render, else the first
+    X-Forwarded-For entry from the right that is not a proxy. The leftmost
+    entry is whatever the client sent and must never be used.
     """
-    if request is None:
-        return "local"
-    parts = [p.strip() for p in (request.headers.get("x-forwarded-for") or "").split(",") if p.strip()]
-    if parts:
-        try:
-            hops = max(1, int(os.environ.get("SPORTIQ_TRUSTED_PROXY_HOPS") or "1"))
-        except ValueError:
-            hops = 1
-        return parts[-hops if len(parts) >= hops else 0][:64]
-    return (request.client.host if request.client else "local")[:64]
+    from app.sportiq_client_ip import client_ip as _sportiq_client_ip
+    return _sportiq_client_ip(request)
 
 
 def _check_admin_lockout_v4615(ip_key: str) -> None:
