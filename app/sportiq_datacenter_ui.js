@@ -460,6 +460,7 @@
       var as=leaders.assists||[];
       var h=leaguePillsHtml(state.standingsLeague,'data-stlg');h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px">';var ext=[{id:'VLEAGUE',l:'🏐 V-리그'},{id:'UFC',l:'🥊 UFC 랭킹'},{id:'TENNIS',l:'🎾 ATP 랭킹'},{id:'F1',l:'🏎️ F1 순위'}];for(var ei=0;ei<ext.length;ei++){var ex=ext[ei];h+='<button class="dc-pill'+(state.standingsLeague===ex.id?' active':'')+'" data-stlg="'+ex.id+'">'+ex.l+'</button>';}h+='</div>';
       if(d.is_sample){h+='<div style="font-size:11px;color:#fbbf24;margin:0 0 10px">⚠️ 실시간 데이터 연동에 실패해 예시 데이터를 표시 중입니다(실제 기록과 다를 수 있음).</div>';}
+      if(d.unavailable||!rows.length){h+='<div class="dc-card" style="color:#94a3b8;font-size:12px;margin-bottom:10px">'+dcEsc(d.league_name||d.league)+' 순위를 지금 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>';}
       h+='<div class="dc-grid-2">';
       h+='<div class="dc-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">🏆 '+dcEsc(d.league_name||d.league)+' 실시간 순위 ('+dcEsc(d.updated_at_kst)+')</div>';
       if(d.grouped){
@@ -477,7 +478,7 @@
           }
           h+='</tbody></table>';
         }
-        h+='<div style="font-size:11px;color:#94a3b8;margin-top:6px">순위는 ESPN 시드(동률 규칙 포함) 기준'+(isNhl?' · 승점 = 승×2 + 연장패':'')+'</div>';
+        h+='<div style="font-size:11px;color:#94a3b8;margin-top:6px">순위는 컨퍼런스 안 '+(isNhl?'승점':'승률')+' 순(동률은 ESPN 시드 순)'+(isNhl?' · 승점 = 승×2 + 연장패':'')+'</div>';
         h+='</div>';
       } else {
       h+='<table class="dc-tbl"><thead><tr><th>#</th><th>구단</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>최근5</th><th>승점/승률</th></tr></thead><tbody>';

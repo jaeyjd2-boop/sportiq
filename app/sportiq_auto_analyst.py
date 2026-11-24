@@ -930,7 +930,8 @@ def post_shorts_interact(req: ShortsInteractReq, request: Request):
         raise HTTPException(status_code=400, detail="invalid action")
     actor = (req.actor_key or "").strip()[:80]
     if not actor:
-        ip_raw = request.client.host if request.client else "unknown"
+        from app.sportiq_client_ip import client_ip as _sportiq_client_ip
+        ip_raw = _sportiq_client_ip(request)
         actor = "ip:" + hashlib.sha256(ip_raw.encode("utf-8", errors="ignore")).hexdigest()[:24]
     with _get_conn() as conn:
         _ensure_shorts_stat_row(conn, cid)

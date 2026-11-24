@@ -2,6 +2,7 @@ from datetime import date
 import time
 from collections import defaultdict, deque
 from fastapi import Request
+from app.sportiq_client_ip import client_ip as _sportiq_client_ip
 from fastapi.responses import JSONResponse
 from app.sportiq_autonomous_sec import router as autonomous_router
 from fastapi import FastAPI, HTTPException, Query
@@ -45,8 +46,7 @@ _RATE_LIMIT_MAX_REQ = 8
 @app.middleware("http")
 async def sportiq_security_and_ratelimit_middleware(request: Request, call_next):
     if request.method == "POST" and request.url.path in _RATE_LIMIT_PATHS:
-        fwd = request.headers.get("x-forwarded-for", "")
-        client_ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "unknown")
+        client_ip = _sportiq_client_ip(request)
         now_ts = time.monotonic()
         bucket = _RATE_LIMIT_BUCKETS[f"{client_ip}:{request.url.path}"]
         while bucket and (now_ts - bucket[0]) > _RATE_LIMIT_WINDOW_SEC:

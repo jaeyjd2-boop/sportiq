@@ -226,7 +226,9 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
           ? "<span style='background:#dc2626;color:#fff;padding:1px 6px;border-radius:5px;font-size:10.5px;font-weight:800;'>LIVE " + esc(it.home_score + ":" + it.away_score) + "</span>"
           : (!isPre
               ? "<span style='background:#334155;color:#e2e8f0;padding:1px 6px;border-radius:5px;font-size:10.5px;font-weight:800;'>" + esc(it.home_score + ":" + it.away_score) + " 종료</span>"
-              : "<span style='color:#6ee7b7;font-size:11px;font-weight:800;'>" + (aiO.is_sample !== false ? "AI 예시 " : "AI ") + esc(aiO.home_pct || 50) + "%:" + esc(aiO.away_pct || 50) + "%</span> <span style='color:#94a3b8;font-size:10.5px;'>(배당 " + esc(oddsO.home || "-") + "/" + esc(oddsO.away || "-") + ")</span>");
+              : (aiO.is_sample === false && aiO.home_pct != null
+                  ? "<span style='color:#6ee7b7;font-size:11px;font-weight:800;'>AI " + esc(aiO.home_pct) + "%:" + esc(aiO.away_pct) + "%</span> <span style='color:#94a3b8;font-size:10.5px;'>(배당 " + esc(oddsO.home || "-") + "/" + esc(oddsO.away || "-") + ")</span>"
+                  : "<span style='color:#94a3b8;font-size:11px;font-weight:700;'>경기 전</span>"));
         return (
           "<div" + hideExtraQa + "justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;background:rgba(2,6,23,.65);border:1px solid rgba(51,65,85,.75);border-radius:9px;flex-wrap:wrap;'>" +
           "  <div style='display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0;'>" +
@@ -356,19 +358,19 @@ _ENHANCED_RENDER_AI_IQ_FN = r'''function renderAiIqSearchResult(d) {
       var v = Number(pct || 0);
       if (!v) return "";
       var col = v >= 90 ? "#34d399" : (v >= 80 ? "#38bdf8" : "#cbd5e1");
-      return "<span style='font-size:10.5px;font-weight:800;color:" + col + ";background:rgba(15,23,42,.9);border:1px solid rgba(148,163,184,.25);border-radius:6px;padding:1px 6px;'>정확도 " + v + "%</span>";
+      return "<span style='font-size:10.5px;font-weight:800;color:" + col + ";background:rgba(15,23,42,.9);border:1px solid rgba(148,163,184,.25);border-radius:6px;padding:1px 6px;'>검색 일치도 " + v + "%</span>";
     }
 
     // 1. SportIQ Live Match & Odds Cards (Clickable -> Opens 5-Tab Match Detail Modal!)
     if (games.length) {
-      out.push("<div data-ai-sec='matches'><div style='font-weight:800;color:#4ade80;font-size:12.5px;margin:10px 0 6px;'>📊 SportIQ 실시간 매치 · AI 승률 · 배당 (" + games.length + "건)</div>");
+      out.push("<div data-ai-sec='matches'><div style='font-weight:800;color:#4ade80;font-size:12.5px;margin:10px 0 6px;'>📊 SportIQ 실시간 매치 (" + games.length + "건)</div>");
       games.forEach(function (g, gIdx) {
         out.push(
           "<div class='sq-ai-iq-card' data-ai-match-idx='" + gIdx + "' data-ai-jump-match='" + esc(g.matchup || "") + "' style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;' title='클릭 시 5탭 경기 상세 모달 열기'>" +
           "  <div>" +
           "    <span style='background:#1e293b;color:#38bdf8;border-radius:6px;padding:2px 6px;font-size:10.5px;font-weight:800;margin-right:6px;'>" + esc(g.league) + "</span>" +
           "    <strong style='color:#f8fafc;font-size:13px;'>" + esc(g.matchup) + "</strong> " + pctBadge(g.match_pct) +
-          "    <div style='font-size:11.5px;color:#94a3b8;margin-top:3px;'>📅 " + esc(g.dt_kst) + " · 스코어 <strong style='color:#e2e8f0;'>" + esc(g.score || "0 : 0") + "</strong> · 🎯 " + esc(g.ai_prob) + (g.drop_badge ? " · <span style='color:#fbbf24;font-weight:800;'>" + esc(g.drop_badge) + "</span>" : "") + "</div>" +
+          "    <div style='font-size:11.5px;color:#94a3b8;margin-top:3px;'>📅 " + esc(g.dt_kst) + " · 스코어 <strong style='color:#e2e8f0;'>" + esc(g.score || "0 : 0") + "</strong>" + (g.ai_prob ? " · 🎯 " + esc(g.ai_prob) : "") + (g.drop_badge ? " · <span style='color:#fbbf24;font-weight:800;'>" + esc(g.drop_badge) + "</span>" : "") + "</div>" +
           "  </div>" +
           "  <button type='button' data-ai-match-idx='" + gIdx + "' style='font-size:11.5px;font-weight:800;color:#38bdf8;background:rgba(14,165,233,.14);border:1px solid rgba(56,189,248,.5);border-radius:8px;padding:4px 9px;cursor:pointer;white-space:nowrap;'>" + esc(g.status || "경기 상세") + " · 상세 ↗</button>" +
           "</div>"
@@ -8156,8 +8158,9 @@ _FRONTEND_V22_JS = r'''
     var stBg = isLive ? "#dc2626" : (it.state === "post" ? "#475569" : "#1d4ed8");
     var ai = it.ai || {};
     var odds = ai.odds || {};
-    var probTxt = (ai.is_sample !== false ? "AI 예시 " : "AI ") + (ai.home_pct || 50) + "% / 0% / " + (ai.away_pct || 50) + "%";
-    var oddsTxt = odds.home ? ("배당 " + odds.home + " / " + odds.away) : "";
+    var aiRealV52 = ai.is_sample === false && ai.home_pct != null;
+    var probTxt = aiRealV52 ? ("AI " + ai.home_pct + "% / 0% / " + ai.away_pct + "%") : "";
+    var oddsTxt = (aiRealV52 && odds.home) ? ("배당 " + odds.home + " / " + odds.away) : "";
     return [
       "<div style='display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:11px;margin-bottom:5px;flex-wrap:nowrap;'>",
       "  <span style='background:#1e293b;color:" + (it.sport === "volleyball" ? "#c4b5fd" : "#fdba74") + ";padding:2px 6px;border-radius:6px;font-weight:800;white-space:nowrap;flex-shrink:0;'>" + (it.sport === "volleyball" ? ("🏐 " + (it.league_code === "VLEAGUE_W" ? "여V리그" : "남V리그")) : ("🏀 " + uxEsc(it.league_code || it.league))) + "</span>",
@@ -8370,9 +8373,9 @@ _FRONTEND_V22_JS = r'''
             var stBg = isLive ? "#dc2626" : (it.state === "post" ? "#475569" : "#1d4ed8");
             var ai = it.ai || {};
             var odds = ai.odds || {};
-            var aiLblV50 = ai.is_sample !== false ? "AI 예시 " : "AI ";
-            var probTxt = ai.draw_pct ? (aiLblV50 + ai.home_pct + "% / " + ai.draw_pct + "% / " + ai.away_pct + "%") : (aiLblV50 + ai.home_pct + "% / " + ai.away_pct + "%");
-            var oddsTxt = odds.home ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
+            var aiRealFbV52 = ai.is_sample === false && ai.home_pct != null;
+            var probTxt = !aiRealFbV52 ? "" : (ai.draw_pct ? ("AI " + ai.home_pct + "% / " + ai.draw_pct + "% / " + ai.away_pct + "%") : ("AI " + ai.home_pct + "% / " + ai.away_pct + "%"));
+            var oddsTxt = (aiRealFbV52 && odds.home) ? ("배당 " + odds.home + (odds.draw ? "/" + odds.draw : "") + "/" + odds.away) : "";
             var fk = matchFavKeyV30(it);
             var fbCard = document.createElement("div");
             fbCard.setAttribute("data-sq-v351-fb", "1");
@@ -11701,7 +11704,7 @@ _FRONTEND_V22_JS = r'''
                 "<div style='font-size:11px;color:#94a3b8;margin-top:2px;'>🕒 " + uxEsc(dtTxt + vnTxt) + "</div>" +
               "</div>" +
               "<div style='text-align:right;flex-shrink:0;'>" +
-                "<div style='font-size:11px;font-weight:800;color:#fde68a;'>" + ((m.ai && m.ai.is_sample === false) ? "AI " : "AI 예시 ") + hp + "% : " + ap + "%</div>" +
+((m.ai && m.ai.is_sample === false && m.ai.home_pct != null) ? "<div style='font-size:11px;font-weight:800;color:#fde68a;'>AI " + hp + "% : " + ap + "%</div>" : "") +
                 "<button type='button' data-sq-mt-detail-btn='1' style='display:inline-block;margin-top:3px;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:800;color:#7dd3fc;background:rgba(14,165,233,0.15);border:1px solid rgba(56,189,248,0.45);cursor:pointer;'>상세 ↗</button>" +
               "</div>" +
             "</div>";
@@ -19236,7 +19239,8 @@ def _search_sportiq_deep_internal(q_meta: Dict[str, Any], fast_cache_only: bool 
                     "dt_kst": str(m.get("match_dt_kst") or "일정 확인"),
                     "status": str(m.get("status_badge") or "Scheduled"),
                     "score": f"{m.get('home_score', 0)} : {m.get('away_score', 0)}",
-                    "ai_prob": f"홈 {ai.get('home_pct', 50)}% / 원정 {ai.get('away_pct', 50)}%",
+                    "ai_prob": (f"홈 {ai.get('home_pct')}% / 원정 {ai.get('away_pct')}%"
+                                if ai.get("is_sample") is False and ai.get("home_pct") is not None else ""),
                     "drop_badge": str(m.get("drop_badge") or ""),
                     "match_pct": rel,
                 }
@@ -19264,7 +19268,10 @@ def _search_sportiq_deep_internal(q_meta: Dict[str, Any], fast_cache_only: bool 
                                 "kind": "standings",
                                 "dc_tab": "standings",
                                 "badge": f"📊 {q_meta['league_hint']} 실시간 순위",
-                                "title": f"{t_name} — 현재 리그 {r.get('rank')}위 (승점/기록: {r.get('pts_label') or r.get('pts')})",
+                                # Conference tables (NBA/NHL/NFL): rank is within r["group"], not the league.
+                                "title": (f"{t_name} — {r.get('group')} {r.get('rank')}위" if r.get("group")
+                                          else f"{t_name} — 현재 리그 {r.get('rank')}위")
+                                         + f" (승점/기록: {r.get('pts_label') or r.get('pts')})",
                                 "detail": f"{r.get('gp', 0)}경기 {r.get('w', 0)}승 {r.get('d', 0)}무 {r.get('l', 0)}패 · 득실 {r.get('gd', 0)}" + (f" · 최근폼 {form_txt}" if form_txt else ""),
                                 "url": "",
                                 "match_pct": rel,
@@ -19508,11 +19515,13 @@ def _build_hyper_briefing_summary(
     games = internal.get("games") or []
     if games:
         g_lines = [
-            f"[{g['league']}] {g['matchup']} ({g['dt_kst']}, {g['status']}) · {g['ai_prob']}"
+            f"[{g['league']}] {g['matchup']} ({g['dt_kst']}, {g['status']})"
+            + (f" · {g['ai_prob']}" if g.get("ai_prob") else "")
             + (f" · {g['drop_badge']}" if g.get("drop_badge") else "")
             for g in games[:3]
         ]
-        sections.append("⚽ 실시간 경기 & AI 배당 흐름: " + " / ".join(g_lines))
+        # No invented AI %: the line only carries a probability when it comes from real odds.
+        sections.append("⚽ 실시간 경기: " + " / ".join(g_lines))
 
     if web_news:
         headlines = [
@@ -24497,10 +24506,11 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
                 a_raw = "노리스 (맥라렌)"
         elif sp == "tennis":
             is_wta = "WTA" in lc
-            if not h_raw or h_raw.lower() == "home":
-                h_raw = "사발렌카" if is_wta else "신네르"
-            if not a_raw or a_raw.lower() == "away":
-                a_raw = "시비옹테크" if is_wta else "알카라스"
+            # Missing names used to be filled with famous players; skip the item instead.
+            if h_raw.lower() == "home":
+                h_raw = ""
+            if a_raw.lower() == "away":
+                a_raw = ""
         if not h_raw or not a_raw:
             return
         h_ko = _localize_team_ko_v37(h_raw, sp)
@@ -24512,12 +24522,14 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
         time_kst = str(raw_m.get("time_kst") or (tm_m.group(1) if tm_m else "예정"))
         ai = raw_m.get("ai") if isinstance(raw_m.get("ai"), dict) else {}
         odds = ai.get("odds") if isinstance(ai.get("odds"), dict) else {}
-        hp = int(ai.get("home_pct") or raw_m.get("home_pct") or 52)
-        dp = int(ai.get("draw_pct") or raw_m.get("draw_pct") or (25 if sp == "soccer" else 0))
-        ap = int(ai.get("away_pct") or raw_m.get("away_pct") or max(5, 100 - hp - dp))
-        oh = str(odds.get("home") or raw_m.get("odds_home") or f"{94.0 / max(10, hp):.2f}")
-        od = str(odds.get("draw") or raw_m.get("odds_draw") or (f"{94.0 / dp:.2f}" if dp > 0 else ""))
-        oa = str(odds.get("away") or raw_m.get("odds_away") or f"{94.0 / max(10, ap):.2f}")
+        # Only bookmaker-odds numbers are real. Name-hash values, "no AI" items
+        # and the old 52%/48% + 94/p defaults are not shown at all.
+        ai_real_v52 = ai.get("is_sample") is False and ai.get("home_pct") is not None
+        if ai_real_v52:
+            hp = int(ai.get("home_pct") or 0)
+            dp = int(ai.get("draw_pct") or 0)
+            ap = int(ai.get("away_pct") or max(0, 100 - hp - dp))
+            oh, od, oa = str(odds.get("home") or ""), str(odds.get("draw") or ""), str(odds.get("away") or "")
         st = str(raw_m.get("state") or "pre").lower()
         hs = int(raw_m.get("home_score") or 0)
         as_ = int(raw_m.get("away_score") or 0)
@@ -24546,15 +24558,13 @@ def _collect_matches_for_offset_v37(off: int, league_codes: List[str], sport_fil
             "period_scores": str(raw_m.get("period_scores") or ""),
             "venue": str(raw_m.get("venue") or ""),
             "status": badge,
-            "ai_prob": f"홈 {hp}%" + (f" / 무 {dp}%" if dp > 0 else "") + f" / 원정 {ap}%",
+            "ai_prob": (f"홈 {hp}%" + (f" / 무 {dp}%" if dp > 0 else "") + f" / 원정 {ap}%") if ai_real_v52 else "",
             "drop_badge": str(raw_m.get("drop_badge") or ""),
-            "match_pct": 98,
-            "ai": {
-                "home_pct": hp,
-                "draw_pct": dp,
-                "away_pct": ap,
-                "odds": {"home": oh, "draw": od, "away": oa},
-            },
+            # A fixed 98 was shown as "정확도 98%"; games carry no relevance score.
+            "match_pct": 0,
+            "ai": ({"home_pct": hp, "draw_pct": dp, "away_pct": ap, "odds": {"home": oh, "draw": od, "away": oa},
+                    "basis": ai.get("basis"), "is_sample": False}
+                   if ai_real_v52 else {"basis": ai.get("basis") or "none", "is_sample": True}),
         }
         def _cand_prio(e: Dict[str, Any]) -> Tuple[int, int, int]:
             e_st = str(e.get("state") or "pre").lower()
@@ -24836,29 +24846,39 @@ def _build_ai_search_standings_brief_v4628(
                     ext_rows = (st_ext.get("standings") or []) if isinstance(st_ext, dict) else []
                     if ext_rows:
                         lg_nm_ext = str(st_ext.get("league_name") or lg)
-                        # Show top 5 + any highlighted club!
+                        # Conference tables (NBA/NHL/NFL): rank is per group, so take the
+                        # top 2 of every group (not the first 5 rows = one conference) and
+                        # name the group next to the team.
+                        grouped_ext = bool(st_ext.get("grouped"))
                         formatted_ext = []
                         for idx_r, r in enumerate(ext_rows):
                             t_nm = _localize_team_ko_v37(str(r.get("team") or ""), "")
                             is_hi = (t_nm in highlight_teams) or any(ht in t_nm or t_nm in ht for ht in highlight_teams if len(ht) >= 2)
-                            if idx_r < 5 or is_hi:
+                            in_top = (int(r.get("rank") or 99) <= 2) if grouped_ext else (idx_r < 5)
+                            if grouped_ext and r.get("group"):
+                                t_nm_disp = f"{t_nm} ({r.get('group')})"
+                            else:
+                                t_nm_disp = t_nm
+                            if in_top or is_hi:
                                 rec = f"{r.get('gp', 0)}G {r.get('w', 0)}승" + (f" {r.get('d', 0)}무" if r.get("d") else "") + f" {r.get('l', 0)}패"
                                 metric_s = str(r.get("pts_label") or f"{r.get('pts', 0)}점")
                                 formatted_ext.append({
                                     "rank": int(r.get("rank") or (idx_r + 1)),
-                                    "team": t_nm,
+                                    "team": t_nm_disp,
+                                    "group": r.get("group") or "",
                                     "record": rec,
                                     "sub": f"득실 {r.get('gd', 0)}",
                                     "metric": metric_s,
                                     "highlight": is_hi,
                                 })
-                                if is_hi or (not highlight_teams and idx_r < 3):
+                                top_card = (int(r.get("rank") or 99) == 1) if grouped_ext else (idx_r < 3)
+                                if is_hi or (not highlight_teams and top_card):
                                     insight_cards.append({
                                         "kind": "standings",
                                         "dc_tab": "standings",
                                         "dc_league": lg,
                                         "badge": f"📊 {lg_nm_ext} 실시간 순위",
-                                        "title": f"#{r.get('rank', idx_r + 1)} {t_nm} — {rec} ({metric_s})",
+                                        "title": f"#{r.get('rank', idx_r + 1)} {t_nm_disp} — {rec} ({metric_s})",
                                         "detail": f"득실 {r.get('gd', 0)} · 클릭 시 데이터센터 순위표 이동",
                                         "url": "",
                                         "match_pct": 98 if is_hi else 93,
@@ -24874,6 +24894,10 @@ def _build_ai_search_standings_brief_v4628(
                             if hi_ext:
                                 hr = hi_ext[0]
                                 summary_lines.append(f"🏆 [{lg_nm_ext} 현재 성적] #{hr['rank']} {hr['team']} ({hr['record']} · {hr['metric']})")
+                            elif grouped_ext:
+                                leaders_e = " · ".join([f"{fr['group']} 1위 {fr['team'].rsplit(' (', 1)[0]}({fr['metric']})"
+                                                        for fr in formatted_ext if fr["rank"] == 1])
+                                summary_lines.append(f"🏆 [{lg_nm_ext} 컨퍼런스 1위] {leaders_e}")
                             else:
                                 top3_e = " · ".join([f"#{fr['rank']} {fr['team']}({fr['metric']})" for fr in formatted_ext[:3]])
                                 summary_lines.append(f"🏆 [{lg_nm_ext} 실시간 TOP 3] {top3_e}")
@@ -25127,10 +25151,12 @@ def run_hyper_ai_iq_search_v37(payload: HyperAiSearchIn):
             for m_it in schedule_qa["items"][:6]:
                 ai_o = m_it.get("ai") or {}
                 odds_o = ai_o.get("odds") or {}
+                ai_real_sum = ai_o.get("is_sample") is False and ai_o.get("home_pct") is not None
                 sc_or_prob = (
                     f"{m_it['home_score']}:{m_it['away_score']} ({m_it['status_badge']})"
                     if m_it["state"] != "pre"
-                    else f"AI 승률 {ai_o.get('home_pct', 50)}% : {ai_o.get('away_pct', 50)}% (배당 {odds_o.get('home', '-')}/{odds_o.get('away', '-')})"
+                    else (f"AI 승률 {ai_o.get('home_pct')}% : {ai_o.get('away_pct')}% (배당 {odds_o.get('home', '-')}/{odds_o.get('away', '-')})"
+                          if ai_real_sum else "경기 전")
                 )
                 top_lines.append(f"• {m_it['time_kst']} {m_it['home']} vs {m_it['away']} — {sc_or_prob}")
             more_note = f"\n(외 {len(schedule_matches) - 6}경기 포함 총 {len(schedule_matches)}경기)" if len(schedule_matches) > 6 else ""
@@ -26203,12 +26229,14 @@ _NEW_ACCT_BY_IP_V4615: Dict[str, List[float]] = {}
 
 
 def _client_ip_v4615(request: Optional[Request]) -> str:
-    if request is None:
-        return "local"
-    xff = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
-    if xff:
-        return xff[:64]
-    return (request.client.host if request.client else "local")[:64]
+    """Client address for vote dedupe, admin lockout and rate limits.
+
+    See app/sportiq_client_ip.py: CF-Connecting-IP on Render, else the first
+    X-Forwarded-For entry from the right that is not a proxy. The leftmost
+    entry is whatever the client sent and must never be used.
+    """
+    from app.sportiq_client_ip import client_ip as _sportiq_client_ip
+    return _sportiq_client_ip(request)
 
 
 def _check_admin_lockout_v4615(ip_key: str) -> None:
@@ -26857,35 +26885,62 @@ def get_global_matches():
     return {"matches": run_with_db_retry(_op), "votes_include_seed_baseline": True}
 
 
-_GM_VOTE_DEDUPE_LOCK = threading.Lock()
-_GM_VOTE_DEDUPE: Dict[str, float] = {}
 _GM_VOTE_DEDUPE_TTL_SEC = 12 * 3600.0
+_GM_VOTE_DEDUPE_TABLE = "global_match_vote_dedupe"
+_GM_VOTE_DEDUPE_READY = [False]
+
+
+def _gm_vote_key(request: Optional[Request], match_id: int) -> str:
+    """Salted hash of client address + match; the raw IP is never stored."""
+    ip_raw = _client_ip_v4615(request)
+    salt = os.environ.get("SPORTIQ_VOTE_HASH_SALT", "sportiq-gm-vote")
+    return hashlib.sha256(f"{salt}:{ip_raw}:{match_id}".encode("utf-8", errors="ignore")).hexdigest()
+
+
+def _ensure_gm_vote_dedupe_table() -> None:
+    """Dedupe records live in the lounge DB (and its PG snapshot), so a
+    restart or redeploy no longer forgets who voted."""
+    if _GM_VOTE_DEDUPE_READY[0]:
+        return
+    with _db_session(write=True) as conn:
+        conn.execute(f"""CREATE TABLE IF NOT EXISTS {_GM_VOTE_DEDUPE_TABLE} (
+            vote_key TEXT PRIMARY KEY, match_id INTEGER NOT NULL, voted_at REAL NOT NULL)""")
+    try:
+        from app import sportiq_auto_analyst as _aa_v52
+        tables = _aa_v52._PG_SNAPSHOT_TABLES
+        if _GM_VOTE_DEDUPE_TABLE not in tables:
+            _aa_v52._PG_SNAPSHOT_TABLES = (tables + [_GM_VOTE_DEDUPE_TABLE]) if isinstance(tables, list) \
+                else tuple(tables) + (_GM_VOTE_DEDUPE_TABLE,)
+        _aa_v52._restore_snapshots_from_pg()
+    except Exception:
+        pass
+    _GM_VOTE_DEDUPE_READY[0] = True
 
 
 def _gm_vote_already_cast(request: Optional[Request], match_id: int) -> bool:
-    """같은 접속자(IP 해시)가 같은 경기에 12시간 안에 다시 투표하면 True. 원본 IP는 저장하지 않는다."""
-    ip_raw = _client_ip_v4615(request)
-    salt = os.environ.get("SPORTIQ_VOTE_HASH_SALT", "sportiq-gm-vote")
-    key = hashlib.sha256(f"{salt}:{ip_raw}:{match_id}".encode("utf-8", errors="ignore")).hexdigest()
-    now_ep = time.time()
-    with _GM_VOTE_DEDUPE_LOCK:
-        if len(_GM_VOTE_DEDUPE) > 20000:
-            for k in [k for k, ts in _GM_VOTE_DEDUPE.items() if (now_ep - ts) >= _GM_VOTE_DEDUPE_TTL_SEC]:
-                _GM_VOTE_DEDUPE.pop(k, None)
-        last = _GM_VOTE_DEDUPE.get(key)
-        if last is not None and (now_ep - last) < _GM_VOTE_DEDUPE_TTL_SEC:
-            return True
-        _GM_VOTE_DEDUPE[key] = now_ep
-        return False
+    """Read-only check: True if this client voted for this match in the last 12 h."""
+    _ensure_gm_vote_dedupe_table()
+    key = _gm_vote_key(request, match_id)
+    with _db_session(write=False) as conn:
+        row = conn.execute(f"SELECT voted_at FROM {_GM_VOTE_DEDUPE_TABLE} WHERE vote_key = ?", (key,)).fetchone()
+    return bool(row) and (time.time() - float(row["voted_at"])) < _GM_VOTE_DEDUPE_TTL_SEC
 
 
 @router.post("/api/rankings/global-matches/{match_id}/vote")
 def vote_global_match(match_id: int, request: Request):
-    already_voted = _gm_vote_already_cast(request, match_id)
+    _ensure_gm_vote_dedupe_table()
+    vote_key = _gm_vote_key(request, match_id)
+    state = {"already": False}
 
     def _op() -> tuple[Optional[dict], list[dict]]:
-        with _db_session(write=not already_voted) as conn:
-            if already_voted:
+        # Check, count and record in one write transaction: the dedupe row is
+        # stored only if the vote itself was stored (a failed UPDATE no longer
+        # blocks the voter for 12 h), and two concurrent requests cannot both pass.
+        with _db_session(write=True) as conn:
+            now_ep = time.time()
+            prev = conn.execute(f"SELECT voted_at FROM {_GM_VOTE_DEDUPE_TABLE} WHERE vote_key = ?", (vote_key,)).fetchone()
+            state["already"] = bool(prev) and (now_ep - float(prev["voted_at"])) < _GM_VOTE_DEDUPE_TTL_SEC
+            if state["already"]:
                 exists = conn.execute("SELECT 1 FROM global_match_rankings WHERE id = ?", (match_id,)).fetchone()
                 if not exists:
                     raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
@@ -26893,6 +26948,9 @@ def vote_global_match(match_id: int, request: Request):
                 cur = conn.execute("UPDATE global_match_rankings SET votes = votes + 1 WHERE id = ?", (match_id,))
                 if cur.rowcount == 0:
                     raise HTTPException(status_code=404, detail="매치를 찾을 수 없습니다.")
+                conn.execute(f"INSERT OR REPLACE INTO {_GM_VOTE_DEDUPE_TABLE}(vote_key, match_id, voted_at) VALUES (?, ?, ?)",
+                             (vote_key, match_id, now_ep))
+                conn.execute(f"DELETE FROM {_GM_VOTE_DEDUPE_TABLE} WHERE voted_at < ?", (now_ep - _GM_VOTE_DEDUPE_TTL_SEC,))
             rows = conn.execute(
                 "SELECT id, match_key, sport, league, league_color, matchup, schedule_venue, votes, buzz_score, rank_change FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC, id ASC"
             ).fetchall()
@@ -26916,10 +26974,11 @@ def vote_global_match(match_id: int, request: Request):
             return voted, items
 
     voted, items = run_with_db_retry(_op)
+    already_voted = state["already"]
     if not already_voted:
         try:
             from app.sportiq_auto_analyst import _backup_tables_to_pg
-            _backup_tables_to_pg("global_match_rankings")
+            _backup_tables_to_pg("global_match_rankings", _GM_VOTE_DEDUPE_TABLE)
         except Exception:
             pass
     return {
@@ -33162,6 +33221,9 @@ def _parse_espn_summary_h2h_v4650(
         if not isinstance(blk, dict):
             continue
         anchor_tm = blk.get("team") or {}
+        if not isinstance(anchor_tm, dict):
+            # Same string-instead-of-object shape seen in summary standings.
+            anchor_tm = {"displayName": str(anchor_tm)}
         anchor_id = str(anchor_tm.get("id") or "")
         anchor_raw = str(anchor_tm.get("shortDisplayName") or anchor_tm.get("displayName") or modal_home).strip()
         for ev in (blk.get("events") or []):
@@ -33171,6 +33233,8 @@ def _parse_espn_summary_h2h_v4650(
             if gid and gid == ev_id:
                 continue
             opp_tm = ev.get("opponent") or {}
+            if not isinstance(opp_tm, dict):
+                opp_tm = {"displayName": str(opp_tm)}
             opp_raw = str(opp_tm.get("shortDisplayName") or opp_tm.get("displayName") or modal_away).strip()
             at_vs = str(ev.get("atVs") or "vs").strip().lower()
             h_id = str(ev.get("homeTeamId") or "")
@@ -33225,6 +33289,8 @@ def _parse_espn_summary_h2h_v4650(
         if not isinstance(f_blk, dict):
             continue
         f_tm = f_blk.get("team") or {}
+        if not isinstance(f_tm, dict):
+            f_tm = {"displayName": str(f_tm)}
         f_nm_ko = _localize_team_ko_v37(str(f_tm.get("shortDisplayName") or f_tm.get("displayName") or ""), sp)
         c_ftm = _canon_team_key_v4616(f_nm_ko, sp)
         for fev in (f_blk.get("events") or []):
