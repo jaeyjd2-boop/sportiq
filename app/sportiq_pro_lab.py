@@ -710,7 +710,11 @@ def get_ai_scorecard() -> Dict[str, Any]:
 
     records = [dict(r) for r in rows]
     for r in records:
-        r["is_sample"] = (str(r.get("match_date") or ""), str(r.get("matchup") or "")) in _SEED_SCORECARD_KEYS
+        # No real prediction model exists yet: rows are either the initial seed
+        # examples or picks the autonomous grader made from a match-key hash.
+        is_seed = (str(r.get("match_date") or ""), str(r.get("matchup") or "")) in _SEED_SCORECARD_KEYS
+        r["is_sample"] = True
+        r["sample_kind"] = "seed" if is_seed else "hash_pick"
     real_records = [r for r in records if not r["is_sample"]]
     real_hits = sum(1 for r in real_records if int(r["hit"]) == 1)
     total = len(records)
@@ -750,6 +754,8 @@ def get_ai_scorecard() -> Dict[str, Any]:
         "real_total_matches": len(real_records),
         "real_hits": real_hits,
         "real_accuracy_pct": round(real_hits * 100.0 / len(real_records), 1) if real_records else None,
+        "verified_records_available": bool(real_records),
+        "sample_note": "검증된 AI 예측 기록이 아직 없습니다. 아래 기록과 적중률·수익률은 예시이며 실제 실적이 아닙니다.",
     }
 
 
