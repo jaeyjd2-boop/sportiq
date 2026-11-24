@@ -5496,7 +5496,8 @@ def _search_sportiq_internal_context(query: str) -> Dict[str, List[Dict[str, Any
                             "dt_kst": str(m.get("match_dt_kst") or "일정 확인"),
                             "status": str(m.get("status_badge") or "Scheduled"),
                             "score": f"{m.get('home_score', 0)} : {m.get('away_score', 0)}",
-                            "ai_prob": f"홈 {ai.get('home_pct', 50)}% / 원정 {ai.get('away_pct', 50)}%",
+                            "ai_prob": (f"홈 {ai.get('home_pct')}% / 원정 {ai.get('away_pct')}%"
+                                if ai.get("is_sample") is False and ai.get("home_pct") is not None else ""),
                             "drop_badge": str(m.get("drop_badge") or ""),
                         }
                     )

@@ -1104,7 +1104,8 @@ def _zone_label(sport, rank, total):
 # and NFL do not send, and kept ESPN's unordered entry order.
 _US_GROUP_LEAGUES = {
     "NBA": {"East": "동부", "West": "서부", "playoff": 6, "playin": 10, "mode": "pct"},
-    "WNBA": {"East": "동부", "West": "서부", "playoff": 4, "playin": 0, "mode": "pct"},
+    # WNBA: the top 8 overall make the playoffs, regardless of conference.
+    "WNBA": {"East": "동부", "West": "서부", "playoff": 0, "playin": 0, "mode": "pct", "league_playoff": 8},
     "NHL": {"East": "동부", "West": "서부", "playoff": 8, "playin": 0, "mode": "points"},
     "NFL": {"AFC": "AFC", "NFC": "NFC", "playoff": 7, "playin": 0, "mode": "pct"},
 }
@@ -1178,6 +1179,10 @@ def _us_group_rows(league_code, data):
             pos = seed or i
             r["zone"] = "PO" if pos <= cfg["playoff"] else ("PI" if cfg["playin"] and pos <= cfg["playin"] else "")
         rows.extend(group_rows)
+    if rows and cfg.get("league_playoff"):
+        overall = sorted(rows, key=lambda r: (-(r["pct"] or 0), r["seed"] or 99))
+        for i, r in enumerate(overall, start=1):
+            r["zone"] = "PO" if i <= cfg["league_playoff"] else ""
     return rows or None
 
 
@@ -1287,11 +1292,18 @@ def get_standings(league: str = Query("EPL")):
     rows = _fetch_espn_standings(lg)
     source = "ESPN Live API"
     is_sample = False
-    if not rows:
+    unavailable = False
+    if not rows and lg not in _FALLBACK_STANDINGS:
+        # No sample table for this league (NFL, WNBA, MLS, ...): show nothing rather
+        # than the EPL table under this league's title (old behaviour).
+        source = "실시간 연동 실패"
+        unavailable = True
+        rows = []
+    elif not rows:
         # 실시간 연동 실패 시 하드코딩 예시 표. 검증된 데이터처럼 표시하지 않는다.
         source = "SportiQ 예시 데이터 (실시간 연동 실패)"
         is_sample = True
-        fb = _FALLBACK_STANDINGS.get(lg) or _FALLBACK_STANDINGS["EPL"]
+        fb = _FALLBACK_STANDINGS[lg]
         rows = []
         for idx, (team, gp, w, d, l, gf, ga, form) in enumerate(fb, start=1):
             pts = w * 3 + d if sport == "soccer" else (w * 2 + d if sport == "hockey" else w)
@@ -1339,6 +1351,13 @@ def get_standings(league: str = Query("EPL")):
         "standings": rows,
         "leaders": leaders,
     }
+    if unavailable:
+        res["unavailable"] = True
+        res["leaders"] = {"scorers": [], "assists": []}
+        with _CACHE_LOCK:
+            # Cached as if 25 min old, so ESPN is retried after 5 min instead of 30.
+            _CACHE[cache_key] = {"ts": time.time() - 1500, "data": res}
+        return res
     groups = list(dict.fromkeys(r["group"] for r in rows if r.get("group")))
     if groups:
         # Conference tables (NBA/NHL/NFL): rank is within "group".
@@ -1355,7 +1374,8 @@ def get_season_sim(league: str = Query("EPL")):
     st_data = get_standings(lg)
     rows = st_data.get("standings") or []
     sport = st_data.get("sport", "soccer")
-    total_games = 38 if sport == "soccer" else (144 if lg == "KBO" else (162 if lg == "MLB" else (18 if lg == "LCK" else 82)))
+    season_games = {"KBO": 144, "NPB": 143, "MLB": 162, "LCK": 18, "NFL": 17, "WNBA": 44, "NBA": 82, "NHL": 82}
+    total_games = 38 if sport == "soccer" else season_games.get(lg, 82)
     po_label = "UCL 진출 확률" if sport == "soccer" else "플레이오프 확률"
     sims = 5000
     rng = random.Random(f"sim_{lg}_{_now_kst().strftime('%Y%m%d')}")
