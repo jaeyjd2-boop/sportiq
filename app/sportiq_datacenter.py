@@ -1993,6 +1993,9 @@ def get_my_alerts(
             except Exception:
                 inj_res = {}
         inj_list = (inj_res or {}).get("items") or (inj_res or {}).get("injuries") or []
+        if (inj_res or {}).get("is_sample"):
+            # ESPN fetch failed and get_injuries returned its sample list: no alerts from that.
+            inj_list = []
         for idx, inj in enumerate(inj_list):
             team_n = str(inj.get("team") or "")
             player_n = str(inj.get("player") or "")
@@ -2022,16 +2025,10 @@ def get_my_alerts(
                     "match_reason": reason,
                 })
 
-    try:
-        odds_res = _build_dropping_odds(matches, "all", 5.0) or {}
-    except Exception:
-        odds_res = {}
-    odds_list = (
-        odds_res.get("items")
-        or odds_res.get("alerts")
-        or live_res.get("odds_alerts")
-        or []
-    )
+    # Dropping-odds items from _build_dropping_odds are invented examples
+    # (reasons and odds moves are made up). They stay on the sample-only
+    # /dropping-odds endpoint and are not mixed into personal alerts.
+    odds_list = []
     for idx, od in enumerate(odds_list):
         sp = str(od.get("sport") or "").lower()
         lg = str(od.get("league") or sp.upper())
@@ -2094,6 +2091,8 @@ def get_my_alerts(
         "active_sports": active_sports,
         "counts": counts,
         "items": filtered,
+        "odds_alerts_excluded": True,
+        "odds_alerts_note": "드롭오즈 알림은 예시 데이터라 맞춤 알림에 넣지 않습니다(예시는 /api/datacenter/dropping-odds).",
     }
 
 

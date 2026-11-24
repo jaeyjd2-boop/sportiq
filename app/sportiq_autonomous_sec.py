@@ -332,6 +332,15 @@ def _parse_espn_events() -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     return pre_games, final_games
 
 
+# The grader's "AI pick" came from _stable_match_metrics (a hash of the match
+# key), so its hit rate and unit P&L were invented track records. Until a real
+# model/odds source exists, no picks are recorded and nothing is graded.
+REAL_PICK_SOURCE_AVAILABLE = False
+SCORECARD_SAMPLE_NOTE = (
+    "검증된 AI 예측 기록이 아직 없습니다. 아래 기록은 예시이며(경기 키 해시로 만든 픽 포함) 실제 적중 실적이 아닙니다."
+)
+
+
 def run_top20_auto_rotation_and_grading() -> Dict[str, Any]:
     _init_autonomous_db()
     now_kst = _now_kst()
@@ -390,7 +399,7 @@ def run_top20_auto_rotation_and_grading() -> Dict[str, Any]:
                 added_count += 1
             conn.execute("DELETE FROM global_match_rankings WHERE match_key NOT IN (SELECT match_key FROM global_match_rankings ORDER BY votes DESC, buzz_score DESC LIMIT 20)")
     
-        for g in pre_games:
+        for g in (pre_games if REAL_PICK_SOURCE_AVAILABLE else []):
             metrics = _stable_match_metrics(g["match_key"], g["sport"], 91)
             pick_side = g["home_team"] if metrics["ai_prob_pct"] >= 50.0 else g["away_team"]
             cur = conn.execute(
@@ -418,7 +427,7 @@ def run_top20_auto_rotation_and_grading() -> Dict[str, Any]:
             if cur.rowcount > 0:
                 recorded_pre += 1
 
-        for fg in final_games:
+        for fg in (final_games if REAL_PICK_SOURCE_AVAILABLE else []):
             ledger = conn.execute(
                 "SELECT * FROM live_prediction_ledger WHERE event_id = ?",
                 (fg["event_id"],),
@@ -536,7 +545,7 @@ def run_top20_auto_rotation_and_grading() -> Dict[str, Any]:
         }
         _PIPELINE_STATUS["scorecard_auto_grader"] = {
             "last_run_kst": now_str,
-            "status": "ok",
+            "status": "ok" if REAL_PICK_SOURCE_AVAILABLE else "disabled_no_real_model",
             "recorded_pre": recorded_pre,
             "graded_final": graded_final,
         }
@@ -718,23 +727,25 @@ def download_scorecard_csv() -> Response:
 
     buf = io.StringIO()
     writer = csv.writer(buf)
+    writer.writerow(["# " + SCORECARD_SAMPLE_NOTE])
     writer.writerow([
         "id", "match_date", "sport", "league", "matchup", "pick_side",
         "ai_prob_pct", "market_prob_pct", "odds", "result_score",
-        "hit", "unit_pnl", "brier_err", "review_note",
+        "hit", "unit_pnl", "brier_err", "review_note", "is_sample",
     ])
     for r in rows:
         writer.writerow([
             r["id"], r["match_date"], r["sport"], r["league"], r["matchup"],
             r["pick_side"], r["ai_prob_pct"], r["market_prob_pct"], r["odds"],
-            r["result_score"], r["hit"], r["unit_pnl"], r["brier_err"], r["review_note"],
+            r["result_score"], r["hit"], r["unit_pnl"], r["brier_err"],
+            "[예시·실적 아님] " + str(r["review_note"] or ""), 1,
         ])
 
     csv_bytes = ("\ufeff" + buf.getvalue()).encode("utf-8")
     return Response(
         content=csv_bytes,
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="sportiq_ai_scorecard.csv"'},
+        headers={"Content-Disposition": 'attachment; filename="sportiq_ai_scorecard_sample.csv"'},
     )
 
 
@@ -880,11 +891,8 @@ def ask_sportiq_scoby(payload: AskAIRequest) -> Dict[str, Any]:
         answer = "[SportIQ AI 스코비] " + VALUE_ODDS_UNAVAILABLE_NOTE
         intent = "value_picks"
     elif any(k in q_low for k in ("적중", "성적", "수익", "성적표", "스코어카드")):
-        answer = (
-            f"[SportIQ AI 스코비] 현재까지 누적 AI 검증 경기 {total_sc}건 중 {hits_sc}건 적중으로 "
-            f"적중률 {hit_rate}%, 누적 수익 {total_pnl:+.2f} 유닛을 기록 중입니다. "
-            "전체 원본 내역은 /api/autonomous/scorecard.csv 에서 내려받으실 수 있습니다."
-        )
+        # The stored records are examples (seed rows and hash-based picks), not a track record.
+        answer = "[SportIQ AI 스코비] " + SCORECARD_SAMPLE_NOTE
         intent = "scorecard_stats"
     elif any(k in q_low for k in ("결장", "부상", "속보", "뉴스", "라인업")):
         top_news = news_rows[:3]
