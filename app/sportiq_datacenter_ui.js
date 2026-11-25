@@ -142,6 +142,26 @@
   modal.onclick=function(e){if(e.target===modal)modal.style.display='none';};
   document.body.appendChild(modal);
 
+  // Same match on the sister sites (app/sportiq_sister_links.py): zynktv match data, ergrow preview.
+  function loadSisterLinks(m,box){
+    var q='id='+encodeURIComponent(m.id||'')+'&sport='+encodeURIComponent(m.sport||'')
+      +'&kst='+encodeURIComponent(m.match_dt_full_kst||'')+'&home='+encodeURIComponent(m.home||'')
+      +'&away='+encodeURIComponent(m.away||'');
+    fetch('/api/sister/match-links?'+q,{credentials:'omit'}).then(function(r){return r.ok?r.json():null;}).then(function(d){
+      box=box||document.getElementById('dcSisterLinks');
+      if(!box||!d)return;
+      var ok=function(u,host){return typeof u==='string'&&u.indexOf('https://'+host+'/')===0;};
+      var a=function(u,label){return '<a class="dc-btn" href="'+dcEsc(u)+'" target="_blank" rel="noopener">'+label+'</a>';};
+      var html='';
+      if(ok(d.zynktv,'zynktv.com'))html+=a(d.zynktv,'📊 상대전적·최근 흐름 (징크 ZYNK)');
+      else if(ok(d.zynktv_day,'zynktv.com'))html+=a(d.zynktv_day,'📅 이 날 경기 일정 (징크 ZYNK)');
+      if(ok(d.ergrow,'ergrow.com'))html+=a(d.ergrow,'📝 경기 프리뷰 읽기 (어그로 ERGROW)');
+      box.innerHTML=html;
+      if(!html)box.style.display='none';
+    }).catch(function(){});
+  }
+  window.__sqLoadSisterLinks=loadSisterLinks;   // also used by the home card modal (sportiq_lounge_router.py)
+
   function openMatchModal(m){
     var box=document.getElementById('dcMatchModalBody');
     var pstr=(m.period_scores&&m.period_scores.length)?m.period_scores.join(' / '):'세부 스코어 집계 중';
@@ -166,8 +186,10 @@
       +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
       +'<button class="dc-btn dc-btn-primary" id="dcGoStandingsBtn">🔢 '+dcEsc(hasLeague)+' 순위표 보기</button>'
       +'<button class="dc-btn" id="dcGoInjuriesBtn">🏥 '+dcEsc(hasLeague)+' 부상자 보기</button>'
-      +'</div>';
+      +'</div>'
+      +'<div id="dcSisterLinks" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>';
     modal.style.display='flex';
+    if(!m.is_sample)loadSisterLinks(m);
     document.getElementById('dcCloseModalBtn').onclick=function(){modal.style.display='none';};
     document.getElementById('dcGoStandingsBtn').onclick=function(){
       modal.style.display='none';
