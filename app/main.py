@@ -16,12 +16,14 @@ from app.diagnostics import router as diagnostics_router
 from app.security.wp_bridge_router import router as wp_bridge_router
 from app.scheduler import web_backfill_lifespan
 from app.sportiq_seo import router as seo_pages_router, ForwardedProtoMiddleware
+from app.sportiq_theme import router as brand_router, ThemeMiddleware
 from app.sportiq_lounge_router import router as lounge_router
 from app.sportiq_auto_analyst import router as auto_analyst_router
 from app.sportiq_issues_ranking import router as issues_ranking_router
 from app.sportiq_pro_lab import router as pro_lab_router
 from app.sportiq_datacenter import router as datacenter_router
 app=FastAPI(title="SportIQ API",version="1.0.0",lifespan=web_backfill_lifespan)
+app.include_router(brand_router)
 app.include_router(details_router)
 app.include_router(diagnostics_router)
 app.include_router(wp_bridge_router)
@@ -33,6 +35,7 @@ app.include_router(pro_lab_router)
 app.include_router(autonomous_router)
 app.include_router(datacenter_router)
 app.add_middleware(CORSMiddleware,allow_origins=list(dict.fromkeys([*settings.allowed_origins,"https://billnojay.com","https://www.billnojay.com","http://billnojay.com","http://www.billnojay.com"])),allow_credentials=False,allow_methods=["GET","POST","PUT","DELETE","OPTIONS"],allow_headers=["*"])
+app.add_middleware(ThemeMiddleware)
 app.add_middleware(ForwardedProtoMiddleware)
 _RATE_LIMIT_PATHS = {
     "/api/pro-lab/tactics",

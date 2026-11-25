@@ -8579,9 +8579,9 @@ _FRONTEND_V22_JS = r'''
       var isTblPostPending = (isPost && (it.sport === "volleyball" || it.sport === "basketball") && hs === 0 && as === 0);
       var scoreMain = (it.state === "pre" || isTblPostPending)
         ? ("<span style='color:#94a3b8;font-weight:800;'>" + (isTblPostPending ? "집계중" : "VS") + "</span>")
-        : ("<span style='font-weight:900;font-size:13.5px;color:" + (hWin ? "#34d399" : "#f8fafc") + ";'>" + hs + "</span>" +
+        : ("<span style='font-weight:900;font-size:13.5px;color:" + (hWin ? "#ffd166" : "#f8fafc") + ";'>" + hs + "</span>" +
            " <span style='color:#64748b;'>:</span> " +
-           "<span style='font-weight:900;font-size:13.5px;color:" + (aWin ? "#34d399" : "#f8fafc") + ";'>" + as + "</span>");
+           "<span style='font-weight:900;font-size:13.5px;color:" + (aWin ? "#ffd166" : "#f8fafc") + ";'>" + as + "</span>");
 
       var rowSubTxt = String(it.period_scores || "").trim() || (it.venue ? ("🏟️ " + String(it.venue).trim()) : "");
       var periodSub = rowSubTxt
@@ -21633,7 +21633,8 @@ def inject_seo_and_og_head_v27(html_text: str) -> str:
     if not html_text:
         return html_text
     out = html_text
-    og_img_url = "https://billnojay.com/og-cover.png?v=27"
+    from app.sportiq_theme import OG_VERSION as _OG_VER, THEME_COLOR as _THEME_COLOR
+    og_img_url = f"https://billnojay.com/og-cover.png?v={_OG_VER}"
 
     # Upgrade any existing relative or old og-cover.png references
     out = re.sub(
@@ -21660,7 +21661,7 @@ def inject_seo_and_og_head_v27(html_text: str) -> str:
     if 'rel="apple-touch-icon"' not in out and "rel='apple-touch-icon'" not in out:
         extra_tags.append('  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />')
     if 'name="theme-color"' not in out and "name='theme-color'" not in out:
-        extra_tags.append('  <meta name="theme-color" content="#0F172A" />')
+        extra_tags.append(f'  <meta name="theme-color" content="{_THEME_COLOR}" />')
     if 'property="og:site_name"' not in out and "property='og:site_name'" not in out:
         extra_tags.append('  <meta property="og:site_name" content="SportIQ" />')
     if 'property="og:locale"' not in out and "property='og:locale'" not in out:
@@ -23575,7 +23576,7 @@ def serve_enriched_sitemap_xml_v27():
         "    <changefreq>hourly</changefreq>\n"
         "    <priority>1.0</priority>\n"
         "    <image:image>\n"
-        "      <image:loc>https://billnojay.com/og-cover.png?v=27</image:loc>\n"
+        "      <image:loc>https://billnojay.com/og-cover.png?v=28</image:loc>\n"
         "      <image:title>SportIQ 라이브스코어·리그 순위표·승부예측 커뮤니티</image:title>\n"
         "    </image:image>\n"
         "  </url>"
@@ -32255,8 +32256,8 @@ def serve_pwa_manifest_v4637():
         "scope": "/",
         "display": "standalone",
         "orientation": "portrait",
-        "background_color": "#070B14",
-        "theme_color": "#0F172A",
+        "background_color": "#1a1d23",
+        "theme_color": "#ff4d5e",
         "lang": "ko",
         "icons": [
             {"src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},

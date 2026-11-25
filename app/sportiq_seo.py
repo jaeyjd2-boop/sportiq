@@ -95,15 +95,15 @@ def set_robots(html_text: str, content: str) -> str:
 # Page shell
 # --------------------------------------------------------------------------
 _CSS = (
-    "body{margin:0;background:#0f172a;color:#e2e8f0;font-family:Pretendard,system-ui,sans-serif;line-height:1.5}"
-    "a{color:#5eead4}header,main,footer{max-width:960px;margin:0 auto;padding:16px}"
+    "body{margin:0;background:#1a1d23;color:#f3f5f7;font-family:Pretendard,system-ui,sans-serif;line-height:1.5}"
+    "a{color:#ff6372}header,main,footer{max-width:960px;margin:0 auto;padding:16px}"
     "nav a{margin-right:14px;font-weight:600}h1{font-size:1.6rem;margin:.4em 0}"
-    "h2{font-size:1.15rem;margin:1.4em 0 .4em;color:#a7f3d0}table{width:100%;border-collapse:collapse;font-size:.92rem}"
-    "th,td{padding:6px 8px;border-bottom:1px solid #1e293b;text-align:left}th{color:#94a3b8;font-weight:600}"
-    ".num{text-align:right;font-variant-numeric:tabular-nums}.muted{color:#94a3b8;font-size:.88rem}"
-    ".live{color:#f87171;font-weight:700}.note{background:#1e293b;padding:12px;border-radius:8px}"
+    "h2{font-size:1.15rem;margin:1.4em 0 .4em;color:#ffd166}table{width:100%;border-collapse:collapse;font-size:.92rem}"
+    "th,td{padding:6px 8px;border-bottom:1px solid #2c3038;text-align:left}th{color:#c4c9d1;font-weight:600}"
+    ".num{text-align:right;font-variant-numeric:tabular-nums}.muted{color:#c4c9d1;font-size:.88rem}"
+    ".live{color:#ff4d5e;font-weight:700}.note{background:#22262e;padding:12px;border-radius:8px}"
     "ul.grid{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}"
-    "ul.grid a{display:block;padding:8px 12px;background:#1e293b;border-radius:8px}"
+    "ul.grid a{display:block;padding:8px 12px;background:#22262e;border-radius:8px}"
     "@media(max-width:600px){th,td{padding:5px 4px;font-size:.85rem}}"
 )
 
@@ -142,11 +142,14 @@ def _page(path: str, title: str, desc: str, h1: str, body: str, ld: Optional[Dic
         f'<meta property="og:title" content="{_e(title)}" />\n'
         f'<meta property="og:description" content="{_e(desc)}" />\n'
         f'<meta property="og:url" content="{_e(url)}" />\n'
-        f'<meta property="og:image" content="{SITE}/og-cover.png?v=27" />\n'
+        f'<meta property="og:image" content="{SITE}/og-cover.png?v=28" />\n'
+        '<meta name="theme-color" content="#ff4d5e" />\n'
+        '<link rel="icon" href="/favicon.svg" type="image/svg+xml" />\n'
+        '<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />\n'
         '<meta name="twitter:card" content="summary_large_image" />\n'
         f'<meta name="twitter:title" content="{_e(title)}" />\n'
         f'<meta name="twitter:description" content="{_e(desc)}" />\n'
-        '<link rel="icon" href="/apple-touch-icon.png" />\n'
+        '<link rel="apple-touch-icon" href="/apple-touch-icon.png" />\n'
         f"<style>{_CSS}</style>\n{ld_html}\n</head>\n<body>\n"
         '<header><nav><a href="/">SportIQ 홈</a><a href="/livescore">라이브스코어</a>'
         '<a href="/standings">리그 순위표</a><a href="/">승부예측 투표·커뮤니티</a></nav></header>\n'
