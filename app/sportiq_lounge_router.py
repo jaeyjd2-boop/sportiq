@@ -21629,6 +21629,7 @@ def apply_dynamic_post_og_v29(html_text: str, post_meta: Optional[Dict[str, str]
 
 
 def inject_seo_and_og_head_v27(html_text: str) -> str:
+    from app import sportiq_seo as _sportiq_seo
     if not html_text:
         return html_text
     out = html_text
@@ -21653,7 +21654,7 @@ def inject_seo_and_og_head_v27(html_text: str) -> str:
     if 'rel="canonical"' not in out and "rel='canonical'" not in out:
         extra_tags.append('  <link rel="canonical" href="https://billnojay.com/" />')
     if 'application/rss+xml' not in out:
-        extra_tags.append('  <link rel="alternate" type="application/rss+xml" title="SportIQ 실시간 스포츠 데이터 분석 RSS" href="https://billnojay.com/rss.xml" />')
+        extra_tags.append('  <link rel="alternate" type="application/rss+xml" title="SportIQ 라이브스코어·리그 순위표 RSS" href="https://billnojay.com/rss.xml" />')
     if 'rel="manifest"' not in out and "rel='manifest'" not in out:
         extra_tags.append('  <link rel="manifest" href="/manifest.webmanifest" />')
     if 'rel="apple-touch-icon"' not in out and "rel='apple-touch-icon'" not in out:
@@ -21671,13 +21672,13 @@ def inject_seo_and_og_head_v27(html_text: str) -> str:
             '  <meta property="og:image:type" content="image/png" />',
             '  <meta property="og:image:width" content="1200" />',
             '  <meta property="og:image:height" content="630" />',
-            '  <meta property="og:image:alt" content="SportIQ 실시간 글로벌 스포츠 데이터 분석 라운지 (billnojay.com)" />',
+            '  <meta property="og:image:alt" content="SportIQ 라이브스코어·리그 순위표·승부예측 커뮤니티 (billnojay.com)" />',
         ])
     if 'name="twitter:card"' not in out and "name='twitter:card'" not in out:
         extra_tags.extend([
             '  <meta name="twitter:card" content="summary_large_image" />',
-            '  <meta name="twitter:title" content="SportIQ 실시간 분석 스포츠IQ 인사이트 라운지" />',
-            '  <meta name="twitter:description" content="9종목 24리그 실시간 스코어·순위, 기대득점(xG) 전술 브리핑, AI 아이큐 검색을 가입 없이 즐기는 스포츠 데이터 커뮤니티" />',
+            f'  <meta name="twitter:title" content="{_sportiq_seo.HOME_TITLE}" />',
+            f'  <meta name="twitter:description" content="{_sportiq_seo.SHORT_DESC}" />',
             f'  <meta name="twitter:image" content="{og_img_url}" />',
         ])
     if "application/ld+json" not in out:
@@ -21689,8 +21690,8 @@ def inject_seo_and_og_head_v27(html_text: str) -> str:
                     "@id": "https://billnojay.com/#website",
                     "url": "https://billnojay.com/",
                     "name": "SportIQ",
-                    "alternateName": ["스포츠아이큐", "SportIQ 실시간 분석 스포츠IQ 인사이트 라운지", "billnojay.com"],
-                    "description": "9종목 24리그 실시간 경기 데이터 분석, 리그 순위, 기대득점(xG) 전술 브리핑, 승부 투표 및 응원톡을 가입 없이 즐기는 순수 스포츠 데이터 커뮤니티",
+                    "alternateName": ["스포츠아이큐", "SportIQ 라이브스코어", "billnojay.com"],
+                    "description": _sportiq_seo.HOME_DESC,
                     "inLanguage": "ko-KR",
                     "publisher": {"@id": "https://billnojay.com/#organization"},
                     "potentialAction": {
@@ -21702,7 +21703,7 @@ def inject_seo_and_og_head_v27(html_text: str) -> str:
                 {
                     "@type": "SportsOrganization",
                     "@id": "https://billnojay.com/#organization",
-                    "name": "SportIQ Sports Data Intelligence Lounge",
+                    "name": "SportIQ",
                     "url": "https://billnojay.com/",
                     "logo": {
                         "@type": "ImageObject",
@@ -23565,7 +23566,7 @@ def serve_enriched_sitemap_xml_v27():
     from fastapi.responses import Response
     now_k = datetime.now(KST)
     now_iso = now_k.strftime("%Y-%m-%dT%H:%M:%S+09:00")
-    posts = _collect_indexable_posts_v38(limit=60)
+    from app import sportiq_seo as _sportiq_seo
 
     url_blocks = [
         "  <url>\n"
@@ -23575,26 +23576,12 @@ def serve_enriched_sitemap_xml_v27():
         "    <priority>1.0</priority>\n"
         "    <image:image>\n"
         "      <image:loc>https://billnojay.com/og-cover.png?v=27</image:loc>\n"
-        "      <image:title>SportIQ 실시간 분석 스포츠IQ 인사이트 라운지</image:title>\n"
+        "      <image:title>SportIQ 라이브스코어·리그 순위표·승부예측 커뮤니티</image:title>\n"
         "    </image:image>\n"
         "  </url>"
     ]
-    for p in posts:
-        pid_q = urllib.parse.quote(str(p["id"]), safe="")
-        loc_url = _xml_safe_text_v38(f"https://billnojay.com/?post={pid_q}")
-        try:
-            p_dt = datetime.fromtimestamp(float(p["ts"]), tz=KST)
-        except Exception:
-            p_dt = now_k
-        p_iso = p_dt.strftime("%Y-%m-%dT%H:%M:%S+09:00")
-        url_blocks.append(
-            "  <url>\n"
-            f"    <loc>{loc_url}</loc>\n"
-            f"    <lastmod>{p_iso}</lastmod>\n"
-            "    <changefreq>daily</changefreq>\n"
-            "    <priority>0.8</priority>\n"
-            "  </url>"
-        )
+    # ?post= pages are noindex (see serve_lounge_home), so they are not listed.
+    url_blocks.extend(_sportiq_seo.sitemap_url_blocks(now_iso))
 
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -23615,11 +23602,14 @@ def serve_enriched_sitemap_xml_v27():
 def serve_naver_rss_feed_v38():
     from email.utils import format_datetime
     from fastapi.responses import Response
+    from app import sportiq_seo as _sportiq_seo
     now_k = datetime.now(KST)
-    posts = _collect_indexable_posts_v38(limit=40)
+    # ?post= previews are noindex and belong to ergrow; the feed lists the
+    # public score and table pages instead.
+    posts: List[Dict[str, Any]] = []
     build_dt_rfc = format_datetime(now_k)
 
-    item_blocks: List[str] = []
+    item_blocks: List[str] = _sportiq_seo.rss_items(_xml_safe_text_v38(build_dt_rfc))
     for p in posts:
         pid_q = urllib.parse.quote(str(p["id"]), safe="")
         raw_link = f"https://billnojay.com/?post={pid_q}"
@@ -23671,9 +23661,9 @@ def serve_naver_rss_feed_v38():
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">\n'
         "  <channel>\n"
-        "    <title>SportIQ 실시간 분석 스포츠IQ 인사이트 라운지</title>\n"
+        f"    <title>{_xml_safe_text_v38(_sportiq_seo.HOME_TITLE)}</title>\n"
         "    <link>https://billnojay.com/</link>\n"
-        "    <description>9종목 24리그 실시간 경기 데이터 분석, 기대득점(xG) 전술 브리핑 및 커뮤니티 인사이트 피드</description>\n"
+        f"    <description>{_xml_safe_text_v38(_sportiq_seo.SHORT_DESC)}</description>\n"
         "    <language>ko</language>\n"
         f"    <lastBuildDate>{_xml_safe_text_v38(build_dt_rfc)}</lastBuildDate>\n"
         '    <atom:link href="https://billnojay.com/rss.xml" rel="self" type="application/rss+xml" />\n'
@@ -26537,9 +26527,20 @@ def serve_lounge_home(request: Request):
                 )
                 rendered = rendered.replace("</body>", _inline_7tab + "\n</body>", 1)
             _pq = (request.query_params.get("post") if request and hasattr(request, "query_params") else "") or ""
+            _status = 200
+            _hdrs = {"Cache-Control": "private, no-store, no-cache, must-revalidate", "CDN-Cache-Control": "no-store", "Cloudflare-CDN-Cache-Control": "no-store"}
             if _pq:
-                rendered = apply_dynamic_post_og_v29(rendered, resolve_post_og_meta_v29(_pq))
-            return HTMLResponse(rendered, media_type="text/html; charset=utf-8", headers={"Cache-Control": "private, no-store, no-cache, must-revalidate", "CDN-Cache-Control": "no-store", "Cloudflare-CDN-Cache-Control": "no-store"})
+                # ?post= pages repeat the home screen with the post only in meta/JSON-LD,
+                # and the auto posts are previews that belong to ergrow: keep them out
+                # of the index. An unknown id is a real 404, not a copy of home.
+                from app import sportiq_seo as _sportiq_seo
+                _meta = resolve_post_og_meta_v29(_pq)
+                rendered = apply_dynamic_post_og_v29(rendered, _meta)
+                rendered = _sportiq_seo.set_robots(rendered, _sportiq_seo.NOINDEX)
+                _hdrs["X-Robots-Tag"] = _sportiq_seo.NOINDEX
+                if not _meta:
+                    _status = 404
+            return HTMLResponse(rendered, status_code=_status, media_type="text/html; charset=utf-8", headers=_hdrs)
         except Exception:
             return FileResponse(HTML_PATH, media_type="text/html; charset=utf-8")
     return HTMLResponse("<h1>SportIQ Lounge</h1><p>HTML file missing.</p>", status_code=200)
@@ -32247,9 +32248,9 @@ def serve_apple_touch_icon_v4637():
 def serve_pwa_manifest_v4637():
     from fastapi.responses import Response
     manifest_obj = {
-        "name": "SportIQ 실시간 분석 스포츠IQ 인사이트 라운지",
+        "name": "SportIQ 라이브스코어·리그 순위표",
         "short_name": "SportIQ",
-        "description": "9종목 24리그 실시간 스코어·순위, 기대득점(xG) 전술 브리핑 및 AI 아이큐 검색 커뮤니티",
+        "description": "실시간 라이브스코어, 리그 순위표, 승부예측 투표와 응원톡을 가입 없이 보는 스포츠 커뮤니티",
         "start_url": "/",
         "scope": "/",
         "display": "standalone",
@@ -33667,21 +33668,32 @@ async def _async_api_member_scoreboard_v4652(date_offset: int = 0):
 
 @router.get("/api/member/p0p1-upgrade.js")
 @router.get("/api/member/p0p1-upgrade-bundle")
-async def _async_serve_patched_upgrade_js_v4652():
+async def _async_serve_patched_upgrade_js_v4652(request: Request):
     from fastapi.responses import Response
     _ensure_upgrade_js_dedup_patched()
     body = getattr(_smu, "UPGRADE_JS", "")
     return Response(
         content=body,
         media_type="application/javascript; charset=utf-8",
-        headers={
-            "Cache-Control": "private, no-store, no-cache, must-revalidate, max-age=0",
-            "CDN-Cache-Control": "no-store",
-            "Cloudflare-CDN-Cache-Control": "no-store",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
+        headers=_upgrade_bundle_cache_headers_v53(request),
     )
+
+
+def _upgrade_bundle_cache_headers_v53(request: Optional[Request]) -> Dict[str, str]:
+    """?v= is the process boot version (_BOOT_VER_V30) and the bundle does not
+    change while the process runs, so that exact URL can be cached for good.
+    Any other (old or missing) version stays no-store, so a deploy is never
+    hidden behind a cached copy."""
+    v = (request.query_params.get("v") if request is not None else "") or ""
+    if v and v == _BOOT_VER_V30:
+        return {"Cache-Control": "public, max-age=31536000, immutable"}
+    return {
+        "Cache-Control": "private, no-store, no-cache, must-revalidate, max-age=0",
+        "CDN-Cache-Control": "no-store",
+        "Cloudflare-CDN-Cache-Control": "no-store",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
 
 
 @router.get("/api/member/match-h2h-v4649")
