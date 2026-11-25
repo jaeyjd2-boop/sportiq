@@ -223,7 +223,12 @@ def build_livescore_html() -> str:
             f"<h2>{_e(name)}</h2><table><thead><tr><th>시간(KST)</th><th>홈</th><th class=\"num\">스코어</th>"
             f"<th>원정</th><th>상태</th></tr></thead><tbody>{''.join(trs)}</tbody></table>"
         )
-    intro = (
+    try:
+        from app import sportiq_results_pages as rp
+        past = f'<p>지난 경기 결과: {rp.recent_links_html(7)}</p>'
+    except Exception:
+        past = ""
+    intro = past + (
         f'<p class="muted">{_e(now_kst)} 기준 · 오늘 경기 {len(matches)}개, 진행 중 {live_n}개. '
         "축구·농구·야구·배구·하키·테니스 실시간 스코어를 리그별로 모았습니다.</p>"
     )
@@ -375,6 +380,12 @@ def sitemap_url_blocks(now_iso: str) -> List[str]:
     try:
         from app import sportiq_team_pages as tp
         entries += [(p, "daily", "0.6") for p, _lg in tp.sitemap_team_urls()]
+    except Exception:
+        pass
+    try:
+        from app import sportiq_results_pages as rp
+        rp.warm_window_async()          # fills missing past days in the background
+        entries += [(f"/livescore/{d}", "monthly", "0.5") for d in rp.sitemap_result_days()]
     except Exception:
         pass
     return [
