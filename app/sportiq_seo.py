@@ -466,6 +466,47 @@ def sitemap_results():
     return _urlset("results")
 
 
+HOME_LINKS_ID = "sqSeoSiteLinks"
+
+
+def home_links_html() -> str:
+    """Plain links for the home page's initial HTML.
+
+    The home screen is drawn by JS, so crawlers saw almost no links. This is a
+    visible footer block (not hidden) with the public pages: live scores, the
+    league tables and the last 7 days of results."""
+    leagues = "".join(f'<li><a href="/standings/{s}">{_e(n)} 순위</a></li>' for s, (_c, n) in STANDINGS_LEAGUES.items())
+    try:
+        from app import sportiq_results_pages as rp
+        days = "".join(
+            f'<li><a href="/livescore/{d.isoformat()}">{d.month}월 {d.day}일 결과</a></li>' for d in rp.window()[:7]
+        )
+    except Exception:
+        days = ""
+    css = (
+        f"#{HOME_LINKS_ID}{{max-width:80rem;margin:24px auto 0;padding:16px;border-top:1px solid #2c3038;"
+        "font-size:13px;color:#c4c9d1}"
+        f"#{HOME_LINKS_ID} h2{{font-size:13px;font-weight:700;color:#f3f5f7;margin:10px 0 6px}}"
+        f"#{HOME_LINKS_ID} ul{{display:flex;flex-wrap:wrap;gap:6px 14px;list-style:none;margin:0;padding:0}}"
+        f"#{HOME_LINKS_ID} a{{color:#c4c9d1;text-decoration:none}}#{HOME_LINKS_ID} a:hover{{color:#ff6372}}"
+    )
+    return (
+        f'<style>{css}</style><nav id="{HOME_LINKS_ID}" aria-label="SportIQ 바로가기">'
+        '<h2>라이브스코어·순위표</h2><ul>'
+        '<li><a href="/livescore">오늘 라이브스코어</a></li><li><a href="/standings">리그 순위표 전체</a></li>'
+        f"{leagues}</ul>"
+        + (f"<h2>지난 경기 결과</h2><ul>{days}</ul>" if days else "")
+        + "</nav>"
+    )
+
+
+def inject_home_links(html_text: str) -> str:
+    if not html_text or HOME_LINKS_ID in html_text or "</body>" not in html_text:
+        return html_text
+    i = html_text.rfind("</body>")
+    return html_text[:i] + home_links_html() + "\n" + html_text[i:]
+
+
 def rss_items(pub_rfc_xml: str) -> List[str]:
     """Feed items for the public pages (pub_rfc_xml is already XML-escaped)."""
     pages = [("/livescore", "오늘 라이브스코어 · 실시간 스포츠 스코어", "오늘 경기의 실시간 스코어와 경기 상태를 리그별로 모았습니다.")]
