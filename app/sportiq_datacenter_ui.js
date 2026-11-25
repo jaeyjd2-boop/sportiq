@@ -1036,3 +1036,27 @@
   [200, 800, 2000].forEach(function (ms) { setTimeout(syncV4665, ms); });
   document.addEventListener("click", function () { setTimeout(syncV4665, 140); }, { passive: true });
 })();
+(function () {
+  if (window.__SQ_DEDUPE_49ERS_V4665__) return;
+  window.__SQ_DEDUPE_49ERS_V4665__ = 1;
+  function cleanDupTeamV4665() {
+    ["tab-matches", "tab-schedule", "globalTop10Grid", "feedList"].forEach(function (id) {
+      var r = document.getElementById(id);
+      if (!r) return;
+      var w = document.createTreeWalker(r, NodeFilter.SHOW_TEXT, null, false), n;
+      while ((n = w.nextNode())) {
+        var v = n.nodeValue;
+        if (!v || (v.indexOf("49ers") === -1 && v.indexOf("76ers") === -1 && v.indexOf("LASK") === -1 && v.indexOf("PSV") === -1)) continue;
+        var nv = v
+          .replace(/(?:샌프란시스코\s+)+49\u200B?ers/gi, "샌프란시스코 49\u200Bers")
+          .replace(/(?:필라델피아\s+)+76\u200B?ers/gi, "필라델피아 76\u200Bers")
+          .replace(/LA\u200B?SK(?:\s+린츠)+/gi, "LA\u200BSK 린츠")
+          .replace(/PS\u200B?V(?:\s+에인트호번)+/gi, "PS\u200BV 에인트호번");
+        if (nv !== v) n.nodeValue = nv;
+      }
+    });
+  }
+  [150, 600, 1400, 2800].forEach(function (ms) { setTimeout(cleanDupTeamV4665, ms); });
+  setInterval(cleanDupTeamV4665, 1500);
+  document.addEventListener("click", function () { setTimeout(cleanDupTeamV4665, 90); }, { passive: true });
+})();
