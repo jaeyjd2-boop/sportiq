@@ -26563,6 +26563,11 @@ def serve_lounge_home(request: Request):
                 rendered,
             )
             rendered = inject_seo_and_og_head_v27(rendered)
+            try:
+                from app import sportiq_seo as _sportiq_seo_links
+                rendered = _sportiq_seo_links.inject_home_links(rendered)
+            except Exception:
+                pass
             if "sqInline7TabBootV4611" not in rendered and "</body>" in rendered:
                 _inline_7tab = (
                     '<style id="sqCritical7TabCssV4611">'
