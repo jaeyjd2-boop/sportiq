@@ -611,7 +611,7 @@ def member_upgrade_status():
         "p3_feed_tabs_search_blind": True,
         "match_chronological_sort": True,
         "ai_iq_online_search": True,
-        "header_tagline": "실시간 분석 스포츠IQ 인사이트",
+        "header_tagline": "라이브스코어·순위표·승부예측 커뮤니티",
         "odds_alert_off_toggle": True,
         "iq_live_tv_tab": "https://jjangdoltv.com/",
         "floating_tabs_aligned_v12": True,
@@ -3445,11 +3445,13 @@ def _rebrand_scobi_text(text: str) -> str:
     if "오픈 스포츠 인사이트" in out:
         out = re.sub(
             r"billnojay\.com\s*(?:[·|\-]\s*)?오픈\s*스포츠\s*인사이트",
-            "실시간 분석 스포츠IQ 인사이트",
+            "billnojay.com 라이브스코어·순위표·승부예측 커뮤니티",
             out,
             flags=re.IGNORECASE,
         )
-        out = out.replace("오픈 스포츠 인사이트", "실시간 분석 스포츠IQ 인사이트")
+        # "SportIQ 오픈 스포츠 인사이트 라운지" (old title/h1) -> search-role title.
+        out = re.sub(r"SportIQ\s*오픈\s*스포츠\s*인사이트\s*라운지", "SportIQ 라이브스코어 · 리그 순위표 · 승부예측 커뮤니티", out)
+        out = out.replace("오픈 스포츠 인사이트", "라이브스코어·순위표·승부예측 커뮤니티")
     if "스코비" in out:
         out = (
             out.replace("AI 스코비", "AI 아이큐")
@@ -5940,8 +5942,8 @@ AI_IQ_ONLINE_SEARCH_JS = r"""
     var out = val;
     if (out.indexOf("오픈 스포츠 인사이트") !== -1) {
       out = out
-        .replace(/billnojay\.com\s*(?:·\s*)?오픈\s*스포츠\s*인사이트/gi, "실시간 분석 스포츠IQ 인사이트")
-        .replace(/오픈\s*스포츠\s*인사이트/g, "실시간 분석 스포츠IQ 인사이트");
+        .replace(/billnojay\.com\s*(?:·\s*)?오픈\s*스포츠\s*인사이트/gi, "billnojay.com 라이브스코어·순위표·승부예측 커뮤니티")
+        .replace(/오픈\s*스포츠\s*인사이트/g, "라이브스코어·순위표·승부예측 커뮤니티");
     }
     if (out.indexOf("스코비") !== -1) {
       out = out.replace(/AI\s*스코비/g, "AI 아이큐").replace(/스코비/g, "아이큐");
@@ -5958,7 +5960,7 @@ AI_IQ_ONLINE_SEARCH_JS = r"""
         if (!el || el.children.length > 3) return;
         var flat = (el.textContent || "").replace(/\s+/g, " ").trim();
         if (/^billnojay\.com\s*(?:·\s*)?오픈\s*스포츠\s*인사이트$/i.test(flat)) {
-          el.textContent = "실시간 분석 스포츠IQ 인사이트";
+          el.textContent = "라이브스코어·순위표·승부예측 커뮤니티";
         }
       });
     }
@@ -6841,7 +6843,7 @@ BRAND_CREST_V13_JS = r"""
 
     target.id = "sqHeroBrandBlock";
     target.classList.add("sq-brand-hero");
-    target.setAttribute("title", "SportIQ — 실시간 분석 스포츠IQ 인사이트 홈");
+    target.setAttribute("title", "SportIQ — 라이브스코어·순위표·승부예측 커뮤니티 홈");
     target.innerHTML = [
       "<div class='sq-brand-emblem' aria-hidden='true'>",
       "  <span class='sq-brand-emblem-bolt'>⚡</span>",
