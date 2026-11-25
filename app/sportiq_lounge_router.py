@@ -24076,10 +24076,62 @@ def _localize_team_ko_v37(raw_name: str, sport: str = "") -> str:
         if low_clean and low_clean in tbl:
             res_nm = tbl[low_clean]
             break
+    if res_nm == nm and sp in ("", "soccer", "american_football", "football"):
+        extra = _ko_extra_team_map_v4666()
+        for k_try in (low, low_clean, low.replace(".", "")):
+            if k_try and k_try in extra:
+                res_nm = extra[k_try]
+                break
     if len(_TEAM_KO_MEMO_V4653) > 6000:
         _TEAM_KO_MEMO_V4653.clear()
     _TEAM_KO_MEMO_V4653[mk] = res_nm
     return res_nm
+
+
+_KO_EXTRA_TEAMS_V4666: Dict[str, Dict[str, str]] = {}
+
+
+def _ko_extra_team_map_v4666() -> Dict[str, str]:
+    """Entries of the front-end table KO_TEAM_MAP_JS_V381 (in _FRONTEND_V22_JS)
+    that the server tables lack, e.g. NFL teams and some European clubs.
+    Read from that one source, so the server and the cards use the same
+    Korean names; nothing is translated here."""
+    if "map" not in _KO_EXTRA_TEAMS_V4666:
+        out: Dict[str, str] = {}
+        try:
+            src = globals().get("_FRONTEND_V22_JS") or ""
+            i = src.find("var KO_TEAM_MAP_JS_V381 = {")
+            j = src.find("};", i) if i != -1 else -1
+            if i != -1 and j != -1:
+                known = set(_KO_NBA_TEAMS_V37) | set(_KO_SOCCER_TEAMS_V37) | set(_KO_HOCKEY_MLB_TEAMS_V37)
+                for k, v in re.findall(r'"([^"\\]+)"\s*:\s*"([^"\\]+)"', src[i:j]):
+                    k = k.strip().lower()
+                    if k and k not in known and _HANGUL_RE_V4653.search(v):
+                        out[k] = v
+        except Exception:
+            out = {}
+        _KO_EXTRA_TEAMS_V4666["map"] = out
+    return _KO_EXTRA_TEAMS_V4666["map"]
+
+
+def _espn_side_name_v4666(side: Dict[str, Any], sport: str = "") -> str:
+    """Raw name for one ESPN competitor.
+
+    ESPN's shortDisplayName ("Melbourne V", "Sanfreece", "V-Varen") often misses
+    the Korean tables while displayName ("Sanfrecce Hiroshima") hits. Use the
+    first candidate that has a Korean name; otherwise the short name as before.
+    """
+    tm = side.get("team") or {}
+    ath = side.get("athlete") or {}
+    cands = [tm.get("shortDisplayName"), tm.get("displayName"), tm.get("name"), tm.get("location"),
+             ath.get("shortName"), ath.get("displayName")]
+    cands = [str(c).strip() for c in cands if c and str(c).strip()]
+    if not cands:
+        return ""
+    for c in cands:
+        if _HANGUL_RE_V4653.search(_localize_team_ko_v37(c, sport)):
+            return c
+    return cands[0]
 
 
 def _fetch_single_espn_json_url_v374(url: str, timeout: float = 3.4) -> Optional[Dict[str, Any]]:
@@ -24194,8 +24246,7 @@ def _fetch_espn_league_date_v37(lg_code: str, ymd: str) -> List[Dict[str, Any]]:
             away_c = next((x for x in competitors if x.get("homeAway") == "away"), competitors[-1])
 
             def _extr_name(comp_item: Dict[str, Any]) -> str:
-                tm = comp_item.get("team") or comp_item.get("athlete") or {}
-                return str(tm.get("shortDisplayName") or tm.get("displayName") or tm.get("name") or "").strip()
+                return _espn_side_name_v4666(comp_item, sport_key)
 
             h_en = _extr_name(home_c)
             a_en = _extr_name(away_c)
@@ -27856,15 +27907,7 @@ def _parse_espn_scoreboard_payload_v4616(
                 ac = next((c for c in cs if c.get("homeAway") == "away"), cs[1])
 
                 def _extr_name(comp_side: Dict[str, Any]) -> str:
-                    tm = comp_side.get("team") or {}
-                    ath = comp_side.get("athlete") or {}
-                    return str(
-                        tm.get("shortDisplayName")
-                        or tm.get("displayName")
-                        or ath.get("shortName")
-                        or ath.get("displayName")
-                        or ""
-                    ).strip()
+                    return _espn_side_name_v4666(comp_side, sport)
 
                 ht_raw = _extr_name(hc)
                 at_raw = _extr_name(ac)
@@ -32963,6 +33006,11 @@ def _with_espn_supplement_v50(items: List[Dict[str, Any]], off_i: int) -> List[D
             out.append(it)
             continue
         it = dict(it)
+        # Supplement rows (NFL, MLB, tennis…) come straight from ESPN in English.
+        sp_v = str(it.get("sport") or "")
+        for side in ("home", "away"):
+            if it.get(side):
+                it[side] = _localize_team_ko_v37(str(it[side]), sp_v)
         ps = it.get("period_scores")
         if isinstance(ps, list):
             it["period_scores"] = " · ".join(str(x) for x in ps if x)
