@@ -449,7 +449,9 @@ def _sitemap_entries(kind: str) -> List[Tuple[str, str, str, str]]:
     return []
 
 
-SITEMAP_KINDS = ("pages", "teams", "results")
+# "results" (/livescore/{date}) is left out while those pages are noindex
+# (sportiq_results_pages.INDEX_DATE_PAGES); /sitemap-results.xml stays as an empty set.
+SITEMAP_KINDS = ("pages", "teams")
 
 
 def sitemap_url_blocks(now_iso: str) -> List[str]:
@@ -474,7 +476,7 @@ def _xml(body: str) -> Response:
 
 @router.api_route("/sitemap.xml", methods=["GET", "HEAD"])
 def sitemap_index():
-    """Sitemap index: pages (home, live scores, standings), teams, daily results."""
+    """Sitemap index: pages (home, live scores, standings) and teams."""
     from datetime import datetime as _dt, timedelta as _td, timezone as _tz
 
     today = _dt.now(_tz(_td(hours=9))).date().isoformat()

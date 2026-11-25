@@ -4,7 +4,8 @@
   and zynktv.com use the same key).
 * Once a day, after 08:00 KST (European games of the previous KST day are over
   by then), the job sends:
-    - yesterday's /livescore/{date} result page, if it is indexable,
+    - yesterday's /livescore/{date} result page, if it is indexable (not
+      while sportiq_results_pages.INDEX_DATE_PAGES is off: zynktv owns date pages),
     - the team pages of teams that played that day (their results changed).
   Each sent day is logged in the lounge SQLite table seo_indexnow_log (also in
   the PG snapshot list), so restarts and redeploys do not resend.
@@ -91,7 +92,7 @@ def urls_for_day(day: date) -> List[str]:
 
     res = rp.day_results(day) or {}
     urls: List[str] = []
-    if int(res.get("finished") or 0) >= rp.MIN_FINISHED:
+    if rp.INDEX_DATE_PAGES and int(res.get("finished") or 0) >= rp.MIN_FINISHED:
         urls.append(f"{SITE}/livescore/{day.isoformat()}")
     team_league = {key: tl for key, _p, _s, _n, tl in rp.RESULT_LEAGUES if tl}
     for lg in res.get("leagues") or []:
