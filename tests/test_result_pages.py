@@ -88,7 +88,10 @@ class ResultPagesTests(unittest.TestCase):
         self.assertIn("끝난 6경기", t)
         self.assertIn('href="/livescore/2026-11-21"', t)
         self.assertIn('href="/livescore/2026-11-23"', t)
-        self.assertIn("index, follow", t)
+        # Date search belongs to zynktv: noindex,follow and a link to the same day there.
+        self.assertIn('<meta name="robots" content="noindex, follow" />', t)
+        self.assertEqual(r.headers.get("x-robots-tag"), seo.NOINDEX)
+        self.assertIn('<a href="https://zynktv.com/schedule/2026-11-22">징크 ZYNK</a>', t)
         for word in ("예정", "프리뷰", "예상", "배당"):
             self.assertNotIn(word, t)
 
@@ -112,7 +115,15 @@ class ResultPagesTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers.get("x-robots-tag"), seo.NOINDEX)
         CLIENT.get("/livescore/2026-11-22")
-        self.assertEqual(rp.sitemap_result_days(), ["2026-11-22"])
+        self.assertEqual(rp.sitemap_result_days(), [])          # no date pages while zynktv owns them
+        with patch.object(rp, "INDEX_DATE_PAGES", True):       # old rule still works if switched back
+            self.assertEqual(rp.sitemap_result_days(), ["2026-11-22"])
+            self.assertTrue(rp.build_page(date(2026, 11, 22), rp.day_results(date(2026, 11, 22)))[1])
+
+    def test_zynktv_note_only_within_its_range(self):
+        self.assertIn("zynktv.com/schedule/2026-10-26", rp.zynktv_note(date(2026, 10, 26), TODAY))  # today-30
+        self.assertEqual(rp.zynktv_note(date(2026, 10, 25), TODAY), "")   # older than 30 days
+        self.assertEqual(rp.zynktv_note(TODAY, TODAY), "")
 
     def test_today_redirects_future_and_old_404(self):
         r = CLIENT.get("/livescore/2026-11-25", follow_redirects=False)
@@ -127,12 +138,11 @@ class ResultPagesTests(unittest.TestCase):
         w = rp.window(TODAY)
         self.assertEqual((len(w), w[0], w[-1]), (60, date(2026, 11, 24), date(2026, 9, 26)))
 
-    def test_sitemap_has_result_days(self):
+    def test_sitemap_has_no_result_days(self):
         CLIENT.get("/livescore/2026-11-22")
         with patch.object(tp, "sitemap_team_urls", return_value=[]):
             locs = all_locs(CLIENT)
-        self.assertIn("https://billnojay.com/livescore/2026-11-22", locs)
-        self.assertNotIn("https://billnojay.com/livescore/2026-11-20", locs)
+        self.assertFalse([u for u in locs if "/livescore/" in u])
 
     def test_livescore_links_recent_days(self):
         seo._PAGE_CACHE.clear()
@@ -152,7 +162,7 @@ class SitemapIndexTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("application/xml", r.headers["content-type"])
         subs = re.findall(r"<loc>(.*?)</loc>", r.text)
-        self.assertEqual(subs, [f"https://billnojay.com/sitemap-{k}.xml" for k in ("pages", "teams", "results")])
+        self.assertEqual(subs, [f"https://billnojay.com/sitemap-{k}.xml" for k in ("pages", "teams")])
         self.assertIn("<sitemapindex", r.text)
 
     def test_sub_sitemaps_split_by_kind(self):

@@ -95,14 +95,16 @@ class DailyJobTests(unittest.TestCase):
 
     def test_urls_for_day(self):
         urls = ix.urls_for_day(date(2026, 11, 24))
-        self.assertEqual(urls, ["https://billnojay.com/livescore/2026-11-24", "https://billnojay.com/team/epl/arsenal"])
+        self.assertEqual(urls, ["https://billnojay.com/team/epl/arsenal"])     # date pages are zynktv's
+        with patch.object(rp, "INDEX_DATE_PAGES", True):
+            self.assertEqual(ix.urls_for_day(date(2026, 11, 24))[0], "https://billnojay.com/livescore/2026-11-24")
 
     def test_runs_once_a_day_after_8_kst(self):
         early = datetime(2026, 11, 25, 7, 30, tzinfo=ix.KST)
         later = datetime(2026, 11, 25, 9, 0, tzinfo=ix.KST)
         with patch.object(ix, "submit", return_value=[202]) as sub:
             self.assertIsNone(ix.run_daily(early))
-            self.assertEqual(ix.run_daily(later), (2, [202]))
+            self.assertEqual(ix.run_daily(later), (1, [202]))      # team page only
             self.assertIsNone(ix.run_daily(later))          # logged: not sent again
         self.assertEqual(sub.call_count, 1)
         self.assertTrue(ix.already_sent(date(2026, 11, 24)))

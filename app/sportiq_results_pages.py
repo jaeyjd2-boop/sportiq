@@ -13,8 +13,12 @@ fetched once and stored in the lounge SQLite table seo_daily_results (also
 in the PG snapshot list, so it survives redeploys). The table has one row
 per date, so widening the window later needs no schema change.
 
-Index rule: at least MIN_FINISHED finished games; otherwise noindex and not
-in the sitemap.
+Index rule (2026-11-26): date pages are noindex,follow and not in the sitemap
+or IndexNow. Date search ("11월 24일 경기 결과") belongs to zynktv's
+/schedule/{date} (three-site roles, sports-creator-ai docs/match-pages-design.md
+A-2), so the two sites do not compete for it. The pages stay for visitors and
+link to the same day on zynktv. INDEX_DATE_PAGES = True restores the old rule
+(at least MIN_FINISHED finished games -> index + sitemap).
 """
 from __future__ import annotations
 
@@ -33,6 +37,9 @@ ESPN_SITE = "https://site.api.espn.com/apis/site/v2/sports"
 WINDOW_DAYS = 60
 MIN_FINISHED = 5
 TABLE = "seo_daily_results"
+INDEX_DATE_PAGES = False
+ZYNKTV = "https://zynktv.com"
+ZYNKTV_PAST_DAYS = 30          # zynktv /schedule/{date} covers today-30 .. today+7
 WD_KO = ["월", "화", "수", "목", "금", "토", "일"]
 
 # (key, ESPN path, sport, Korean league name, team-page league or None)
@@ -245,7 +252,9 @@ def warm_window_async() -> None:
 
 
 def sitemap_result_days() -> List[str]:
-    """Stored days in the window with enough finished games (newest first)."""
+    """Indexable stored days in the window (newest first); none while INDEX_DATE_PAGES is off."""
+    if not INDEX_DATE_PAGES:
+        return []
     try:
         have = stored_counts()
     except Exception:
@@ -278,13 +287,22 @@ def _team_link(league: Optional[str], team: Dict[str, Any], sport: str) -> str:
     return _e(name)
 
 
+def zynktv_note(day: date, today: Optional[date] = None) -> str:
+    """One line to the same day on zynktv (date search is zynktv's role), within its range."""
+    today = today or today_kst()
+    if not (today - timedelta(days=ZYNKTV_PAST_DAYS) <= day < today):
+        return ""
+    return (f'<p class="muted">{_e(date_ko(day))} 경기 일정과 경기별 상대전적·AI 예측 채점은 '
+            f'<a href="{ZYNKTV}/schedule/{day.isoformat()}">징크 ZYNK</a>에서 볼 수 있습니다.</p>')
+
+
 def build_page(day: date, res: Dict[str, Any]) -> Tuple[str, bool]:
     from app import sportiq_seo as seo
     from app import sportiq_team_pages as tp
 
     meta = {k: (path, sport, name, tl) for k, path, sport, name, tl in RESULT_LEAGUES}
     finished = int(res.get("finished") or 0)
-    indexable = finished >= MIN_FINISHED
+    indexable = INDEX_DATE_PAGES and finished >= MIN_FINISHED
     blocks, samples = [], []
     for lg in res.get("leagues") or []:
         if lg["key"] not in meta:
@@ -318,7 +336,7 @@ def build_page(day: date, res: Dict[str, Any]) -> Tuple[str, bool]:
     desc = f"{date_ko(day)}({wd}) 끝난 {finished}경기 결과" + (f": {', '.join(samples)} 등." if samples else ".")
     intro = (f'<p class="muted">{_e(date_ko(day))}({wd}) 한국 시간 기준 · 끝난 경기 {finished}개 · '
              "축구·농구·야구·하키·미식축구 주요 리그 최종 스코어</p>")
-    body = intro + f'<p>{" · ".join(nav)}</p>' + "".join(blocks) + f'<p>{" · ".join(nav)}</p>'
+    body = intro + f'<p>{" · ".join(nav)}</p>' + "".join(blocks) + zynktv_note(day) + f'<p>{" · ".join(nav)}</p>'
     page = seo._page(f"/livescore/{day.isoformat()}", title, desc, f"{date_ko(day)} 경기 결과", body)
     if not indexable:
         page = seo.set_robots(page, seo.NOINDEX)
