@@ -65,5 +65,33 @@ class LookupTests(unittest.TestCase):
         self.assertEqual(lr._localize_team_ko_v37(name, "soccer"), "애들레이드 유나이티드")
 
 
+class StandingsPageNamesTests(unittest.TestCase):
+    def test_standings_rows_show_korean_names(self):
+        from unittest.mock import patch
+        from fastapi.testclient import TestClient
+        from app import sportiq_datacenter as dc
+        from app import sportiq_seo as seo
+        from app import sportiq_team_pages as tp
+        from app.main import app
+        seo._PAGE_CACHE.clear()
+        rows = [
+            {"rank": 1, "team": "Arsenal", "team_full": "Arsenal", "gp": 11, "w": 9, "d": 1, "l": 1, "gd": 10, "_pts": 28},
+            {"rank": 2, "team": "Spurs", "team_full": "Tottenham Hotspur", "gp": 11, "w": 4, "d": 3, "l": 4, "gd": 1, "_pts": 15},
+            {"rank": 3, "team": "Atlético", "team_full": "Atlético Madrid", "gp": 11, "w": 4, "d": 3, "l": 4, "gd": 1, "_pts": 15},
+            {"rank": 4, "team": "Newtown", "team_full": "Newtown Rovers", "gp": 11, "w": 1, "d": 1, "l": 9, "gd": -9, "_pts": 4},
+            {"rank": 5, "team": "Man City", "gp": 11, "w": 7, "d": 1, "l": 3, "gd": 8, "_pts": 22},
+        ]
+        data = {"ok": True, "sport": "soccer", "is_sample": False, "source": "ESPN", "updated_at_kst": "x", "standings": rows}
+        with patch.object(dc, "get_standings", return_value=data), \
+             patch.object(tp, "team_slug_lookup", return_value={"Arsenal": "arsenal"}):
+            t = TestClient(app).get("/standings/epl").text
+        self.assertIn('<a href="/team/epl/arsenal">아스널</a>', t)
+        self.assertIn("<td>토트넘 홋스퍼</td>", t)
+        self.assertIn("<td>아틀레티코 마드리드</td>", t)     # full name, not the short "Atlético"
+        self.assertIn("<td>Newtown</td>", t)                  # no Korean name: English stays
+        self.assertIn("<td>맨체스터 시티</td>", t)            # rows without team_full (old cache)
+        self.assertIn("현재 1위: 아스널", t)
+
+
 if __name__ == "__main__":
     unittest.main()

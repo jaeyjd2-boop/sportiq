@@ -148,7 +148,7 @@ class TeamPageTests(unittest.TestCase):
                 "ok": True, "sport": "soccer", "is_sample": False, "source": "ESPN", "updated_at_kst": "x",
                 "standings": [{"rank": 1, "team": "Arsenal", "gp": 11, "w": 9, "d": 1, "l": 1, "gd": 10, "_pts": 28}]}):
             t = CLIENT.get("/standings/epl").text
-        self.assertIn('<a href="/team/epl/arsenal">Arsenal</a>', t)
+        self.assertIn('<a href="/team/epl/arsenal">아스널</a>', t)
 
     def test_new_england_is_not_the_national_team(self):
         from app import sportiq_lounge_router as lr

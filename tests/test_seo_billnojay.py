@@ -39,7 +39,7 @@ EPL = {
     "updated_at_kst": "2026.11.25 (수) 11:00 KST",
     "standings": [
         {"rank": 1, "team": "Arsenal", "gp": 11, "w": 9, "d": 1, "l": 1, "gd": 10, "_pts": 28, "pts_label": "28점"},
-        {"rank": 2, "team": "Brighton <b>", "gp": 11, "w": 7, "d": 1, "l": 3, "gd": 17, "_pts": 22, "pts_label": "22점"},
+        {"rank": 2, "team": "Newtown <b>", "gp": 11, "w": 7, "d": 1, "l": 3, "gd": 17, "_pts": 22, "pts_label": "22점"},
     ],
 }
 NBA = {
@@ -150,9 +150,9 @@ class PublicPagesTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("<title>프리미어리그(EPL) 순위표", t)
         self.assertIn('href="https://billnojay.com/standings/epl"', t)
-        self.assertIn("<td>Arsenal</td>", t)
-        self.assertIn("Brighton &lt;b&gt;", t)                              # escaped
-        self.assertIn("현재 1위: Arsenal", t)
+        self.assertIn("<td>아스널</td>", t)
+        self.assertIn("Newtown &lt;b&gt;", t)                              # escaped
+        self.assertIn("현재 1위: 아스널", t)
         self.assertIn('href="/standings/nba"', t)
 
     def test_grouped_table_has_sections(self):
@@ -161,7 +161,7 @@ class PublicPagesTests(unittest.TestCase):
         self.assertIn("<h2>동부</h2>", t)
         self.assertIn("<h2>서부</h2>", t)
         self.assertIn(".833", t)
-        self.assertIn("동부 1위 Philadelphia 76ers", t)
+        self.assertIn("동부 1위 필라델피아 세븐티식서스", t)
 
     def test_sample_or_unavailable_table_shows_no_rows(self):
         for data in (SAMPLE, {"unavailable": True, "standings": [], "is_sample": False}):

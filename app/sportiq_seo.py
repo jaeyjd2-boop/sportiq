@@ -245,6 +245,27 @@ def _standings(code: str) -> Dict[str, Any]:
     return dc.get_standings(code) or {}
 
 
+def _ko_team(name: Any, sport: str) -> str:
+    """Korean name from the shared tables (home cards, team pages); English when there is none."""
+    en = str(name or "")
+    try:
+        from app import sportiq_team_pages as tp
+        return tp.korean_name(en, sport) or en
+    except Exception:
+        return en
+
+
+def _row_team_name(r: Dict[str, Any], sport: str) -> str:
+    """Korean name by ESPN's full name first (short names like "Atlético" or
+    "Miami" miss or fit several clubs), then by the short name, else English."""
+    full = str(r.get("team_full") or "")
+    if full:
+        ko = _ko_team(full, sport)
+        if ko != full:
+            return ko
+    return _ko_team(r.get("team"), sport)
+
+
 def _table_html(rows: List[Dict[str, Any]], sport: str, links: Optional[Dict[str, str]] = None) -> str:
     # soccer: W-D-L, goal difference, points. NHL: W-L, points (no OTL in the
     # feed). Other US leagues: W-L and win percentage.
@@ -257,8 +278,9 @@ def _table_html(rows: List[Dict[str, Any]], sport: str, links: Optional[Dict[str
         vals = [r.get("gp"), r.get("w")] + ([r.get("d")] if soccer else []) + [r.get("l")]
         vals += [r.get("gd"), r.get("_pts")] if soccer else ([r.get("_pts")] if hockey else [r.get("pts_label")])
         tds = "".join(f'<td class="num">{_e(v)}</td>' for v in vals)
-        team_cell = _e(r.get("team"))
-        href = (links or {}).get(str(r.get("team") or "")) or (links or {}).get(str(r.get("team_abbr") or ""))
+        team_cell = _e(_row_team_name(r, sport))
+        href = ((links or {}).get(str(r.get("team_full") or "")) or (links or {}).get(str(r.get("team") or ""))
+                or (links or {}).get(str(r.get("team_abbr") or "")))
         if href:
             team_cell = f'<a href="{_e(href)}">{team_cell}</a>'
         trs.append(f'<tr><td>{_e(r.get("rank"))}</td><td>{team_cell}</td>{tds}</tr>')
@@ -295,8 +317,8 @@ def build_standings_league_html(slug: str) -> Optional[str]:
         else:
             body = _table_html(rows, sport, links)
             basis = "승점 순" if sport == "soccer" else "승률 순"
-        leader = rows[0].get("team") if not groups else " · ".join(
-            f"{g} 1위 {next((r.get('team') for r in rows if r.get('group') == g), '')}" for g in groups
+        leader = _row_team_name(rows[0], sport) if not groups else " · ".join(
+            f"{g} 1위 {_row_team_name(next((r for r in rows if r.get('group') == g), {}), sport)}" for g in groups
         )
         intro = (
             f'<p class="muted">{_e(res.get("updated_at_kst"))} 기준 · {_e(basis)} · 출처 {_e(res.get("source") or "ESPN")}. '
