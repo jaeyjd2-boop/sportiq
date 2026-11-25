@@ -68,7 +68,12 @@ class SitemapScopeTests(unittest.TestCase):
         with patch.object(tp, "sitemap_team_urls", return_value=[]):
             locs = all_locs(CLIENT)
         self.assertEqual(len(locs), len(set(locs)))
-        self.assertEqual(set(locs), {seo.SITE + "/"} | {seo.SITE + p for p, _f, _pr in seo.PUBLIC_PATHS})
+        allowed = {seo.SITE + "/"} | {seo.SITE + p for p, _f, _pr in seo.PUBLIC_PATHS}
+        self.assertTrue(set(locs) <= allowed, set(locs) - allowed)
+        # Standings pages without a real table are left out (tests/test_standings_noindex.py).
+        for p, _f, _pr in seo.PUBLIC_PATHS:
+            if not p.startswith("/standings/"):
+                self.assertIn(seo.SITE + p, locs)
         for loc in locs:
             path = loc[len(seo.SITE):] or "/"
             r = CLIENT.get(path)

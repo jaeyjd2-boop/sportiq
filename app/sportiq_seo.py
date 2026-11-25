@@ -347,7 +347,7 @@ def build_standings_league_html(slug: str) -> Optional[str]:
             "inLanguage": "ko-KR",
             "dateModified": time.strftime("%Y-%m-%d"),
         }
-    return _page(
+    page = _page(
         f"/standings/{slug}",
         title,
         desc,
@@ -355,6 +355,10 @@ def build_standings_league_html(slug: str) -> Optional[str]:
         intro + body + f"<h2>다른 리그 순위표</h2><ul class=\"grid\">{others}</ul>",
         ld,
     )
+    # No real table (source failed, example data, or no source at all, as for
+    # K League 1, which ESPN does not cover): keep it out of the index. The
+    # page is rebuilt every minute, so it is indexable again once data returns.
+    return page if real else set_robots(page, NOINDEX)
 
 
 def build_standings_index_html() -> str:
@@ -394,7 +398,23 @@ def seo_standings_league_page(league: str, request: Request):
             '<p><a href="/standings">리그 순위표 목록</a>으로 이동해 주세요.</p>',
         )
         return HTMLResponse(set_robots(page, NOINDEX), status_code=404)
-    return _response(_cached(f"standings:{slug}", lambda: build_standings_league_html(slug) or ""))
+    page = _cached(f"standings:{slug}", lambda: build_standings_league_html(slug) or "")
+    resp = _response(page)
+    if f'content="{NOINDEX}"' in page:
+        resp.headers["X-Robots-Tag"] = NOINDEX
+    return resp
+
+
+def standings_has_data(slug: str) -> bool:
+    """True when /standings/<slug> shows a real table (same test as the page)."""
+    if slug not in STANDINGS_LEAGUES:
+        return False
+    try:
+        res = _standings(STANDINGS_LEAGUES[slug][0])
+    except Exception:
+        return False
+    rows = [r for r in (res.get("standings") or []) if isinstance(r, dict)]
+    return bool(rows) and res.get("is_sample") is False and not res.get("unavailable")
 
 
 def _sitemap_entries(kind: str) -> List[Tuple[str, str, str, str]]:
@@ -403,7 +423,12 @@ def _sitemap_entries(kind: str) -> List[Tuple[str, str, str, str]]:
 
     today = _dt.now(_tz(_td(hours=9))).date().isoformat()
     if kind == "pages":
-        return [("/", today, "hourly", "1.0")] + [(p, today, f, pr) for p, f, pr in PUBLIC_PATHS]
+        out = [("/", today, "hourly", "1.0")]
+        for p, f, pr in PUBLIC_PATHS:
+            if p.startswith("/standings/") and not standings_has_data(p.rsplit("/", 1)[1]):
+                continue          # noindex page: not in the sitemap
+            out.append((p, today, f, pr))
+        return out
     if kind == "teams":
         try:
             from app import sportiq_team_pages as tp
@@ -535,6 +560,7 @@ def rss_items(pub_rfc_xml: str) -> List[str]:
     pages += [
         (f"/standings/{slug}", f"{name} 순위표", f"{name} 현재 순위표: 경기 수, 승·무·패, 득실차, 승점(승률).")
         for slug, (_c, name) in STANDINGS_LEAGUES.items()
+        if standings_has_data(slug)          # no noindex pages in the feed
     ]
     return [
         "    <item>\n"
