@@ -677,7 +677,7 @@
       h+='<div class="dc-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">📋 최근 종료 경기 적중/미적중 투명 기록</div><table class="dc-tbl"><thead><tr><th>일시</th><th>리그</th><th>매치업</th><th>AI 픽</th><th>결과</th><th>채점</th></tr></thead><tbody>';
       for(var j=0;j<rg.length;j++){
         var r=rg[j];
-        h+='<tr><td>'+dcEsc(r.match_dt_kst)+'</td><td>'+dcEsc(r.league)+'</td><td>'+dcEsc(r.matchup)+'</td><td>'+dcEsc(r.ai_pick)+'</td><td>'+dcEsc(r.actual)+'</td><td style="font-weight:700;color:'+(r.is_hit?'#34d399':'#f87171')+'">'+(r.is_hit?'적중':'미적중')+'</td></tr>';
+        h+='<tr><td>'+dcEsc(r.match_dt_kst)+'</td><td>'+dcEsc(r.league)+'</td><td>'+dcEsc(r.matchup)+'</td><td>'+dcEsc(r.ai_pick)+'</td><td>'+dcEsc(r.actual)+'</td><td style="font-weight:700;color:'+(r.is_hit?'#4ade80':'#f87171')+'">'+(r.is_hit?'적중':'미적중')+'</td></tr>';
       }
       h+='</tbody></table></div>';
 

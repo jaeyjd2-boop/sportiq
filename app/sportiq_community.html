@@ -10,6 +10,9 @@
   <meta property="og:description" content="실시간 라이브스코어, 리그 순위표, 승부예측 투표와 응원톡을 가입 없이 보는 스포츠 커뮤니티" />
   <meta property="og:url" content="https://billnojay.com/" />
   <link rel="canonical" href="https://billnojay.com/" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="alternate icon" href="/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -24,13 +27,15 @@
           fontFamily: {
             sans: ['Pretendard', 'Inter', 'system-ui', 'sans-serif'],
           },
+          // billnojay colours: dark grey + crimson (app/sportiq_theme.py TAILWIND_COLORS)
+          colors: {"slate":{"50":"#f8f9fa","100":"#f3f5f7","200":"#dde1e6","300":"#c4c9d1","400":"#9aa1ac","500":"#6f7782","600":"#4f5661","700":"#3a3f48","800":"#2c3038","900":"#22262e","950":"#1a1d23"},"emerald":{"50":"#fff1f2","100":"#ffe0e3","200":"#ffc2c8","300":"#ff929d","400":"#ff6372","500":"#ff4d5e","600":"#d92d40","700":"#b3202f","800":"#8f1a27","900":"#6e1520","950":"#3d0a11"},"teal":{"50":"#fff1f2","100":"#ffe0e3","200":"#ffc2c8","300":"#ff929d","400":"#ff6372","500":"#ff4d5e","600":"#d92d40","700":"#b3202f","800":"#8f1a27","900":"#6e1520","950":"#3d0a11"},"amber":{"50":"#fffbeb","100":"#fff4cc","200":"#ffe7a8","300":"#ffdd8a","400":"#ffd166","500":"#f5b83d","600":"#e0a526","700":"#b45309","800":"#92400e","900":"#78350f","950":"#451a03"}},
         },
       },
     };
   </script>
   <style>
     body { font-family: 'Pretendard', 'Inter', system-ui, sans-serif; }
-    .glass-card { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.7); }
+    .glass-card { background: rgba(34, 38, 46, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.7); }
     .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
     .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
   </style>
@@ -1426,7 +1431,7 @@ setRole(state.role); lockQuickChallengeUI();
 
   function formatRankChange(rc) {
     if (!rc || rc === '-') return '<span class="rounded-md border border-slate-700 bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-bold text-slate-400">-</span>';
-    if (rc.startsWith('▲')) return '<span class="rounded-md border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-400">' + rc + '</span>';
+    if (rc.startsWith('▲')) return '<span class="rounded-md border border-green-500/30 bg-green-500/15 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-400">' + rc + '</span>';
     if (rc.startsWith('▼')) return '<span class="rounded-md border border-rose-500/30 bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-extrabold text-rose-400">' + rc + '</span>';
     return '<span class="rounded-md border border-sky-400/40 bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-extrabold text-sky-300">' + rc + '</span>';
   }
@@ -1649,7 +1654,7 @@ function renderMatches() {
           <div class="grid grid-cols-3 gap-2">
             <button type="button" onclick="voteMatchPrediction('${mk}','home')" class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/20">${homeTeam} 승 (${hp}%)</button>
             <button type="button" onclick="voteMatchPrediction('${mk}','draw')" class="rounded-xl border border-slate-600/50 bg-slate-800/80 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-700">${drawLabel} (${dp}%)</button>
-            <button type="button" onclick="voteMatchPrediction('${mk}','away')" class="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-300 hover:bg-rose-500/20">${awayTeam} 승 (${ap}%)</button>
+            <button type="button" onclick="voteMatchPrediction('${mk}','away')" class="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-bold text-sky-300 hover:bg-sky-500/20">${awayTeam} 승 (${ap}%)</button>
           </div>
           <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-800 flex">
             <div style="width:${hp}%" class="bg-emerald-500 transition-all duration-300"></div>
