@@ -24082,6 +24082,13 @@ def _localize_team_ko_v37(raw_name: str, sport: str = "") -> str:
             if k_try and k_try in extra:
                 res_nm = extra[k_try]
                 break
+    if res_nm == nm and sp in ("", "soccer", "football"):
+        try:
+            from app.sportiq_team_names_ko import SOCCER_KO as _SOCCER_KO_V4667
+        except Exception:
+            _SOCCER_KO_V4667 = {}
+        if low in _SOCCER_KO_V4667:
+            res_nm = _SOCCER_KO_V4667[low]
     if len(_TEAM_KO_MEMO_V4653) > 6000:
         _TEAM_KO_MEMO_V4653.clear()
     _TEAM_KO_MEMO_V4653[mk] = res_nm

@@ -34,10 +34,10 @@ class TeamNameTests(unittest.TestCase):
         self.assertEqual(lr._espn_side_name_v4666(side, "soccer"), "Arsenal")
 
     def test_no_source_stays_english(self):
-        side = {"team": {"shortDisplayName": "Melbourne V", "displayName": "Melbourne Victory"}}
+        side = {"team": {"shortDisplayName": "Samaleswari SC", "displayName": "Samaleswari Sports Club"}}
         raw = lr._espn_side_name_v4666(side, "soccer")
-        self.assertEqual(raw, "Melbourne V")                       # nothing invented
-        self.assertEqual(lr._localize_team_ko_v37(raw, "soccer"), "Melbourne V")
+        self.assertEqual(raw, "Samaleswari SC")                    # nothing invented
+        self.assertEqual(lr._localize_team_ko_v37(raw, "soccer"), "Samaleswari SC")
         self.assertEqual(lr._espn_side_name_v4666({"athlete": {"shortName": "M. Carle"}}, "tennis"), "M. Carle")
 
     def test_front_end_table_fills_server_gaps(self):
