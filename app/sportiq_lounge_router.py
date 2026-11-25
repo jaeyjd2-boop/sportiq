@@ -13935,6 +13935,15 @@ _FRONTEND_V22_JS = r'''
       "  </div>",
       "</div>"
     ].join("");
+    // Same match on zynktv (match data) and ergrow (preview): sportiq_sister_links.py
+    try {
+      if (!it.is_sample && typeof window.__sqLoadSisterLinks === "function") {
+        var sqSisterBox = document.createElement("div");
+        sqSisterBox.style.cssText = "padding:10px 16px;border-top:1px solid #1e293b;display:flex;gap:8px;flex-wrap:wrap;";
+        (modal.firstElementChild || modal).appendChild(sqSisterBox);
+        window.__sqLoadSisterLinks(it, sqSisterBox);
+      }
+    } catch (eSister) {}
 
     document.getElementById("sqCloseMatchInsightV30").onclick = function () { modal.style.removeProperty("display"); modal.classList.remove("hidden"); modal.style.display = "none"; };
     document.getElementById("sqModalFavBtnV30").onclick = function (ev) {
