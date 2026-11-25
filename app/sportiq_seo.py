@@ -396,6 +396,10 @@ class ForwardedProtoMiddleware:
     (e.g. /sitemap.xml/ -> /sitemap.xml) pointed at http://. Only the scheme is
     taken from the header; the client address is left alone (see
     app/sportiq_client_ip.py).
+
+    HTTPS responses also get Strict-Transport-Security (HSTS_VALUE), as
+    ergrow.com and zynktv.com send. It is never added to plain-http
+    responses, where browsers ignore it anyway.
     """
 
     def __init__(self, app):
@@ -410,4 +414,18 @@ class ForwardedProtoMiddleware:
                         ws = scope["type"] == "websocket"
                         scope = dict(scope, scheme=("wss" if proto == "https" else "ws") if ws else proto)
                     break
+        if scope.get("type") == "http" and scope.get("scheme") == "https":
+            async def _send(message):
+                if message["type"] == "http.response.start":
+                    headers = list(message.get("headers") or [])
+                    if not any(k.lower() == b"strict-transport-security" for k, _v in headers):
+                        headers.append((b"strict-transport-security", HSTS_VALUE.encode("latin-1")))
+                        message = dict(message, headers=headers)
+                await send(message)
+
+            await self.app(scope, receive, _send)
+            return
         await self.app(scope, receive, send)
+
+
+HSTS_VALUE = "max-age=31536000"
