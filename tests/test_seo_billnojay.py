@@ -107,9 +107,11 @@ class PostPagesTests(unittest.TestCase):
         self.assertEqual(meta(head_of(r.text), "name", "robots"), seo.NOINDEX)
 
     def test_sitemap_and_rss_have_no_post_urls(self):
-        sm = CLIENT.get("/sitemap.xml").text
-        self.assertNotIn("?post=", sm)
-        locs = re.findall(r"<loc>(.*?)</loc>", sm)
+        from sitemap_util import all_locs
+        from app import sportiq_team_pages as tp
+        with patch.object(tp, "sitemap_team_urls", return_value=[]):
+            locs = all_locs(CLIENT)
+        self.assertFalse([u for u in locs if "?post=" in u])
         self.assertIn("https://billnojay.com/", locs)
         for path, _f, _p in seo.PUBLIC_PATHS:
             self.assertIn(seo.SITE + path, locs)

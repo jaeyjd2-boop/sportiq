@@ -10,6 +10,8 @@ os.environ.setdefault("SPORTIQ_LOUNGE_DB", os.path.join(tempfile.mkdtemp(), "lou
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from sitemap_util import all_locs  # noqa: E402
+
 from app import sportiq_datacenter as dc  # noqa: E402
 from app import sportiq_results_pages as rp  # noqa: E402
 from app import sportiq_seo as seo  # noqa: E402
@@ -128,7 +130,7 @@ class ResultPagesTests(unittest.TestCase):
     def test_sitemap_has_result_days(self):
         CLIENT.get("/livescore/2026-11-22")
         with patch.object(tp, "sitemap_team_urls", return_value=[]):
-            locs = re.findall(r"<loc>(.*?)</loc>", CLIENT.get("/sitemap.xml").text)
+            locs = all_locs(CLIENT)
         self.assertIn("https://billnojay.com/livescore/2026-11-22", locs)
         self.assertNotIn("https://billnojay.com/livescore/2026-11-20", locs)
 
@@ -142,3 +144,29 @@ class ResultPagesTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SitemapIndexTests(unittest.TestCase):
+    def test_index_lists_three_sitemaps(self):
+        r = CLIENT.get("/sitemap.xml")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("application/xml", r.headers["content-type"])
+        subs = re.findall(r"<loc>(.*?)</loc>", r.text)
+        self.assertEqual(subs, [f"https://billnojay.com/sitemap-{k}.xml" for k in ("pages", "teams", "results")])
+        self.assertIn("<sitemapindex", r.text)
+
+    def test_sub_sitemaps_split_by_kind(self):
+        with patch.object(tp, "sitemap_team_urls", return_value=[("/team/epl/arsenal", "epl")]), \
+             patch.object(rp, "sitemap_result_days", return_value=["2026-11-22"]):
+            pages = re.findall(r"<loc>(.*?)</loc>", CLIENT.get("/sitemap-pages.xml").text)
+            teams = re.findall(r"<loc>(.*?)</loc>", CLIENT.get("/sitemap-teams.xml").text)
+            results = CLIENT.get("/sitemap-results.xml").text
+        self.assertIn("https://billnojay.com/", pages)
+        self.assertIn("https://billnojay.com/livescore", pages)
+        self.assertFalse([u for u in pages if "/team/" in u or "/livescore/" in u])
+        self.assertEqual(teams, ["https://billnojay.com/team/epl/arsenal"])
+        self.assertIn("<loc>https://billnojay.com/livescore/2026-11-22</loc>", results)
+        self.assertIn("<lastmod>2026-11-23</lastmod>", results)   # final the day after
+
+    def test_robots_points_to_index(self):
+        self.assertIn("Sitemap: https://billnojay.com/sitemap.xml", CLIENT.get("/robots.txt").text)
