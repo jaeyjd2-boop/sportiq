@@ -1213,6 +1213,7 @@ def _fetch_espn_standings(league_code):
     for idx, ent in enumerate(entries[:20], start=1):
         try:
             tname = ((ent.get("team") or {}).get("shortDisplayName")) or ((ent.get("team") or {}).get("displayName")) or f"Team {idx}"
+            tfull = ((ent.get("team") or {}).get("displayName")) or tname
             stats_map = {}
             for st in (ent.get("stats") or []):
                 stats_map[st.get("name")] = st.get("value", 0)
@@ -1231,6 +1232,7 @@ def _fetch_espn_standings(league_code):
                 "rank": idx,
                 "zone": _zone_label(sport, idx, len(entries)),
                 "team": tname,
+                "team_full": tfull,
                 "gp": gp,
                 "w": w,
                 "d": d,
