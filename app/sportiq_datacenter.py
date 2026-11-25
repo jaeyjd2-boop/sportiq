@@ -1105,7 +1105,7 @@ def _zone_label(sport, rank, total):
 _US_GROUP_LEAGUES = {
     "NBA": {"East": "동부", "West": "서부", "playoff": 6, "playin": 10, "mode": "pct"},
     # WNBA: the top 8 overall make the playoffs, regardless of conference.
-    "WNBA": {"East": "동부", "West": "서부", "playoff": 0, "playin": 0, "mode": "pct", "league_playoff": 8},
+    "WNBA": {"East": "동부", "West": "서부", "E": "동부", "W": "서부", "playoff": 0, "playin": 0, "mode": "pct", "league_playoff": 8},
     "NHL": {"East": "동부", "West": "서부", "playoff": 8, "playin": 0, "mode": "points"},
     "NFL": {"AFC": "AFC", "NFC": "NFC", "playoff": 7, "playin": 0, "mode": "pct"},
 }

@@ -123,6 +123,10 @@ class PostPagesTests(unittest.TestCase):
 class PublicPagesTests(unittest.TestCase):
     def setUp(self):
         fresh()
+        from app import sportiq_team_pages as tp   # no ESPN calls for team links here
+        self._tp = patch.object(tp, "team_slug_lookup", return_value={})
+        self._tp.start()
+        self.addCleanup(self._tp.stop)
 
     def test_livescore_snapshot(self):
         with patch.object(dc, "get_live_scores", return_value=LIVE):
@@ -139,7 +143,8 @@ class PublicPagesTests(unittest.TestCase):
         self.assertIn("public, max-age=60", r.headers["cache-control"])
 
     def test_league_table_snapshot(self):
-        with patch.object(dc, "get_standings", return_value=EPL):
+        from app import sportiq_team_pages as tp   # team links: tests/test_team_pages.py
+        with patch.object(dc, "get_standings", return_value=EPL), patch.object(tp, "team_slug_lookup", return_value={}):
             r = CLIENT.get("/standings/epl")
         t = r.text
         self.assertEqual(r.status_code, 200)

@@ -17,6 +17,36 @@ from __future__ import annotations
 from typing import Dict
 
 SOCCER_KO: Dict[str, str] = {
+    # --- league-table clubs for /team pages (MLS, Bundesliga, LaLiga, Ligue 1, J1) ---
+    # Exact keys here win over the older tables' substring match, which turned
+    # "New England Revolution" into the national team 잉글랜드.
+    "new england revolution": "뉴잉글랜드 레볼루션",
+    "new england": "뉴잉글랜드 레볼루션",
+    "chicago fire fc": "시카고 파이어",
+    "columbus crew": "콜럼버스 크루",
+    "red bull new york": "뉴욕 레드불스",
+    "new york red bulls": "뉴욕 레드불스",
+    "d.c. united": "DC 유나이티드",
+    "toronto fc": "토론토 FC",
+    "cf montréal": "CF 몽레알",
+    "philadelphia union": "필라델피아 유니언",
+    "new york city fc": "뉴욕 시티 FC",
+    "atlanta united fc": "애틀랜타 유나이티드",
+    "nashville sc": "내슈빌 SC",
+    "charlotte fc": "샬럿 FC",
+    "colorado rapids": "콜로라도 래피즈",
+    "hamburg sv": "함부르크 SV",
+    "schalke 04": "샬케 04",
+    "borussia mönchengladbach": "묀헨글라트바흐",
+    "sc paderborn 07": "파더보른",
+    "alavés": "알라베스",
+    "málaga": "말라가",
+    "racing santander": "라싱 산탄데르",
+    "frosinone": "프로시노네",
+    "paris fc": "파리 FC",
+    "lorient": "로리앙",
+    "le mans": "르망",
+    "jef united ichihara-chiba": "제프 유나이티드 지바",
     # A-League (Australia)
     "melbourne v": "멜버른 빅토리",
     "melbourne victory": "멜버른 빅토리",

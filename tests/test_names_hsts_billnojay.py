@@ -62,7 +62,9 @@ class TeamNameTests(unittest.TestCase):
 
 class SitemapScopeTests(unittest.TestCase):
     def test_sitemap_lists_only_real_public_pages(self):
-        locs = re.findall(r"<loc>(.*?)</loc>", CLIENT.get("/sitemap.xml").text)
+        from app import sportiq_team_pages as tp   # team URLs: tests/test_team_pages.py
+        with patch.object(tp, "sitemap_team_urls", return_value=[]):
+            locs = re.findall(r"<loc>(.*?)</loc>", CLIENT.get("/sitemap.xml").text)
         self.assertEqual(len(locs), len(set(locs)))
         self.assertEqual(set(locs), {seo.SITE + "/"} | {seo.SITE + p for p, _f, _pr in seo.PUBLIC_PATHS})
         for loc in locs:
