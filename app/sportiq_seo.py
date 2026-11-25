@@ -245,7 +245,7 @@ def _standings(code: str) -> Dict[str, Any]:
     return dc.get_standings(code) or {}
 
 
-def _table_html(rows: List[Dict[str, Any]], sport: str) -> str:
+def _table_html(rows: List[Dict[str, Any]], sport: str, links: Optional[Dict[str, str]] = None) -> str:
     # soccer: W-D-L, goal difference, points. NHL: W-L, points (no OTL in the
     # feed). Other US leagues: W-L and win percentage.
     soccer, hockey = sport == "soccer", sport == "hockey"
@@ -257,7 +257,11 @@ def _table_html(rows: List[Dict[str, Any]], sport: str) -> str:
         vals = [r.get("gp"), r.get("w")] + ([r.get("d")] if soccer else []) + [r.get("l")]
         vals += [r.get("gd"), r.get("_pts")] if soccer else ([r.get("_pts")] if hockey else [r.get("pts_label")])
         tds = "".join(f'<td class="num">{_e(v)}</td>' for v in vals)
-        trs.append(f'<tr><td>{_e(r.get("rank"))}</td><td>{_e(r.get("team"))}</td>{tds}</tr>')
+        team_cell = _e(r.get("team"))
+        href = (links or {}).get(str(r.get("team") or "")) or (links or {}).get(str(r.get("team_abbr") or ""))
+        if href:
+            team_cell = f'<a href="{_e(href)}">{team_cell}</a>'
+        trs.append(f'<tr><td>{_e(r.get("rank"))}</td><td>{team_cell}</td>{tds}</tr>')
     return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(trs)}</tbody></table>"
 
 
@@ -272,16 +276,24 @@ def build_standings_league_html(slug: str) -> Optional[str]:
     rows = [r for r in (res.get("standings") or []) if isinstance(r, dict)]
     sport = str(res.get("sport") or "")
     real = bool(rows) and res.get("is_sample") is False and not res.get("unavailable")
+    links: Dict[str, str] = {}
+    if real:
+        try:
+            from app import sportiq_team_pages as tp
+            if slug in tp.TEAM_LEAGUES:
+                links = {k: f"/team/{slug}/{v}" for k, v in tp.team_slug_lookup(code).items()}
+        except Exception:
+            links = {}
     if real:
         groups = list(dict.fromkeys(r.get("group") for r in rows if r.get("group")))
         if groups:
             body = "".join(
-                f"<h2>{_e(g)}</h2>" + _table_html([r for r in rows if r.get("group") == g], sport)
+                f"<h2>{_e(g)}</h2>" + _table_html([r for r in rows if r.get("group") == g], sport, links)
                 for g in groups
             )
             basis = "컨퍼런스 안 승점 순" if code == "NHL" else "컨퍼런스 안 승률 순"
         else:
-            body = _table_html(rows, sport)
+            body = _table_html(rows, sport, links)
             basis = "승점 순" if sport == "soccer" else "승률 순"
         leader = rows[0].get("team") if not groups else " · ".join(
             f"{g} 1위 {next((r.get('team') for r in rows if r.get('group') == g), '')}" for g in groups
@@ -359,6 +371,12 @@ def seo_standings_league_page(league: str, request: Request):
 
 
 def sitemap_url_blocks(now_iso: str) -> List[str]:
+    entries = list(PUBLIC_PATHS)
+    try:
+        from app import sportiq_team_pages as tp
+        entries += [(p, "daily", "0.6") for p, _lg in tp.sitemap_team_urls()]
+    except Exception:
+        pass
     return [
         "  <url>\n"
         f"    <loc>{SITE}{p}</loc>\n"
@@ -366,7 +384,7 @@ def sitemap_url_blocks(now_iso: str) -> List[str]:
         f"    <changefreq>{freq}</changefreq>\n"
         f"    <priority>{prio}</priority>\n"
         "  </url>"
-        for p, freq, prio in PUBLIC_PATHS
+        for p, freq, prio in entries
     ]
 
 

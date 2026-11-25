@@ -24053,7 +24053,11 @@ def _localize_team_ko_v37(raw_name: str, sport: str = "") -> str:
     if sp == "basketball":
         hit = _lookup_tbl(_KO_NBA_TEAMS_V37, 4)
     elif sp == "soccer":
-        hit = _lookup_tbl(_KO_SOCCER_TEAMS_V37, 4)
+        try:
+            from app.sportiq_team_names_ko import SOCCER_KO as _SOCCER_KO_EXACT
+        except Exception:
+            _SOCCER_KO_EXACT = {}
+        hit = _SOCCER_KO_EXACT.get(low) or _lookup_tbl(_KO_SOCCER_TEAMS_V37, 4)
     elif sp in ("hockey", "baseball"):
         if sp == "hockey" and low == "kings":
             hit = "LA 킹스"
