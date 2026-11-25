@@ -980,3 +980,59 @@
   setInterval(cleanDomV5, 600);
 })();
 /* Auto-deploy webhook active */
+(function () {
+  if (window.__SQ_MOB_V4665__) return;
+  window.__SQ_MOB_V4665__ = 1;
+  function syncV4665() {
+    if (!document.getElementById("sqMobCssV4665")) {
+      var st = document.createElement("style");
+      st.id = "sqMobCssV4665";
+      st.textContent = "@media(max-width:820px){#sqPwaInstallBanner,[data-sq-pwa-banner='1']{display:none!important;pointer-events:none!important}}#sqPwaInstallBanner,[data-sq-pwa-banner='1']{transition:opacity .22s,transform .22s!important}[data-sq-pwa-scroll-hide='1']{opacity:0!important;pointer-events:none!important;transform:translateY(22px)!important}[data-sq-mob-vote-row='1']{gap:7px!important;align-items:stretch!important}[data-sq-mob-vote-row='1']>button{padding:8.5px 8px!important;min-height:40px!important;line-height:1.36!important;word-break:keep-all!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;text-align:center!important}@media(max-width:520px){[data-sq-mob-vote-row='1']>button{padding:9px 10px!important;min-height:42px!important;font-size:12.2px!important}[data-sq-long-vote-row='1']{display:grid!important;grid-template-columns:1fr!important;gap:6px!important}[data-sq-long-vote-row='1']>button{width:100%!important;padding:9.5px 14px!important}#tab-ranking li,#tab-ranking>div>div{flex-wrap:wrap!important;row-gap:6px!important}}";
+      (document.head || document.documentElement).appendChild(st);
+    }
+    if (!document.body) return;
+    var pwa = document.getElementById("sqPwaInstallBanner") || document.querySelector("[data-sq-pwa-banner='1']");
+    if (!pwa) {
+      var ds = document.body.querySelectorAll("div,aside");
+      for (var i = 0; i < ds.length && i < 220; i++) {
+        var el = ds[i], tx = el.textContent || "";
+        if (tx.indexOf("홈 화면 앱으로 열기") !== -1 && tx.length < 180 && getComputedStyle(el).position === "fixed" && el.offsetHeight < 180) {
+          el.setAttribute("data-sq-pwa-banner", "1"); pwa = el; break;
+        }
+      }
+    }
+    if (pwa) {
+      if ((window.scrollY || 0) > 80) pwa.setAttribute("data-sq-pwa-scroll-hide", "1");
+      else pwa.removeAttribute("data-sq-pwa-scroll-hide");
+    }
+    ["tab-matches", "tab-schedule", "sqMatchDetailModal"].forEach(function (id) {
+      var root = document.getElementById(id);
+      if (!root) return;
+      var rows = root.querySelectorAll("div");
+      for (var d = 0; d < rows.length && d < 260; d++) {
+        var r = rows[d];
+        if (!r.children || r.children.length < 2 || r.children.length > 3) continue;
+        var ok = true, kw = false, mL = 0;
+        for (var b = 0; b < r.children.length; b++) {
+          if (r.children[b].tagName !== "BUTTON") { ok = false; break; }
+          var bt = (r.children[b].textContent || "").replace(/\s+/g, " ").trim();
+          if (bt.indexOf("승") !== -1 || bt.indexOf("무승부") !== -1) kw = true;
+          if (bt.length > mL) mL = bt.length;
+        }
+        if (ok && kw) {
+          r.setAttribute("data-sq-mob-vote-row", "1");
+          if (mL >= 13) r.setAttribute("data-sq-long-vote-row", "1"); else r.removeAttribute("data-sq-long-vote-row");
+        }
+      }
+    });
+  }
+  window.addEventListener("scroll", function () {
+    var pwa = document.getElementById("sqPwaInstallBanner") || document.querySelector("[data-sq-pwa-banner='1']");
+    if (!pwa) return;
+    var y = window.scrollY || 0;
+    if (y > 80) pwa.setAttribute("data-sq-pwa-scroll-hide", "1");
+    else if (y <= 36) pwa.removeAttribute("data-sq-pwa-scroll-hide");
+  }, { passive: true });
+  [200, 800, 2000].forEach(function (ms) { setTimeout(syncV4665, ms); });
+  document.addEventListener("click", function () { setTimeout(syncV4665, 140); }, { passive: true });
+})();
