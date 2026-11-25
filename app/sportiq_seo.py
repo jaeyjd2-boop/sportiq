@@ -21,7 +21,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 SITE = "https://billnojay.com"
 
@@ -375,28 +375,95 @@ def seo_standings_league_page(league: str, request: Request):
     return _response(_cached(f"standings:{slug}", lambda: build_standings_league_html(slug) or ""))
 
 
+def _sitemap_entries(kind: str) -> List[Tuple[str, str, str, str]]:
+    """(path, lastmod date, changefreq, priority) for one sub-sitemap."""
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+
+    today = _dt.now(_tz(_td(hours=9))).date().isoformat()
+    if kind == "pages":
+        return [("/", today, "hourly", "1.0")] + [(p, today, f, pr) for p, f, pr in PUBLIC_PATHS]
+    if kind == "teams":
+        try:
+            from app import sportiq_team_pages as tp
+            return [(p, today, "daily", "0.6") for p, _lg in tp.sitemap_team_urls()]
+        except Exception:
+            return []
+    if kind == "results":
+        try:
+            from app import sportiq_results_pages as rp
+            rp.warm_window_async()          # fills missing past days in the background
+            out = []
+            for d in rp.sitemap_result_days():
+                nxt = (_dt.fromisoformat(d) + _td(days=1)).date().isoformat()   # final the day after
+                out.append((f"/livescore/{d}", nxt, "monthly", "0.5"))
+            return out
+        except Exception:
+            return []
+    return []
+
+
+SITEMAP_KINDS = ("pages", "teams", "results")
+
+
 def sitemap_url_blocks(now_iso: str) -> List[str]:
-    entries = list(PUBLIC_PATHS)
-    try:
-        from app import sportiq_team_pages as tp
-        entries += [(p, "daily", "0.6") for p, _lg in tp.sitemap_team_urls()]
-    except Exception:
-        pass
-    try:
-        from app import sportiq_results_pages as rp
-        rp.warm_window_async()          # fills missing past days in the background
-        entries += [(f"/livescore/{d}", "monthly", "0.5") for d in rp.sitemap_result_days()]
-    except Exception:
-        pass
+    """All URLs except home in one list (kept for the old single sitemap builder)."""
     return [
         "  <url>\n"
         f"    <loc>{SITE}{p}</loc>\n"
-        f"    <lastmod>{now_iso}</lastmod>\n"
+        f"    <lastmod>{lm}</lastmod>\n"
         f"    <changefreq>{freq}</changefreq>\n"
         f"    <priority>{prio}</priority>\n"
         "  </url>"
-        for p, freq, prio in entries
+        for kind in SITEMAP_KINDS
+        for p, lm, freq, prio in _sitemap_entries(kind)
+        if p != "/"
     ]
+
+
+def _xml(body: str) -> Response:
+    return Response(content='<?xml version="1.0" encoding="UTF-8"?>\n' + body, media_type="application/xml; charset=utf-8",
+                    headers={"Cache-Control": "public, max-age=600"})
+
+
+@router.api_route("/sitemap.xml", methods=["GET", "HEAD"])
+def sitemap_index():
+    """Sitemap index: pages (home, live scores, standings), teams, daily results."""
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+
+    today = _dt.now(_tz(_td(hours=9))).date().isoformat()
+    items = "".join(
+        f"  <sitemap>\n    <loc>{SITE}/sitemap-{k}.xml</loc>\n    <lastmod>{today}</lastmod>\n  </sitemap>\n"
+        for k in SITEMAP_KINDS
+    )
+    return _xml(f'<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{items}</sitemapindex>\n')
+
+
+def _urlset(kind: str) -> Response:
+    rows = []
+    for p, lm, freq, prio in _sitemap_entries(kind):
+        img = ""
+        if p == "/":
+            img = ("    <image:image>\n      <image:loc>" + SITE + "/og-cover.png?v=28</image:loc>\n"
+                   "      <image:title>SportIQ 라이브스코어·리그 순위표·승부예측 커뮤니티</image:title>\n    </image:image>\n")
+        rows.append(f"  <url>\n    <loc>{SITE}{p}</loc>\n    <lastmod>{lm}</lastmod>\n"
+                    f"    <changefreq>{freq}</changefreq>\n    <priority>{prio}</priority>\n{img}  </url>\n")
+    return _xml('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+                'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n' + "".join(rows) + "</urlset>\n")
+
+
+@router.api_route("/sitemap-pages.xml", methods=["GET", "HEAD"])
+def sitemap_pages():
+    return _urlset("pages")
+
+
+@router.api_route("/sitemap-teams.xml", methods=["GET", "HEAD"])
+def sitemap_teams():
+    return _urlset("teams")
+
+
+@router.api_route("/sitemap-results.xml", methods=["GET", "HEAD"])
+def sitemap_results():
+    return _urlset("results")
 
 
 def rss_items(pub_rfc_xml: str) -> List[str]:

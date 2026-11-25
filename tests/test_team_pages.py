@@ -9,6 +9,8 @@ os.environ.setdefault("SPORTIQ_LOUNGE_DB", os.path.join(tempfile.mkdtemp(), "lou
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from sitemap_util import all_locs  # noqa: E402
+
 from app import sportiq_datacenter as dc  # noqa: E402
 from app import sportiq_seo as seo  # noqa: E402
 from app import sportiq_team_pages as tp  # noqa: E402
@@ -138,7 +140,7 @@ class TeamPageTests(unittest.TestCase):
             self.assertEqual(r.headers.get("x-robots-tag"), seo.NOINDEX)
 
     def test_sitemap_lists_indexable_teams(self):
-        locs = re.findall(r"<loc>(.*?)</loc>", CLIENT.get("/sitemap.xml").text)
+        locs = all_locs(CLIENT)
         self.assertIn("https://billnojay.com/team/epl/arsenal", locs)
         self.assertNotIn("https://billnojay.com/team/epl/brighton-hove-albion", locs)
         self.assertEqual(len(locs), len(set(locs)))

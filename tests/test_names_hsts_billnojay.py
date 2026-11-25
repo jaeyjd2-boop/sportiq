@@ -12,6 +12,8 @@ os.environ.setdefault("SPORTIQ_LOUNGE_DB", os.path.join(tempfile.mkdtemp(), "lou
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from sitemap_util import all_locs  # noqa: E402
+
 from app import sportiq_lounge_router as lr  # noqa: E402
 from app import sportiq_seo as seo  # noqa: E402
 from app.main import app  # noqa: E402
@@ -64,7 +66,7 @@ class SitemapScopeTests(unittest.TestCase):
     def test_sitemap_lists_only_real_public_pages(self):
         from app import sportiq_team_pages as tp   # team URLs: tests/test_team_pages.py
         with patch.object(tp, "sitemap_team_urls", return_value=[]):
-            locs = re.findall(r"<loc>(.*?)</loc>", CLIENT.get("/sitemap.xml").text)
+            locs = all_locs(CLIENT)
         self.assertEqual(len(locs), len(set(locs)))
         self.assertEqual(set(locs), {seo.SITE + "/"} | {seo.SITE + p for p, _f, _pr in seo.PUBLIC_PATHS})
         for loc in locs:
