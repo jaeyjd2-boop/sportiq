@@ -109,7 +109,7 @@ class PostPagesTests(unittest.TestCase):
     def test_sitemap_and_rss_have_no_post_urls(self):
         from sitemap_util import all_locs
         from app import sportiq_team_pages as tp
-        with patch.object(tp, "sitemap_team_urls", return_value=[]):
+        with patch.object(tp, "sitemap_team_urls", return_value=[]),              patch.object(seo, "standings_has_data", return_value=True):
             locs = all_locs(CLIENT)
         self.assertFalse([u for u in locs if "?post=" in u])
         self.assertIn("https://billnojay.com/", locs)
