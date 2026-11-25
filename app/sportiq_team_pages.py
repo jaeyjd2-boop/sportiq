@@ -97,8 +97,11 @@ def _cached(key: str, ttl: float, build):
     if val is not None:
         with _LOCK:
             _CACHE[key] = (now, val)
-    elif hit:
+    elif hit and hit[1] is not None:
         return hit[1]          # keep serving the last good copy when ESPN fails
+    else:
+        with _LOCK:            # remember the failure for 5 minutes instead of retrying every view
+            _CACHE[key] = (now - max(0.0, ttl - 300.0), None)
     return val
 
 
