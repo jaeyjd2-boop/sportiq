@@ -59,6 +59,29 @@ class FindTests(unittest.TestCase):
             self.assertIsNone(sl.pick_by_names(cands, "Arsenal", "Z", "soccer"))
             self.assertEqual(sl.pick_by_names(cands, "Arsenal", "Y", "soccer")["id"], 2)
 
+    def test_english_live_names_match_football_data_names(self):
+        # Live items keep English names when no Korean name is known; football-data adds "FC".
+        cands = [{"id": 7, "home": "Arsenal FC", "away": "Chelsea FC"},
+                 {"id": 8, "home": "Fulham FC", "away": "Brentford FC"}]
+        with patch("app.sportiq_team_pages.korean_name", return_value=None):
+            self.assertEqual(sl.pick_by_names(cands, "Arsenal", "Chelsea", "soccer")["id"], 7)
+            self.assertEqual(sl.pick_by_names(cands, "AFC Fulham", "Brentford", "soccer")["id"], 8)
+
+    def test_korean_on_live_side_and_english_on_db_side(self):
+        ko = {"Arsenal": "아스널", "Arsenal FC": "아스널", "Chelsea FC": "첼시"}
+        cands = [{"id": 7, "home": "Arsenal FC", "away": "Chelsea FC"}]
+        with patch("app.sportiq_team_pages.korean_name", side_effect=lambda n, s: ko.get(n)):
+            self.assertEqual(sl.pick_by_names(cands, "아스널", "Chelsea", "soccer")["id"], 7)
+        # one English live name translated on the live side
+        cands = [{"id": 9, "home": "아스널", "away": "X"}]
+        with patch("app.sportiq_team_pages.korean_name", side_effect=lambda n, s: ko.get(n)):
+            self.assertEqual(sl.pick_by_names(cands, "Arsenal", "", "soccer")["id"], 9)
+
+    def test_club_tokens_do_not_merge_different_teams(self):
+        cands = [{"id": 1, "home": "Manchester City FC", "away": "A"}, {"id": 2, "home": "Manchester United FC", "away": "B"}]
+        with patch("app.sportiq_team_pages.korean_name", return_value=None):
+            self.assertEqual(sl.pick_by_names(cands, "Manchester United", "", "soccer")["id"], 2)
+
     def test_unsupported_sport(self):
         self.assertIsNone(sl.find_match("WTA-1", "tennis", None, "a", "b"))
 
@@ -96,6 +119,29 @@ class LinkTests(unittest.TestCase):
         self.assertIsNone(d["zynktv"])
         self.assertEqual(d["zynktv_day"], f"https://zynktv.com/schedule/{today.date().isoformat()}")
 
+    def test_cache_key_includes_names(self):
+        kst = "2026.11.26 (목) 05:00 KST"
+        calls = []
+
+        def find(live_id, sport, kickoff, home, away):
+            calls.append(home)
+            return {"id": 29523, "sport": "football", "home": "Club Brugge", "away": "Liverpool"} if home == "클뤼프 브뤼허" else None
+        with patch.object(sl, "find_match", side_effect=find), patch.object(sl, "ergrow_preview", return_value=None):
+            bad = sl.links_for("UCL-1", "soccer", kst, "made up", "names")      # cached as "not found"
+            good = sl.links_for("UCL-1", "soccer", kst, "클뤼프 브뤼허", "리버풀")
+        self.assertIsNone(bad["zynktv"])
+        self.assertEqual(good["zynktv"], "https://zynktv.com/match/29523")
+        self.assertEqual(calls, ["made up", "클뤼프 브뤼허"])
+
+    def test_full_cache_drops_only_the_oldest(self):
+        with patch.object(sl, "MAX_CACHE", 8):
+            for i in range(8):
+                sl._cput(f"k{i}", 60, i)
+            sl._cput("new", 60, "x")
+        self.assertEqual(sl._cget("k0"), (False, None))     # oldest quarter gone
+        self.assertEqual(sl._cget("k7"), (True, 7))         # the rest kept
+        self.assertEqual(sl._cget("new"), (True, "x"))
+
     def test_db_error_does_not_break(self):
         with patch.object(sl, "find_match", side_effect=RuntimeError("db down")):
             d = sl.links_for("NBA-1", "basketball", "", "", "")
@@ -116,6 +162,11 @@ class UiTests(unittest.TestCase):
             js = f.read()
         self.assertIn("/api/sister/match-links?", js)
         self.assertIn("window.__sqLoadSisterLinks=loadSisterLinks", js)
+        # A late answer for a closed modal must not fill the next match's box.
+        i = js.index("function loadSisterLinks(m,box){")
+        body = js[i:js.index("window.__sqLoadSisterLinks", i)]
+        self.assertLess(body.index("box=box||document.getElementById('dcSisterLinks')"), body.index("fetch("))
+        self.assertIn("!box.isConnected", body)
         from app import sportiq_lounge_router as lr
         with open(lr.__file__, encoding="utf-8") as f:
             src = f.read()
