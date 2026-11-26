@@ -82,6 +82,14 @@ class FindTests(unittest.TestCase):
         with patch("app.sportiq_team_pages.korean_name", return_value=None):
             self.assertEqual(sl.pick_by_names(cands, "Manchester United", "", "soccer")["id"], 2)
 
+    def test_one_matching_side_is_not_enough(self):
+        # Real Korean names: "Arsenal U21" is looked up as 아스널, so one side alone would
+        # link a youth match to Arsenal's senior match in the same kickoff window.
+        cands = [{"id": 1, "home": "Arsenal FC", "away": "Brentford FC"}]
+        self.assertIsNone(sl.pick_by_names(cands, "Arsenal U21", "Chelsea U21", "soccer"))
+        self.assertIsNone(sl.pick_by_names(cands, "아스널", "첼시", "soccer"))
+        self.assertEqual(sl.pick_by_names(cands, "아스널", "Brentford", "soccer")["id"], 1)
+
     def test_unsupported_sport(self):
         self.assertIsNone(sl.find_match("WTA-1", "tennis", None, "a", "b"))
 
@@ -132,6 +140,26 @@ class LinkTests(unittest.TestCase):
         self.assertIsNone(bad["zynktv"])
         self.assertEqual(good["zynktv"], "https://zynktv.com/match/29523")
         self.assertEqual(calls, ["made up", "클뤼프 브뤼허"])
+
+    def test_espn_cache_key_ignores_names(self):
+        calls = []
+
+        def find(*a):
+            calls.append(a)
+            return None
+        with patch.object(sl, "find_match", side_effect=find):
+            sl.links_for("NBA-1", "basketball", "", "a", "b")
+            sl.links_for("NBA-1", "basketball", "", "c", "d")
+        self.assertEqual(len(calls), 1)
+
+    def test_recently_used_key_survives_eviction(self):
+        with patch.object(sl, "MAX_CACHE", 8):
+            for i in range(8):
+                sl._cput(f"k{i}", 60, i)
+            sl._cget("k0")
+            sl._cput("new", 60, "x")
+        self.assertEqual(sl._cget("k0"), (True, 0))
+        self.assertEqual(sl._cget("k1"), (False, None))
 
     def test_full_cache_drops_only_the_oldest(self):
         with patch.object(sl, "MAX_CACHE", 8):
