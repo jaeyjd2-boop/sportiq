@@ -39,6 +39,23 @@
     .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
     .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
   </style>
+  <!-- Google tag (gtag.js) - billnojay.com GA4 (async, no PII, deduplicated) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WL9F5N7VC6"></script>
+  <script>
+    (function () {
+      if (window.__billnojayGa4Init) return;
+      window.__billnojayGa4Init = true;
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function () { window.dataLayer.push(arguments); };
+      window.gtag('js', new Date());
+      window.gtag('config', 'G-WL9F5N7VC6', {
+        allow_google_signals: false,
+        allow_ad_personalization_signals: false,
+        send_page_view: true
+      });
+    })();
+  </script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen antialiased pb-20 lg:pb-6">
   <!-- Toast -->
@@ -3429,4 +3446,26 @@ function renderLabInjuryBoard(sport) {
   setInterval(function(){var g=document.getElementById('dcLaunchCards')||document.getElementById('dcLauncherGrid');if(g&&!document.getElementById('dcHofLaunchCard')){var fc=g.firstElementChild;var c=document.createElement(fc?fc.tagName:'div');c.id='dcHofLaunchCard';c.className=fc?fc.className.replace('active','').trim():'dc-launch-card';c.innerHTML='<div style="font-weight:700;color:#fde68a">🏆 명예의 전당 랭킹</div><div style="font-size:12px;color:#cbd5e1">TOP 분석가</div><div style="font-size:11px;color:#94a3b8">수상 횟수·누적 보너스·적중률 종합 순위</div>';c.addEventListener('click',openHofTab);g.appendChild(c);}
                          if(g){Array.prototype.forEach.call(g.children,function(ch){if(ch.id!=='dcHofLaunchCard'&&!ch.dataset.hofBound){ch.dataset.hofBound='1';ch.addEventListener('click',function(){var hc=document.getElementById('dcHofLaunchCard');if(hc)hc.classList.remove('active');});}});}var bar=document.getElementById('dcBestAnalystHallBar');if(bar&&!document.getElementById('dcJumpHofBtn')){var jb=document.createElement('button');jb.id='dcJumpHofBtn';jb.type='button';jb.className='dc-pill';jb.style.borderColor='#f59e0b';jb.style.color='#fde68a';jb.textContent='🏆 명예의 전당 랭킹 보기 →';jb.addEventListener('click',openHofTab);bar.appendChild(jb);}
                          var body=document.getElementById('dcHubBody');if(body&&!body.dataset.hofDel){body.dataset.hofDel='1';body.addEventListener('click',function(e){var s=e.target.closest('[data-hof-sort]');if(s){hofSort=s.getAttribute('data-hof-sort');loadHof();return;}var sp=e.target.closest('[data-hof-sport]');if(sp){hofSport=sp.getAttribute('data-hof-sport');loadHof();}});}},600);})();</script>
+<script>
+  (function () {
+    if (window.__billnojayGa4TabHook || typeof window.switchTab !== 'function') return;
+    window.__billnojayGa4TabHook = true;
+    var _prevTab = 'feed';
+    var _origSwitchTab = window.switchTab;
+    window.switchTab = function (tab) {
+      var ret = _origSwitchTab.apply(this, arguments);
+      try {
+        var nextTab = tab ? String(tab) : '';
+        if (nextTab && nextTab !== _prevTab && typeof window.gtag === 'function') {
+          _prevTab = nextTab;
+          window.gtag('event', 'page_view', {
+            page_path: '/#' + encodeURIComponent(nextTab),
+            page_title: document.title + ' - ' + nextTab
+          });
+        }
+      } catch (_) {}
+      return ret;
+    };
+  })();
+</script>
 </html>
