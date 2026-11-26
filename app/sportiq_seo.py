@@ -34,6 +34,36 @@ HOME_DESC = (
 )
 SHORT_DESC = "실시간 라이브스코어, 리그 순위표, 승부예측 투표와 응원톡을 가입 없이 보는 스포츠 커뮤니티"
 NOINDEX = "noindex, follow"
+PUBLIC_REPORT_IDS = ("1372",)
+
+
+def public_report(post_id: str) -> Optional[Dict[str, str]]:
+    if post_id not in PUBLIC_REPORT_IDS:
+        return None
+    from app.sportiq_lounge_router import resolve_post_og_meta_v29
+
+    report = resolve_post_og_meta_v29(post_id)
+    if (
+        report
+        and report["author"] == "SportIQ AI 분석팀"
+        and report["title"].startswith("[00:00 글로벌 TOP 20 종합 리포트]")
+        and len(report["full_body"].strip()) >= 200
+    ):
+        return report
+    return None
+
+
+def public_report_response(post_id: str, report: Dict[str, str]) -> HTMLResponse:
+    paragraphs = "".join(
+        f"<p>{_e(paragraph.strip())}</p>"
+        for paragraph in report["full_body"].splitlines()
+        if paragraph.strip()
+    )
+    page = _page(
+        f"/?post={post_id}", f'{report["title"]} | SportIQ', report["desc"], report["title"],
+        f'<article><p class="muted">{_e(report["author"])}</p>{paragraphs}</article>',
+    )
+    return HTMLResponse(page, headers={"Cache-Control": "private, no-store"})
 
 # URL slug -> datacenter league code. ESPN-backed tables only: leagues whose
 # table is always an example (KBO, NPB, LCK, V-리그) get no public page.
@@ -117,7 +147,7 @@ def _page(path: str, title: str, desc: str, h1: str, body: str, ld: Optional[Dic
         "@type": "BreadcrumbList",
         "itemListElement": [{"@type": "ListItem", "position": 1, "name": "SportIQ", "item": SITE + "/"}],
     }
-    parts = [p for p in path.strip("/").split("/") if p]
+    parts = [p for p in path.split("?", 1)[0].strip("/").split("/") if p]
     acc = ""
     for i, p in enumerate(parts, start=2):
         acc += "/" + p
@@ -441,6 +471,9 @@ def _sitemap_entries(kind: str) -> List[Tuple[str, str, str, str]]:
             if p.startswith("/standings/") and not standings_has_data(p.rsplit("/", 1)[1]):
                 continue          # noindex page: not in the sitemap
             out.append((p, today, f, pr))
+        for post_id in PUBLIC_REPORT_IDS:
+            if public_report(post_id):
+                out.append((f"/?post={post_id}", "", "monthly", "0.5"))
         return out
     if kind == "teams":
         try:
@@ -472,8 +505,8 @@ def sitemap_url_blocks(now_iso: str) -> List[str]:
     return [
         "  <url>\n"
         f"    <loc>{SITE}{p}</loc>\n"
-        f"    <lastmod>{lm}</lastmod>\n"
-        f"    <changefreq>{freq}</changefreq>\n"
+        + (f"    <lastmod>{lm}</lastmod>\n" if lm else "")
+        + f"    <changefreq>{freq}</changefreq>\n"
         f"    <priority>{prio}</priority>\n"
         "  </url>"
         for kind in SITEMAP_KINDS
@@ -507,7 +540,8 @@ def _urlset(kind: str) -> Response:
         if p == "/":
             img = ("    <image:image>\n      <image:loc>" + SITE + "/og-cover.png?v=28</image:loc>\n"
                    "      <image:title>SportIQ 라이브스코어·리그 순위표·승부예측 커뮤니티</image:title>\n    </image:image>\n")
-        rows.append(f"  <url>\n    <loc>{SITE}{p}</loc>\n    <lastmod>{lm}</lastmod>\n"
+        modified = f"    <lastmod>{lm}</lastmod>\n" if lm else ""
+        rows.append(f"  <url>\n    <loc>{SITE}{p}</loc>\n{modified}"
                     f"    <changefreq>{freq}</changefreq>\n    <priority>{prio}</priority>\n{img}  </url>\n")
     return _xml('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
                 'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n' + "".join(rows) + "</urlset>\n")

@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from app.sportiq_autonomous_sec import router as autonomous_router
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import text
 from app.config import settings
 from app.db import engine
@@ -15,7 +16,7 @@ from app.match_status import SOURCE_SQL, live_cutoff, with_stale_flag
 from app.diagnostics import router as diagnostics_router
 from app.security.wp_bridge_router import router as wp_bridge_router
 from app.scheduler import web_backfill_lifespan
-from app.sportiq_seo import router as seo_pages_router, ForwardedProtoMiddleware
+from app.sportiq_seo import router as seo_pages_router, ForwardedProtoMiddleware, public_report, public_report_response
 from app.sportiq_theme import router as brand_router, ThemeMiddleware
 from app.sportiq_team_pages import router as team_pages_router
 from app.sportiq_results_pages import router as result_pages_router
@@ -80,7 +81,13 @@ async def sportiq_security_and_ratelimit_middleware(request: Request, call_next)
             return resp_429
         bucket.append(now_ts)
 
-    response = await call_next(request)
+    report = None
+    post_id = ""
+    if request.method in ("GET", "HEAD") and request.url.path == "/":
+        post_id = request.query_params.get("post", "")
+        if post_id:
+            report = await run_in_threadpool(public_report, post_id)
+    response = public_report_response(post_id, report) if report else await call_next(request)
     # JSON is UTF-8, but some clients (e.g. Windows PowerShell 5.1) fall back
     # to Latin-1 without an explicit charset and show "MÃ¼nchen".
     if response.headers.get("content-type") == "application/json":
