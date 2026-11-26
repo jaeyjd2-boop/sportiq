@@ -7253,7 +7253,7 @@ IQ_DUAL_DOCK_AND_MOBILE_V15_JS = r"""
       "      <span>🎬 짱돌티비 바로가기</span>",
       "      <span style='font-size:14px;'>↗</span>",
       "    </a>",
-      "    <div style='margin-top:10px;font-size:11px;color:#64748b;'>클릭 시 공식 중계 페이지(jjangdoltv.com)로 즉시 이동합니다</div>",
+      "    <div style='margin-top:10px;font-size:11px;color:#64748b;'>짱돌TV(jjangdoltv.com)로 이동합니다</div>",
       "  </div>",
       "</div>"
     ].join("");

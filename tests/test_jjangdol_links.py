@@ -109,6 +109,9 @@ class ModalLinkTests(unittest.TestCase):
         self.assertIn("rel='nofollow sponsored noopener'", js)
         self.assertNotIn("rel='noopener noreferrer' class='sq-jjangdol-cta'", js)
         self.assertIn("/api/jjangdol/links", js)
+        # Plain wording: no claim that it is an official broadcaster.
+        self.assertIn("짱돌TV(jjangdoltv.com)로 이동합니다", js)
+        self.assertNotIn("공식 중계", js)
 
 
 if __name__ == "__main__":
