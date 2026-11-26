@@ -27,9 +27,11 @@ class HomeLinksTests(unittest.TestCase):
         self.assertIn("/standings", hrefs)
         for slug in seo.STANDINGS_LEAGUES:
             self.assertIn(f"/standings/{slug}", hrefs)
-        self.assertIn("/livescore/2026-11-24", hrefs)
-        self.assertIn("/livescore/2026-11-18", hrefs)
-        self.assertNotIn("/livescore/2026-11-17", hrefs)
+        # Past days link to zynktv (date pages are zynktv's; ours are noindex).
+        self.assertIn("https://zynktv.com/schedule/2026-11-24", hrefs)
+        self.assertIn("https://zynktv.com/schedule/2026-11-18", hrefs)
+        self.assertNotIn("https://zynktv.com/schedule/2026-11-17", hrefs)
+        self.assertFalse([h for h in hrefs if h.startswith("/livescore/")])
         self.assertGreaterEqual(len(hrefs), 20)
         self.assertEqual(t.count(f'id="{seo.HOME_LINKS_ID}"'), 1)
 
