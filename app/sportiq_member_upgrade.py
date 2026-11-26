@@ -7249,11 +7249,11 @@ IQ_DUAL_DOCK_AND_MOBILE_V15_JS = r"""
       "  <div style='background:linear-gradient(145deg,rgba(6,182,212,.14),rgba(15,23,42,.98));border:1px solid rgba(56,189,248,.4);border-radius:15px;padding:18px;text-align:center;'>",
       "    <div style='font-size:15px;font-weight:900;color:#f8fafc;margin-bottom:6px;'>⚡ 전 종목 고화질 실시간 라이브 중계</div>",
       "    <div style='font-size:12.5px;color:#94a3b8;line-height:1.6;margin-bottom:16px;'>해외축구 · 야구 · 농구 · 배구 · 하키 · E스포츠 실시간 생중계를<br/><strong style='color:#67e8f9;'>짱돌티비</strong>에서 끊김 없이 바로 시청하실 수 있습니다.</div>",
-      "    <a id='sqGoJjangdolTvLink' href='" + JJANGDOL_URL + "' target='_blank' rel='noopener noreferrer' class='sq-jjangdol-cta'>",
+      "    <a id='sqGoJjangdolTvLink' href='" + JJANGDOL_URL + "' target='_blank' rel='nofollow sponsored noopener' class='sq-jjangdol-cta'>",
       "      <span>🎬 짱돌티비 바로가기</span>",
       "      <span style='font-size:14px;'>↗</span>",
       "    </a>",
-      "    <div style='margin-top:10px;font-size:11px;color:#64748b;'>클릭 시 공식 중계 페이지(jjangdoltv.com)로 즉시 이동합니다</div>",
+      "    <div style='margin-top:10px;font-size:11px;color:#64748b;'>짱돌TV(jjangdoltv.com)로 이동합니다</div>",
       "  </div>",
       "</div>"
     ].join("");
@@ -7267,8 +7267,35 @@ IQ_DUAL_DOCK_AND_MOBILE_V15_JS = r"""
     return m;
   }
 
-  function openIqTvModal() {
+  // League deep links come from /api/jjangdol/links (sportiq_jjangdol_links.py):
+  // only leagues whose jjangdoltv page exists are listed, others use the home page.
+  var jjangdolLinks = null;
+  function loadJjangdolLinks() {
+    if (jjangdolLinks) return Promise.resolve(jjangdolLinks);
+    return fetch("/api/jjangdol/links", { credentials: "omit" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { jjangdolLinks = d || { leagues: {} }; return jjangdolLinks; })
+      .catch(function () { return { leagues: {} }; });
+  }
+  function currentLeagueSlug(explicit) {
+    if (explicit) return String(explicit).toLowerCase();
+    if (window.__sportiqJjangdolLeague) return String(window.__sportiqJjangdolLeague).toLowerCase();
+    var mm = location.pathname.match(/^\/(?:standings|team)\/([a-z0-9]+)/);
+    return mm ? mm[1] : "";
+  }
+  function applyJjangdolHref(slug) {
+    var a = document.getElementById("sqGoJjangdolTvLink");
+    if (!a) return;
+    a.href = JJANGDOL_URL;
+    loadJjangdolLinks().then(function (d) {
+      var hit = slug && d && d.leagues && d.leagues[slug];
+      if (hit && /^https:\/\/jjangdoltv\.com\//.test(hit)) a.href = hit;
+    });
+  }
+
+  function openIqTvModal(leagueSlug) {
     var m = buildIqTvModalIfNeeded();
+    applyJjangdolHref(currentLeagueSlug(leagueSlug));
     m.style.display = "flex";
   }
   window.__openSportiqIqTv = openIqTvModal;

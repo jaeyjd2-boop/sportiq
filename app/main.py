@@ -21,6 +21,7 @@ from app.sportiq_team_pages import router as team_pages_router
 from app.sportiq_results_pages import router as result_pages_router
 from app.sportiq_indexnow import router as indexnow_router
 from app.sportiq_sister_links import router as sister_links_router
+from app.sportiq_jjangdol_links import router as jjangdol_links_router
 from app.sportiq_lounge_router import router as lounge_router
 from app.sportiq_auto_analyst import router as auto_analyst_router
 from app.sportiq_issues_ranking import router as issues_ranking_router
@@ -37,6 +38,7 @@ app.include_router(team_pages_router)
 app.include_router(result_pages_router)
 app.include_router(indexnow_router)
 app.include_router(sister_links_router)
+app.include_router(jjangdol_links_router)
 app.include_router(lounge_router)
 app.include_router(issues_ranking_router)
 app.include_router(pro_lab_router)

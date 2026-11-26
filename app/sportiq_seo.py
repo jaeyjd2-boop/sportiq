@@ -292,6 +292,19 @@ def _table_html(rows: List[Dict[str, Any]], sport: str, links: Optional[Dict[str
     return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(trs)}</tbody></table>"
 
 
+def _stream_note(slug: str, name: str) -> str:
+    """One nofollow line to jjangdoltv: the league page once it exists, else its home page."""
+    try:
+        from app import sportiq_jjangdol_links as jl
+        href, rel = jl.url_for(slug), jl.REL
+    except Exception:
+        return ""
+    return (
+        f'<p class="muted">{_e(name)} 경기 실시간 중계는 '
+        f'<a href="{_e(href)}" target="_blank" rel="{_e(rel)}">짱돌TV</a>에서 볼 수 있습니다.</p>'
+    )
+
+
 def build_standings_league_html(slug: str) -> Optional[str]:
     if slug not in STANDINGS_LEAGUES:
         return None
@@ -352,7 +365,7 @@ def build_standings_league_html(slug: str) -> Optional[str]:
         title,
         desc,
         f"{name} 순위표",
-        intro + body + f"<h2>다른 리그 순위표</h2><ul class=\"grid\">{others}</ul>",
+        intro + body + _stream_note(slug, name) + f"<h2>다른 리그 순위표</h2><ul class=\"grid\">{others}</ul>",
         ld,
     )
     # No real table (source failed, example data, or no source at all, as for
