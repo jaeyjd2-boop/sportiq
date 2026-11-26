@@ -34,11 +34,16 @@ HOME_DESC = (
 )
 SHORT_DESC = "실시간 라이브스코어, 리그 순위표, 승부예측 투표와 응원톡을 가입 없이 보는 스포츠 커뮤니티"
 NOINDEX = "noindex, follow"
-PUBLIC_REPORT_IDS = ("1372",)
+PUBLIC_REPORT_TITLES = {
+    "1372": "[00:00 글로벌 TOP 20 종합 리포트]",
+    "1374": "[00:00 커뮤니티 자동분석] 아스널 vs 보루시아 도르트문트",
+    "1376": "[00:00 커뮤니티 자동분석] 플로리다 팬서스 vs 에드먼턴 오일러스",
+}
 
 
 def public_report(post_id: str) -> Optional[Dict[str, str]]:
-    if post_id not in PUBLIC_REPORT_IDS:
+    title_prefix = PUBLIC_REPORT_TITLES.get(post_id)
+    if not title_prefix:
         return None
     from app.sportiq_lounge_router import resolve_post_og_meta_v29
 
@@ -46,7 +51,7 @@ def public_report(post_id: str) -> Optional[Dict[str, str]]:
     if (
         report
         and report["author"] == "SportIQ AI 분석팀"
-        and report["title"].startswith("[00:00 글로벌 TOP 20 종합 리포트]")
+        and report["title"].startswith(title_prefix)
         and len(report["full_body"].strip()) >= 200
     ):
         return report
@@ -471,7 +476,7 @@ def _sitemap_entries(kind: str) -> List[Tuple[str, str, str, str]]:
             if p.startswith("/standings/") and not standings_has_data(p.rsplit("/", 1)[1]):
                 continue          # noindex page: not in the sitemap
             out.append((p, today, f, pr))
-        for post_id in PUBLIC_REPORT_IDS:
+        for post_id in PUBLIC_REPORT_TITLES:
             if public_report(post_id):
                 out.append((f"/?post={post_id}", "", "monthly", "0.5"))
         return out
