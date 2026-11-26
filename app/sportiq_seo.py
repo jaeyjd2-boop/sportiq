@@ -536,12 +536,15 @@ def home_links_html() -> str:
 
     The home screen is drawn by JS, so crawlers saw almost no links. This is a
     visible footer block (not hidden) with the public pages: live scores, the
-    league tables and the last 7 days of results."""
+    league tables and the last 7 days of results (on zynktv, which owns date pages)."""
     leagues = "".join(f'<li><a href="/standings/{s}">{_e(n)} 순위</a></li>' for s, (_c, n) in STANDINGS_LEAGUES.items())
     try:
         from app import sportiq_results_pages as rp
+        # Date search belongs to zynktv (our /livescore/{date} pages are noindex),
+        # so the home footer sends crawlers and people to zynktv's page for that day.
         days = "".join(
-            f'<li><a href="/livescore/{d.isoformat()}">{d.month}월 {d.day}일 결과</a></li>' for d in rp.window()[:7]
+            f'<li><a href="{rp.ZYNKTV}/schedule/{d.isoformat()}">{d.month}월 {d.day}일 결과</a></li>'
+            for d in rp.window()[:7]
         )
     except Exception:
         days = ""
