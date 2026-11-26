@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 from app.db import engine
+from app import team_elo
 from app.match_status import SOURCE_SQL, with_stale_flag
 
 router = APIRouter(prefix="/v1/matches", tags=["analysis"])
@@ -37,15 +38,17 @@ def forecast(match_id: int):
     from math import exp, factorial
     with engine.connect() as c:
         match = c.execute(text("""
-            SELECT m.id, m.home_team_id, m.away_team_id, m.start_time, m.status, s.code AS sport
+            SELECT m.id, m.sport_id, m.home_team_id, m.away_team_id, m.start_time, m.status, s.code AS sport
             FROM matches m JOIN sports s ON s.id=m.sport_id WHERE m.id=:id
         """), {"id": match_id}).mappings().first()
         if not match:
             raise HTTPException(404, "match not found")
+        if match["sport"] in team_elo.PARAMS:
+            return _elo_forecast(c, match)
         if match["sport"] != "football":
             # The Poisson goal model only makes sense for football.
             return {"match_id": match_id, "available": False, "sport": match["sport"],
-                    "reason": "Forecast model covers football only"}
+                    "reason": "Forecast model covers football, basketball, hockey and American football only"}
         if not match["home_team_id"] or not match["away_team_id"]:
             raise HTTPException(422, "team identifiers unavailable")
         rows = c.execute(text("""
@@ -93,6 +96,55 @@ def forecast(match_id: int):
             "most_likely_score":{"home":score[0],"away":score[1]},
             "samples":{"home":len(h),"away":len(a)},
             "disclaimer":"Experimental estimate, not calibrated or validated; historical data may be incomplete."}
+
+
+def _as_datetime(value):
+    """SQLite returns timestamps as text; Postgres returns datetimes."""
+    from datetime import datetime, timezone
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def _elo_forecast(c, match):
+    """Experimental Elo win probability from earlier stored results of the same sport."""
+    from datetime import timedelta
+    match_id, sport = match["id"], match["sport"]
+    if not match["home_team_id"] or not match["away_team_id"]:
+        raise HTTPException(422, "team identifiers unavailable")
+    params = team_elo.PARAMS[sport]
+    kickoff = _as_datetime(match["start_time"])
+    # Two seasons of history is enough for Elo to settle and keeps the replay small.
+    rows = c.execute(text("""
+        SELECT home_team_id, away_team_id, home_score, away_score, start_time
+        FROM matches
+        WHERE sport_id = :sport_id AND start_time < :kickoff AND start_time >= :since AND id <> :id
+          AND status IN ('FT','AET','PEN')
+          AND home_score IS NOT NULL AND away_score IS NOT NULL
+          AND home_team_id IS NOT NULL AND away_team_id IS NOT NULL
+        ORDER BY start_time, id LIMIT 6000
+    """), {"sport_id": match["sport_id"], "kickoff": match["start_time"],
+           "since": kickoff - timedelta(days=800), "id": match_id}).mappings().all()
+    games = [{"home": r["home_team_id"], "away": r["away_team_id"], "home_score": r["home_score"],
+              "away_score": r["away_score"], "start_time": _as_datetime(r["start_time"])} for r in rows]
+    ratings, played = team_elo.run_ratings(games, params, as_of=kickoff)
+    samples = {"home": played.get(match["home_team_id"], 0), "away": played.get(match["away_team_id"], 0)}
+    if min(samples.values()) < params.min_games:
+        return {"match_id": match_id, "available": False, "sport": sport,
+                "reason": f"At least {params.min_games} completed prior games per team are required",
+                "samples": samples}
+    p_home, p_away, r_home, r_away = team_elo.predict(ratings, match["home_team_id"], match["away_team_id"], params)
+    return {"match_id": match_id, "available": True, "sport": sport,
+            "model_version": team_elo.MODEL_VERSION[sport],
+            # Final winner including overtime/shootout; ties are not modelled.
+            "probabilities": {"home": round(p_home, 4), "draw": 0.0, "away": round(p_away, 4)},
+            "ratings": {"home": round(r_home, 1), "away": round(r_away, 1),
+                        "home_advantage": params.home_advantage},
+            "samples": samples,
+            "method": "Elo ratings from earlier stored results of this sport; final result including overtime.",
+            "disclaimer": "Experimental estimate, not calibrated or validated; historical data may be incomplete."}
 
 
 @router.get("/forecasts/upcoming")
