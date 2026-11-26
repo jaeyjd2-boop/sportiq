@@ -579,7 +579,7 @@ def home_links_html() -> str:
     reports = _cached(
         "home:public-reports",
         lambda: "".join(
-            f'<li><a href="/?post={post_id}">{_e(title.partition("] ")[2])}</a></li>'
+            f'<li><a href="/?post={post_id}">{_e(title.partition("] ")[2] or title.strip("[]").split(" ", 1)[-1])}</a></li>'
             for post_id, title in PUBLIC_REPORT_TITLES.items()
             if public_report(post_id)
         ),
