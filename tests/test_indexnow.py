@@ -48,12 +48,19 @@ class KeyFileTests(unittest.TestCase):
         self.assertEqual(ix.KEY, KEY)
 
 
+def _is_indexnow(req) -> bool:
+    """urlopen is patched process-wide; count only this module's requests (other
+    threads, e.g. a background ESPN fetch, may call urlopen at the same time)."""
+    return getattr(req, "full_url", req) == ix.ENDPOINT
+
+
 class SubmitTests(unittest.TestCase):
     def test_payload_and_status(self):
         sent = []
 
         def fake_urlopen(req, timeout=0):
-            sent.append((req.full_url, req.get_method(), json.loads(req.data.decode("utf-8"))))
+            if _is_indexnow(req):
+                sent.append((req.full_url, req.get_method(), json.loads(req.data.decode("utf-8"))))
             return FakeResp(202)
 
         with patch("urllib.request.urlopen", side_effect=fake_urlopen):
@@ -69,7 +76,9 @@ class SubmitTests(unittest.TestCase):
         with patch("urllib.request.urlopen", return_value=FakeResp(200)) as m:
             st = ix.submit([f"https://billnojay.com/p{i}" for i in range(10001)])
         self.assertEqual(st, [200, 200])
-        self.assertEqual(m.call_count, 2)
+        ours = [c for c in m.call_args_list if _is_indexnow(c.args[0])]
+        self.assertEqual(len(ours), 2)
+        self.assertEqual([len(json.loads(c.args[0].data)["urlList"]) for c in ours], [10000, 1])
 
     def test_failure_never_raises(self):
         with patch("urllib.request.urlopen", side_effect=OSError("down")):
