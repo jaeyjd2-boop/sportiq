@@ -3418,7 +3418,7 @@ function renderLabInjuryBoard(sport) {
   }
 })();
 </script>
-<script src="/api/datacenter/widget.js?v=20261126s"></script>
+<script src="/api/datacenter/widget.js?v=20261126r2"></script>
   
 <script>(function(){/* Older copy of the hall of fame; sportiq_datacenter_ui.js (widget.js) now renders it with the same ids and click handlers. Run only as a fallback when that widget is absent, so the two never render over each other. */if(window.__sqHofLegacyStandDown||document.querySelector('script[src*="/api/datacenter/widget.js"]')){window.__sqHofLegacyStandDown=true;return;}var hofSort='composite',hofSport='all';function openHofTab(){var g=document.getElementById('dcLaunchCards')||document.getElementById('dcLauncherGrid');if(g){Array.prototype.forEach.call(g.children,function(ch){ch.classList.remove('active');});}var hc=document.getElementById('dcHofLaunchCard');if(hc)hc.classList.add('active');var b=document.getElementById('dcHubBody');if(b)b.style.display='block';var s=document.getElementById('dcMainHubSection');if(s)s.scrollIntoView({behavior:'smooth'});loadHof();}
   function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}function loadHof(){var b=document.getElementById('dcHubBody');if(!b)return;b.innerHTML='<div style="padding:20px;text-align:center;color:#94a3b8">명예의 전당 불러오는 중...</div>';fetch('/api/datacenter/hall-of-fame?sort='+hofSort+'&sport='+hofSport).then(function(r){return r.json();}).then(function(d){var k=d.summary_kpis||{},items=d.items||[],pod=d.podium||items.slice(0,3);

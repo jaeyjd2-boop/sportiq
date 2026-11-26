@@ -147,9 +147,11 @@
     var q='id='+encodeURIComponent(m.id||'')+'&sport='+encodeURIComponent(m.sport||'')
       +'&kst='+encodeURIComponent(m.match_dt_full_kst||'')+'&home='+encodeURIComponent(m.home||'')
       +'&away='+encodeURIComponent(m.away||'');
+    // Take the box now, not when the answer arrives: by then the modal may show another
+    // match (its HTML is rebuilt, so this box is detached and the late answer is dropped).
+    box=box||document.getElementById('dcSisterLinks');
     fetch('/api/sister/match-links?'+q,{credentials:'omit'}).then(function(r){return r.ok?r.json():null;}).then(function(d){
-      box=box||document.getElementById('dcSisterLinks');
-      if(!box||!d)return;
+      if(!box||!d||!box.isConnected)return;
       var ok=function(u,host){return typeof u==='string'&&u.indexOf('https://'+host+'/')===0;};
       var a=function(u,label){return '<a class="dc-btn" href="'+dcEsc(u)+'" target="_blank" rel="noopener">'+label+'</a>';};
       var html='';

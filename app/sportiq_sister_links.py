@@ -69,7 +69,11 @@ def _cget(key: str):
 def _cput(key: str, ttl: float, value: Any) -> None:
     with _LOCK:
         if len(_CACHE) >= MAX_CACHE:
-            _CACHE.clear()
+            # Drop the oldest quarter (dicts keep insertion order), not everything:
+            # many unknown keys must not wipe the links already found.
+            for k in list(_CACHE)[: MAX_CACHE // 4]:
+                _CACHE.pop(k, None)
+        _CACHE.pop(key, None)
         _CACHE[key] = (time.monotonic(), ttl, value)
 
 
@@ -112,11 +116,19 @@ def _norm(name: str) -> str:
     return re.sub(r"[\W_]+", "", unicodedata.normalize("NFKC", name or "").lower())
 
 
-def _names(name_en: str, live_sport: str) -> set:
-    out = {_norm(name_en)}
+def _stripped(name: str) -> str:
+    """ASCII form without club tokens: 'Arsenal FC' / 'Arsenal' -> 'arsenal'. Empty for Korean."""
+    text = unicodedata.normalize("NFKD", (name or "").translate(_TRANSLIT)).encode("ascii", "ignore").decode().lower()
+    return "".join(w for w in re.split(r"[^a-z0-9]+", text) if w and w not in _DROP)
+
+
+def _names(name: str, live_sport: str) -> set:
+    """Comparable forms of one team name: as given, without club tokens, and its Korean name.
+    Used on both sides (live item and DB row), so English or Korean on either side can match."""
+    out = {_norm(name), _stripped(name)}
     try:
         from app import sportiq_team_pages as tp
-        ko = tp.korean_name(name_en, live_sport)
+        ko = tp.korean_name(name, live_sport)
         if ko:
             out.add(_norm(ko))
     except Exception:
@@ -140,11 +152,11 @@ _SELECT = ("SELECT m.id, s.code AS sport, ht.name AS home, at.name AS away, m.st
 
 def pick_by_names(cands: List[Dict[str, Any]], home: str, away: str, live_sport: str) -> Optional[Dict[str, Any]]:
     """The one candidate whose teams match; both sides when several match one side."""
-    h, a = _norm(home), _norm(away)
+    h, a = _names(home, live_sport), _names(away, live_sport)
     scored = []
     for c in cands:
-        hit_h = h in _names(c.get("home") or "", live_sport)
-        hit_a = a in _names(c.get("away") or "", live_sport)
+        hit_h = bool(h & _names(c.get("home") or "", live_sport))
+        hit_a = bool(a & _names(c.get("away") or "", live_sport))
         if hit_h or hit_a:
             scored.append((hit_h and hit_a, c))
     both = [c for ok, c in scored if ok]
@@ -218,7 +230,9 @@ def zynktv_day(kickoff: Optional[datetime], today: Optional[date] = None) -> Opt
 
 def links_for(live_id: str, sport: str, kst: str, home: str, away: str) -> Dict[str, Optional[str]]:
     kickoff = parse_kickoff(kst)
-    key = f"m:{live_id}:{sport}:{kst}"
+    # Football is matched by name, so the names are part of the key: a lookup with other
+    # (or made-up) names must not decide the result cached for this match.
+    key = f"m:{live_id}:{sport}:{kst}:{_norm(home)}:{_norm(away)}"
     cached, hit = _cget(key)
     if not cached:
         try:
