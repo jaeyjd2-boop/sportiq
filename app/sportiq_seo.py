@@ -574,8 +574,16 @@ def home_links_html() -> str:
     """Plain links for the home page's initial HTML.
 
     The home screen is drawn by JS, so crawlers saw almost no links. This is a
-    visible footer block (not hidden) with the public pages: live scores, the
-    league tables and the last 7 days of results (on zynktv, which owns date pages)."""
+    visible footer block with public reports, live scores, league tables and
+    links to the last 7 days of results on ZynkTV."""
+    reports = _cached(
+        "home:public-reports",
+        lambda: "".join(
+            f'<li><a href="/?post={post_id}">{_e(title.partition("] ")[2])}</a></li>'
+            for post_id, title in PUBLIC_REPORT_TITLES.items()
+            if public_report(post_id)
+        ),
+    )
     leagues = "".join(f'<li><a href="/standings/{s}">{_e(n)} 순위</a></li>' for s, (_c, n) in STANDINGS_LEAGUES.items())
     try:
         from app import sportiq_results_pages as rp
@@ -596,7 +604,8 @@ def home_links_html() -> str:
     )
     return (
         f'<style>{css}</style><nav id="{HOME_LINKS_ID}" aria-label="SportIQ 바로가기">'
-        '<h2>라이브스코어·순위표</h2><ul>'
+        + (f"<h2>공개 경기 분석과 리포트</h2><ul>{reports}</ul>" if reports else "")
+        + '<h2>라이브스코어·순위표</h2><ul>'
         '<li><a href="/livescore">오늘 라이브스코어</a></li><li><a href="/standings">리그 순위표 전체</a></li>'
         f"{leagues}</ul>"
         + (f"<h2>지난 경기 결과</h2><ul>{days}</ul>" if days else "")
