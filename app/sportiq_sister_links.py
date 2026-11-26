@@ -9,8 +9,8 @@ GET /api/sister/match-links and shows "next to read" links for the same match.
   and ergrow use the SportIQ DB match id (matches.id), the same database this
   app reads. ESPN-sourced rows store provider_match_id = "espn:<event id>",
   so those map exactly. Football rows come from football-data (no ESPN id);
-  they are matched by kickoff (within KICKOFF_WINDOW) and team name, English
-  or Korean, and only when the pick is unambiguous.
+  they are matched by kickoff (within KICKOFF_WINDOW) and both team names,
+  English or Korean, and only when the pick is unambiguous.
 * zynktv: https://zynktv.com/match/<id> (zynktv redirects to the full slug).
   Without a DB match, the zynktv day page for that KST date (its range is
   today-30 .. today+7).
@@ -61,16 +61,17 @@ _LOCK = threading.Lock()
 def _cget(key: str):
     with _LOCK:
         hit = _CACHE.get(key)
-    if hit and time.monotonic() - hit[0] < hit[1]:
-        return True, hit[2]
+        if hit and time.monotonic() - hit[0] < hit[1]:
+            _CACHE[key] = _CACHE.pop(key)   # recently used -> newest, so eviction drops unused keys first
+            return True, hit[2]
     return False, None
 
 
 def _cput(key: str, ttl: float, value: Any) -> None:
     with _LOCK:
         if len(_CACHE) >= MAX_CACHE:
-            # Drop the oldest quarter (dicts keep insertion order), not everything:
-            # many unknown keys must not wipe the links already found.
+            # Drop the least recently used quarter (_cget moves hits to the end), not
+            # everything: many unknown keys must not wipe the links already found.
             for k in list(_CACHE)[: MAX_CACHE // 4]:
                 _CACHE.pop(k, None)
         _CACHE.pop(key, None)
@@ -151,20 +152,22 @@ _SELECT = ("SELECT m.id, s.code AS sport, ht.name AS home, at.name AS away, m.st
 
 
 def pick_by_names(cands: List[Dict[str, Any]], home: str, away: str, live_sport: str) -> Optional[Dict[str, Any]]:
-    """The one candidate whose teams match; both sides when several match one side."""
+    """The one candidate whose teams match.
+
+    With both names given, both sides must match: Korean names are looked up loosely
+    ("Arsenal U21" -> 아스널), so one matching side could be another match in the same
+    kickoff window (Arsenal U21 vs Chelsea U21 -> Arsenal vs Brentford). Fewer links
+    is better than a wrong one. With only one name given, that side must match one row."""
     h, a = _names(home, live_sport), _names(away, live_sport)
-    scored = []
+    if not (h or a):
+        return None
+    hits = []
     for c in cands:
-        hit_h = bool(h & _names(c.get("home") or "", live_sport))
-        hit_a = bool(a & _names(c.get("away") or "", live_sport))
-        if hit_h or hit_a:
-            scored.append((hit_h and hit_a, c))
-    both = [c for ok, c in scored if ok]
-    if len(both) == 1:
-        return both[0]
-    if not both and len(scored) == 1:
-        return scored[0][1]
-    return None
+        hit_h = not h or bool(h & _names(c.get("home") or "", live_sport))
+        hit_a = not a or bool(a & _names(c.get("away") or "", live_sport))
+        if hit_h and hit_a:
+            hits.append(c)
+    return hits[0] if len(hits) == 1 else None
 
 
 def find_match(live_id: str, live_sport: str, kickoff: Optional[datetime], home: str, away: str) -> Optional[Dict[str, Any]]:
@@ -230,9 +233,11 @@ def zynktv_day(kickoff: Optional[datetime], today: Optional[date] = None) -> Opt
 
 def links_for(live_id: str, sport: str, kst: str, home: str, away: str) -> Dict[str, Optional[str]]:
     kickoff = parse_kickoff(kst)
-    # Football is matched by name, so the names are part of the key: a lookup with other
-    # (or made-up) names must not decide the result cached for this match.
-    key = f"m:{live_id}:{sport}:{kst}:{_norm(home)}:{_norm(away)}"
+    # Football is matched by name, so the names are part of its key: a lookup with other
+    # (or made-up) names must not decide the result cached for this match. ESPN sports map
+    # by event id, so their key leaves the names out (made-up names cannot add DB lookups).
+    names = f":{_norm(home)}:{_norm(away)}" if SPORT_CODES.get((sport or "").lower()) == "football" else ""
+    key = f"m:{live_id}:{sport}:{kst}{names}"
     cached, hit = _cget(key)
     if not cached:
         try:
