@@ -21,6 +21,12 @@ jobs:
     timeout-minutes: 10
     env:
       DATABASE_URL: postgresql+psycopg2://sportiq:sportiq_dev_password@localhost:5432/sportiq
+      # Same switches as tests/conftest.py (unittest does not load conftest): no background
+      # ESPN warm-up, IndexNow pings or jjangdoltv checks while tests run. The warm-up used
+      # urllib.request.urlopen in a thread and made test_indexnow's call counts flaky.
+      SPORTIQ_RESULTS_WARM: "0"
+      INDEXNOW_ENABLED: "0"
+      JJANGDOL_LINKS_ENABLED: "0"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
