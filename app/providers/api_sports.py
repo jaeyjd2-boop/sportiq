@@ -58,7 +58,30 @@ def active_sports():
     if not enabled():
         return set()
     wanted = {s.strip() for s in (settings.api_sports_sports or "").split(",") if s.strip()}
+    if wanted == {"none"}:      # key used only for Korean games (see korea_sports)
+        return set()
     return {s for s in SUPPORTED_SPORTS if not wanted or s in wanted}
+
+
+KOREA_COUNTRIES = {"south korea", "korea", "korea republic", "republic of korea"}
+
+
+def korea_sports():
+    """Sports fetched from API-SPORTS for their Korean games only (ESPN keeps the rest).
+
+    Needs the key; a sport already fully on API-SPORTS is left out because its
+    Korean games come with the full feed.
+    """
+    if not enabled():
+        return set()
+    wanted = {s.strip() for s in (settings.api_sports_korea or "").split(",") if s.strip()}
+    return {s for s in SUPPORTED_SPORTS if s in wanted} - active_sports()
+
+
+def is_korean(item):
+    """True for a normalized game whose API-SPORTS country is South Korea."""
+    name = str(((item or {}).get("country") or {}).get("name") or "").strip().lower()
+    return name in KOREA_COUNTRIES
 
 
 def map_status(short):
@@ -149,8 +172,12 @@ class ApiSportsClient:
                               ON CONFLICT(day, api) DO UPDATE SET used = api_request_budget.used + 1"""),
                       {"d": day, "a": sport})
 
-    def games(self, sport, day):
-        """Games on one UTC date. Raises BudgetExhausted when out of budget."""
+    def games(self, sport, day, korea_only=False):
+        """Games on one UTC date. Raises BudgetExhausted when out of budget.
+
+        korea_only keeps South Korean games only; it costs the same single
+        request, since /games?date= returns every league of the sport.
+        """
         if sport not in HOSTS:
             return []
         rem = self.remote_remaining.get(sport)
@@ -187,7 +214,8 @@ class ApiSportsClient:
         rows = data.get("response") if isinstance(data, dict) else None
         if not isinstance(rows, list):
             return []
-        return [x for x in (normalize_game(g, sport) for g in rows) if x]
+        out = [x for x in (normalize_game(g, sport) for g in rows) if x]
+        return [x for x in out if is_korean(x)] if korea_only else out
 
     def close(self):
         self.client.close()

@@ -17,9 +17,13 @@ class Settings(BaseSettings):
     multisport_schedule_minutes: int = 60
     multisport_live_minutes: int = 10
     api_sports_key: str = ""
-    api_sports_sports: str = ""          # comma list; empty = all supported
+    api_sports_sports: str = ""          # comma list; empty = all supported; "none" = none (Korean games only)
     api_sports_daily_budget: int = 80    # per sport API per UTC day
     api_sports_reserve: int = 10         # stop when the key has this many left
+    # Sports whose South Korean games (KBO, KBL, V-League...) come from API-SPORTS
+    # while the rest of that sport stays on ESPN, which has no Korean leagues.
+    # Only used with API_SPORTS_KEY; a sport already in api_sports_sports is skipped.
+    api_sports_korea: str = "baseball,basketball,volleyball"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property

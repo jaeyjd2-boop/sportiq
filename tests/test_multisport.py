@@ -211,7 +211,9 @@ def as_game(gid, home, away, when, short="NS", hs=None, as_=None, league=12):
             "scores": {"home": {"total": hs}, "away": {"total": as_}}}
 
 
-class ApiSportsTests(unittest.TestCase):
+class _ApiSportsBase(unittest.TestCase):
+    """Scratch DB, fake API-SPORTS transport, key set, basketball fully on API-SPORTS."""
+
     def setUp(self):
         self.eng = make_engine()
         self.requests = []
@@ -238,6 +240,8 @@ class ApiSportsTests(unittest.TestCase):
     def client(self):
         return api_sports.ApiSportsClient(self.eng, transport=self.transport)
 
+
+class ApiSportsTests(_ApiSportsBase):
     def test_no_key_means_no_client_and_no_requests(self):
         with patch.object(api_sports.settings, "api_sports_key", ""):
             self.assertEqual(api_sports.active_sports(), set())
@@ -288,6 +292,58 @@ class ApiSportsTests(unittest.TestCase):
             teams = [r[0] for r in c.execute(text("SELECT provider_team_id FROM teams ORDER BY id")).all()]
         self.assertEqual([tuple(r) for r in rows], [("as:9", "LIVE", 50.0)])
         self.assertEqual(teams, ["as:91", "as:92"])
+
+
+class KoreaLeagueTests(_ApiSportsBase):
+    """Korean games from API-SPORTS while the rest of the sport stays on ESPN."""
+
+    def kr_game(self, gid, home, away, when, short="NS", hs=None, as_=None):
+        g = as_game(gid, home, away, when, short, hs, as_, league=91)
+        g["league"]["name"], g["country"]["name"] = "KBL", "South Korea"
+        return g
+
+    def test_no_key_no_korea_sports(self):
+        with patch.object(api_sports.settings, "api_sports_key", ""):
+            self.assertEqual(api_sports.korea_sports(), set())
+            self.assertEqual(multisport._collect_api_sports_days(None, [datetime.now(timezone.utc).date()],
+                                                                 api_sports.korea_sports(), korea_only=True), {})
+        self.assertEqual(self.requests, [])
+
+    def test_korea_sports_skip_sports_fully_on_api_sports(self):
+        # setUp puts basketball fully on API-SPORTS: its Korean games come with the full feed.
+        self.assertEqual(api_sports.korea_sports(), {"baseball", "volleyball"})
+        with patch.object(api_sports.settings, "api_sports_sports", "none"):
+            self.assertEqual(api_sports.active_sports(), set())
+            self.assertEqual(api_sports.korea_sports(), {"baseball", "basketball", "volleyball"})
+            self.assertEqual(multisport.source_for("basketball"), "espn")
+
+    def test_korea_only_stores_korean_games_without_adoption(self):
+        when = datetime.now(timezone.utc).replace(microsecond=0)
+        self.games = [as_game(1, "Boston Celtics", "Denver Nuggets", when.isoformat()),
+                      self.kr_game(2, "Seoul SK Knights", "Busan KCC Egis", when.isoformat(), "FT", 81, 77)]
+        with patch.object(api_sports.settings, "api_sports_sports", "none"):
+            res = multisport._collect_api_sports_days(self.client(), [when.date()], api_sports.korea_sports() & {"basketball"},
+                                                      korea_only=True)
+        self.assertEqual(res, {"as-kr:basketball": 1})
+        self.assertEqual(len(self.requests), 1)
+        with self.eng.connect() as c:
+            rows = c.execute(text("""SELECT m.provider_match_id, l.name, l.country, m.status, m.home_score
+                                     FROM matches m JOIN leagues l ON l.id=m.league_id""")).all()
+        self.assertEqual([tuple(r) for r in rows], [("as:2", "KBL", "South Korea", "FT", 81.0)])
+
+    def test_empty_sport_set_means_none(self):
+        self.assertEqual(multisport._collect_api_sports_days(self.client(), [datetime.now(timezone.utc).date()], set()), {})
+        self.assertEqual(self.requests, [])
+
+    def test_live_poll_refetches_korean_games(self):
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        self.games = [self.kr_game(3, "Seoul SK Knights", "Busan KCC Egis", now.isoformat(), "Q2", 40, 38)]
+        with patch.object(api_sports.settings, "api_sports_sports", "none"):
+            multisport._collect_api_sports_days(self.client(), [now.date()], {"basketball"}, korea_only=True)
+            self.requests.clear()
+            res = multisport.collect_live(espn_client=object(), as_client=self.client(), now=now)
+        self.assertEqual(res, {"as-kr:basketball": 1})
+        self.assertEqual(len(self.requests), 1)
 
 
 class WorkerJobTests(unittest.TestCase):
