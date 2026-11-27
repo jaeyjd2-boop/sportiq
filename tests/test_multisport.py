@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, text
 
 from app import collector, multisport
-from app.providers import api_sports, espn
+from app.providers import api_sports, espn, kr_scoreboard
 
 FIX = Path(__file__).parent / "fixtures" / "espn"
 LEAGUE = {lg.key: lg for lg in espn.LEAGUES}
@@ -136,7 +136,9 @@ class CollectAndApiTests(unittest.TestCase):
     def setUp(self):
         self.eng = make_engine()
         self.patches = [patch.object(collector, "engine", self.eng), patch.object(multisport, "engine", self.eng),
-                        patch.object(api_sports.settings, "api_sports_key", "")]
+                        patch.object(api_sports.settings, "api_sports_key", ""),
+                        # no network: the Korean scoreboard has its own tests (KoreaScoreboardTests)
+                        patch.object(multisport.settings, "kr_scoreboard_enabled", False)]
         for p in self.patches:
             p.start()
 
@@ -344,6 +346,106 @@ class KoreaLeagueTests(_ApiSportsBase):
             res = multisport.collect_live(espn_client=object(), as_client=self.client(), now=now)
         self.assertEqual(res, {"as-kr:basketball": 1})
         self.assertEqual(len(self.requests), 1)
+
+
+def sb_item(code, league, home, away, when_kst, state="pre", hs=0, as_=0, badge="예정", venue="서울월드컵경기장"):
+    """One billnojay scoreboard item as /api/member/scoreboard-v30 returns it (2026-11-27 shape)."""
+    return {"id": "rt-x", "sport": "soccer" if code.startswith("KLEAGUE") else "volleyball", "league": league,
+            "league_code": code, "state": state, "status_badge": badge, "match_dt_full_kst": when_kst,
+            "home": home, "away": away, "home_score": hs, "away_score": as_, "venue": venue,
+            "ai": {"home_pct": 50, "is_sample": True}}
+
+
+class KoreaScoreboardTests(unittest.TestCase):
+    """Korean leagues from billnojay's scoreboard (no key)."""
+
+    def setUp(self):
+        self.eng = make_engine()
+        self.requests = []
+        today = datetime.now(timezone(timedelta(hours=9)))
+        self.day = today.strftime("%Y.%m.%d")
+        self.pages = {
+            0: [sb_item("KLEAGUE", "K리그1", "FC 서울", "대전 하나 시티즌", f"{self.day} (토) 14:00 KST"),
+                sb_item("VLEAGUE_W", "V-리그 여자부", "흥국생명", "GS칼텍스", f"{self.day} (토) 16:00 KST",
+                        state="post", hs=3, as_=1, badge="종료"),
+                {"league_code": "SOCCER_ALL", "home": "Arsenal", "away": "Chelsea",
+                 "match_dt_full_kst": f"{self.day} (토) 21:00 KST"}],
+        }
+
+        def handler(request):
+            off = int(request.url.params.get("date_offset", "0"))
+            self.requests.append(off)
+            return httpx.Response(200, json={"ok": True, "items": self.pages.get(off, [])})
+        self.transport = httpx.MockTransport(handler)
+        self.patches = [patch.object(collector, "engine", self.eng), patch.object(multisport, "engine", self.eng),
+                        patch.object(api_sports.settings, "api_sports_key", ""),
+                        patch.object(multisport.settings, "kr_scoreboard_enabled", True)]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in reversed(self.patches):
+            p.stop()
+
+    def client(self):
+        return kr_scoreboard.ScoreboardClient("https://billnojay.test/api/member/scoreboard-v30", transport=self.transport)
+
+    def test_normalize_korean_only_with_stable_ids(self):
+        a = kr_scoreboard.normalize(self.pages[0][0])
+        b = kr_scoreboard.normalize(dict(self.pages[0][0], venue="다른 표기"))
+        self.assertEqual(a[0], "football")
+        f = a[1]
+        self.assertEqual(f["fixture"]["id"], b[1]["fixture"]["id"])          # same game, same id
+        self.assertTrue(f["fixture"]["id"].startswith("kr:"))
+        self.assertEqual(f["league"]["name"], "K League 1")
+        self.assertEqual(f["country"]["name"], "South Korea")
+        self.assertEqual(f["teams"]["home"]["name"], "FC 서울")
+        self.assertIn("kleague.com", f["teams"]["home"]["logo"])
+        self.assertEqual(f["goals"], {"home": None, "away": None})            # no score before kickoff
+        self.assertEqual(f["fixture"]["date"][11:16], "05:00")                # 14:00 KST = 05:00 UTC
+        post = kr_scoreboard.normalize(self.pages[0][1])[1]
+        self.assertEqual(post["fixture"]["status"]["short"], "FT")
+        self.assertEqual(post["goals"], {"home": 3, "away": 1})
+        self.assertIsNone(kr_scoreboard.normalize(self.pages[0][2]))         # not a Korean league
+        self.assertIsNone(kr_scoreboard.normalize({"league_code": "KLEAGUE", "home": "A"}))
+
+    def test_collect_stores_korean_games(self):
+        res = multisport.collect_korea(self.client(), offsets=(0, 1))
+        self.assertEqual(res["kr:football"], 1)
+        self.assertEqual(res["kr:volleyball"], 1)
+        self.assertEqual(sorted(self.requests), [0, 1])
+        with self.eng.connect() as c:
+            rows = c.execute(text("""SELECT s.code, l.name, l.country, ht.name, ht.logo_url, m.status, m.home_score
+                                     FROM matches m JOIN sports s ON s.id=m.sport_id JOIN leagues l ON l.id=m.league_id
+                                     JOIN teams ht ON ht.id=m.home_team_id ORDER BY s.code""")).all()
+        self.assertEqual([(r[0], r[1], r[2], r[3], r[5]) for r in rows],
+                         [("football", "K League 1", "South Korea", "FC 서울", "NS"),
+                          ("volleyball", "V-League Women", "South Korea", "흥국생명", "FT")])
+        self.assertIn("kovo.co.kr", rows[1][4])
+        # running again updates the same rows
+        multisport.collect_korea(self.client(), offsets=(0,))
+        with self.eng.connect() as c:
+            self.assertEqual(c.execute(text("SELECT COUNT(*) FROM matches")).scalar(), 2)
+
+    def test_sports_served_by_api_sports_are_skipped(self):
+        with patch.object(api_sports.settings, "api_sports_key", "k"), \
+             patch.object(api_sports.settings, "api_sports_sports", "none"):
+            # API-SPORTS brings Korean baseball/basketball/volleyball; football stays on the scoreboard
+            self.assertEqual(multisport.korea_scoreboard_sports(), {"football"})
+            res = multisport.collect_korea(self.client(), offsets=(0,))
+        self.assertEqual(res, {"kr:football": 1})
+        with patch.object(multisport.settings, "kr_scoreboard_enabled", False):
+            self.assertEqual(multisport.collect_korea(self.client(), offsets=(0,)), {})
+
+    def test_live_poll_refreshes_korean_games(self):
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        kst = (now + timedelta(hours=9)).strftime("%Y.%m.%d (토) %H:%M KST")
+        self.pages[0] = [sb_item("KLEAGUE", "K리그1", "FC 서울", "대전 하나 시티즌", kst, state="in", hs=1, badge="전반")]
+        multisport.collect_korea(self.client(), offsets=(0,))
+        self.requests.clear()
+        res = multisport.collect_live(espn_client=object(), as_client=object(), now=now, kr_client=self.client())
+        self.assertEqual(res, {"kr:football": 1})
+        self.assertEqual(sorted(self.requests), [-1, 0])
 
 
 class WorkerJobTests(unittest.TestCase):

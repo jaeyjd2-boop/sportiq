@@ -20,6 +20,10 @@ South Korean games from API-SPORTS (same /games?date= request, filtered by
 country), stored as as:... rows next to the ESPN rows of that sport. No
 adoption runs for them: ESPN never has those games.
 
+Without a key, Korean games come from billnojay's own live scoreboard
+(providers.kr_scoreboard) as kr:... rows, for every Korean sport that
+API-SPORTS does not serve. Those rows skip adoption as well.
+
 Statuses and scores are always the provider's values.
 """
 import logging
@@ -31,7 +35,7 @@ from sqlalchemy import bindparam, text
 from app.collector import store_fixtures
 from app.config import settings
 from app.db import engine
-from app.providers import api_sports, espn
+from app.providers import api_sports, espn, kr_scoreboard
 
 log = logging.getLogger("sportiq-multisport")
 
@@ -143,7 +147,7 @@ def _store(items, sport, prefix, adopt=True):
     return store_fixtures(good, sport_code=sport)
 
 
-def collect_schedule(espn_client=None, as_client=None, now=None):
+def collect_schedule(espn_client=None, as_client=None, now=None, kr_client=None):
     """Yesterday..lookahead for every non-football sport from its source."""
     first, last = window_dates(now)
     result = {}
@@ -161,10 +165,38 @@ def collect_schedule(espn_client=None, as_client=None, now=None):
         days = [first + timedelta(days=i) for i in range((last - first).days + 1)] if full else [now_dt.date()]
         result.update(_collect_api_sports_days(as_client, days))
         result.update(_collect_api_sports_days(as_client, days, api_sports.korea_sports(), korea_only=True))
+        # Korean scoreboard: yesterday-1 .. +5 KST days every run (one cheap request per day, same service).
+        result.update(collect_korea(kr_client, range(-2, 6)))
     finally:
         if own_espn:
             espn_client.close()
     return result
+
+
+def korea_scoreboard_sports():
+    """Korean sports read from the scoreboard: all of them unless API-SPORTS already brings their Korean games."""
+    if not settings.kr_scoreboard_enabled:
+        return set()
+    via_api = api_sports.active_sports() | api_sports.korea_sports()
+    return set(kr_scoreboard.SPORTS) - via_api
+
+
+def collect_korea(kr_client=None, offsets=range(-2, 6), sports=None):
+    """Store Korean games from the scoreboard for the given KST day offsets. {"kr:<sport>": stored}."""
+    sports = korea_scoreboard_sports() if sports is None else set(sports) & korea_scoreboard_sports()
+    if not sports:
+        return {}
+    own = kr_client is None
+    kr_client = kr_client or kr_scoreboard.ScoreboardClient(settings.kr_scoreboard_url)
+    out = {}
+    try:
+        by_sport = kr_client.window(offsets)
+        for sport in sorted(sports):
+            out["kr:" + sport] = _store(by_sport.get(sport, []), sport, "kr:", adopt=False)
+    finally:
+        if own:
+            kr_client.close()
+    return out
 
 
 def _collect_api_sports_days(as_client, days, sports=None, korea_only=False):
@@ -193,14 +225,15 @@ def _collect_api_sports_days(as_client, days, sports=None, korea_only=False):
 
 
 def sports_needing_live_poll(now=None):
-    """Non-football sports with a match live now or starting within 15 min."""
+    """Non-football sports (and Korean football) with a match live now or starting within 15 min."""
     now = now or datetime.now(timezone.utc)
     with engine.connect() as c:
         rows = c.execute(text("""
             SELECT DISTINCT s.code AS sport, l.provider_league_id AS league
             FROM matches m JOIN sports s ON s.id=m.sport_id JOIN leagues l ON l.id=m.league_id
-            WHERE s.code <> 'football'
-              AND (m.provider_match_id LIKE 'espn:%' OR m.provider_match_id LIKE 'as:%')
+            WHERE (s.code <> 'football' OR m.provider_match_id LIKE 'kr:%')
+              AND (m.provider_match_id LIKE 'espn:%' OR m.provider_match_id LIKE 'as:%'
+                   OR m.provider_match_id LIKE 'kr:%')
               AND ((m.status IN :live AND m.start_time >= :old)
                    OR (m.status NOT IN :final AND m.start_time BETWEEN :lo AND :hi))
         """).bindparams(bindparam("live", expanding=True), bindparam("final", expanding=True)), {
@@ -210,7 +243,7 @@ def sports_needing_live_poll(now=None):
     return {(r["sport"], str(r["league"])) for r in rows}
 
 
-def collect_live(espn_client=None, as_client=None, now=None):
+def collect_live(espn_client=None, as_client=None, now=None, kr_client=None):
     """Every 10 min: refetch only leagues that have live/imminent matches (today ±1)."""
     now = now or datetime.now(timezone.utc)
     targets = sports_needing_live_poll(now)
@@ -238,4 +271,7 @@ def collect_live(espn_client=None, as_client=None, now=None):
     kr_sports = {sp for sp, lg in targets if lg.startswith("as:")} & api_sports.korea_sports()
     if kr_sports:
         result.update(_collect_api_sports_days(as_client, [today], kr_sports, korea_only=True))
+    sb_sports = {sp for sp, lg in targets if lg.startswith("kr:")}
+    if sb_sports:
+        result.update(collect_korea(kr_client, (-1, 0), sb_sports))
     return result

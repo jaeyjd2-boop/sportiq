@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # while the rest of that sport stays on ESPN, which has no Korean leagues.
     # Only used with API_SPORTS_KEY; a sport already in api_sports_sports is skipped.
     api_sports_korea: str = "baseball,basketball,volleyball"
+    # Korean leagues from billnojay's own live scoreboard (no key). A sport whose Korean
+    # games come from API-SPORTS (key set) is skipped here so games are not stored twice.
+    kr_scoreboard_enabled: bool = True
+    kr_scoreboard_url: str = "https://billnojay.com/api/member/scoreboard-v30"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
