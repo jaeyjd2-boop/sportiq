@@ -1255,6 +1255,50 @@ def _fetch_espn_standings(league_code):
             r["zone"] = _zone_label(sport, i, len(rows))
     return rows
 
+_KLEAGUE_TEAM_FULL = {
+    "서울": "FC 서울", "울산": "울산 HD", "대전": "대전 하나 시티즌", "인천": "인천 유나이티드",
+"강원": "강원 FC", "전북": "전북 현대", "제주": "제주 SK", "안양": "FC 안양",
+"포항": "포항 스틸러스", "김천": "김천 상무", "부천": "부천 FC 1995", "광주": "광주 FC",
+"대구": "대구 FC", "수원FC": "수원 FC", "수원": "수원 삼성",
+ }
+
+
+def _fetch_daum_kleague_standings():
+    html_txt = _fetch_text("https://sports.daum.net/record/kl", timeout=5)
+    if not html_txt:
+        return None
+    seen_ranks = set()
+    rows = []
+    for tr_m in re.finditer(r"<tr\b[^>]*>(.*?)</tr>", html_txt, flags=re.I | re.S):
+        tds = [
+            re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", td)).strip()
+            for td in re.findall(r"<td\b[^>]*>(.*?)</td>", tr_m.group(1), flags=re.I | re.S)
+        ]
+        if len(tds) < 10 or not re.match(r"^\d{1,2}$", tds[0]):
+            continue
+        try:
+            rk = int(tds[0])
+            if rk < 1 or rk > 16 or rk in seen_ranks:
+                continue
+            raw_tm = re.sub(r"^팀\s*로고\s*", "", tds[1]).strip()
+            if not raw_tm:
+                continue
+            tfull = _KLEAGUE_TEAM_FULL.get(raw_tm, raw_tm)
+            pts, gp, w, d, l, gf, ga, gd = (int(tds[i]) for i in range(2, 10))
+        except Exception:
+            continue
+        seen_ranks.add(rk)
+        zone = "ACLE" if rk <= 2 else ("ACL2" if rk == 3 else ("승강 PO" if rk >= 11 else ""))
+        rows.append({
+            "rank": rk, "zone": zone, "team": tfull, "team_full": tfull,
+            "gp": gp, "w": w, "d": d, "l": l, "gf": gf, "ga": ga, "gd": gd,
+            "form": [], "pts_label": f"{pts}점", "_pts": pts,
+        })
+    if len(rows) < 10:
+        return None
+    rows.sort(key=lambda r: r["rank"])
+    return rows
+
 
 @router.get("/standings")
 def get_standings(league: str = Query("EPL")):
@@ -1293,6 +1337,10 @@ def get_standings(league: str = Query("EPL")):
     sport, _, league_full = LEAGUE_CONFIG[lg]
     rows = _fetch_espn_standings(lg)
     source = "ESPN Live API"
+    if not rows and lg == "KLEAGUE":
+        rows = _fetch_daum_kleague_standings()
+        if rows:
+            source = "Daum 스포츠 공식 기록실"
     is_sample = False
     unavailable = False
     if not rows and lg not in _FALLBACK_STANDINGS:
