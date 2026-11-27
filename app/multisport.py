@@ -14,6 +14,12 @@ rewritten. The normal upsert then updates that same row, so history and
 team ids (used by /analysis) carry over. Names that differ between providers
 are not merged; those matches stay as separate rows under the old source.
 
+Korean leagues: ESPN has no KBO, KBL or V-League. With the key set, the
+sports in API_SPORTS_KOREA (that are not fully on API-SPORTS) also get their
+South Korean games from API-SPORTS (same /games?date= request, filtered by
+country), stored as as:... rows next to the ESPN rows of that sport. No
+adoption runs for them: ESPN never has those games.
+
 Statuses and scores are always the provider's values.
 """
 import logging
@@ -128,11 +134,12 @@ def adopt_existing(items, sport, new_prefix):
     return adopted
 
 
-def _store(items, sport, prefix):
+def _store(items, sport, prefix, adopt=True):
     good = [x for x in items if x and x["fixture"]["id"].startswith(prefix)]
     if not good:
         return 0
-    adopt_existing(good, sport, prefix)
+    if adopt:
+        adopt_existing(good, sport, prefix)
     return store_fixtures(good, sport_code=sport)
 
 
@@ -153,14 +160,16 @@ def collect_schedule(espn_client=None, as_client=None, now=None):
         full = now_dt.hour % 6 == 0
         days = [first + timedelta(days=i) for i in range((last - first).days + 1)] if full else [now_dt.date()]
         result.update(_collect_api_sports_days(as_client, days))
+        result.update(_collect_api_sports_days(as_client, days, api_sports.korea_sports(), korea_only=True))
     finally:
         if own_espn:
             espn_client.close()
     return result
 
 
-def _collect_api_sports_days(as_client, days, sports=None):
-    sports = sorted(sports or api_sports.active_sports())
+def _collect_api_sports_days(as_client, days, sports=None, korea_only=False):
+    """sports=None means every sport fully on API-SPORTS; an empty set means none."""
+    sports = sorted(api_sports.active_sports() if sports is None else sports)
     if not sports:
         return {}
     own = as_client is None
@@ -171,11 +180,12 @@ def _collect_api_sports_days(as_client, days, sports=None):
             total = 0
             for d in days:
                 try:
-                    total += _store(as_client.games(sport, d.isoformat()), sport, "as:")
+                    total += _store(as_client.games(sport, d.isoformat(), korea_only=korea_only),
+                                    sport, "as:", adopt=not korea_only)
                 except api_sports.BudgetExhausted as exc:
                     log.warning("api-sports budget: %s", exc)
                     break
-            out["as:" + sport] = total
+            out[("as-kr:" if korea_only else "as:") + sport] = total
     finally:
         if own:
             as_client.close()
@@ -225,4 +235,7 @@ def collect_live(espn_client=None, as_client=None, now=None):
     as_sports = {sp for sp, lg in targets if source_for(sp) == "api_sports"}
     if as_sports:
         result.update(_collect_api_sports_days(as_client, [today], as_sports))
+    kr_sports = {sp for sp, lg in targets if lg.startswith("as:")} & api_sports.korea_sports()
+    if kr_sports:
+        result.update(_collect_api_sports_days(as_client, [today], kr_sports, korea_only=True))
     return result
