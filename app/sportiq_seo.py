@@ -15,9 +15,11 @@ or unavailable table renders a notice instead of rows.
 from __future__ import annotations
 
 import html
+import json
 import re
 import threading
 import time
+from urllib.parse import parse_qs
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Request
@@ -34,12 +36,7 @@ HOME_DESC = (
 )
 SHORT_DESC = "실시간 라이브스코어, 리그 순위표, 승부예측 투표와 응원톡을 가입 없이 보는 스포츠 커뮤니티"
 NOINDEX = "noindex, follow"
-PUBLIC_REPORT_TITLES = {
-    "1372": "[00:00 글로벌 TOP 20 종합 리포트]",
-    "1374": "[00:00 커뮤니티 자동분석] 아스널 vs 보루시아 도르트문트",
-    "1376": "[00:00 커뮤니티 자동분석] 플로리다 팬서스 vs 에드먼턴 오일러스",
-}
-
+PUBLIC_REPORT_TITLES: Dict[str, str] = {}
 
 def public_report(post_id: str) -> Optional[Dict[str, str]]:
     title_prefix = PUBLIC_REPORT_TITLES.get(post_id)
@@ -68,8 +65,9 @@ def public_report_response(post_id: str, report: Dict[str, str]) -> HTMLResponse
         f"/?post={post_id}", f'{report["title"]} | SportIQ', report["desc"], report["title"],
         f'<article><p class="muted">{_e(report["author"])}</p>{paragraphs}</article>',
     )
-    return HTMLResponse(page, headers={"Cache-Control": "private, no-store"})
-
+    page = set_robots(page, NOINDEX)
+    return HTMLResponse(page, headers={"Cache-Control": "private, no-store", "X-Robots-Tag": NOINDEX})
+  
 # URL slug -> datacenter league code. ESPN-backed tables only: leagues whose
 # table is always an example (KBO, NPB, LCK, V-리그) get no public page.
 STANDINGS_LEAGUES: Dict[str, Tuple[str, str]] = {
@@ -120,10 +118,21 @@ def set_robots(html_text: str, content: str) -> str:
     tag = f'<meta name="robots" content="{_e(content)}" />'
     pat = re.compile(r'<meta\s+name=["\']robots["\'][^>]*>', re.I)
     if pat.search(html_text):
-        return pat.sub(lambda _m: tag, html_text)
-    if "</head>" in html_text:
-        return html_text.replace("</head>", f"  {tag}\n</head>", 1)
-    return html_text
+        out = pat.sub(lambda _m: tag, html_text)
+    elif "</head>" in html_text:
+        out = html_text.replace("</head>", f"  {tag}\n</head>", 1)
+    else:
+        out = html_text
+    if content == NOINDEX and "?post=" in out:
+        out = re.sub(
+            r'<link\s+rel=["\']canonical["\']\s+href=["\']https://billnojay\.com/\?post=[^"\']*["\']\s*/?>',
+            '<link rel="canonical" href="https://billnojay.com/" />',
+            out,
+            flags=re.I,
+        )
+    out = out.replace("[00:00 글로벌 TOP 20 종합 리포트]", "[데일리 글로벌 TOP 20 종합 리포트]")
+    out = out.replace("[00:00 커뮤니티 자동분석]", "[AI 데일리 자동분석]")
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -273,6 +282,7 @@ def build_livescore_html() -> str:
         "오늘 축구·농구·야구·배구·하키·테니스 경기의 실시간 스코어와 경기 상태를 리그별로 확인하세요. 진행 중인 경기를 먼저 보여 줍니다.",
         "오늘 라이브스코어 · 실시간 스포츠 스코어",
         intro + "".join(blocks),
+        ld={"@context": "https://schema.org", "@type": "CollectionPage", "name": "라이브스코어 · 오늘 실시간 스포츠 스코어 | SportIQ", "url": f"{SITE}/livescore", "inLanguage": "ko-KR"},
     )
 
 
@@ -417,21 +427,50 @@ def build_standings_index_html() -> str:
         "프리미어리그, 라리가, 분데스리가, K리그, 챔피언스리그, NBA, MLB, NHL, NFL 등 주요 리그의 현재 순위표를 한곳에서 보세요.",
         "리그 순위표",
         '<p class="muted">리그를 고르면 현재 순위표를 볼 수 있습니다.</p>'
-        f'<h2>축구·농구·야구·하키·미식축구</h2><ul class="grid">{items}</ul>',
+        f'<h2>축구·농구·야구·하키·미식축구</h2><ul class="grid">{items}</ul>',,
+        ld={"@context": "https://schema.org", "@type": "CollectionPage", "name": "리그 순위표 · EPL·K리그·NBA·MLB 실시간 순위 | SportIQ", "url": f"{SITE}/standings", "inLanguage": "ko-KR"},
     )
 
 
 # --------------------------------------------------------------------------
 # Routes
 # --------------------------------------------------------------------------
+def _param_guarded_response(page: str, request: Request) -> HTMLResponse:
+    if request and request.query_params:
+        return HTMLResponse(
+            set_robots(page, NOINDEX),
+            status_code=200,
+            headers={"Cache-Control": "private, no-store", "X-Robots-Tag": NOINDEX},
+        )
+    return _response(page)
+
+
+@router.api_route("/robots.txt", methods=["GET", "HEAD"])
+def seo_robots_txt() -> Response:
+    txt = (
+        "User-agent: *\nAllow: /\nAllow: /og-cover.png\nAllow: /rss.xml\n"
+        "Allow: /sitemap.xml\nAllow: /sitemap-pages.xml\nAllow: /sitemap-teams.xml\n"
+        "Allow: /pwa-icon-192.png\nAllow: /pwa-icon-512.png\nAllow: /apple-touch-icon.png\n"
+        "Allow: /manifest.webmanifest\nAllow: /api/member/p0p1-upgrade-bundle\nAllow: /api/member/p0p1-upgrade.js\n"
+        "Disallow: /api/admin/\nDisallow: /api/presence/\nDisallow: /api/datacenter/\n"
+        "Disallow: /api/pro-lab/\nDisallow: /api/auto-analyst/\nDisallow: /api/member/scoreboard\n"
+        "Disallow: /api/member/auto-shorts\nDisallow: /api/member/match-h2h\n"
+        "Disallow: /api/member/live-sources-diag\nDisallow: /api/wp/member/verify\n"
+        "Disallow: /api/wp/member/reward\nDisallow: /api/member/sync\n"
+        f"Sitemap: {SITE}/sitemap.xml\n"
+    )
+    return Response(content=txt, media_type="text/plain; charset=utf-8", headers={"Cache-Control": "public, max-age=3600"})
+
+
+          
 @router.api_route("/livescore", methods=["GET", "HEAD"], response_class=HTMLResponse)
-def seo_livescore_page():
-    return _response(_cached("livescore", build_livescore_html))
+def seo_livescore_page(request: Request):
+    return _param_guarded_response(_cached("livescore", build_livescore_html), request)
 
 
 @router.api_route("/standings", methods=["GET", "HEAD"], response_class=HTMLResponse)
-def seo_standings_index_page():
-    return _response(_cached("standings", build_standings_index_html))
+def seo_standings_index_page(request: Request):
+    return _param_guarded_response(_cached("standings", build_standings_index_html), request)
 
 
 @router.api_route("/standings/{league}", methods=["GET", "HEAD"], response_class=HTMLResponse)
@@ -445,8 +484,10 @@ def seo_standings_league_page(league: str, request: Request):
             "순위표를 찾을 수 없습니다",
             '<p><a href="/standings">리그 순위표 목록</a>으로 이동해 주세요.</p>',
         )
-        return HTMLResponse(set_robots(page, NOINDEX), status_code=404)
+        return HTMLResponse(set_robots(page, NOINDEX), status_code=404, headers={"X-Robots-Tag": NOINDEX})
     page = _cached(f"standings:{slug}", lambda: build_standings_league_html(slug) or "")
+    if request and request.query_params:
+        return _param_guarded_response(page, request)
     resp = _response(page)
     if f'content="{NOINDEX}"' in page:
         resp.headers["X-Robots-Tag"] = NOINDEX
@@ -469,13 +510,15 @@ def _sitemap_entries(kind: str) -> List[Tuple[str, str, str, str]]:
     """(path, lastmod date, changefreq, priority) for one sub-sitemap."""
     from datetime import datetime as _dt, timedelta as _td, timezone as _tz
 
-    today = _dt.now(_tz(_td(hours=9))).date().isoformat()
+    now_kst = _dt.now(_tz(_td(hours=9)))
+    today = now_kst.date().isoformat()
+    hour_iso = now_kst.strftime("%Y-%m-%dT%H:00:00+09:00")
     if kind == "pages":
-        out = [("/", today, "hourly", "1.0")]
+        out = [("/", hour_iso, "hourly", "1.0")]
         for p, f, pr in PUBLIC_PATHS:
             if p.startswith("/standings/") and not standings_has_data(p.rsplit("/", 1)[1]):
                 continue          # noindex page: not in the sitemap
-            out.append((p, today, f, pr))
+            out.append((p, hour_iso if p == "/livescore" else today, f, pr))
         for post_id in PUBLIC_REPORT_TITLES:
             if public_report(post_id):
                 out.append((f"/?post={post_id}", "", "monthly", "0.5"))
@@ -529,10 +572,11 @@ def _xml(body: str) -> Response:
 def sitemap_index():
     """Sitemap index: pages (home, live scores, standings) and teams."""
     from datetime import datetime as _dt, timedelta as _td, timezone as _tz
-
-    today = _dt.now(_tz(_td(hours=9))).date().isoformat()
+    now_kst = _dt.now(_tz(_td(hours=9)))
+    today = now_kst.date().isoformat()
+    hour_iso = now_kst.strftime("%Y-%m-%dT%H:00:00+09:00")
     items = "".join(
-        f"  <sitemap>\n    <loc>{SITE}/sitemap-{k}.xml</loc>\n    <lastmod>{today}</lastmod>\n  </sitemap>\n"
+        f"  <sitemap>\n    <loc>{SITE}/sitemap-{k}.xml</loc>\n    <lastmod>{hour_iso if k == "pages" else today}</lastmod>\n  </sitemap>\n"
         for k in SITEMAP_KINDS
     )
     return _xml(f'<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{items}</sitemapindex>\n')
@@ -612,10 +656,61 @@ def home_links_html() -> str:
         + "</nav>"
     )
 
+def _clean_home_head(html_text: str) -> str:
+    if not html_text or "</head>" not in html_text:
+        return html_text
+    head_end = html_text.find("</head>")
+    head = html_text[:head_end]
+    tail = html_text[head_end:]
+    robots_pat = re.compile(r'[ \t]*<meta\s+name=["\']robots["\'][^>]*>\s*\n?', re.I)
+    m_rob = robots_pat.search(head)
+    m_desc = re.search(r'<meta\s+name=["\']description["\'][^>]*>', head, re.I)
+    if m_rob and m_desc:
+        rob_tag = m_rob.group(0).strip()
+        head = robots_pat.sub("", head)
+        head = re.sub(
+            r'(<meta\s+name=["\']description["\'][^>]*>)',
+            lambda m: f"{m.group(1)}\n  {rob_tag}",
+            head,
+            count=1,
+            flags=re.I,
+        )
+
+    def _strip_search_action(m: re.Match) -> str:
+        prefix, raw_json, suffix = m.group(1), m.group(2), m.group(3)
+        try:
+            data = json.loads(raw_json)
+        except Exception:
+            return m.group(0)
+        changed = False
+        if isinstance(data, dict):
+            graph = data.get("@graph")
+            if isinstance(graph, list):
+                for node in graph:
+                    if isinstance(node, dict) and node.get("@type") == "WebSite" and "potentialAction" in node:
+                        node.pop("potentialAction", None)
+                        changed = True
+            elif data.get("@type") == "WebSite" and "potentialAction" in data:
+                data.pop("potentialAction", None)
+                changed = True
+        if not changed:
+            return m.group(0)
+        return f"{prefix}{json.dumps(data, ensure_ascii=False)}{suffix}"
+
+    out = re.sub(
+        r'(<script\b[^>]*type=["\']application/ld\+json["\'][^>]*>)(.*?)(</script>)',
+        _strip_search_action,
+        head + tail,
+        flags=re.I | re.S,
+    )
+    return out
+
+
 
 def inject_home_links(html_text: str) -> str:
     if not html_text or HOME_LINKS_ID in html_text or "</body>" not in html_text:
         return html_text
+    html_text = _clean_home_head(html_text)
     i = html_text.rfind("</body>")
     return html_text[:i] + home_links_html() + "\n" + html_text[i:]
 
@@ -641,18 +736,6 @@ def rss_items(pub_rfc_xml: str) -> List[str]:
 
 
 class ForwardedProtoMiddleware:
-    """Use X-Forwarded-Proto for the URL scheme.
-
-    TLS ends at Render's edge, so the app sees http, and redirects it builds
-    (e.g. /sitemap.xml/ -> /sitemap.xml) pointed at http://. Only the scheme is
-    taken from the header; the client address is left alone (see
-    app/sportiq_client_ip.py).
-
-    HTTPS responses also get Strict-Transport-Security (HSTS_VALUE), as
-    ergrow.com and zynktv.com send. It is never added to plain-http
-    responses, where browsers ignore it anyway.
-    """
-
     def __init__(self, app):
         self.app = app
 
@@ -665,13 +748,52 @@ class ForwardedProtoMiddleware:
                         ws = scope["type"] == "websocket"
                         scope = dict(scope, scheme=("wss" if proto == "https" else "ws") if ws else proto)
                     break
-        if scope.get("type") == "http" and scope.get("scheme") == "https":
+
+        is_http = scope.get("type") == "http"
+        is_https = is_http and scope.get("scheme") == "https"
+        qs_bytes = scope.get("query_string") or b""
+        need_root_no_idx = False
+        if is_http and scope.get("method") in ("GET", "HEAD") and scope.get("path") == "/" and qs_bytes:
+            qs_map = parse_qs(qs_bytes.decode("latin-1", errors="ignore"), keep_blank_values=True)
+            if not (qs_map.get("post") and any(v.strip() for v in qs_map["post"])):
+                need_root_no_idx = True
+
+        if is_https or need_root_no_idx:
+            start_msg: Dict[str, Any] = {}
+            chunks: List[bytes] = []
+            buf_html = False
+
             async def _send(message):
+                nonlocal buf_html
                 if message["type"] == "http.response.start":
                     headers = list(message.get("headers") or [])
-                    if not any(k.lower() == b"strict-transport-security" for k, _v in headers):
+                    if is_https and not any(k.lower() == b"strict-transport-security" for k, _v in headers):
                         headers.append((b"strict-transport-security", HSTS_VALUE.encode("latin-1")))
-                        message = dict(message, headers=headers)
+                    if need_root_no_idx:
+                        ctype = next((v for k, v in headers if k.lower() == b"content-type"), b"").lower()
+                        enc = next((v for k, v in headers if k.lower() == b"content-encoding"), b"")
+                        if not any(k.lower() == b"x-robots-tag" for k, _v in headers):
+                            headers.append((b"x-robots-tag", NOINDEX.encode("latin-1")))
+                        if ctype.startswith(b"text/html") and not enc and scope.get("method") == "GET":
+                            buf_html = True
+                            start_msg.update(message)
+                            start_msg["headers"] = headers
+                            return
+                    message = dict(message, headers=headers)
+                elif message["type"] == "http.response.body" and buf_html:
+                    chunks.append(message.get("body", b""))
+                    if message.get("more_body"):
+                        return
+                    raw_body = b"".join(chunks)
+                    try:
+                        patched = set_robots(raw_body.decode("utf-8"), NOINDEX).encode("utf-8")
+                    except UnicodeDecodeError:
+                        patched = raw_body
+                    hdrs = [(k, v) for k, v in (start_msg.get("headers") or []) if k.lower() != b"content-length"]
+                    hdrs.append((b"content-length", str(len(patched)).encode("latin-1")))
+                    await send(dict(start_msg, headers=hdrs))
+                    await send({"type": "http.response.body", "body": patched, "more_body": False})
+                    return
                 await send(message)
 
             await self.app(scope, receive, _send)
