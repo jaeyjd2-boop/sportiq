@@ -427,7 +427,7 @@ def build_standings_index_html() -> str:
         "프리미어리그, 라리가, 분데스리가, K리그, 챔피언스리그, NBA, MLB, NHL, NFL 등 주요 리그의 현재 순위표를 한곳에서 보세요.",
         "리그 순위표",
         '<p class="muted">리그를 고르면 현재 순위표를 볼 수 있습니다.</p>'
-        f'<h2>축구·농구·야구·하키·미식축구</h2><ul class="grid">{items}</ul>',,
+        f'<h2>축구·농구·야구·하키·미식축구</h2><ul class="grid">{items}</ul>',
         ld={"@context": "https://schema.org", "@type": "CollectionPage", "name": "리그 순위표 · EPL·K리그·NBA·MLB 실시간 순위 | SportIQ", "url": f"{SITE}/standings", "inLanguage": "ko-KR"},
     )
 
