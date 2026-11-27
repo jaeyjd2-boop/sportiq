@@ -1256,48 +1256,104 @@ def _fetch_espn_standings(league_code):
     return rows
 
 _KLEAGUE_TEAM_FULL = {
-    "서울": "FC 서울", "울산": "울산 HD", "대전": "대전 하나 시티즌", "인천": "인천 유나이티드",
-"강원": "강원 FC", "전북": "전북 현대", "제주": "제주 SK", "안양": "FC 안양",
-"포항": "포항 스틸러스", "김천": "김천 상무", "부천": "부천 FC 1995", "광주": "광주 FC",
-"대구": "대구 FC", "수원FC": "수원 FC", "수원": "수원 삼성",
- }
+    "서울": "FC 서울", "FC 서울": "FC 서울", "FC Seoul": "FC 서울",
+    "울산": "울산 HD", "울산 HD": "울산 HD", "Ulsan HD": "울산 HD", "Ulsan Hyundai": "울산 HD",
+    "대전": "대전 하나 시티즌", "대전 하나 시티즌": "대전 하나 시티즌", "Daejeon Hana Citizen": "대전 하나 시티즌",
+    "인천": "인천 유나이티드", "인천 유나이티드": "인천 유나이티드", "Incheon United": "인천 유나이티드",
+    "강원": "강원 FC", "강원 FC": "강원 FC", "Gangwon FC": "강원 FC",
+    "전북": "전북 현대", "전북 현대": "전북 현대", "전북 현대 모터스": "전북 현대", "Jeonbuk Hyundai Motors": "전북 현대",
+    "제주": "제주 SK", "제주 SK": "제주 SK", "제주 유나이티드": "제주 SK", "Jeju SK": "제주 SK", "Jeju United": "제주 SK",
+    "안양": "FC 안양", "FC 안양": "FC 안양", "FC Anyang": "FC 안양",
+    "포항": "포항 스틸러스", "포항 스틸러스": "포항 스틸러스", "Pohang Steelers": "포항 스틸러스",
+    "김천": "김천 상무", "김천 상무": "김천 상무", "Gimcheon Sangmu": "김천 상무",
+    "부천": "부천 FC 1995", "부천 FC 1995": "부천 FC 1995", "Bucheon FC 1995": "부천 FC 1995",
+    "광주": "광주 FC", "광주 FC": "광주 FC", "Gwangju FC": "광주 FC",
+    "대구": "대구 FC", "대구 FC": "대구 FC", "Daegu FC": "대구 FC",
+    "수원FC": "수원 FC", "수원 FC": "수원 FC", "Suwon FC": "수원 FC",
+    "수원": "수원 삼성", "수원 삼성": "수원 삼성", "Suwon Samsung Bluewings": "수원 삼성",
+}
 
 
 def _fetch_daum_kleague_standings():
-    html_txt = _fetch_text("https://sports.daum.net/record/kl", timeout=5)
-    if not html_txt:
-        return None
-    seen_ranks = set()
-    rows = []
-    for tr_m in re.finditer(r"<tr\b[^>]*>(.*?)</tr>", html_txt, flags=re.I | re.S):
-        tds = [
-            re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", td)).strip()
-            for td in re.findall(r"<td\b[^>]*>(.*?)</td>", tr_m.group(1), flags=re.I | re.S)
-        ]
-        if len(tds) < 10 or not re.match(r"^\d{1,2}$", tds[0]):
+    yr = _now_kst().year
+    for y in (yr, yr - 1):
+        js = _fetch_json(f"https://sports.daum.net/prx/hermes/api/team/rank.json?leagueCode=kl&seasonKey={y}", timeout=4)
+        items = (js or {}).get("list") if isinstance(js, dict) else None
+        if isinstance(items, list) and len(items) >= 10:
+            rows = []
+            seen = set()
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                rk_obj = it.get("rank") if isinstance(it.get("rank"), dict) else it
+                try:
+                    rk = int(rk_obj.get("rank", 0) or 0)
+                    if rk < 1 or rk > 16 or rk in seen:
+                        continue
+                    raw_nm = str(it.get("shortNameKo") or it.get("nameMain") or it.get("nameKo") or "").strip()
+                    if not raw_nm:
+                        continue
+                    tfull = _KLEAGUE_TEAM_FULL.get(raw_nm, raw_nm)
+                    gp = int(rk_obj.get("game", 0) or 0)
+                    w = int(rk_obj.get("win", 0) or 0)
+                    d = int(rk_obj.get("draw", 0) or 0)
+                    l = int(rk_obj.get("loss", 0) or 0)
+                    gf = int(rk_obj.get("gf", 0) or 0)
+                    ga = int(rk_obj.get("ga", 0) or 0)
+                    pts = int(rk_obj.get("pts", w * 3 + d) or 0)
+                except Exception:
+                    continue
+                if gp <= 0:
+                    continue
+                seen.add(rk)
+                zone = "ACLE" if rk <= 2 else ("ACL2" if rk == 3 else ("승강 PO" if rk >= 11 else ""))
+                rows.append({
+                    "rank": rk, "zone": zone, "team": tfull, "team_full": tfull,
+                    "gp": gp, "w": w, "d": d, "l": l, "gf": gf, "ga": ga, "gd": gf - ga,
+                    "form": [], "pts_label": f"{pts}점", "_pts": pts,
+                })
+            if len(rows) >= 10:
+                rows.sort(key=lambda r: r["rank"])
+                return rows
+    for y in (yr, yr - 1):
+        html_txt = _fetch_text(f"https://en.wikipedia.org/wiki/Template:{y}_K_League_1_table", timeout=5)
+        if not html_txt:
             continue
-        try:
-            rk = int(tds[0])
-            if rk < 1 or rk > 16 or rk in seen_ranks:
+        seen = set()
+        rows = []
+        for tr_m in re.finditer(r"<tr\b[^>]*>(.*?)</tr>", html_txt, flags=re.I | re.S):
+            cells = [
+                re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", re.sub(r"<sup\b[^>]*>.*?</sup>", "", c, flags=re.I | re.S))).strip()
+                for c in re.findall(r"<t[hd]\b[^>]*>(.*?)</t[hd]>", tr_m.group(1), flags=re.I | re.S)
+            ]
+            if len(cells) < 10 or not re.match(r"^\d{1,2}$", cells[0]):
                 continue
-            raw_tm = re.sub(r"^팀\s*로고\s*", "", tds[1]).strip()
-            if not raw_tm:
+            try:
+                rk = int(cells[0])
+                if rk < 1 or rk > 16 or rk in seen:
+                    continue
+                tm_clean = re.sub(r"\[[^\]]*\]|\([^)]*\)", "", cells[1]).strip()
+                tm_clean = re.sub(r"^팀\s*로고\s*", "", tm_clean).strip()
+                if not tm_clean:
+                    continue
+                tfull = _KLEAGUE_TEAM_FULL.get(tm_clean, tm_clean)
+                gp, w, d, l, gf, ga = (int(cells[i]) for i in range(2, 8))
+                pts = int(re.sub(r"[^\d-]", "", cells[9]))
+            except Exception:
                 continue
-            tfull = _KLEAGUE_TEAM_FULL.get(raw_tm, raw_tm)
-            pts, gp, w, d, l, gf, ga, gd = (int(tds[i]) for i in range(2, 10))
-        except Exception:
-            continue
-        seen_ranks.add(rk)
-        zone = "ACLE" if rk <= 2 else ("ACL2" if rk == 3 else ("승강 PO" if rk >= 11 else ""))
-        rows.append({
-            "rank": rk, "zone": zone, "team": tfull, "team_full": tfull,
-            "gp": gp, "w": w, "d": d, "l": l, "gf": gf, "ga": ga, "gd": gd,
-            "form": [], "pts_label": f"{pts}점", "_pts": pts,
-        })
-    if len(rows) < 10:
-        return None
-    rows.sort(key=lambda r: r["rank"])
-    return rows
+            if gp <= 0:
+                continue
+            seen.add(rk)
+            zone = "ACLE" if rk <= 2 else ("ACL2" if rk == 3 else ("승강 PO" if rk >= 11 else ""))
+            rows.append({
+                "rank": rk, "zone": zone, "team": tfull, "team_full": tfull,
+                "gp": gp, "w": w, "d": d, "l": l, "gf": gf, "ga": ga, "gd": gf - ga,
+                "form": [], "pts_label": f"{pts}점", "_pts": pts,
+            })
+        if len(rows) >= 10:
+            rows.sort(key=lambda r: r["rank"])
+            return rows
+    return None
 
 
 @router.get("/standings")
@@ -1340,7 +1396,7 @@ def get_standings(league: str = Query("EPL")):
     if not rows and lg == "KLEAGUE":
         rows = _fetch_daum_kleague_standings()
         if rows:
-            source = "Daum 스포츠 공식 기록실"
+            source = "K리그1 공식 순위 연동"
     is_sample = False
     unavailable = False
     if not rows and lg not in _FALLBACK_STANDINGS:
