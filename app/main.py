@@ -47,7 +47,7 @@ app.include_router(issues_ranking_router)
 app.include_router(pro_lab_router)
 app.include_router(autonomous_router)
 app.include_router(datacenter_router)
-app.add_middleware(CORSMiddleware,allow_origins=list(dict.fromkeys([*settings.allowed_origins,"https://billnojay.com","https://www.billnojay.com","http://billnojay.com","http://www.billnojay.com"])),allow_credentials=False,allow_methods=["GET","POST","PUT","DELETE","OPTIONS"],allow_headers=["*"])
+app.add_middleware(CORSMiddleware,allow_origins=list(dict.fromkeys([*settings.allowed_origins,"https://billnojay.com","https://www.billnojay.com","http://billnojay.com","http://www.billnojay.com","https://gyeonggipan.com","https://www.gyeonggipan.com"])),allow_credentials=False,allow_methods=["GET","POST","PUT","DELETE","OPTIONS"],allow_headers=["*"])
 app.add_middleware(ThemeMiddleware)
 app.add_middleware(ForwardedProtoMiddleware)
 _RATE_LIMIT_PATHS = {
