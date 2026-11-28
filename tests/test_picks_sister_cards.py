@@ -73,6 +73,15 @@ class CardTests(unittest.TestCase):
             self.assertEqual(sl._display_name("Unknown FC", "football"), "Unknown FC")
         self.assertEqual(calls[:2], [("Deportivo Alavés", "soccer"), ("Deportivo Alaves", "soccer")])
 
+    def test_korean_league_labels(self):
+        cases = [("football", "Primera Division", "라리가"), ("football", "Premier League", "프리미어리그"),
+                 ("football", "UEFA Champions League", "챔피언스리그"), ("football", "UEFA Europa Conference League", "컨퍼런스리그"),
+                 ("football", "UEFA Europa League", "유로파리그"), ("football", "Championship", "챔피언십"),
+                 ("football", "2. Bundesliga", "2. Bundesliga"), ("football", "Ligue 2", "Ligue 2"),
+                 ("basketball", "NBA", "NBA"), ("basketball", "WKBL", "WKBL"), ("basketball", "EuroLeague", "EuroLeague")]
+        for sport, name, want in cases:
+            self.assertEqual(sl.league_ko(sport, name), want, name)
+
     def test_league_codes(self):
         self.assertEqual(sl.pick_league_code("football", "Primera Division"), "LALIGA")
         self.assertEqual(sl.pick_league_code("football", "UEFA Champions League"), "UCL")
