@@ -501,7 +501,7 @@ def _match_cards_html(active_lg: str = "") -> str:
                      f'<div class="sis-links">{_sister_links_html(c["links"])}</div>{write}</div>')
     grid = "".join(items)
     return ('<section class="card" aria-labelledby="qpMatchCardsTitle"><h2 id="qpMatchCardsTitle">📅 다가오는 경기 · 분석·기록·시청 가이드</h2>'
-            '<p class="sub" style="margin-bottom:12px">자매 사이트 어그로(분석), ZYNK(기록), 경기판(시청 가이드)의 같은 경기 페이지입니다. 읽어 보고 내 3줄 픽을 남겨 보세요.</p>'
+            '<p class="sub" style="margin-bottom:12px">어그로의 경기 분석, ZYNK의 전적·기록, 경기판의 중계·시청 정보까지 한 번에 확인하고 나만의 3줄 픽을 남겨 보세요.</p>'
             f'<div class="mc-grid" id="qpMatchCards">{grid}</div></section>'
             '<script>(function(){var g=document.getElementById("qpMatchCards");if(!g)return;g.addEventListener("click",function(e){var b=e.target.closest("[data-write-match]");if(!b)return;'
             'var lg=document.getElementById("qpLeague"),m=document.getElementById("qpMatch"),f=document.getElementById("qpWriteForm");if(lg)lg.value=b.getAttribute("data-write-lg");if(m)m.value=b.getAttribute("data-write-match");'
@@ -520,7 +520,7 @@ def _pick_sister_html(pick: Dict[str, Any]) -> str:
     if not inner:
         return ""
     return (f'<section class="card" aria-labelledby="qpSisterTitle"><h2 id="qpSisterTitle">🔗 이 경기 더 보기</h2>'
-            f'<p class="sub" style="margin-bottom:10px">{_e(pick["match_label"])} 경기의 분석 글, 기록, 시청 가이드입니다.</p><div class="sis-links">{inner}</div></section>')
+            f'<p class="sub" style="margin-bottom:10px">{_e(pick["match_label"])} 경기의 분석, 전적·기록, 중계·시청 정보를 이어서 확인해 보세요.</p><div class="sis-links">{inner}</div></section>')
 
 
 class QuickPickCreateIn(BaseModel):
