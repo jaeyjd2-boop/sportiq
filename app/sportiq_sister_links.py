@@ -309,9 +309,14 @@ def pick_league_code(sport: str, league_name: str) -> Optional[str]:
 
 
 def _display_name(name: str, sport: str) -> str:
+    """Korean name when known. sport is the DB code; the Korean tables use the live-score
+    name "soccer" for football (only then do they match "Real Betis Balompié" -> 레알 베티스).
+    Accented football-data names are tried again without accents ("Deportivo Alavés")."""
     try:
         from app import sportiq_team_pages as tp
-        return tp.korean_name(name, sport) or name
+        sp = "soccer" if sport == "football" else sport
+        ascii_name = unicodedata.normalize("NFKD", (name or "").translate(_TRANSLIT)).encode("ascii", "ignore").decode()
+        return tp.korean_name(name, sp) or (ascii_name != name and tp.korean_name(ascii_name, sp)) or name
     except Exception:
         return name
 
