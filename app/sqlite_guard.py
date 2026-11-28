@@ -15,7 +15,8 @@ DEFAULT_MAX_RETRIES = int(os.environ.get("SPORTIQ_SQLITE_MAX_RETRIES", "6"))
 _ORIG_CONNECT = sqlite3.connect
 _GUARD_LOCK = threading.Lock()
 _GUARD_INSTALLED = False
-
+_WAL_INITIALIZED_DBS: set = set()
+_WAL_INIT_LOCK = threading.Lock()
 
 def is_sqlite_lock_error(exc: BaseException) -> bool:
     if not isinstance(exc, sqlite3.OperationalError):
@@ -127,8 +128,17 @@ def _apply_pragmas(conn: sqlite3.Connection, db_target: str) -> None:
         try:
             sqlite3.Connection.execute(conn, f"PRAGMA busy_timeout = {DEFAULT_BUSY_TIMEOUT_MS};")
             if db_target and db_target != ":memory:" and not db_target.startswith("file::memory:"):
-                sqlite3.Connection.execute(conn, "PRAGMA journal_mode = WAL;")
-                sqlite3.Connection.execute(conn, "PRAGMA synchronous = NORMAL;")
+                norm_path = os.path.abspath(db_target)
+                if norm_path not in _WAL_INITIALIZED_DBS:
+                    with _WAL_INIT_LOCK:
+                     if norm_path not in _WAL_INITIALIZED_DBS:
+                         try:
+                            sqlite3.Connection.execute(conn, "PRAGMA journal_mode = WAL;")
+                           sqlite3.Connection.execute(conn, "PRAGMA synchronous = NORMAL;")
+                                _WAL_INITIALIZED_DBS.add(norm_path)
+                            except sqlite3.OperationalError:
+                                pass
+                        
                 sqlite3.Connection.execute(conn, "PRAGMA wal_autocheckpoint = 1000;")
             sqlite3.Connection.execute(conn, "PRAGMA temp_store = MEMORY;")
             return
