@@ -3453,7 +3453,7 @@ _FRONTEND_V22_JS = r'''
           return;
         }
         var curMin = false;
-        try { curMin = (localStorage.getItem("sportiq_dock_minimized_v382") === "1"); } catch (e) {}
+        try { var _sqS382 = localStorage.getItem("sportiq_dock_minimized_v382"); curMin = (_sqS382 === null) ? (window.innerWidth <= 768) : (_sqS382 === "1"); } catch (e) { curMin = (window.innerWidth <= 768); }
         var nextMin = !curMin;
         window.__sqDockUserToggledV4637 = !nextMin;
         if (nextMin && document.body) {
@@ -3466,7 +3466,7 @@ _FRONTEND_V22_JS = r'''
     }
 
     var isMin = false;
-    try { isMin = (localStorage.getItem("sportiq_dock_minimized_v382") === "1"); } catch (e) {}
+    try { var _sqM382 = localStorage.getItem("sportiq_dock_minimized_v382"); isMin = (_sqM382 === null) ? (window.innerWidth <= 768) : (_sqM382 === "1"); } catch (e) { isMin = (window.innerWidth <= 768); }
     var isScrollSlim = Boolean(document.body && document.body.getAttribute("data-sq-scroll-slim-dock") === "1" && !window.__sqDockUserToggledV4637);
 
     if (isMin || isScrollSlim) {
@@ -3487,7 +3487,7 @@ _FRONTEND_V22_JS = r'''
       });
       var bannerVis = Boolean(banner && window.getComputedStyle(banner).display !== "none" && banner.offsetHeight > 0);
       var bH = bannerVis ? (banner.offsetHeight || 54) : 0;
-      var minBot = isMobile ? ((bannerVis ? (10 + bH + 10) : 14) + (mobNavH || 0)) : 14;
+      var minBot = isMobile ? ((bannerVis ? (10 + bH + 10) : 14) + (mobNavH || (window.innerWidth <= 768 ? 60 : 0))) : 14;
       var minRight = isMobile ? 10 : 14;
       minBtn.setAttribute("aria-expanded", "false");
       minBtn.setAttribute("aria-label", "플로팅 메뉴 펼치기");
@@ -17338,7 +17338,8 @@ _FRONTEND_V22_JS = r'''
         "body[data-sq-scroll-slim-dock='1'] [data-sq-floating-item='tv'],",
         "body[data-sq-scroll-slim-dock='1'] [data-sq-floating-item='ai'] {",
         "  display: none !important;",
-        "}"
+        "}",
+          "@media (max-width: 768px) { #sqFloatingDockMinBtnV382, [data-sq-floating-dock='1'] { bottom: 74px !important; } }"
       ].join("\n");
       document.head.appendChild(st);
     }

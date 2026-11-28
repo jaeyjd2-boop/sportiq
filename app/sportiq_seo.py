@@ -152,7 +152,7 @@ _CSS = (
     ".live{color:#ff4d5e;font-weight:700}.note{background:#22262e;padding:12px;border-radius:8px}"
     "ul.grid{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}"
     "ul.grid a{display:block;padding:8px 12px;background:#22262e;border-radius:8px}"
-    "@media(max-width:600px){th,td{padding:5px 4px;font-size:.85rem}}"
+    "@media(max-width:600px){th,td{padding:5px 4px;font-size:.85rem}}.tbl-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px 0;border-radius:8px}.tbl-scroll table{min-width:520px;margin:0}@media(max-width:768px){input,select,textarea{font-size:16px!important}}"
 )
 
 
@@ -270,8 +270,8 @@ def build_livescore_html() -> str:
                 f'<td class="num">{score}</td><td>{_e(m.get("away"))}</td><td{cls}>{badge}</td></tr>'
             )
         blocks.append(
-            f"<h2>{_e(name)}</h2><table><thead><tr><th>시간(KST)</th><th>홈</th><th class=\"num\">스코어</th>"
-            f"<th>원정</th><th>상태</th></tr></thead><tbody>{''.join(trs)}</tbody></table>"
+            f"<h2>{_e(name)}</h2><div class='tbl-scroll'><table><thead><tr><th>시간(KST)</th><th>홈</th><th class=\"num\">스코어</th>"
+            f"<th>원정</th><th>상태</th></tr></thead><tbody>{''.join(trs)}</tbody></table></div>"
         )
     try:
         from app import sportiq_results_pages as rp
@@ -340,7 +340,7 @@ def _table_html(rows: List[Dict[str, Any]], sport: str, links: Optional[Dict[str
         if href:
             team_cell = f'<a href="{_e(href)}">{team_cell}</a>'
         trs.append(f'<tr><td>{_e(r.get("rank"))}</td><td>{team_cell}</td>{tds}</tr>')
-    return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(trs)}</tbody></table>"
+    return f"<div class='tbl-scroll'><table><thead><tr>{head}</tr></thead><tbody>{''.join(trs)}</tbody></table></div>"
 
 
 def _stream_note(slug: str, name: str) -> str:
