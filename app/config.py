@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     multisport_enabled: bool = True
     multisport_schedule_minutes: int = 60
     multisport_live_minutes: int = 10
+    # Korean live games (billnojay scoreboard -> DB) on their own, faster job; 0 = keep them in multisport_live.
+    korea_live_minutes: int = 2
     api_sports_key: str = ""
     api_sports_sports: str = ""          # comma list; empty = all supported; "none" = none (Korean games only)
     api_sports_daily_budget: int = 80    # per sport API per UTC day
