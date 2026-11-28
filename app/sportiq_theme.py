@@ -31,8 +31,8 @@ from fastapi.responses import Response
 
 BG = "#1a1d23"
 PANEL = "#22262e"
-TEXT = "#f3f5f7"
-TEXT_SUB = "#c4c9d1"
+TEXT = "#f6f8fb"
+TEXT_SUB = "#d2dae6"
 ACCENT = "#539bf5"     # nordic sapphire-sky: calm on eyes, buttons, links, highlights
 ACCENT_2 = "#ffd166"   # champagne gold: score emphasis, badges
 THEME_COLOR = ACCENT
@@ -41,8 +41,8 @@ OG_VERSION = "28"
 # Tailwind palette overrides (same values as HEX_MAP, by shade).
 TAILWIND_COLORS: Dict[str, Dict[str, str]] = {
     "slate": {
-        "50": "#f8f9fa", "100": "#f3f5f7", "200": "#dde1e6", "300": "#c4c9d1", "400": "#9aa1ac",
-        "500": "#6f7782", "600": "#4f5661", "700": "#3a3f48", "800": "#2c3038", "900": "#22262e", "950": "#1a1d23",
+        "50": "#fbfcfe", "100": "#f6f8fb", "200": "#e6ecf5", "300": "#d2dae6", "400": "#aeb8c7",
+        "500": "#8893a4", "600": "#596273", "700": "#3b424f", "800": "#2c3038", "900": "#22262e", "950": "#1a1d23",
     },
     "emerald": {
         "50": "#f0f6ff", "100": "#dcebff", "200": "#b8d7ff", "300": "#8ec0ff", "400": "#6cb2ff",
@@ -79,7 +79,10 @@ for _shade, _old_c in zip(_SHADES, _OLD_CRIMSON):
     HEX_MAP[_old_c] = TAILWIND_COLORS["emerald"][_shade]
 HEX_MAP.update({
     "#ff8590": "#8ec0ff",
-    "#0b1220": "#1e2128",   # near-black panels
+    "#c4c9d1": "#d2dae6",
+     "#9aa1ac": "#aeb8c7",
+     "#6f7782": "#8893a4",
+      "#0b1220": "#1e2128",   # near-black panels
     "#070b14": "#16181d",   # manifest/icon background
 })
 
