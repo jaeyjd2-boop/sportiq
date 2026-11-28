@@ -1,6 +1,7 @@
 """KBL/WKBL/V-League standings: hardcoded tables must never pass as official.
 
-No network: the Daum fetch (_http_fetch_text_v4616) is patched.
+No network: the Daum fetch (_http_fetch_text_v4616) and the official-site fetch
+(_official_http_v4700, here: always failing) are patched.
 """
 import os
 import tempfile
@@ -38,9 +39,14 @@ def daum_vb_html(teams):
     return "<table>" + "".join(trs) + "</table>"
 
 
-def build(code, html, form_cal=None):
+def reset():
     lr._DOM_STANDINGS_SSR_CACHE_V4624.clear()
-    with patch.object(lr, "_http_fetch_text_v4616", return_value=html), \
+    lr._OFFICIAL_KR_FAIL_AT_V4700.clear()
+
+
+def build(code, html, form_cal=None):
+    reset()
+    with patch.object(lr, "_official_http_v4700", return_value=""),             patch.object(lr, "_http_fetch_text_v4616", return_value=html), \
             patch.object(lr, "_compute_club_form_and_h2h_from_cal_v4624", return_value=(form_cal or {}, {}, None)):
         return lr._build_domestic_bball_standings_v341(code)
 
@@ -62,8 +68,8 @@ class FallbackIsSampleTests(unittest.TestCase):
         self.assertIs(build("KBL", shell)["is_sample"], True)
 
     def test_sim_carries_sample_flag(self):
-        lr._DOM_STANDINGS_SSR_CACHE_V4624.clear()
-        with patch.object(lr, "_http_fetch_text_v4616", return_value=""):
+        reset()
+        with patch.object(lr, "_official_http_v4700", return_value=""),                 patch.object(lr, "_http_fetch_text_v4616", return_value=""):
             sim = lr._build_domestic_bball_sim_v341("KBL", 500)
         self.assertIs(sim["is_sample"], True)
 
@@ -85,10 +91,11 @@ class LiveRowsNotMixedTests(unittest.TestCase):
         # Leaders have no live source yet.
         self.assertIs(res["leaders_is_sample"], True)
 
-    def test_live_form_comes_only_from_calendar(self):
+    def test_live_rows_ignore_hardcoded_calendar_form(self):
+        # The season calendar is a hardcoded snapshot; it must not fill live rows.
         res = build("KBL", daum_bball_html(KBL_TEAMS), form_cal={"서울 SK": ["L", "W", "L", "W", "W", "L"]})
         by_tm = {r["team"]: r for r in res["standings"]}
-        self.assertEqual(by_tm["서울 SK"]["form"], ["W", "L", "W", "W", "L"])
+        self.assertEqual(by_tm["서울 SK"]["form"], [])
         self.assertEqual(by_tm["서울 삼성"]["form"], [])
 
     def test_vleague_live_rows_keep_daum_values(self):
@@ -103,8 +110,8 @@ class LiveRowsNotMixedTests(unittest.TestCase):
             self.assertEqual(r["form"], [], r["team"])
 
     def test_sim_runs_without_goal_difference(self):
-        lr._DOM_STANDINGS_SSR_CACHE_V4624.clear()
-        with patch.object(lr, "_http_fetch_text_v4616", return_value=daum_bball_html(KBL_TEAMS)):
+        reset()
+        with patch.object(lr, "_official_http_v4700", return_value=""),                 patch.object(lr, "_http_fetch_text_v4616", return_value=daum_bball_html(KBL_TEAMS)):
             sim = lr._build_domestic_bball_sim_v341("KBL", 500)
         self.assertIs(sim["is_sample"], False)
         self.assertEqual(len(sim["table"]), 10)
