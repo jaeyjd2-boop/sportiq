@@ -275,6 +275,151 @@ def links_for(live_id: str, sport: str, kst: str, home: str, away: str) -> Dict[
     return out
 
 
+# --------------------------------------------------------------------------
+# /picks: upcoming matches that have an ergrow preview, and links for a pick
+# --------------------------------------------------------------------------
+# ergrow auto preview slugs end in "-<sport>-preview-<SportIQ match id>" (ergrow_slugs).
+PREVIEW_SLUG = re.compile(r"-(football|basketball|baseball|hockey|american-football|volleyball)-preview-(\d+)/?$")
+CARD_TTL = 15 * 60
+CARD_PAST = timedelta(hours=2)        # a match that just started still gets its card
+CARD_FUTURE = timedelta(hours=48)
+# /picks league codes (sportiq_quick_picks.ALLOWED_LEAGUES) -> SportIQ sports.code
+PICK_LEAGUE_SPORTS = {"EPL": "football", "KLEAGUE": "football", "LALIGA": "football", "BUNDESLIGA": "football",
+                      "SERIEA": "football", "LIGUE1": "football", "UCL": "football", "NBA": "basketball",
+                      "KBL": "basketball", "MLB": "baseball", "NHL": "hockey", "NFL": "american_football",
+                      "VLEAGUE": "volleyball"}
+_FOOTBALL_LEAGUES = (("champions league", "UCL"), ("premier league", "EPL"), ("k league 1", "KLEAGUE"),
+                     ("k리그1", "KLEAGUE"), ("primera", "LALIGA"), ("la liga", "LALIGA"), ("laliga", "LALIGA"),
+                     ("bundesliga", "BUNDESLIGA"), ("serie a", "SERIEA"), ("ligue 1", "LIGUE1"))
+_SPORT_LEAGUE = {"basketball": "NBA", "baseball": "MLB", "hockey": "NHL", "american_football": "NFL",
+                 "volleyball": "VLEAGUE"}
+_VS = re.compile(r"\s+(?:vs\.?|v\.?|대)\s+", re.I)
+
+
+def pick_league_code(sport: str, league_name: str) -> Optional[str]:
+    """The /picks league code for a DB match, or None when /picks has no such league."""
+    name = (league_name or "").lower()
+    if sport == "football":
+        if "premier league" in name and any(x in name for x in ("2", "championship", "women", "u21", "u18")):
+            return None
+        return next((code for key, code in _FOOTBALL_LEAGUES if key in name), None)
+    if sport == "basketball" and ("kbl" in name or "korea" in name):
+        return "KBL"
+    return _SPORT_LEAGUE.get(sport)
+
+
+def _display_name(name: str, sport: str) -> str:
+    try:
+        from app import sportiq_team_pages as tp
+        return tp.korean_name(name, sport) or name
+    except Exception:
+        return name
+
+
+def ergrow_recent_previews() -> Dict[int, str]:
+    """{SportIQ match id: ergrow preview URL} for the latest published previews."""
+    cached, value = _cget("ergrow:recent")
+    if cached:
+        return value
+    q = urllib.parse.urlencode({"per_page": 60, "_fields": "slug,link", "orderby": "date", "order": "desc"})
+    try:
+        rows = _http_json(f"{ERGROW}/wp-json/wp/v2/posts?{q}")
+    except Exception as e:
+        log.info("ergrow recent previews failed: %s", e)
+        _cput("ergrow:recent", ERROR_TTL, {})
+        return {}
+    out: Dict[int, str] = {}
+    for r in rows if isinstance(rows, list) else []:
+        link, m = (r.get("link") or "") if isinstance(r, dict) else "", PREVIEW_SLUG.search(str((r or {}).get("slug") or ""))
+        if m and isinstance(link, str) and link.startswith(ERGROW + "/"):
+            out.setdefault(int(m.group(2)), link)
+    _cput("ergrow:recent", CARD_TTL, out)
+    return out
+
+
+_CARD_SELECT = ("SELECT m.id, s.code AS sport, ht.name AS home, at.name AS away, m.start_time, l.name AS league "
+                "FROM matches m JOIN sports s ON s.id = m.sport_id LEFT JOIN leagues l ON l.id = m.league_id "
+                "LEFT JOIN teams ht ON ht.id = m.home_team_id LEFT JOIN teams at ON at.id = m.away_team_id ")
+
+
+def _aware(ts: Any) -> Optional[datetime]:
+    if not isinstance(ts, datetime):
+        return None
+    return ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+
+
+def upcoming_match_cards(limit: int = 8, now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    """Matches from now-2h to now+48h that have an ergrow preview, soonest first, each with
+    its ergrow / zynktv / 경기판 links and the /picks league + match label for "write a pick".
+    A failure gives an empty list (the /picks page then just has no cards)."""
+    now = now or datetime.now(timezone.utc)
+    cached, value = _cget("cards")
+    if cached:
+        return value[:limit]
+    previews = ergrow_recent_previews()
+    if not previews:
+        return []
+    try:
+        rows = _rows(_CARD_SELECT + "WHERE m.id = ANY(:ids) AND m.start_time BETWEEN :a AND :b ORDER BY m.start_time",
+                     {"ids": list(previews), "a": now - CARD_PAST, "b": now + CARD_FUTURE})
+    except Exception as e:
+        log.info("pick cards lookup failed: %s", e)
+        _cput("cards", ERROR_TTL, [])
+        return []
+    cards: List[Dict[str, Any]] = []
+    for r in rows:
+        ko = _aware(r.get("start_time"))
+        sport, mid = str(r.get("sport") or ""), int(r["id"])
+        if ko is None or not (r.get("home") and r.get("away")):
+            continue
+        home, away = _display_name(str(r["home"]), sport), _display_name(str(r["away"]), sport)
+        cards.append({
+            "id": mid, "sport": sport, "league": str(r.get("league") or ""), "home": home, "away": away,
+            "kickoff": ko.astimezone(KST).isoformat(), "pick_league": pick_league_code(sport, str(r.get("league") or "")),
+            "match_label": f"{home} vs {away}",
+            "links": {"ergrow": previews[mid], "zynktv": f"{ZYNKTV}/match/{mid}",
+                      "gyeonggipan": gyeonggipan_link({"id": mid}, ko, now)},
+        })
+    _cput("cards", CARD_TTL, cards)
+    return cards[:limit]
+
+
+def split_match_label(label: str) -> Tuple[str, str]:
+    """'아스널 vs 첼시' -> ('아스널', '첼시'); ('', '') when the label has no 'vs'."""
+    parts = _VS.split((label or "").strip(), maxsplit=1)
+    return (parts[0].strip(), parts[1].strip()) if len(parts) == 2 else ("", "")
+
+
+def links_for_pick(league: str, match_label: str, created_at: Optional[datetime]) -> Dict[str, Optional[str]]:
+    """Sister links for a user's pick: the DB match with both team names, kicking off from 12 h
+    before the post to 7 days after it. Nothing when the label is free text or ambiguous."""
+    out: Dict[str, Optional[str]] = {"zynktv": None, "ergrow": None, "gyeonggipan": None}
+    code = PICK_LEAGUE_SPORTS.get((league or "").upper())
+    home, away = split_match_label(match_label)
+    created = _aware(created_at)
+    if not (code and home and away and created):
+        return out
+    key = f"pick:{code}:{_norm(home)}:{_norm(away)}:{created.date().isoformat()}"
+    cached, hit = _cget(key)
+    if not cached:
+        try:
+            cands = _rows(_SELECT + "WHERE s.code = :code AND m.start_time BETWEEN :a AND :b ORDER BY m.start_time LIMIT 800",
+                          {"code": code, "a": created - timedelta(hours=12), "b": created + timedelta(days=7)})
+            hit = pick_by_names(cands, home, away, "soccer" if code == "football" else code)
+            _cput(key, FOUND_TTL if hit else MISSING_TTL, hit)
+        except Exception as e:
+            log.info("pick sister lookup failed: %s", e)
+            hit = None
+            _cput(key, ERROR_TTL, None)
+    if not hit:
+        return out
+    mid, ko = int(hit["id"]), _aware(hit.get("start_time"))
+    out["zynktv"] = f"{ZYNKTV}/match/{mid}"
+    out["ergrow"] = ergrow_preview(mid, str(hit.get("sport") or code), str(hit.get("home") or ""), str(hit.get("away") or ""))
+    out["gyeonggipan"] = gyeonggipan_link(hit, ko)
+    return out
+
+
 @router.get("/api/sister/match-links")
 def sister_match_links(
     id: str = Query("", max_length=80),
