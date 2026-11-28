@@ -40,6 +40,14 @@ def fake_http(url, data=None, headers=None, timeout=4.0):
     return ""
 
 
+def poisoned_calendar(lg, team, won=False):
+    """Five made-up results for team in the old hardcoded calendar's shape; live rows must ignore them."""
+    hs, as_ = (90, 50) if won else (50, 90)
+    if lg.startswith("VLEAGUE"):
+        hs, as_ = (3, 0) if won else (0, 3)
+    return {f"2026-11-{d:02d}": [[lg, "19:00", team, "상대팀", hs, as_, "가짜 체육관"]] for d in range(20, 25)}
+
+
 def reset():
     lr._DOM_STANDINGS_SSR_CACHE_V4624.clear()
     lr._OFFICIAL_KR_FAIL_AT_V4700.clear()
@@ -49,7 +57,7 @@ def build(code, http=fake_http):
     reset()
     with patch.object(lr, "_official_http_v4700", side_effect=http), \
             patch.object(lr, "_http_fetch_text_v4616", return_value=""), \
-            patch.object(lr, "_compute_club_form_and_h2h_from_cal_v4624", return_value=({}, {}, None)):
+            patch.object(lr, "_OFFICIAL_KOVO_WKBL_SEASON_2627_V4622", {}):
         return lr._build_domestic_bball_standings_v341(code)
 
 
@@ -144,13 +152,13 @@ class KblOfficialTests(unittest.TestCase):
 
     def test_live_form_not_replaced_by_calendar(self):
         reset()
-        with patch.object(lr, "_official_http_v4700", side_effect=fake_http),                 patch.object(lr, "_http_fetch_text_v4616", return_value=""),                 patch.object(lr, "_compute_club_form_and_h2h_from_cal_v4624", return_value=({"서울 삼성": ["L"] * 5}, {}, None)):
+        with patch.object(lr, "_official_http_v4700", side_effect=fake_http),                 patch.object(lr, "_http_fetch_text_v4616", return_value=""),                 patch.object(lr, "_OFFICIAL_KOVO_WKBL_SEASON_2627_V4622", poisoned_calendar("KBL", "서울 삼성")):
             res = lr._build_domestic_bball_standings_v341("KBL")
         self.assertEqual(res["standings"][0]["form"], ["W", "L", "W", "L", "W"])
 
     def test_vleague_rows_ignore_calendar_form(self):
         reset()
-        with patch.object(lr, "_official_http_v4700", side_effect=fake_http),                 patch.object(lr, "_http_fetch_text_v4616", return_value=""),                 patch.object(lr, "_compute_club_form_and_h2h_from_cal_v4624", return_value=({"한국전력": ["W"] * 5}, {}, None)):
+        with patch.object(lr, "_official_http_v4700", side_effect=fake_http),                 patch.object(lr, "_http_fetch_text_v4616", return_value=""),                 patch.object(lr, "_OFFICIAL_KOVO_WKBL_SEASON_2627_V4622", poisoned_calendar("VLEAGUE_M", "한국전력", won=True)):
             res = lr._build_domestic_bball_standings_v341("VLEAGUE_M")
         kepco = next(r for r in res["standings"] if r["team"] == "한국전력")
         self.assertEqual((kepco["form"], kepco["streak_ko"]), ([], "1패"))

@@ -14294,6 +14294,8 @@ _FRONTEND_V22_JS = r'''
             var activeH2h = (stData.h2h && typeof stData.h2h === "object")
               ? stData.h2h
               : ((h2hExtra && h2hExtra.h2h && typeof h2hExtra.h2h === "object") ? h2hExtra.h2h : null);
+            // 예시(is_sample) 맞대결은 실제 기록처럼 보이지 않도록 그리지 않는다.
+            if (activeH2h && activeH2h.is_sample === true) activeH2h = null;
 
             var h2hBlockHtml = "";
             if (activeH2h && ((Array.isArray(activeH2h.past_games) && activeH2h.past_games.length > 0) || activeH2h.summary)) {
@@ -22151,90 +22153,89 @@ def _normalize_dom_lg_code_v4624(raw_code: str) -> str:
     return "KBL"
 
 
-def _compute_club_form_and_h2h_from_cal_v4624(cu: str, home_q: str = "", away_q: str = "") -> Tuple[Dict[str, List[str]], Dict[str, str], Optional[Dict[str, Any]]]:
-    cal_map = globals().get("_OFFICIAL_KOVO_WKBL_SEASON_2627_V4622") or {}
-    now_ymd = datetime.now(KST).strftime("%Y-%m-%d")
-    wd_ko = ["월", "화", "수", "목", "금", "토", "일"]
+def _kst_today_ymd_v4710() -> str:
+    return datetime.now(KST).strftime("%Y-%m-%d")
 
-    form_by_team: Dict[str, List[str]] = {}
-    last_game_by_team: Dict[str, str] = {}
-    past_h2h: List[str] = []
-    next_rematch_str = ""
-    h_wins = 0
-    a_wins = 0
 
+def _norm_kr_team_v4710(raw: str, sp_m: str) -> str:
+    """One name per club, the same one the standings rows use (SOOP 수퍼스, BNK썸, KB스타즈 ...)."""
+    s = str(raw or "").strip()
+    if sp_m == "basketball":
+        s = _WKBL_TEAM_NAMES_V4700.get(s, s).replace("부산 BNK 썸", "BNK썸").replace("BNK 썸", "BNK썸")
+    if not s:
+        return ""
+    s, _, _ = _clean_team_label_v4616(s, sp_m)
+    if sp_m == "volleyball" and s in ("페퍼저축은행", "SOOP"):
+        s = "SOOP 수퍼스"
+    return s
+
+
+def _compute_h2h_from_games_v4710(
+    cu: str, home_q: str, away_q: str, games: List[Dict[str, Any]], today_ymd: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Match-modal head-to-head from a season's official game list.
+
+    games: [{"date": "YYYY-MM-DD", "time": "HH:MM" or "", "home", "away", "hs", "as", "venue"}],
+    hs/as are None until the game is final. Returns None when there is no valid pair."""
     sp_m = "volleyball" if cu in ("VLEAGUE_M", "VLEAGUE_W") else "basketball"
-    hq = ("SOOP 수퍼스" if home_q == "페퍼저축은행" else home_q.replace("부산 BNK 썸", "BNK썸").replace("BNK 썸", "BNK썸").strip())
-    aq = ("SOOP 수퍼스" if away_q == "페퍼저축은행" else away_q.replace("부산 BNK 썸", "BNK썸").replace("BNK 썸", "BNK썸").strip())
-    if hq:
-        hq, _, _ = _clean_team_label_v4616(hq, sp_m)
-        if sp_m == "volleyball" and hq == "페퍼저축은행":
-            hq = "SOOP 수퍼스"
-    if aq:
-        aq, _, _ = _clean_team_label_v4616(aq, sp_m)
-        if sp_m == "volleyball" and aq == "페퍼저축은행":
-            aq = "SOOP 수퍼스"
-    target_pair = frozenset([hq, aq]) if (hq and aq and hq != aq) else None
+    hq, aq = _norm_kr_team_v4710(home_q, sp_m), _norm_kr_team_v4710(away_q, sp_m)
+    if not hq or not aq or hq == aq:
+        return None
+    today = today_ymd or _kst_today_ymd_v4710()
+    pair = frozenset([hq, aq])
+    wd_ko = ["월", "화", "수", "목", "금", "토", "일"]
+    last_by_team: Dict[str, str] = {}
+    past: List[str] = []
+    next_rematch = ""
+    h_wins = a_wins = 0
 
-    for ymd in sorted(cal_map.keys()):
-        for lg_code, hhmm, h_raw, a_raw, hs_r, as_r, venue in cal_map[ymd]:
-            if lg_code != cu:
-                continue
-            hc, _, _ = _clean_team_label_v4616(str(h_raw), sp_m)
-            ac, _, _ = _clean_team_label_v4616(str(a_raw), sp_m)
-            if sp_m == "volleyball":
-                if hc == "페퍼저축은행":
-                    hc = "SOOP 수퍼스"
-                if ac == "페퍼저축은행":
-                    ac = "SOOP 수퍼스"
-            hs_i, as_i = int(hs_r or 0), int(as_r or 0)
-            mmdd = f"{ymd[5:7]}.{ymd[8:10]}"
-            try:
-                dt_obj = datetime(int(ymd[:4]), int(ymd[5:7]), int(ymd[8:10]), tzinfo=KST)
-                wd_s = wd_ko[dt_obj.weekday()]
-            except Exception:
-                wd_s = ""
+    for g in sorted(games, key=lambda x: (str(x.get("date") or ""), str(x.get("time") or ""))):
+        ymd = str(g.get("date") or "")
+        hc, ac = _norm_kr_team_v4710(g.get("home"), sp_m), _norm_kr_team_v4710(g.get("away"), sp_m)
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", ymd) or not hc or not ac:
+            continue
+        try:
+            wd_s = wd_ko[datetime(int(ymd[:4]), int(ymd[5:7]), int(ymd[8:10])).weekday()]
+        except ValueError:
+            continue
+        mmdd = f"{ymd[5:7]}.{ymd[8:10]}"
+        venue = str(g.get("venue") or "").strip()
+        hs, as_ = g.get("hs"), g.get("as")
+        is_pair = frozenset([hc, ac]) == pair
+        if isinstance(hs, int) and isinstance(as_, int) and hs != as_ and ymd <= today:
+            h_won = hs > as_
+            last_by_team[hc] = f"{mmdd} vs {ac} ({hs}:{as_} {'승' if h_won else '패'})"
+            last_by_team[ac] = f"{mmdd} vs {hc} ({as_}:{hs} {'패' if h_won else '승'})"
+            if is_pair:
+                if (hc if h_won else ac) == hq:
+                    h_wins += 1
+                else:
+                    a_wins += 1
+                past.append(f"{mmdd}({wd_s}) {hc} {hs} : {as_} {ac}" + (f" ({venue})" if venue else ""))
+        elif is_pair and hs is None and ymd > today and not next_rematch:
+            tm = str(g.get("time") or "").strip()
+            next_rematch = f"{mmdd} ({wd_s})" + (f" {tm}" if tm else "") + f" {hc} vs {ac}" + (f" · {venue}" if venue else "")
 
-            if ymd <= now_ymd and (hs_i > 0 or as_i > 0) and hs_i != as_i:
-                h_res = "W" if hs_i > as_i else "L"
-                a_res = "W" if as_i > hs_i else "L"
-                form_by_team.setdefault(hc, []).append(h_res)
-                form_by_team.setdefault(ac, []).append(a_res)
-                last_game_by_team[hc] = f"{mmdd} vs {ac} ({hs_i}:{as_i} {'승' if h_res == 'W' else '패'})"
-                last_game_by_team[ac] = f"{mmdd} vs {hc} ({as_i}:{hs_i} {'승' if a_res == 'W' else '패'})"
-                if target_pair and frozenset([hc, ac]) == target_pair:
-                    win_tm = hc if hs_i > as_i else ac
-                    if win_tm == hq:
-                        h_wins += 1
-                    else:
-                        a_wins += 1
-                    past_h2h.append(f"{mmdd}({wd_s}) {hc} {hs_i} : {as_i} {ac} ({venue})")
-            elif target_pair and ymd > now_ymd and not next_rematch_str and frozenset([hc, ac]) == target_pair:
-                next_rematch_str = f"{mmdd} ({wd_s}) {hhmm} {hc} vs {ac}" + (f" · {venue}" if venue else "")
-
-    h2h_obj: Optional[Dict[str, Any]] = None
-    if target_pair:
-        if (h_wins + a_wins) > 0:
-            if h_wins > a_wins:
-                summ = f"올 시즌 맞대결: {hq} {h_wins}승 {a_wins}패 우위"
-            elif a_wins > h_wins:
-                summ = f"올 시즌 맞대결: {aq} {a_wins}승 {h_wins}패 우위"
-            else:
-                summ = f"올 시즌 맞대결: {h_wins}승 {a_wins}패 백중세"
-        else:
-            summ = f"2026-2027 정규리그 시즌 첫 맞대결 ({hq} vs {aq})"
-        h2h_obj = {
-            "home": hq,
-            "away": aq,
-            "home_wins": h_wins,
-            "away_wins": a_wins,
-            "summary": summ,
-            "past_games": past_h2h[-4:],
-            "home_last": last_game_by_team.get(hq, ""),
-            "away_last": last_game_by_team.get(aq, ""),
-            "next_rematch": next_rematch_str,
-        }
-    return form_by_team, last_game_by_team, h2h_obj
+    if h_wins > a_wins:
+        summ = f"올 시즌 맞대결: {hq} {h_wins}승 {a_wins}패 우위"
+    elif a_wins > h_wins:
+        summ = f"올 시즌 맞대결: {aq} {a_wins}승 {h_wins}패 우위"
+    elif h_wins:
+        summ = f"올 시즌 맞대결: {h_wins}승 {a_wins}패 백중세"
+    else:
+        summ = f"올 시즌 첫 맞대결 ({hq} vs {aq})"
+    return {
+        "home": hq,
+        "away": aq,
+        "home_wins": h_wins,
+        "away_wins": a_wins,
+        "summary": summ,
+        "past_games": past[-4:],
+        "home_last": last_by_team.get(hq, ""),
+        "away_last": last_by_team.get(aq, ""),
+        "next_rematch": next_rematch,
+        "is_sample": False,
+    }
 
 
 def _fetch_daum_kr_standings_ssr_v4624(cu: str) -> Optional[List[Dict[str, Any]]]:
@@ -22551,6 +22552,143 @@ def _fetch_official_kr_standings_v4700(cu: str) -> Tuple[Optional[List[Dict[str,
     return None, ""
 
 
+_KR_SCHED_CACHE_V4710: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
+_KR_SCHED_FAIL_AT_V4710: Dict[str, float] = {}
+
+
+def _parse_kovo_game_schedule_v4710(payload: Any) -> Dict[str, List[Dict[str, Any]]]:
+    """KOVO user-api /stat/game-schedule payload -> {VLEAGUE_M: games, VLEAGUE_W: games} (gender 1 men, 2 women).
+    Only games with result W/L are final; the rest keep hs/as None."""
+    content = payload.get("content") if isinstance(payload, dict) else payload
+    out: Dict[str, List[Dict[str, Any]]] = {"VLEAGUE_M": [], "VLEAGUE_W": []}
+    for it in content if isinstance(content, list) else []:
+        if not isinstance(it, dict):
+            continue
+        cu = {"1": "VLEAGUE_M", "2": "VLEAGUE_W"}.get(str(it.get("gender") or ""))
+        ymd = str(it.get("gdate") or "")
+        home, away = str(it.get("hsname") or "").strip(), str(it.get("asname") or "").strip()
+        if not cu or str(it.get("leagueCode") or "") != "201" or not re.match(r"^\d{4}-\d{2}-\d{2}$", ymd) or not home or not away:
+            continue
+        hs: Optional[int] = None
+        as_: Optional[int] = None
+        if str(it.get("result") or "") in ("W", "L"):
+            try:
+                hs, as_ = int(it["hspoint"]), int(it["aspoint"])
+            except (KeyError, TypeError, ValueError):
+                hs = as_ = None
+        out[cu].append({
+            "date": ymd, "time": str(it.get("gstime") or "")[:5], "home": home, "away": away,
+            "hs": hs, "as": as_, "venue": str(it.get("place") or "").strip(),
+        })
+    return out
+
+
+def _fetch_kovo_official_schedule_v4710() -> Dict[str, List[Dict[str, Any]]]:
+    hdr = {"Accept-Language": "ko", "Referer": "https://kovo.co.kr/", "Accept": "application/json"}
+    try:
+        seasons = json.loads(_official_http_v4700("https://user-api.kovo.co.kr/stat/season-list?gcode=001", headers=hdr) or "null")
+    except ValueError:
+        seasons = None
+    s_list = seasons.get("payload") if isinstance(seasons, dict) else None
+    if not isinstance(s_list, list):
+        return {}
+    cand = sorted((x for x in s_list if isinstance(x, dict) and x.get("seasonCode")), key=lambda x: str(x["seasonCode"]), reverse=True)
+    for sea in cand[:2]:
+        if not any(str(g.get("leagueCode")) == "201" for g in (sea.get("leagues") or []) if isinstance(g, dict)):
+            continue
+        q = urllib.parse.urlencode({"seasonCode": sea["seasonCode"], "leagueCode": "201"})
+        try:
+            js = json.loads(_official_http_v4700(f"https://user-api.kovo.co.kr/stat/game-schedule?{q}", headers=hdr) or "null")
+        except ValueError:
+            js = None
+        parsed = _parse_kovo_game_schedule_v4710(js.get("payload") if isinstance(js, dict) else None)
+        if parsed["VLEAGUE_M"] and parsed["VLEAGUE_W"]:
+            return parsed
+    return {}
+
+
+def _parse_wkbl_schedule_month_v4710(html_txt: str, ym: str) -> List[Dict[str, Any]]:
+    """One month of wkbl.or.kr /game/sch/schedule1.asp (calendar view). The first team listed is the home team.
+    [] unless the page really is month ym (yyyymm)."""
+    if not re.search(rf'value="{re.escape(ym)}"\s+selected', html_txt or ""):
+        return []
+    games: List[Dict[str, Any]] = []
+    for td in re.findall(r"<td\b[^>]*>(.*?)</td>", html_txt, flags=re.I | re.S):
+        m_day = re.search(r'class="date_day"[^>]*>\s*(\d{1,2})\s*<', td)
+        if not m_day:
+            continue
+        ymd = f"{ym[:4]}-{ym[4:6]}-{int(m_day.group(1)):02d}"
+        for blk in re.findall(r'class="info_game"(.*?)</div>', td, flags=re.S):
+            teams = [_html_lib.unescape(re.sub(r"<[^>]+>", "", t)).strip()
+                     for t in re.findall(r'<span class="language"[^>]*>(.*?)</span>', blk, flags=re.S)]
+            teams = [t for t in teams if t]
+            if len(teams) < 2:
+                continue
+            m_sc = re.search(r"\[\s*<em>\s*(\d+)\s*</em>\s*vs\s*<em>\s*(\d+)\s*</em>\s*\]", blk)
+            games.append({
+                "date": ymd, "time": "", "home": _WKBL_TEAM_NAMES_V4700.get(teams[0], teams[0]),
+                "away": _WKBL_TEAM_NAMES_V4700.get(teams[1], teams[1]),
+                "hs": int(m_sc.group(1)) if m_sc else None, "as": int(m_sc.group(2)) if m_sc else None, "venue": "",
+            })
+    return games
+
+
+def _fetch_wkbl_official_schedule_v4710() -> Optional[List[Dict[str, Any]]]:
+    base = "https://www.wkbl.or.kr/game/sch/schedule1.asp"
+    page = _official_http_v4700(base)
+    m_sea = re.search(r'name="season_gu".*?<option value="(\d{3})" selected', page or "", flags=re.S)
+    m_sel = re.search(r'<select name="ym"[^>]*>(.*?)</select>', page or "", flags=re.S)
+    if not m_sea or not m_sel:
+        return None
+    months = sorted(set(re.findall(r'<option value="(20\d{4})"', m_sel.group(1))))
+    if not months:
+        return None
+    this_ym = _kst_today_ymd_v4710().replace("-", "")[:6]
+
+    def load(ym: str) -> List[Dict[str, Any]]:
+        if re.search(rf'value="{ym}"\s+selected', page):
+            return _parse_wkbl_schedule_month_v4710(page, ym)
+        q = urllib.parse.urlencode({"season_gu": m_sea.group(1), "gun": "1", "ym": ym})
+        return _parse_wkbl_schedule_month_v4710(_official_http_v4700(f"{base}?{q}", headers={"Referer": base}), ym)
+
+    with ThreadPoolExecutor(max_workers=min(4, len(months))) as pool:
+        per_month = list(pool.map(load, months))
+    games: List[Dict[str, Any]] = []
+    for ym, rows in zip(months, per_month):
+        if not rows and ym <= this_ym:
+            return None          # a played month is missing: the season record would be wrong
+        games.extend(rows)       # later months are only for the next rematch
+    return games or None
+
+
+def _fetch_official_kr_schedule_v4710(cu: str) -> Tuple[Optional[List[Dict[str, Any]]], str]:
+    """Season games (results and fixtures) from the leagues' own sites: WKBL (wkbl.or.kr) and
+    V-League (KOVO user-api). KBL is not connected yet. Returns (games or None, source label)."""
+    src_map = {"WKBL": "WKBL 공식 일정·결과", "VLEAGUE_M": "KOVO 공식 일정·결과", "VLEAGUE_W": "KOVO 공식 일정·결과"}
+    if cu not in src_map:
+        return None, ""
+    now_m = time.monotonic()
+    cached = _KR_SCHED_CACHE_V4710.get(cu)
+    if cached and (now_m - cached[0]) < _OFFICIAL_KR_CACHE_TTL_V4700:
+        return [dict(x) for x in cached[1]], src_map[cu]
+    fam = "WKBL" if cu == "WKBL" else "KOVO"
+    if (now_m - _KR_SCHED_FAIL_AT_V4710.get(fam, -1e9)) < _OFFICIAL_KR_FAIL_TTL_V4700:
+        return None, ""
+    if cu == "WKBL":
+        games = _fetch_wkbl_official_schedule_v4710()
+        if games:
+            _KR_SCHED_CACHE_V4710[cu] = (now_m, [dict(x) for x in games])
+            return games, src_map[cu]
+    else:
+        both = _fetch_kovo_official_schedule_v4710()
+        if both:
+            for k, v in both.items():
+                _KR_SCHED_CACHE_V4710[k] = (now_m, [dict(x) for x in v])
+            return [dict(x) for x in both[cu]], src_map[cu]
+    _KR_SCHED_FAIL_AT_V4710[fam] = now_m
+    return None, ""
+
+
 def _build_domestic_bball_standings_v341(code: str, home_q: str = "", away_q: str = "") -> Dict[str, Any]:
     cu = _normalize_dom_lg_code_v4624(code)
     is_vb = cu in ("VLEAGUE_M", "VLEAGUE_W")
@@ -22563,7 +22701,14 @@ def _build_domestic_bball_standings_v341(code: str, home_q: str = "", away_q: st
     lg_full = lg_full_map[cu]
     po_cut = 3 if is_vb else (4 if cu == "WKBL" else 6)
 
-    _, _, h2h_obj = _compute_club_form_and_h2h_from_cal_v4624(cu, home_q, away_q)
+    # 맞대결(h2h)은 리그 공식 일정·결과로만 만든다. 연동이 안 되면(KBL 포함) 아예 내보내지 않는다.
+    h2h_obj: Optional[Dict[str, Any]] = None
+    if home_q and away_q:
+        sched_games, sched_src = _fetch_official_kr_schedule_v4710(cu)
+        if sched_games:
+            h2h_obj = _compute_h2h_from_games_v4710(cu, home_q, away_q, sched_games)
+            if h2h_obj is not None:
+                h2h_obj["source"] = sched_src
     live_ssr_rows, live_src = _fetch_official_kr_standings_v4700(cu)
     if not live_ssr_rows:
         live_ssr_rows, live_src = _fetch_daum_kr_standings_ssr_v4624(cu), "공식 기록실 실시간 연동"
