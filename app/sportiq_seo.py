@@ -138,13 +138,13 @@ def set_robots(html_text: str, content: str) -> str:
 # --------------------------------------------------------------------------
 # Page shell
 # --------------------------------------------------------------------------
-_CSS = (
-    "body{margin:0;background:#1a1d23;color:#f3f5f7;font-family:Pretendard,system-ui,sans-serif;line-height:1.5}"
-    "a{color:#ff6372}header,main,footer{max-width:960px;margin:0 auto;padding:16px}"
+home_links_html = (
+    "body{margin:0;background:#1a1d23;color:#f6f8fb;font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;font-weight:450;letter-spacing:-0.014em;line-height:1.65;word-break:keep-all;font-synthesis:none}@media (-webkit-min-device-pixel-ratio:2),(min-resolution:192dpi){body{-webkit-font-smoothing:antialiased}}"
+    "a{color:#6cb2ff}a:hover{color:#539bf5}header,main,footer{max-width:960px;margin:0 auto;padding:16px}"
     "nav a{margin-right:14px;font-weight:600}h1{font-size:1.6rem;margin:.4em 0}"
     "h2{font-size:1.15rem;margin:1.4em 0 .4em;color:#ffd166}table{width:100%;border-collapse:collapse;font-size:.92rem}"
-    "th,td{padding:6px 8px;border-bottom:1px solid #2c3038;text-align:left}th{color:#c4c9d1;font-weight:600}"
-    ".num{text-align:right;font-variant-numeric:tabular-nums}.muted{color:#c4c9d1;font-size:.88rem}"
+    "th,td{padding:6px 8px;border-bottom:1px solid #2c3038;text-align:left;font-variant-numeric:tabular-nums}th{color:#d2dae6;font-weight:600}"
+    ".num{text-align:right;font-variant-numeric:tabular-nums}.muted{color:#aeb8c7;font-size:.88rem}"
     ".live{color:#ff4d5e;font-weight:700}.note{background:#22262e;padding:12px;border-radius:8px}"
     "ul.grid{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}"
     "ul.grid a{display:block;padding:8px 12px;background:#22262e;border-radius:8px}"
@@ -194,7 +194,9 @@ def _page(path: str, title: str, desc: str, h1: str, body: str, ld: Optional[Dic
         f'<meta name="twitter:title" content="{_e(title)}" />\n'
         f'<meta name="twitter:description" content="{_e(desc)}" />\n'
         '<link rel="apple-touch-icon" href="/apple-touch-icon.png" />\n'
-        f"<style>{_CSS}</style>\n{ld_html}\n</head>\n<body>\n"
+        '<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />\n'
+        '<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />\n'
+      f"<style>{_CSS}</style>\n{ld_html}\n</head>\n<body>\n"
         '<header><nav><a href="/">SportIQ 홈</a><a href="/livescore">라이브스코어</a>'
         '<a href="/standings">리그 순위표</a><a href="/picks">3줄 퀵 픽</a><a href="/">승부예측 투표·커뮤니티</a></nav></header>\n'
         f"<main>\n<h1>{_e(h1)}</h1>\n{body}\n</main>\n"
@@ -665,8 +667,8 @@ def home_links_html() -> str:
         "border-radius:999px;background:#ff4d5e;color:#14161b;font-weight:800}"
         f"#{HOME_LINKS_ID} a.sq-qp-cta:hover{{background:#ff6372;color:#fff}}"
         "#sqTopQuickPickBtn{display:inline-flex;align-items:center;gap:4px;padding:6px 11px;border-radius:999px;"
-        "background:rgba(255,77,94,.16);border:1px solid rgba(255,77,94,.55);color:#ff8590;font-size:12px;"
-        "font-weight:800;text-decoration:none;white-space:nowrap;flex-shrink:0}"
+        "background:rgba(255,77,94,.16);border:1px solid rgba(255,77,94,.55);color:#ff8590;font-size:12.5px;"
+        "font-weight:700;letter-spacing:-0.01em;text-decoration:none;white-space:nowrap;flex-shrink:0}"
         "#sqTopQuickPickBtn:hover{background:#ff4d5e;color:#14161b}"
         "@media(max-width:640px){#sqTopQuickPickBtn{padding:5px 8px;font-size:11px}}"
     )
