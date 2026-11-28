@@ -196,7 +196,7 @@ def _page(path: str, title: str, desc: str, h1: str, body: str, ld: Optional[Dic
         '<link rel="apple-touch-icon" href="/apple-touch-icon.png" />\n'
         '<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />\n'
         '<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />\n'
-      f"<style>{_CSS}</style>\n{ld_html}\n</head>\n<body>\n"
+        f"<style>{_CSS}</style>\n{ld_html}\n</head>\n<body>\n"
         '<header><nav><a href="/">SportIQ 홈</a><a href="/livescore">라이브스코어</a>'
         '<a href="/standings">리그 순위표</a><a href="/picks">3줄 퀵 픽</a><a href="/">승부예측 투표·커뮤니티</a></nav></header>\n'
         f"<main>\n<h1>{_e(h1)}</h1>\n{body}\n</main>\n"
