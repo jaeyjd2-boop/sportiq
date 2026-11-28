@@ -138,7 +138,7 @@ def set_robots(html_text: str, content: str) -> str:
 # --------------------------------------------------------------------------
 # Page shell
 # --------------------------------------------------------------------------
-home_links_html = (
+_CSS = (
     "body{margin:0;background:#1a1d23;color:#f6f8fb;font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;font-weight:450;letter-spacing:-0.014em;line-height:1.65;word-break:keep-all;font-synthesis:none}@media (-webkit-min-device-pixel-ratio:2),(min-resolution:192dpi){body{-webkit-font-smoothing:antialiased}}"
     "a{color:#6cb2ff}a:hover{color:#539bf5}header,main,footer{max-width:960px;margin:0 auto;padding:16px}"
     "nav a{margin-right:14px;font-weight:600}h1{font-size:1.6rem;margin:.4em 0}"
