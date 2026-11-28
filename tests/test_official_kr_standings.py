@@ -1,6 +1,7 @@
-"""WKBL and V-League standings from the leagues' own public sites.
+"""KBL, WKBL and V-League standings from the leagues' own public sites.
 
 Fixtures are copies of the real responses on 2026-11-28:
+- api.kbl.or.kr /league/rank/team (headers as sent by www.kbl.or.kr)
 - wkbl.or.kr /game/ajax/ajax_team_rank.asp (season_gu=047, gun=1)
 - user-api.kovo.co.kr /stat/season-list?gcode=001 (last two seasons) and
   /stat/league/team-rank?seasonCode=023&leagueCode=201
@@ -20,10 +21,14 @@ FIX = Path(__file__).parent / "fixtures" / "kr_official"
 WKBL_AJAX = (FIX / "wkbl_ajax_team_rank.html").read_text(encoding="utf-8")
 KOVO_SEASONS = (FIX / "kovo_season_list.json").read_text(encoding="utf-8")
 KOVO_RANK = (FIX / "kovo_team_rank.json").read_text(encoding="utf-8")
+KBL_RANK = (FIX / "kbl_league_rank_team.json").read_text(encoding="utf-8")
 WKBL_PAGE = "<script>$(function() {\n\tfnTeamRank('047', '2026-2027', '1');\n});</script>"
 
 
 def fake_http(url, data=None, headers=None, timeout=4.0):
+    if url == "https://api.kbl.or.kr/league/rank/team":
+        # The API refuses requests without the web client's headers.
+        return KBL_RANK if (headers or {}).get("Channel") == "WEB" and (headers or {}).get("TeamCode") == "XX" else ""
     if url == "https://www.wkbl.or.kr/game/team_rank.asp":
         return WKBL_PAGE
     if url == "https://www.wkbl.or.kr/game/ajax/ajax_team_rank.asp":
@@ -118,9 +123,40 @@ class KovoOfficialTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
 
 
-class KblStillSampleTests(unittest.TestCase):
-    def test_kbl_has_no_official_source_yet(self):
+class KblOfficialTests(unittest.TestCase):
+    def test_parses_official_table(self):
         res = build("KBL")
+        self.assertIs(res["is_sample"], False)
+        self.assertEqual(res["source"], "KBL 공식 기록 실시간 연동")
+        rows = res["standings"]
+        self.assertEqual(len(rows), 10)
+        top = rows[0]
+        self.assertEqual((top["team"], top["gp"], top["w"], top["l"], top["pts_label"], top["gb"]), ("서울 삼성", 15, 12, 3, ".800", "-"))
+        self.assertEqual((top["home_record"], top["away_record"], top["streak_ko"]), ("6-2", "6-1", "1연승"))
+        # lastRecord is newest first; form is oldest -> newest, so the newest result is last.
+        self.assertEqual(top["form"], ["W", "L", "W", "L", "W"])
+        db = next(r for r in rows if r["team"] == "원주 DB")
+        self.assertEqual((db["form"][-2:], db["streak_ko"], db["gb"]), (["L", "L"], "2연패", "4.5"))
+        self.assertEqual([r["rank"] for r in rows][4:8], [5, 5, 5, 5])   # four-way tie as the league shows it
+        self.assertEqual(sum(1 for r in rows if r["zone"]), 8)            # ranks 1..6 incl. the tie at 5
+        for r in rows:
+            self.assertNotIn("gf", r)
+
+    def test_live_form_not_replaced_by_calendar(self):
+        reset()
+        with patch.object(lr, "_official_http_v4700", side_effect=fake_http),                 patch.object(lr, "_http_fetch_text_v4616", return_value=""),                 patch.object(lr, "_compute_club_form_and_h2h_from_cal_v4624", return_value=({"서울 삼성": ["L"] * 5}, {}, None)):
+            res = lr._build_domestic_bball_standings_v341("KBL")
+        self.assertEqual(res["standings"][0]["form"], ["W", "L", "W", "L", "W"])
+
+    def test_vleague_rows_ignore_calendar_form(self):
+        reset()
+        with patch.object(lr, "_official_http_v4700", side_effect=fake_http),                 patch.object(lr, "_http_fetch_text_v4616", return_value=""),                 patch.object(lr, "_compute_club_form_and_h2h_from_cal_v4624", return_value=({"한국전력": ["W"] * 5}, {}, None)):
+            res = lr._build_domestic_bball_standings_v341("VLEAGUE_M")
+        kepco = next(r for r in res["standings"] if r["team"] == "한국전력")
+        self.assertEqual((kepco["form"], kepco["streak_ko"]), ([], "1패"))
+
+    def test_falls_back_to_sample_when_api_refuses(self):
+        res = build("KBL", http=lambda *a, **k: '{"resultCode":"Fail","errorCode":400}')
         self.assertIs(res["is_sample"], True)
 
 

@@ -22475,23 +22475,71 @@ def _fetch_kovo_official_standings_v4700() -> Dict[str, List[Dict[str, Any]]]:
     return {}
 
 
+def _parse_kbl_team_rank_v4700(payload: Any) -> List[Dict[str, Any]]:
+    """api.kbl.or.kr /league/rank/team list -> rows. lastRecord is newest first (1 = win)."""
+    rows: List[Dict[str, Any]] = []
+    for it in payload if isinstance(payload, list) else []:
+        if not isinstance(it, dict):
+            continue
+        try:
+            rk, w, l = int(it["rank"]), int(it["win"]), int(it["loss"])
+            d = int(it.get("draw") or 0)
+            gb = float(it.get("winDiff") or 0.0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        team = str(it.get("tname") or "").strip()
+        if not team:
+            continue
+        pct_milli = int(round(w * 1000.0 / (w + l))) if (w + l) else 0
+        pct_lbl = f".{pct_milli:03d}" if pct_milli < 1000 else "1.000"
+        last = [x for x in (it.get("lastRecord") or []) if x in (0, 1)]
+        cw, cl = int(it.get("contiWin") or 0), int(it.get("contiLoss") or 0)
+        rows.append({
+            "rank": rk, "team": team, "gp": w + l + d, "w": w, "d": d, "l": l,
+            "pts": pct_milli, "pts_label": pct_lbl, "win_pct": pct_lbl,
+            "gb": "-" if gb == 0 else (f"{gb:.1f}".rstrip("0").rstrip(".")),
+            "home_record": f"{int(it.get('hwin') or 0)}-{int(it.get('hloss') or 0)}",
+            "away_record": f"{int(it.get('awin') or 0)}-{int(it.get('aloss') or 0)}",
+            "streak_ko": f"{cw}연승" if cw else (f"{cl}연패" if cl else ""),
+            # oldest -> newest, like the calendar-derived form elsewhere in this module
+            "form": ["W" if x == 1 else "L" for x in reversed(last[:5])],
+            "zone": "플레이오프" if rk <= 6 else "",
+        })
+    rows.sort(key=lambda r: r["rank"])
+    return rows
+
+
+def _fetch_kbl_official_standings_v4700() -> Optional[List[Dict[str, Any]]]:
+    # Same request the public www.kbl.or.kr page makes (Channel/TeamCode are its web-client headers).
+    hdr = {
+        "Accept": "application/json", "Origin": "https://www.kbl.or.kr", "Referer": "https://www.kbl.or.kr/",
+        "Channel": "WEB", "TeamCode": "XX", "X-Requested-With": "XMLHttpRequest", "lang": "ko",
+    }
+    try:
+        js = json.loads(_official_http_v4700("https://api.kbl.or.kr/league/rank/team", headers=hdr) or "null")
+    except ValueError:
+        return None
+    rows = _parse_kbl_team_rank_v4700(js)
+    return rows if len(rows) == 10 else None
+
+
 def _fetch_official_kr_standings_v4700(cu: str) -> Tuple[Optional[List[Dict[str, Any]]], str]:
-    """Live standings from the leagues' own public sites: WKBL (wkbl.or.kr) and V-League (KOVO user-api).
-    KBL has no public source wired yet. Returns (rows or None, source label)."""
-    src_map = {"WKBL": "WKBL 공식 기록 실시간 연동", "VLEAGUE_M": "KOVO 공식 기록 실시간 연동", "VLEAGUE_W": "KOVO 공식 기록 실시간 연동"}
+    """Live standings from the leagues' own public sites: KBL (api.kbl.or.kr), WKBL (wkbl.or.kr)
+    and V-League (KOVO user-api). Returns (rows or None, source label)."""
+    src_map = {"KBL": "KBL 공식 기록 실시간 연동", "WKBL": "WKBL 공식 기록 실시간 연동", "VLEAGUE_M": "KOVO 공식 기록 실시간 연동", "VLEAGUE_W": "KOVO 공식 기록 실시간 연동"}
     if cu not in src_map:
         return None, ""
     now_m = time.monotonic()
     cached = _DOM_STANDINGS_SSR_CACHE_V4624.get(f"official_{cu}")
     if cached and (now_m - cached[0]) < _OFFICIAL_KR_CACHE_TTL_V4700:
         return [dict(x) for x in cached[1]], src_map[cu]
-    fam = "WKBL" if cu == "WKBL" else "KOVO"
+    fam = cu if cu in ("KBL", "WKBL") else "KOVO"
     if (now_m - _OFFICIAL_KR_FAIL_AT_V4700.get(fam, -1e9)) < _OFFICIAL_KR_FAIL_TTL_V4700:
         return None, ""
-    if cu == "WKBL":
-        rows = _fetch_wkbl_official_standings_v4700()
+    if cu in ("KBL", "WKBL"):
+        rows = _fetch_kbl_official_standings_v4700() if cu == "KBL" else _fetch_wkbl_official_standings_v4700()
         if rows:
-            _DOM_STANDINGS_SSR_CACHE_V4624["official_WKBL"] = (now_m, [dict(x) for x in rows])
+            _DOM_STANDINGS_SSR_CACHE_V4624[f"official_{cu}"] = (now_m, [dict(x) for x in rows])
             return rows, src_map[cu]
     else:
         both = _fetch_kovo_official_standings_v4700()
@@ -22515,7 +22563,7 @@ def _build_domestic_bball_standings_v341(code: str, home_q: str = "", away_q: st
     lg_full = lg_full_map[cu]
     po_cut = 3 if is_vb else (4 if cu == "WKBL" else 6)
 
-    form_cal, _, h2h_obj = _compute_club_form_and_h2h_from_cal_v4624(cu, home_q, away_q)
+    _, _, h2h_obj = _compute_club_form_and_h2h_from_cal_v4624(cu, home_q, away_q)
     live_ssr_rows, live_src = _fetch_official_kr_standings_v4700(cu)
     if not live_ssr_rows:
         live_ssr_rows, live_src = _fetch_daum_kr_standings_ssr_v4624(cu), "공식 기록실 실시간 연동"
@@ -22526,9 +22574,9 @@ def _build_domestic_bball_standings_v341(code: str, home_q: str = "", away_q: st
         src_lbl = live_src
         for r in live_ssr_rows:
             r_cp = dict(r)
-            # 최근 5경기는 실제 경기 결과(일정 캘린더)에서만 채운다. 없으면 비워 둔다(하드코딩 값과 섞지 않음).
-            cal_fm = form_cal.get(r_cp["team"])
-            r_cp["form"] = list(cal_fm[-5:]) if cal_fm else []
+            # 최근 5경기는 실시간 출처가 준 값(KBL)만 쓴다. 코드에 적힌 시즌 일정(_OFFICIAL_KOVO_WKBL_SEASON_2627_V4622)은
+            # 갱신되지 않는 하드코딩 데이터라 실시간 순위와 섞지 않는다. 없으면 비워 둔다.
+            r_cp["form"] = list(r_cp.get("form") or [])[-5:]
             rows.append(r_cp)
     else:
         # 실시간 연동 실패 시 하드코딩 예시 표. 공식 순위처럼 표시하지 않는다.

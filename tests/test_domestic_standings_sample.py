@@ -91,10 +91,11 @@ class LiveRowsNotMixedTests(unittest.TestCase):
         # Leaders have no live source yet.
         self.assertIs(res["leaders_is_sample"], True)
 
-    def test_live_form_comes_only_from_calendar(self):
+    def test_live_rows_ignore_hardcoded_calendar_form(self):
+        # The season calendar is a hardcoded snapshot; it must not fill live rows.
         res = build("KBL", daum_bball_html(KBL_TEAMS), form_cal={"서울 SK": ["L", "W", "L", "W", "W", "L"]})
         by_tm = {r["team"]: r for r in res["standings"]}
-        self.assertEqual(by_tm["서울 SK"]["form"], ["W", "L", "W", "W", "L"])
+        self.assertEqual(by_tm["서울 SK"]["form"], [])
         self.assertEqual(by_tm["서울 삼성"]["form"], [])
 
     def test_vleague_live_rows_keep_daum_values(self):
