@@ -624,7 +624,8 @@ GYEONGGIPAN = "https://gyeonggipan.com"
 SISTER_WATCH_HTML = (
     "<h2>무엇을 볼까 · 시청 가이드 (경기판)</h2><ul>"
     f'<li><a href="{GYEONGGIPAN}/this-week/">이번 주 볼만한 경기</a></li>'
-    f'<li><a href="{GYEONGGIPAN}/previews/">경기 프리뷰·관전 포인트</a></li>'
+    f'<li><a href="{GYEONGGIPAN}/previews/">경기별 관전 포인트</a></li>'
+    f'<li><a href="{GYEONGGIPAN}/watch/">리그별 중계 안내</a></li>'
     f'<li><a href="{GYEONGGIPAN}/guides/">종목별 보는 법</a></li></ul>'
 )
 
