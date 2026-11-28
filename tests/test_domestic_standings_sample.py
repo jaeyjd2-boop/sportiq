@@ -47,7 +47,7 @@ def reset():
 def build(code, html, form_cal=None):
     reset()
     with patch.object(lr, "_official_http_v4700", return_value=""),             patch.object(lr, "_http_fetch_text_v4616", return_value=html), \
-            patch.object(lr, "_compute_club_form_and_h2h_from_cal_v4624", return_value=(form_cal or {}, {}, None)):
+            patch.object(lr, "_OFFICIAL_KOVO_WKBL_SEASON_2627_V4622", form_cal or {}):
         return lr._build_domestic_bball_standings_v341(code)
 
 
@@ -93,7 +93,7 @@ class LiveRowsNotMixedTests(unittest.TestCase):
 
     def test_live_rows_ignore_hardcoded_calendar_form(self):
         # The season calendar is a hardcoded snapshot; it must not fill live rows.
-        res = build("KBL", daum_bball_html(KBL_TEAMS), form_cal={"서울 SK": ["L", "W", "L", "W", "W", "L"]})
+        res = build("KBL", daum_bball_html(KBL_TEAMS), form_cal={f"2026-11-{d:02d}": [["KBL", "19:00", "서울 SK", "원주 DB", 50 + d, 70, "가짜 체육관"]] for d in range(20, 26)})
         by_tm = {r["team"]: r for r in res["standings"]}
         self.assertEqual(by_tm["서울 SK"]["form"], [])
         self.assertEqual(by_tm["서울 삼성"]["form"], [])
