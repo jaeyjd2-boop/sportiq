@@ -94,6 +94,7 @@ STANDINGS_LEAGUES: Dict[str, Tuple[str, str]] = {
 PUBLIC_PATHS: List[Tuple[str, str, str]] = (
     [("/livescore", "always", "0.9"), ("/standings", "daily", "0.8")]
     + [(f"/standings/{slug}", "daily", "0.7") for slug in STANDINGS_LEAGUES]
+    + [("/privacy", "yearly", "0.2")]
 )
 
 SPORT_KO = {
@@ -169,7 +170,7 @@ def _page(path: str, title: str, desc: str, h1: str, body: str, ld: Optional[Dic
     acc = ""
     for i, p in enumerate(parts, start=2):
         acc += "/" + p
-        name = {"livescore": "라이브스코어", "standings": "리그 순위표"}.get(p) or STANDINGS_LEAGUES.get(p, (None, p))[1]
+        name = {"livescore": "라이브스코어", "standings": "리그 순위표", "privacy": "개인정보처리방침"}.get(p) or STANDINGS_LEAGUES.get(p, (None, p))[1]
         crumbs["itemListElement"].append({"@type": "ListItem", "position": i, "name": name, "item": SITE + acc})
     lds = [crumbs] + ([ld] if ld else [])
     ld_html = "".join(
@@ -205,7 +206,7 @@ def _page(path: str, title: str, desc: str, h1: str, body: str, ld: Optional[Dic
         '<a href="/standings">리그 순위표</a><a href="/picks">3줄 퀵 픽</a><a href="/">승부예측 투표·커뮤니티</a></nav></header>\n'
         f"<main>\n<h1>{_e(h1)}</h1>\n{body}\n</main>\n"
         '<footer class="muted"><p>데이터: ESPN 등 공개 경기 정보. 실시간 화면과 승부예측 투표, 응원톡은 '
-        '<a href="/">SportIQ 홈</a>에서 이용할 수 있습니다.</p></footer>\n'
+        '<a href="/">SportIQ 홈</a>에서 이용할 수 있습니다.</p><p><a href="/privacy">개인정보처리방침</a></p></footer>\n'
         "</body>\n</html>\n"
     )
 
@@ -703,6 +704,7 @@ def home_links_html() -> str:
         f"{leagues}</ul>"
         + (f"<h2>지난 경기 결과</h2><ul>{days}</ul>" if days else "")
         + SISTER_WATCH_HTML
+        + '<h2>안내</h2><ul><li><a href="/privacy">개인정보처리방침</a></li></ul>'
         + f"</nav>{js}"
     )
 
