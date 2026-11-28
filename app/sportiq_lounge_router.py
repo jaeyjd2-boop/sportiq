@@ -1287,9 +1287,9 @@ _FRONTEND_V22_JS = r'''
       "  #sqV39AlertDrawer::-webkit-scrollbar { display: none; }",
       "}",
       "#dcToastWrap, #dcGoalToastHost {",
-      "  top: auto !important;",
-      "  bottom: 118px !important;",
-      "  right: 16px !important;",
+      "  top: 76px !important;",
+      "  bottom: auto !important;",
+      "  right: 20px !important;",
       "  z-index: 99975 !important;",
       "  pointer-events: none !important;",
       "  max-width: min(340px, calc(100vw - 28px)) !important;",
@@ -13939,7 +13939,7 @@ _FRONTEND_V22_JS = r'''
     try {
       if (!it.is_sample && typeof window.__sqLoadSisterLinks === "function") {
         var sqSisterBox = document.createElement("div");
-        sqSisterBox.style.cssText = "padding:10px 16px;border-top:1px solid #1e293b;display:flex;gap:8px;flex-wrap:wrap;";
+        sqSisterBox.style.cssText = "padding:10px 16px;border-top:1px solid #1e293b;display:flex;gap:8px;flex-wrap:wrap;min-height:58px;align-items:center;box-sizing:border-box;";
         (modal.firstElementChild || modal).appendChild(sqSisterBox);
         window.__sqLoadSisterLinks(it, sqSisterBox);
       }
