@@ -138,7 +138,7 @@ def set_robots(html_text: str, content: str) -> str:
 # --------------------------------------------------------------------------
 # Page shell
 # --------------------------------------------------------------------------
-home_links_html = (
+_CSS = (
     "body{margin:0;background:#1a1d23;color:#f6f8fb;font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;font-weight:450;letter-spacing:-0.014em;line-height:1.65;word-break:keep-all;font-synthesis:none}@media (-webkit-min-device-pixel-ratio:2),(min-resolution:192dpi){body{-webkit-font-smoothing:antialiased}}"
     "a{color:#6cb2ff}a:hover{color:#539bf5}header,main,footer{max-width:960px;margin:0 auto;padding:16px}"
     "nav a{margin-right:14px;font-weight:600}h1{font-size:1.6rem;margin:.4em 0}"
@@ -196,7 +196,7 @@ def _page(path: str, title: str, desc: str, h1: str, body: str, ld: Optional[Dic
         '<link rel="apple-touch-icon" href="/apple-touch-icon.png" />\n'
         '<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />\n'
         '<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />\n'
-      f"<style>{_CSS}</style>\n{ld_html}\n</head>\n<body>\n"
+        f"<style>{_CSS}</style>\n{ld_html}\n</head>\n<body>\n"
         '<header><nav><a href="/">SportIQ 홈</a><a href="/livescore">라이브스코어</a>'
         '<a href="/standings">리그 순위표</a><a href="/picks">3줄 퀵 픽</a><a href="/">승부예측 투표·커뮤니티</a></nav></header>\n'
         f"<main>\n<h1>{_e(h1)}</h1>\n{body}\n</main>\n"
