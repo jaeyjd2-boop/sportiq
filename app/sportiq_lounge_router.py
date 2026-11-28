@@ -22317,9 +22317,6 @@ def _fetch_daum_kr_standings_ssr_v4624(cu: str) -> Optional[List[Dict[str, Any]]
                 "w": w_i,
                 "d": 0,
                 "l": l_i,
-                "gf": w_i * 75,
-                "ga": l_i * 75,
-                "gd": (w_i - l_i) * 4,
                 "pts": pts_milli,
                 "pts_label": f".{pts_milli:03d}",
                 "win_pct": f".{pts_milli:03d}",
@@ -22330,26 +22327,6 @@ def _fetch_daum_kr_standings_ssr_v4624(cu: str) -> Optional[List[Dict[str, Any]]
 
     expected_n = 7 if cu in ("VLEAGUE_M", "VLEAGUE_W") else (6 if cu == "WKBL" else 10)
     if len(rows_out) == expected_n:
-        # Reconcile Men's V-League 2026-11-19 result (`대한항공 3:1 KB손해보험`) if Daum SSR lags at 4GP
-        if cu == "VLEAGUE_M":
-            by_tm = {r["team"]: r for r in rows_out}
-            if by_tm.get("대한항공", {}).get("gp") == 4 and by_tm.get("KB손해보험", {}).get("gp") == 4:
-                by_tm["대한항공"]["gp"] = 5
-                by_tm["대한항공"]["w"] += 1
-                by_tm["대한항공"]["pts"] += 3
-                by_tm["대한항공"]["pts_label"] = f"{by_tm['대한항공']['pts']}점"
-                by_tm["대한항공"]["gf"] += 97
-                by_tm["대한항공"]["ga"] += 90
-                by_tm["대한항공"]["gd"] = by_tm["대한항공"]["gf"] - by_tm["대한항공"]["ga"]
-                by_tm["KB손해보험"]["gp"] = 5
-                by_tm["KB손해보험"]["l"] += 1
-                by_tm["KB손해보험"]["gf"] += 90
-                by_tm["KB손해보험"]["ga"] += 97
-                by_tm["KB손해보험"]["gd"] = by_tm["KB손해보험"]["gf"] - by_tm["KB손해보험"]["ga"]
-                rows_out.sort(key=lambda r: (-r["pts"], -r["w"], -float(r.get("set_ratio") or 0.0), -r["gd"]))
-                for idx_r, r_it in enumerate(rows_out, start=1):
-                    r_it["rank"] = idx_r
-                    r_it["zone"] = "봄배구 PO" if idx_r <= po_cut else ""
         _DOM_STANDINGS_SSR_CACHE_V4624[cu] = (now_m, [dict(x) for x in rows_out])
         return rows_out
     return None
@@ -22370,35 +22347,28 @@ def _build_domestic_bball_standings_v341(code: str, home_q: str = "", away_q: st
     form_cal, _, h2h_obj = _compute_club_form_and_h2h_from_cal_v4624(cu, home_q, away_q)
     live_ssr_rows = _fetch_daum_kr_standings_ssr_v4624(cu)
 
-    fb_map = {
-        "KBL": _KBL_STANDINGS_V34,
-        "WKBL": _WKBL_STANDINGS_V34,
-        "VLEAGUE_M": _VLEAGUE_M_STANDINGS_V4624,
-        "VLEAGUE_W": _VLEAGUE_W_STANDINGS_V4624,
-    }
-    fb_rows = fb_map[cu]
-    fb_by_team = {tup[0]: tup for tup in fb_rows}
-
     rows: List[Dict[str, Any]] = []
+    is_sample = not live_ssr_rows
     if live_ssr_rows:
         src_lbl = "공식 기록실 실시간 연동"
         for r in live_ssr_rows:
-            tm_nm = r["team"]
-            fb_t = fb_by_team.get(tm_nm)
-            cal_fm = form_cal.get(tm_nm)
-            fm_list = list(cal_fm[-5:]) if cal_fm else (list(fb_t[8][:5]) if fb_t else ["W", "L"])
             r_cp = dict(r)
-            if fb_t and cu in ("KBL", "WKBL"):
-                r_cp["gf"], r_cp["ga"], r_cp["gd"] = fb_t[5], fb_t[6], fb_t[5] - fb_t[6]
-            r_cp["form"] = fm_list
+            # 최근 5경기는 실제 경기 결과(일정 캘린더)에서만 채운다. 없으면 비워 둔다(하드코딩 값과 섞지 않음).
+            cal_fm = form_cal.get(r_cp["team"])
+            r_cp["form"] = list(cal_fm[-5:]) if cal_fm else []
             rows.append(r_cp)
     else:
-        src_lbl = "2026-2027 공식 시즌 순위"
-        for i, tup in enumerate(fb_rows):
+        # 실시간 연동 실패 시 하드코딩 예시 표. 공식 순위처럼 표시하지 않는다.
+        src_lbl = "SportiQ 예시 데이터 (실시간 연동 실패)"
+        fb_map = {
+            "KBL": _KBL_STANDINGS_V34,
+            "WKBL": _WKBL_STANDINGS_V34,
+            "VLEAGUE_M": _VLEAGUE_M_STANDINGS_V4624,
+            "VLEAGUE_W": _VLEAGUE_W_STANDINGS_V4624,
+        }
+        for i, tup in enumerate(fb_map[cu]):
             t, gp, w, d, l, gf, ga, pts, fm = tup[:9]
             set_rat = tup[9] if len(tup) > 9 else ""
-            cal_fm = form_cal.get(t)
-            fm_list = list(cal_fm[-5:]) if cal_fm else list(fm[:5])
             row_d: Dict[str, Any] = {
                 "rank": i + 1,
                 "team": t,
@@ -22411,7 +22381,7 @@ def _build_domestic_bball_standings_v341(code: str, home_q: str = "", away_q: st
                 "gd": gf - ga,
                 "pts": pts,
                 "pts_label": f"{pts}점" if is_vb else f".{pts:03d}",
-                "form": fm_list,
+                "form": list(fm[:5]),
                 "zone": ("봄배구 PO" if is_vb else "플레이오프") if (i + 1) <= po_cut else "",
             }
             if is_vb and set_rat:
@@ -22430,10 +22400,15 @@ def _build_domestic_bball_standings_v341(code: str, home_q: str = "", away_q: st
         "league_name": lg_full,
         "sport": "volleyball" if is_vb else "basketball",
         "source": src_lbl,
+        "is_sample": is_sample,
+        # 리더보드는 아직 실시간 출처가 없어 항상 예시값이다.
+        "leaders_is_sample": True,
         "updated_at_kst": now_s,
         "standings": rows,
         "leaders": leaders,
     }
+    if is_sample:
+        res["sample_note"] = "실시간 순위 연동에 실패해 예시 데이터를 표시 중입니다(실제 순위 아님)."
     if h2h_obj is not None:
         res["h2h"] = h2h_obj
     return res
@@ -22530,9 +22505,10 @@ def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[st
     for r in rows:
         gp = max(1, r["gp"])
         ppg = (r["w"] / gp) * 3.0
-        elo = int(round(1550 + (ppg - 1.35) * 185 + (r["gd"] / gp) * (6 if is_vb else 18)))
+        gd_v = r.get("gd") or 0
+        elo = int(round(1550 + (ppg - 1.35) * 185 + (gd_v / gp) * (6 if is_vb else 18)))
         cur_val = r["pts"] if is_vb else r["w"]
-        meta.append({"team": r["team"], "cur": cur_val, "rem": max(1, tot_g - gp), "gd": r["gd"], "elo": elo, "tc": 0, "pc": 0, "ps": 0.0})
+        meta.append({"team": r["team"], "cur": cur_val, "rem": max(1, tot_g - gp), "gd": gd_v, "elo": elo, "tc": 0, "pc": 0, "ps": 0.0})
     avg_elo = sum(t["elo"] for t in meta) / max(1, len(meta))
     rng = _r.Random(20261120 + sum(ord(c) for c in cu))
     probs = [max(0.12, min(0.85, 1.0 / (1.0 + _m.pow(10.0, (avg_elo - t["elo"]) / 380.0)))) for t in meta]
@@ -22573,6 +22549,7 @@ def _build_domestic_bball_sim_v341(code: str, iterations: int = 5000) -> Dict[st
         "league_name": st["league_name"],
         "sport": st["sport"],
         "simulations": iters,
+        "is_sample": bool(st.get("is_sample")),
         "po_label": "봄배구 진출 확률" if is_vb else "플레이오프 진출 확률",
         "updated_at_kst": st["updated_at_kst"],
         "table": table,
@@ -24849,7 +24826,7 @@ def _build_ai_search_standings_brief_v4628(
         if lg in ("VLEAGUE_M", "VLEAGUE_W", "WKBL", "KBL"):
             st_obj = _build_domestic_bball_standings_v341(lg)
             rows_raw = st_obj.get("standings") or []
-            if not rows_raw:
+            if not rows_raw or st_obj.get("is_sample"):
                 continue
             is_vb = lg in ("VLEAGUE_M", "VLEAGUE_W")
             lg_name = str(st_obj.get("league_name") or lg)
