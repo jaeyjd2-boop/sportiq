@@ -473,8 +473,8 @@ def seo_robots_txt() -> Response:
 def seo_livescore_page(request: Request):
    try:
        return _param_guarded_response(_cached("livescore", build_livescore_html), request)
-    except Exception:
-      return _param_guarded_response(_page("/livescore", "Live Score | SportIQ", SHORT_DESC, "Live Score", "<p>Data is temporarily unavailable.</p>"), request)
+     except Exception:
+       return _param_guarded_response(_page("/livescore", "Live Score | SportIQ", SHORT_DESC, "Live Score", "<p>Data is temporarily unavailable.</p>"), request)
       
 
 @router.api_route("/standings", methods=["GET", "HEAD"], response_class=HTMLResponse)
