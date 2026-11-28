@@ -1,10 +1,12 @@
-"""Match-modal head-to-head (h2h) for WKBL and V-League from the leagues' own schedules.
+"""Match-modal head-to-head (h2h) for KBL, WKBL and V-League from the leagues' own schedules.
 
 Fixtures are copies of the real responses on 2026-11-28:
 - user-api.kovo.co.kr /stat/game-schedule?seasonCode=023&leagueCode=201
   (trimmed to games up to 2026-12-31; the real payload runs to April 2027)
 - wkbl.or.kr /game/sch/schedule1.asp (current month, 2026-11) and ?season_gu=047&gun=1&ym=202612
-KBL is not connected yet, so its h2h is left out rather than built from the old hardcoded calendar.
+- api.kbl.or.kr /match/list?fromDate=20260901&toDate=20270531&tcodeList=all (headers as sent by
+  www.kbl.or.kr; trimmed to games up to 2026-12-31; includes D-League and EASL rows)
+None of them comes from the old hardcoded calendar.
 No network: _official_http_v4700 is patched with a fake router.
 """
 import os
@@ -22,6 +24,8 @@ KOVO_SEASONS = (FIX / "kovo_season_list.json").read_text(encoding="utf-8")
 KOVO_RANK = (FIX / "kovo_team_rank.json").read_text(encoding="utf-8")
 KOVO_SCHED = (FIX / "kovo_game_schedule.json").read_text(encoding="utf-8")
 KBL_RANK = (FIX / "kbl_league_rank_team.json").read_text(encoding="utf-8")
+KBL_SCHED = (FIX / "kbl_match_list.json").read_text(encoding="utf-8")
+KBL_SCHED_URL = "https://api.kbl.or.kr/match/list?fromDate=20260901&toDate=20270531&tcodeList=all"
 WKBL_AJAX = (FIX / "wkbl_ajax_team_rank.html").read_text(encoding="utf-8")
 WKBL_NOV = (FIX / "wkbl_schedule_202611.html").read_text(encoding="utf-8")
 WKBL_DEC = (FIX / "wkbl_schedule_202612.html").read_text(encoding="utf-8")
@@ -33,6 +37,9 @@ WKBL_SCHED = "https://www.wkbl.or.kr/game/sch/schedule1.asp"
 def fake_http(url, data=None, headers=None, timeout=4.0):
     if url == "https://api.kbl.or.kr/league/rank/team":
         return KBL_RANK
+    if url == KBL_SCHED_URL:
+        # The API refuses requests without the web client's headers.
+        return KBL_SCHED if (headers or {}).get("Channel") == "WEB" and (headers or {}).get("TeamCode") == "XX" else ""
     if url == "https://www.wkbl.or.kr/game/team_rank.asp":
         return WKBL_RANK_PAGE
     if url == "https://www.wkbl.or.kr/game/ajax/ajax_team_rank.asp":
@@ -168,11 +175,27 @@ class KblAndCalendarTests(unittest.TestCase):
     def setUp(self):
         reset()
 
-    def test_kbl_h2h_not_shown(self):
-        calls = []
-        res = build("KBL", "서울 SK", "원주 DB", calls=calls)
+    def test_kbl_h2h_from_official_results(self):
+        h2h = build("KBL", "서울 SK", "원주 DB")["h2h"]
+        self.assertIs(h2h["is_sample"], False)
+        self.assertEqual(h2h["source"], "KBL 공식 일정·결과")
+        self.assertEqual(h2h["past_games"], ["11.08(일) 서울 SK 81 : 65 원주 DB (잠실학생체육관)"])
+        self.assertEqual((h2h["home_wins"], h2h["away_wins"]), (1, 0))
+        self.assertEqual(h2h["summary"], "올 시즌 맞대결: 서울 SK 1승 0패 우위")
+        self.assertEqual(h2h["next_rematch"], "12.05 (토) 16:30 원주 DB vs 서울 SK · 원주DB프로미아레나")
+
+    def test_kbl_only_regular_season(self):
+        import json
+        games = lr._parse_kbl_match_list_v4710(json.loads(KBL_SCHED))
+        teams = {g["home"] for g in games} | {g["away"] for g in games}
+        self.assertEqual(len(teams), 10)                  # no D-League / EASL clubs
+        self.assertNotIn("나가사키 벨카", teams)
+        self.assertTrue(all(g["hs"] is None for g in games if g["date"] > TODAY))
+
+    def test_kbl_refused_hides_h2h(self):
+        res = build("KBL", "서울 SK", "원주 DB", http=lambda u, *a, **k: "" if "match/list" in u else fake_http(u, *a, **k))
         self.assertNotIn("h2h", res)
-        self.assertEqual(calls, ["https://api.kbl.or.kr/league/rank/team"])   # standings only
+        self.assertIs(res["is_sample"], False)            # standings still live
 
     def test_hardcoded_calendar_not_used(self):
         poisoned = {TODAY: [["VLEAGUE_W", "14:00", "흥국생명", "GS칼텍스", 3, 0, "가짜 체육관"]]}

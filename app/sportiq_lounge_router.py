@@ -22661,21 +22661,65 @@ def _fetch_wkbl_official_schedule_v4710() -> Optional[List[Dict[str, Any]]]:
     return games or None
 
 
+def _parse_kbl_match_list_v4710(payload: Any) -> List[Dict[str, Any]]:
+    """api.kbl.or.kr /match/list -> regular-season games (seasonCategory R). Final only when isEnded is 1."""
+    games: List[Dict[str, Any]] = []
+    for it in payload if isinstance(payload, list) else []:
+        if not isinstance(it, dict) or str(it.get("seasonCategory") or "") != "R":
+            continue
+        ymd_raw = str(it.get("gameDate") or "")
+        home, away = str(it.get("tnameH") or "").strip(), str(it.get("tnameA") or "").strip()
+        if not re.match(r"^\d{8}$", ymd_raw) or not home or not away:
+            continue
+        hs: Optional[int] = None
+        as_: Optional[int] = None
+        if it.get("isEnded") in (1, "1", True):
+            try:
+                hs, as_ = int(it["scoreH"]), int(it["scoreA"])
+            except (KeyError, TypeError, ValueError):
+                hs = as_ = None
+        st = str(it.get("gameStart") or "")
+        games.append({
+            "date": f"{ymd_raw[:4]}-{ymd_raw[4:6]}-{ymd_raw[6:]}",
+            "time": f"{st[:2]}:{st[2:4]}" if re.match(r"^\d{4}$", st) else "",
+            "home": home, "away": away, "hs": hs, "as": as_,
+            "venue": str(it.get("stadiumnameF") or it.get("stadiumname") or "").strip(),
+        })
+    return games
+
+
+def _fetch_kbl_official_schedule_v4710() -> Optional[List[Dict[str, Any]]]:
+    # Same request www.kbl.or.kr's schedule page makes (getMatchList), with its web-client headers.
+    hdr = {
+        "Accept": "application/json", "Origin": "https://www.kbl.or.kr", "Referer": "https://www.kbl.or.kr/",
+        "Channel": "WEB", "TeamCode": "XX", "X-Requested-With": "XMLHttpRequest", "lang": "ko",
+    }
+    today = _kst_today_ymd_v4710()
+    y0 = int(today[:4]) if int(today[5:7]) >= 7 else int(today[:4]) - 1      # season runs Oct..Apr
+    q = urllib.parse.urlencode({"fromDate": f"{y0}0901", "toDate": f"{y0 + 1}0531", "tcodeList": "all"})
+    try:
+        js = json.loads(_official_http_v4700(f"https://api.kbl.or.kr/match/list?{q}", headers=hdr) or "null")
+    except ValueError:
+        return None
+    games = _parse_kbl_match_list_v4710(js)
+    return games or None
+
+
 def _fetch_official_kr_schedule_v4710(cu: str) -> Tuple[Optional[List[Dict[str, Any]]], str]:
-    """Season games (results and fixtures) from the leagues' own sites: WKBL (wkbl.or.kr) and
-    V-League (KOVO user-api). KBL is not connected yet. Returns (games or None, source label)."""
-    src_map = {"WKBL": "WKBL 공식 일정·결과", "VLEAGUE_M": "KOVO 공식 일정·결과", "VLEAGUE_W": "KOVO 공식 일정·결과"}
+    """Season games (results and fixtures) from the leagues' own sites: KBL (api.kbl.or.kr),
+    WKBL (wkbl.or.kr) and V-League (KOVO user-api). Returns (games or None, source label)."""
+    src_map = {"KBL": "KBL 공식 일정·결과", "WKBL": "WKBL 공식 일정·결과", "VLEAGUE_M": "KOVO 공식 일정·결과", "VLEAGUE_W": "KOVO 공식 일정·결과"}
     if cu not in src_map:
         return None, ""
     now_m = time.monotonic()
     cached = _KR_SCHED_CACHE_V4710.get(cu)
     if cached and (now_m - cached[0]) < _OFFICIAL_KR_CACHE_TTL_V4700:
         return [dict(x) for x in cached[1]], src_map[cu]
-    fam = "WKBL" if cu == "WKBL" else "KOVO"
+    fam = cu if cu in ("KBL", "WKBL") else "KOVO"
     if (now_m - _KR_SCHED_FAIL_AT_V4710.get(fam, -1e9)) < _OFFICIAL_KR_FAIL_TTL_V4700:
         return None, ""
-    if cu == "WKBL":
-        games = _fetch_wkbl_official_schedule_v4710()
+    if cu in ("KBL", "WKBL"):
+        games = _fetch_kbl_official_schedule_v4710() if cu == "KBL" else _fetch_wkbl_official_schedule_v4710()
         if games:
             _KR_SCHED_CACHE_V4710[cu] = (now_m, [dict(x) for x in games])
             return games, src_map[cu]
@@ -22701,7 +22745,7 @@ def _build_domestic_bball_standings_v341(code: str, home_q: str = "", away_q: st
     lg_full = lg_full_map[cu]
     po_cut = 3 if is_vb else (4 if cu == "WKBL" else 6)
 
-    # 맞대결(h2h)은 리그 공식 일정·결과로만 만든다. 연동이 안 되면(KBL 포함) 아예 내보내지 않는다.
+    # 맞대결(h2h)은 리그 공식 일정·결과로만 만든다. 연동이 안 되면 아예 내보내지 않는다.
     h2h_obj: Optional[Dict[str, Any]] = None
     if home_q and away_q:
         sched_games, sched_src = _fetch_official_kr_schedule_v4710(cu)
