@@ -649,24 +649,37 @@ def home_links_html() -> str:
         f"#{HOME_LINKS_ID}{{max-width:80rem;margin:24px auto 0;padding:16px;border-top:1px solid #2c3038;"
         "font-size:13px;color:#c4c9d1}"
         f"#{HOME_LINKS_ID} h2{{font-size:13px;font-weight:700;color:#f3f5f7;margin:10px 0 6px}}"
-        f"#{HOME_LINKS_ID} ul{{display:flex;flex-wrap:wrap;gap:6px 14px;list-style:none;margin:0;padding:0}}"
+        f"#{HOME_LINKS_ID} ul{{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;list-style:none;margin:0;padding:0}}"
         f"#{HOME_LINKS_ID} a{{color:#c4c9d1;text-decoration:none}}#{HOME_LINKS_ID} a:hover{{color:#ff6372}}"
-        "#sqQuickPickFab{position:fixed;right:16px;bottom:78px;z-index:45;display:inline-flex;align-items:center;"
-        "gap:6px;padding:10px 15px;border-radius:999px;background:#ff4d5e;color:#14161b;font-size:13px;"
-        "font-weight:800;text-decoration:none;box-shadow:0 8px 22px rgba(0,0,0,.42)}"
-        "#sqQuickPickFab:hover{background:#ff6372;color:#fff}"
+        f"#{HOME_LINKS_ID} a.sq-qp-cta{{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;"
+        "border-radius:999px;background:#ff4d5e;color:#14161b;font-weight:800}"
+        f"#{HOME_LINKS_ID} a.sq-qp-cta:hover{{background:#ff6372;color:#fff}}"
+        "#sqTopQuickPickBtn{display:inline-flex;align-items:center;gap:4px;padding:6px 11px;border-radius:999px;"
+        "background:rgba(255,77,94,.16);border:1px solid rgba(255,77,94,.55);color:#ff8590;font-size:12px;"
+        "font-weight:800;text-decoration:none;white-space:nowrap;flex-shrink:0}"
+        "#sqTopQuickPickBtn:hover{background:#ff4d5e;color:#14161b}"
+        "@media(max-width:640px){#sqTopQuickPickBtn{padding:5px 8px;font-size:11px}}"
+    )
+    js = (
+        "<script>(function(){if(document.getElementById('sqTopQuickPickBtn'))return;"
+        "var els=document.querySelectorAll('header button,header a,nav button,nav a,button');"
+        "for(var i=0;i<els.length;i++){var t=(els[i].textContent||'').trim();"
+        "if(t.indexOf('+ 분석 작성')!==-1&&els[i].parentElement){"
+        "var a=document.createElement('a');a.id='sqTopQuickPickBtn';a.href='/picks';a.textContent='⚡ 3줄 퀵 픽';"
+        "els[i].parentElement.insertBefore(a,els[i]);break;}}})();</script>"
     )
     return (
         f'<style>{css}</style><nav id="{HOME_LINKS_ID}" aria-label="SportIQ 바로가기">'
         + (f"<h2>공개 경기 분석과 리포트</h2><ul>{reports}</ul>" if reports else "")
         + '<h2>승부예측 3줄 퀵 픽 포럼</h2><ul>'
-        '<li><a href="/picks">오늘 경기 3줄 퀵 픽 바로 쓰기 · 전체 목록</a></li>'
+        '<li><a class="sq-qp-cta" href="/picks">⚡ 3줄 퀵 픽 바로 쓰기</a></li>'
+        '<li><a href="/picks">전체 3줄 퀵 픽 목록</a></li>'
         '<li><a href="/sitemap-picks.xml">3줄 퀵 픽 사이트맵</a></li></ul>'
         + '<h2>라이브스코어·순위표</h2><ul>'
         '<li><a href="/livescore">오늘 라이브스코어</a></li><li><a href="/standings">리그 순위표 전체</a></li>'
         f"{leagues}</ul>"
         + (f"<h2>지난 경기 결과</h2><ul>{days}</ul>" if days else "")
-        + '</nav><a id="sqQuickPickFab" href="/picks" aria-label="3줄 퀵 픽 바로 쓰기">⚡ 3줄 퀵 픽 쓰기</a>'
+        + f"</nav>{js}"
     )
 
 def _clean_home_head(html_text: str) -> str:
