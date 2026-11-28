@@ -61,6 +61,18 @@ class CardTests(unittest.TestCase):
             self.assertEqual(sl.upcoming_match_cards(now=NOW), [])
         rows.assert_not_called()
 
+    def test_football_names_use_soccer_tables_and_drop_accents(self):
+        calls = []
+
+        def ko(name, sport):
+            calls.append((name, sport))
+            return {"Deportivo Alaves": "알라베스"}.get(name)
+
+        with patch("app.sportiq_team_pages.korean_name", side_effect=ko):
+            self.assertEqual(sl._display_name("Deportivo Alavés", "football"), "알라베스")
+            self.assertEqual(sl._display_name("Unknown FC", "football"), "Unknown FC")
+        self.assertEqual(calls[:2], [("Deportivo Alavés", "soccer"), ("Deportivo Alaves", "soccer")])
+
     def test_league_codes(self):
         self.assertEqual(sl.pick_league_code("football", "Primera Division"), "LALIGA")
         self.assertEqual(sl.pick_league_code("football", "UEFA Champions League"), "UCL")
