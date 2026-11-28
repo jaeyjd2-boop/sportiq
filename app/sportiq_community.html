@@ -15,8 +15,9 @@
   <link rel="alternate icon" href="/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script>
@@ -25,19 +26,45 @@
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Pretendard', 'Inter', 'system-ui', 'sans-serif'],
+            sans: ['"Pretendard Variable"', 'Pretendard', 'Inter', '"Noto Sans KR"', '"Apple SD Gothic Neo"', '"Malgun Gothic"', 'system-ui', 'sans-serif'],
           },
           // billnojay colours: dark slate + nordic sapphire & glacier cyan (app/sportiq_theme.py TAILWIND_COLORS)
-          colors: {"slate":{"50":"#f8f9fa","100":"#f3f5f7","200":"#dde1e6","300":"#c4c9d1","400":"#9aa1ac","500":"#6f7782","600":"#4f5661","700":"#3a3f48","800":"#2c3038","900":"#22262e","950":"#1a1d23"},"emerald":{"50":"#f0f6ff","100":"#dcebff","200":"#b8d7ff","300":"#8ec0ff","400":"#6cb2ff","500":"#539bf5","600":"#2563eb","700":"#1d4ed8","800":"#1e40af","900":"#193573","950":"#132347"},"teal":{"50":"#eefbfd","100":"#d5f3f8","200":"#aee6f0","300":"#7bd4e6","400":"#52c1da","500":"#38a8c4","600":"#1f7a94","700":"#1b6379","800":"#194f61","900":"#173f4e","950":"#102935"},"amber":{"50":"#fffbeb","100":"#fff4cc","200":"#ffe7a8","300":"#ffdd8a","400":"#ffd166","500":"#f5b83d","600":"#e0a526","700":"#b45309","800":"#92400e","900":"#78350f","950":"#451a03"},"rose":{"50":"#fdf4f5","100":"#fae8ea","200":"#f3d0d4","300":"#e7aeb4","400":"#da8b93","500":"#c96d77","600":"#ad525d","700":"#8e414b","800":"#6e343c","900":"#4d272d","950":"#29181c"}},
+          colors: {"slate":{"50":"#fbfcfe","100":"#f6f8fb","200":"#e6ecf5","300":"#d2dae6","400":"#aeb8c7","500":"#8893a4","600":"#596273","700":"#3b424f","800":"#2c3038","900":"#22262e","950":"#1a1d23"},"emerald":{"50":"#f0f6ff","100":"#dcebff","200":"#b8d7ff","300":"#8ec0ff","400":"#6cb2ff","500":"#539bf5","600":"#2563eb","700":"#1d4ed8","800":"#1e40af","900":"#193573","950":"#132347"},"teal":{"50":"#eefbfd","100":"#d5f3f8","200":"#aee6f0","300":"#7bd4e6","400":"#52c1da","500":"#38a8c4","600":"#1f7a94","700":"#1b6379","800":"#194f61","900":"#173f4e","950":"#102935"},"amber":{"50":"#fffbeb","100":"#fff4cc","200":"#ffe7a8","300":"#ffdd8a","400":"#ffd166","500":"#f5b83d","600":"#e0a526","700":"#b45309","800":"#92400e","900":"#78350f","950":"#451a03"},"rose":{"50":"#fdf4f5","100":"#fae8ea","200":"#f3d0d4","300":"#e7aeb4","400":"#da8b93","500":"#c96d77","600":"#ad525d","700":"#8e414b","800":"#6e343c","900":"#4d272d","950":"#29181c"}},
         },
       },
     };
   </script>
   <style>
-    body { font-family: 'Pretendard', 'Inter', system-ui, sans-serif; }
-    .glass-card { background: rgba(34, 38, 46, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.7); }
+    html { -webkit-text-size-adjust: 100%; text-rendering: optimizeLegibility; font-kerning: normal; }
+    body {
+      font-family: 'Pretendard Variable', Pretendard, 'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+      font-weight: 450;
+      letter-spacing: -0.014em;
+      line-height: 1.62;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+      font-synthesis: none;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+      body { -webkit-font-smoothing: antialiased; font-weight: 460; }
+    }
+    h1, h2, h3, h4, .text-lg, .text-xl, .text-2xl { letter-spacing: -0.022em; line-height: 1.36; }
+    .font-medium { font-weight: 540 !important; }
+    .font-semibold { font-weight: 640 !important; }
+    .font-bold { font-weight: 730 !important; }
+    .font-extrabold { font-weight: 810 !important; }
+    .text-\[9px\], .text-\[10px\] { font-size: 11.5px !important; line-height: 1.44 !important; font-weight: 520; letter-spacing: -0.008em; }
+    .text-\[11px\] { font-size: 12.25px !important; line-height: 1.46 !important; font-weight: 510; letter-spacing: -0.01em; }
+    .text-xs { font-size: 12.75px !important; line-height: 1.5 !important; letter-spacing: -0.01em; }
+    .text-sm { font-size: 14.25px !important; line-height: 1.6 !important; letter-spacing: -0.012em; }
+    table, th, td, .tabular-nums, [id*="Count"], [id*="Score"], [id*="Clock"] {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1, "cv11" 1;
+    }
+    .glass-card { background: rgba(34, 38, 46, 0.88); backdrop-filter: blur(12px); border: 1px solid rgba(59, 66, 79, 0.75); }
     .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-    .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #3b424f; border-radius: 9999px; }
   </style>
   <!-- Google tag (gtag.js) - billnojay.com GA4 (async, no PII, deduplicated) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-WL9F5N7VC6"></script>
@@ -57,7 +84,7 @@
     })();
   </script>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen antialiased pb-20 lg:pb-6">
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-20 lg:pb-6">
   <!-- Toast -->
   <div id="toast" class="fixed bottom-6 right-6 z-50 hidden items-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 shadow-2xl transition-all"></div>
 
