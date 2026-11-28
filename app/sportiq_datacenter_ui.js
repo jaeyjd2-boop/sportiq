@@ -158,6 +158,7 @@
       if(ok(d.zynktv,'zynktv.com'))html+=a(d.zynktv,'📊 상대전적·최근 흐름 (징크 ZYNK)');
       else if(ok(d.zynktv_day,'zynktv.com'))html+=a(d.zynktv_day,'📅 이 날 경기 일정 (징크 ZYNK)');
       if(ok(d.ergrow,'ergrow.com'))html+=a(d.ergrow,'📝 경기 프리뷰 읽기 (어그로 ERGROW)');
+      if(ok(d.gyeonggipan,'gyeonggipan.com'))html+=a(d.gyeonggipan,'📺 언제·어디서 보나 (경기판)');
       box.innerHTML=html;
       if(!html)box.style.display='none';
     }).catch(function(){});

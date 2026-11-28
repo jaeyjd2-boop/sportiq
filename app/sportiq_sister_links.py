@@ -41,6 +41,9 @@ log = logging.getLogger("sportiq.sister")
 
 ZYNKTV = "https://zynktv.com"
 ERGROW = "https://ergrow.com"
+GYEONGGIPAN = "https://gyeonggipan.com"
+GYEONGGIPAN_PAST_DAYS = 1     # 경기판 build.js DAYS_BEFORE / DAYS_AFTER
+GYEONGGIPAN_FUTURE_DAYS = 6
 ZYNKTV_PAST_DAYS = 30
 ZYNKTV_FUTURE_DAYS = 7
 KICKOFF_WINDOW = timedelta(minutes=20)
@@ -231,6 +234,22 @@ def zynktv_day(kickoff: Optional[datetime], today: Optional[date] = None) -> Opt
     return None
 
 
+def gyeonggipan_link(hit: Optional[Dict[str, Any]], kickoff: Optional[datetime],
+                     now: Optional[datetime] = None) -> Optional[str]:
+    """경기판 (watch guide): its page for this match while the match is in its build window
+    (KST yesterday .. +6 days; same SportIQ match id), else its "this week" page for games
+    still to come. Finished games outside the window get no link (경기판 is about what to watch)."""
+    if kickoff is None:
+        return None
+    now = now or datetime.now(timezone.utc)
+    d, today = kickoff.astimezone(KST).date(), now.astimezone(KST).date()
+    if hit and today - timedelta(days=GYEONGGIPAN_PAST_DAYS) <= d <= today + timedelta(days=GYEONGGIPAN_FUTURE_DAYS):
+        return f"{GYEONGGIPAN}/match/{int(hit['id'])}/"
+    if today <= d <= today + timedelta(days=GYEONGGIPAN_FUTURE_DAYS):
+        return f"{GYEONGGIPAN}/this-week/"
+    return None
+
+
 def links_for(live_id: str, sport: str, kst: str, home: str, away: str) -> Dict[str, Optional[str]]:
     kickoff = parse_kickoff(kst)
     # Football is matched by name, so the names are part of its key: a lookup with other
@@ -247,7 +266,8 @@ def links_for(live_id: str, sport: str, kst: str, home: str, away: str) -> Dict[
             log.info("sister match lookup %s failed: %s", live_id, e)
             hit = None
             _cput(key, ERROR_TTL, None)
-    out: Dict[str, Optional[str]] = {"zynktv": None, "zynktv_day": zynktv_day(kickoff), "ergrow": None}
+    out: Dict[str, Optional[str]] = {"zynktv": None, "zynktv_day": zynktv_day(kickoff), "ergrow": None,
+                                     "gyeonggipan": gyeonggipan_link(hit, kickoff)}
     if hit:
         out["zynktv"] = f"{ZYNKTV}/match/{int(hit['id'])}"
         out["ergrow"] = ergrow_preview(int(hit["id"]), str(hit.get("sport") or ""), str(hit.get("home") or ""),

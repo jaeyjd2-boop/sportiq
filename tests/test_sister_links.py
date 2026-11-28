@@ -173,7 +173,23 @@ class LinkTests(unittest.TestCase):
     def test_db_error_does_not_break(self):
         with patch.object(sl, "find_match", side_effect=RuntimeError("db down")):
             d = sl.links_for("NBA-1", "basketball", "", "", "")
-        self.assertEqual(d, {"zynktv": None, "zynktv_day": None, "ergrow": None})
+        self.assertEqual(d, {"zynktv": None, "zynktv_day": None, "ergrow": None, "gyeonggipan": None})
+
+    def test_gyeonggipan_link(self):
+        now = datetime(2026, 11, 28, 3, 0, tzinfo=timezone.utc)   # 12:00 KST
+        k = lambda days: datetime(2026, 11, 28, 19, 0, tzinfo=KST) + timedelta(days=days)
+        hit = {"id": 118636}
+        # In 경기판's build window: its page for that match.
+        self.assertEqual(sl.gyeonggipan_link(hit, k(0), now), "https://gyeonggipan.com/match/118636/")
+        self.assertEqual(sl.gyeonggipan_link(hit, k(-1), now), "https://gyeonggipan.com/match/118636/")
+        self.assertEqual(sl.gyeonggipan_link(hit, k(6), now), "https://gyeonggipan.com/match/118636/")
+        # No DB match but still to come this week: the week page.
+        self.assertEqual(sl.gyeonggipan_link(None, k(2), now), "https://gyeonggipan.com/this-week/")
+        # Outside the window, or unknown kickoff: nothing.
+        self.assertIsNone(sl.gyeonggipan_link(hit, k(7), now))
+        self.assertIsNone(sl.gyeonggipan_link(hit, k(-2), now))
+        self.assertIsNone(sl.gyeonggipan_link(None, k(-1), now))
+        self.assertIsNone(sl.gyeonggipan_link(hit, None, now))
 
     def test_zynktv_day_range(self):
         t = date(2026, 11, 26)
@@ -182,6 +198,15 @@ class LinkTests(unittest.TestCase):
         self.assertIsNone(sl.zynktv_day(k(t - timedelta(days=31)), t))
         self.assertIsNotNone(sl.zynktv_day(k(t + timedelta(days=7)), t))
         self.assertIsNone(sl.zynktv_day(k(t + timedelta(days=8)), t))
+
+
+class HomeLinksTests(unittest.TestCase):
+    def test_home_links_point_to_gyeonggipan_indexable_pages(self):
+        from app import sportiq_seo
+        html = sportiq_seo.home_links_html()
+        for path in ("/this-week/", "/previews/", "/guides/"):
+            self.assertIn(f'href="https://gyeonggipan.com{path}"', html)
+        self.assertNotIn("gyeonggipan.com/match/", html)   # 경기판 match pages are noindex
 
 
 class UiTests(unittest.TestCase):
