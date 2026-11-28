@@ -196,7 +196,7 @@ def _page(path: str, title: str, desc: str, h1: str, body: str, ld: Optional[Dic
         '<link rel="apple-touch-icon" href="/apple-touch-icon.png" />\n'
         f"<style>{_CSS}</style>\n{ld_html}\n</head>\n<body>\n"
         '<header><nav><a href="/">SportIQ 홈</a><a href="/livescore">라이브스코어</a>'
-        '<a href="/standings">리그 순위표</a><a href="/">승부예측 투표·커뮤니티</a></nav></header>\n'
+        '<a href="/standings">리그 순위표</a><a href="/picks">3줄 퀵 픽</a><a href="/">승부예측 투표·커뮤니티</a></nav></header>\n'
         f"<main>\n<h1>{_e(h1)}</h1>\n{body}\n</main>\n"
         '<footer class="muted"><p>데이터: ESPN 등 공개 경기 정보. 실시간 화면과 승부예측 투표, 응원톡은 '
         '<a href="/">SportIQ 홈</a>에서 이용할 수 있습니다.</p></footer>\n'
@@ -449,7 +449,7 @@ def _param_guarded_response(page: str, request: Request) -> HTMLResponse:
 def seo_robots_txt() -> Response:
     txt = (
         "User-agent: *\nAllow: /\nAllow: /og-cover.png\nAllow: /rss.xml\n"
-        "Allow: /sitemap.xml\nAllow: /sitemap-pages.xml\nAllow: /sitemap-teams.xml\n"
+        "Allow: /picks\nAllow: /sitemap.xml\nAllow: /sitemap-pages.xml\nAllow: /sitemap-teams.xml\nAllow: /sitemap-picks.xml\n"
         "Allow: /pwa-icon-192.png\nAllow: /pwa-icon-512.png\nAllow: /apple-touch-icon.png\n"
         "Allow: /manifest.webmanifest\nAllow: /api/member/p0p1-upgrade-bundle\nAllow: /api/member/p0p1-upgrade.js\n"
         "Disallow: /api/admin/\nDisallow: /api/presence/\nDisallow: /api/datacenter/\n"
@@ -529,6 +529,12 @@ def _sitemap_entries(kind: str) -> List[Tuple[str, str, str, str]]:
             return [(p, today, "daily", "0.6") for p, _lg in tp.sitemap_team_urls()]
         except Exception:
             return []
+    if kind == "picks":
+        try:
+            from app.sportiq_quick_picks import sitemap_pick_entries
+            return sitemap_pick_entries()
+        except Exception:
+            return [("/picks", hour_iso, "hourly", "0.8")]
     if kind == "results":
         try:
             from app import sportiq_results_pages as rp
@@ -545,7 +551,7 @@ def _sitemap_entries(kind: str) -> List[Tuple[str, str, str, str]]:
 
 # "results" (/livescore/{date}) is left out while those pages are noindex
 # (sportiq_results_pages.INDEX_DATE_PAGES); /sitemap-results.xml stays as an empty set.
-SITEMAP_KINDS = ("pages", "teams")
+SITEMAP_KINDS = ("pages", "teams", "picks")
 
 
 def sitemap_url_blocks(now_iso: str) -> List[str]:
@@ -576,7 +582,7 @@ def sitemap_index():
     today = now_kst.date().isoformat()
     hour_iso = now_kst.strftime("%Y-%m-%dT%H:00:00+09:00")
     items = "".join(
-        f"  <sitemap>\n    <loc>{SITE}/sitemap-{k}.xml</loc>\n    <lastmod>{hour_iso if k == "pages" else today}</lastmod>\n  </sitemap>\n"
+        f"  <sitemap>\n    <loc>{SITE}/sitemap-{k}.xml</loc>\n    <lastmod>{hour_iso if k in ("pages", "picks") else today}</lastmod>\n  </sitemap>\n"
         for k in SITEMAP_KINDS
     )
     return _xml(f'<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{items}</sitemapindex>\n')
@@ -645,15 +651,22 @@ def home_links_html() -> str:
         f"#{HOME_LINKS_ID} h2{{font-size:13px;font-weight:700;color:#f3f5f7;margin:10px 0 6px}}"
         f"#{HOME_LINKS_ID} ul{{display:flex;flex-wrap:wrap;gap:6px 14px;list-style:none;margin:0;padding:0}}"
         f"#{HOME_LINKS_ID} a{{color:#c4c9d1;text-decoration:none}}#{HOME_LINKS_ID} a:hover{{color:#ff6372}}"
+        "#sqQuickPickFab{position:fixed;right:16px;bottom:78px;z-index:45;display:inline-flex;align-items:center;"
+        "gap:6px;padding:10px 15px;border-radius:999px;background:#ff4d5e;color:#14161b;font-size:13px;"
+        "font-weight:800;text-decoration:none;box-shadow:0 8px 22px rgba(0,0,0,.42)}"
+        "#sqQuickPickFab:hover{background:#ff6372;color:#fff}"
     )
     return (
         f'<style>{css}</style><nav id="{HOME_LINKS_ID}" aria-label="SportIQ 바로가기">'
         + (f"<h2>공개 경기 분석과 리포트</h2><ul>{reports}</ul>" if reports else "")
+        + '<h2>승부예측 3줄 퀵 픽 포럼</h2><ul>'
+        '<li><a href="/picks">오늘 경기 3줄 퀵 픽 바로 쓰기 · 전체 목록</a></li>'
+        '<li><a href="/sitemap-picks.xml">3줄 퀵 픽 사이트맵</a></li></ul>'
         + '<h2>라이브스코어·순위표</h2><ul>'
         '<li><a href="/livescore">오늘 라이브스코어</a></li><li><a href="/standings">리그 순위표 전체</a></li>'
         f"{leagues}</ul>"
         + (f"<h2>지난 경기 결과</h2><ul>{days}</ul>" if days else "")
-        + "</nav>"
+        + '</nav><a id="sqQuickPickFab" href="/picks" aria-label="3줄 퀵 픽 바로 쓰기">⚡ 3줄 퀵 픽 쓰기</a>'
     )
 
 def _clean_home_head(html_text: str) -> str:
