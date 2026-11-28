@@ -86,7 +86,7 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen pb-20 lg:pb-6">
   <!-- Toast -->
-  <div id="toast" class="fixed bottom-6 right-6 z-50 hidden items-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 shadow-2xl transition-all"></div>
+  <div id="toast" class="fixed top-[76px] right-5 z-50 hidden items-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 shadow-2xl transition-all"></div>
 
   <!-- Top Header -->
   <header class="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
@@ -998,8 +998,8 @@
             </div>
             <button onclick="reportPost('${p.id}')" class="text-[11px] text-slate-500 hover:text-rose-400 transition">신고·숨김</button>
           </div>
-          <h3 class="text-base font-bold text-white">${p.title}</h3>
-          <p class="text-xs leading-relaxed text-slate-300">${p.body}</p>
+          <h3 onclick="openComments('${p.id}')" class="text-base font-bold text-white cursor-pointer hover:text-emerald-400 transition">${p.title}</h3>
+          <p onclick="openComments('${p.id}')" class="text-xs leading-relaxed text-slate-300 cursor-pointer hover:text-slate-100 transition">${p.body}</p>
           ${p.isAutoAnalyst ? `<div class="rounded-xl bg-slate-900/80 border border-slate-700/70 p-3 space-y-2"><div class="flex items-center justify-between text-[11px] font-semibold"><span class="text-emerald-300">${p.homeLabel} ${p.homePct}%</span><span class="text-slate-400">커뮤니티 여론 게이지</span><span class="text-rose-300">${p.awayPct}% ${p.awayLabel}</span></div><div class="h-2 w-full rounded-full bg-rose-500/40 overflow-hidden flex"><div class="h-full bg-emerald-400 transition-all" style="width:${p.homePct}%"></div></div><div class="flex flex-wrap items-center justify-between gap-2 text-[11px] pt-1"><span class="text-slate-300">🎯 <strong>핵심 전술:</strong> ${p.tacticalPoints}</span><span class="rounded-md bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 font-bold text-amber-300">⭐ 추천 픽: ${p.recommendedPick}</span></div></div>` : ''}
           <div class="flex flex-wrap gap-1.5">
             ${p.tags.map(t => `<button onclick="filterByTag('${t}')" class="rounded-full bg-slate-800/90 px-2.5 py-0.5 text-[11px] text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 transition">${t}</button>`).join('')}
