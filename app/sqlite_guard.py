@@ -134,7 +134,7 @@ def _apply_pragmas(conn: sqlite3.Connection, db_target: str) -> None:
                      if norm_path not in _WAL_INITIALIZED_DBS:
                          try:
                             sqlite3.Connection.execute(conn, "PRAGMA journal_mode = WAL;")
-                           sqlite3.Connection.execute(conn, "PRAGMA synchronous = NORMAL;")
+                               sqlite3.Connection.execute(conn, "PRAGMA synchronous = NORMAL;")
                                 _WAL_INITIALIZED_DBS.add(norm_path)
                             except sqlite3.OperationalError:
                                 pass
