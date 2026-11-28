@@ -388,7 +388,7 @@ _SSR_CSS = (
     ".mc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}.mc{background:#171a21;border:1px solid var(--border);border-radius:12px;padding:12px 13px;display:flex;flex-direction:column;gap:7px}"
     ".mc-top{display:flex;justify-content:space-between;gap:8px;font-size:.76rem;color:var(--muted);font-variant-numeric:tabular-nums}.mc-teams{font-weight:800;font-size:.97rem;line-height:1.35}"
     ".sis-links{display:flex;flex-wrap:wrap;gap:6px}.sis-links a{padding:4px 9px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);color:var(--sub);font-size:.78rem;font-weight:700}.sis-links a:hover{border-color:var(--accent);color:#8ec0ff;text-decoration:none}"
-    ".mc .btn-ghost{margin-top:auto;align-self:flex-start}"
+    ".mc .btn-ghost{margin-top:auto;align-self:flex-start}#qpComposerTitle,#qpWriteForm{scroll-margin-top:72px}"
 )
 
 _GA4_SNIPPET = (
@@ -420,7 +420,7 @@ def _render_ssr_shell(*, canonical_path: str, title: str, description: str, robo
     )
 
 
-def _composer_widget_html(default_league: str = "EPL") -> str:
+def _composer_widget_html(default_league: str = "EPL", prefill_match: str = "") -> str:
     lg_opts = "".join(f'<option value="{c}"{" selected" if c == default_league else ""}>{_e(lbl)}</option>' for c, lbl in ALLOWED_LEAGUES.items())
     pick_btns = "".join(f'<button type="button" class="pick-pill{" active" if i == 0 else ""}" data-pick-code="{c}">{_e(lbl)}</button>' for i, (c, lbl) in enumerate(PICK_CHOICES.items()))
     m_chips = "".join(f'<button type="button" class="match-chip" data-lg="{_e(lg)}" data-match="{_e(m)}">⚡ {_e(m)}</button>' for lg, m in _today_match_chips())
@@ -430,7 +430,7 @@ def _composer_widget_html(default_league: str = "EPL") -> str:
         f'<div class="match-chips" id="qpQuickMatches" aria-label="추천 경기 빠른 선택">{m_chips}</div>'
         '<form id="qpWriteForm" novalidate><input type="text" name="website" class="hp-trap" tabindex="-1" autocomplete="off" />'
         f'<div class="grid-2" style="margin-bottom:10px"><div><label class="lbl" for="qpLeague">리그 선택</label><select id="qpLeague" class="inp" required>{lg_opts}</select></div>'
-        '<div><label class="lbl" for="qpMatch">대상 매치업 (직접 입력 또는 위 버튼 클릭)</label><input id="qpMatch" class="inp" type="text" maxlength="120" placeholder="예: 아스널 vs 첼시 / FC 서울 vs 울산 HD" required /></div></div>'
+        '<div><label class="lbl" for="qpMatch">대상 매치업 (직접 입력 또는 위 버튼 클릭)</label><input id="qpMatch" class="inp" type="text" maxlength="120" placeholder="예: 아스널 vs 첼시 / FC 서울 vs 울산 HD" required value="' + _e(prefill_match) + '" /></div></div>'
         f'<div class="grid-2" style="margin-bottom:12px"><div><span class="lbl">승부 방향 선택</span><div class="pick-pills" id="qpPickGroup">{pick_btns}</div><input type="hidden" id="qpPickCode" value="HOME" /></div>'
         '<div><label class="lbl" for="qpConf">확신도 (★1~★5)</label><select id="qpConf" class="inp"><option value="5">★★★★★ (강력 추천 5성)</option><option value="4" selected>★★★★☆ (주력 픽 4성)</option><option value="3">★★★☆☆ (보통 3성)</option><option value="2">★★☆☆☆ (이변 노림수 2성)</option><option value="1">★☆☆☆☆ (가벼운 관전픽 1성)</option></select></div></div>'
         '<div style="margin-bottom:10px"><label class="lbl" for="qpHeadline">한 줄 제목 (비워두면 매치업+픽으로 자동 생성)</label><input id="qpHeadline" class="inp" type="text" maxlength="160" placeholder="예: [EPL] 아스널 홈 압박 우위, 2-1 홈승 봅니다" /></div>'
@@ -508,6 +508,13 @@ def _match_cards_html(active_lg: str = "") -> str:
             'if(f)f.scrollIntoView({behavior:"smooth",block:"start"});var l1=document.getElementById("qpLine1");if(l1)setTimeout(function(){l1.focus({preventScroll:true});},350);});})();</script>')
 
 
+def _prefill_jump_js(prefill: str) -> str:
+    if not prefill:
+        return ""
+    return ('<script>(function(){var f=document.getElementById("qpComposerTitle"),l1=document.getElementById("qpLine1");'
+            'if(f)f.scrollIntoView({block:"start"});if(l1)l1.focus({preventScroll:true});})();</script>')
+
+
 def _pick_sister_html(pick: Dict[str, Any]) -> str:
     """"이 경기 더 보기" under a pick: the same match on ergrow / zynktv / 경기판, when it is found."""
     try:
@@ -552,10 +559,13 @@ class QuickPickDeleteIn(BaseModel):
 def ssr_picks_hub(request: Request):
     lg_param = (request.query_params.get("league") or "").strip().upper()
     has_query, active_lg = len(request.query_params) > 0, (lg_param if lg_param in ALLOWED_LEAGUES else "")
+    # ?match= comes from "이 경기 3줄 픽 쓰기" links (live-score modal, 경기판, ergrow): fill the composer
+    # and jump to it. Pages with a query are noindex, so this adds no duplicate pages.
+    prefill = re.sub(r"\s+", " ", request.query_params.get("match") or "").strip()[:120]
     picks = list_recent_picks(league=active_lg, limit=25)
     chips = [f'<a class="filter-chip{" active" if not active_lg else ""}" href="/picks">전체 리그</a>'] + [f'<a class="filter-chip{" active" if active_lg == c else ""}" href="/picks?league={c}">{_e(n)}</a>' for c, n in ALLOWED_LEAGUES.items()]
     cards = "".join(_pick_card_html(p) for p in picks) or '<div class="card"><p class="sub">아직 등록된 3줄 퀵 픽이 없습니다. 첫 번째 승부예측 퀵 픽을 남겨 보세요!</p></div>'
-    body = '<div style="margin-bottom:14px"><h1>승부예측 3줄 퀵 픽 라운지</h1><p class="sub">경기별 핵심 근거·변수·최종 승부픽을 3줄로 간결하게 공유하고 팬들과 의견을 나누세요.</p></div>' + _match_cards_html(active_lg) + _composer_widget_html(default_league=active_lg or "EPL") + f'<nav class="filter-strip" aria-label="리그 필터">{"".join(chips)}</nav><section aria-label="최신 3줄 퀵 픽 목록">{cards}</section>'
+    body = '<div style="margin-bottom:14px"><h1>승부예측 3줄 퀵 픽 라운지</h1><p class="sub">경기별 핵심 근거·변수·최종 승부픽을 3줄로 간결하게 공유하고 팬들과 의견을 나누세요.</p></div>' + _match_cards_html(active_lg) + _composer_widget_html(default_league=active_lg or "EPL", prefill_match=prefill) + _prefill_jump_js(prefill) + f'<nav class="filter-strip" aria-label="리그 필터">{"".join(chips)}</nav><section aria-label="최신 3줄 퀵 픽 목록">{cards}</section>'
     crumbs = _breadcrumbs_ld([("SportIQ", f"{SITE}/"), ("3줄 퀵 픽", f"{SITE}/picks")])
     col_ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "SportIQ 승부예측 3줄 퀵 픽 라운지", "url": f"{SITE}/picks", "inLanguage": "ko-KR", "mainEntity": {"@type": "ItemList", "itemListElement": [{"@type": "ListItem", "position": i, "url": f"{SITE}/picks/{p['id']}", "name": p["headline"]} for i, p in enumerate(picks[:15], start=1)]}}
     html_out = _render_ssr_shell(canonical_path="/picks", title="승부예측 3줄 퀵 픽 라운지 · 경기별 한줄 근거 커뮤니티 | SportIQ", description="EPL·K리그1·NBA·MLB 오늘 경기의 핵심 근거, 결장 변수, 최종 승부픽을 3줄로 공유하는 실시간 스포츠 토론 포럼입니다.", robots=NOINDEX if has_query else INDEX_ROBOTS, ld_blocks=[crumbs, col_ld], body_html=body)

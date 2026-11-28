@@ -150,6 +150,8 @@
     // Take the box now, not when the answer arrives: by then the modal may show another
     // match (its HTML is rebuilt, so this box is detached and the late answer is dropped).
     box=box||document.getElementById('dcSisterLinks');
+    var pick=pickWriteLink(m);
+    if(box&&pick){box.innerHTML=pick;box.style.display='';}
     fetch('/api/sister/match-links?'+q,{credentials:'omit'}).then(function(r){return r.ok?r.json():null;}).then(function(d){
       if(!box||!d||!box.isConnected)return;
       var ok=function(u,host){return typeof u==='string'&&u.indexOf('https://'+host+'/')===0;};
@@ -159,9 +161,20 @@
       else if(ok(d.zynktv_day,'zynktv.com'))html+=a(d.zynktv_day,'📅 이 날 경기 일정 (징크 ZYNK)');
       if(ok(d.ergrow,'ergrow.com'))html+=a(d.ergrow,'📝 경기 프리뷰 읽기 (어그로 ERGROW)');
       if(ok(d.gyeonggipan,'gyeonggipan.com'))html+=a(d.gyeonggipan,'📺 언제·어디서 보나 (경기판)');
+      html=pick+html;
       box.innerHTML=html;
       if(!html)box.style.display='none';
     }).catch(function(){});
+  }
+  // "이 경기 3줄 픽 쓰기": /picks with this match filled in (sportiq_quick_picks.py reads ?league=&match=).
+  // Only for games not finished yet, and only for leagues the /picks composer offers.
+  var PICK_LEAGUES={EPL:'EPL',KLEAGUE:'KLEAGUE',LALIGA:'LALIGA',BUNDESLIGA:'BUNDESLIGA',SERIEA:'SERIEA',LIGUE1:'LIGUE1',UCL:'UCL',
+    NBA:'NBA',MLB:'MLB',NHL:'NHL',NFL:'NFL',VLEAGUE_M:'VLEAGUE',VLEAGUE_W:'VLEAGUE',VLEAGUE:'VLEAGUE',KBL:'KBL',WKBL:'KBL'};
+  function pickWriteLink(m){
+    var lg=PICK_LEAGUES[String((m&&(m.league_code||m.league))||'').toUpperCase()];
+    if(!lg||!m.home||!m.away||m.is_sample||m.state==='post')return '';
+    var u='/picks?league='+encodeURIComponent(lg)+'&match='+encodeURIComponent(m.home+' vs '+m.away);
+    return '<a class="dc-btn" href="'+dcEsc(u)+'" style="border-color:#539bf5;color:#8ec0ff">✍️ 이 경기 3줄 픽 쓰기</a>';
   }
   window.__sqLoadSisterLinks=loadSisterLinks;   // also used by the home card modal (sportiq_lounge_router.py)
 
