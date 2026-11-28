@@ -28,12 +28,14 @@ from app.sportiq_auto_analyst import router as auto_analyst_router
 from app.sportiq_issues_ranking import router as issues_ranking_router
 from app.sportiq_pro_lab import router as pro_lab_router
 from app.sportiq_datacenter import router as datacenter_router
+from app.sportiq_quick_picks import router as quick_picks_router
 app=FastAPI(title="SportIQ API",version="1.0.0",lifespan=web_backfill_lifespan)
 app.include_router(brand_router)
 app.include_router(details_router)
 app.include_router(diagnostics_router)
 app.include_router(wp_bridge_router)
 app.include_router(auto_analyst_router)
+app.include_router(quick_picks_router)
 app.include_router(seo_pages_router)
 app.include_router(team_pages_router)
 app.include_router(result_pages_router)
@@ -54,6 +56,7 @@ _RATE_LIMIT_PATHS = {
     "/api/auto-analyst/run-now",
     "/api/partner-inquiries",
     "/api/posts",
+    "/api/picks",
 }
 _RATE_LIMIT_BUCKETS: dict[str, deque[float]] = defaultdict(deque)
 _RATE_LIMIT_WINDOW_SEC = 60.0
