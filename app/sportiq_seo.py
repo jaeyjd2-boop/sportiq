@@ -24,7 +24,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response
-
+try:
+    from app.sqlite_guard import install_sqlite_guard; install_sqlite_guard()
+except Exception:
+    pass
+  
 SITE = "https://billnojay.com"
 
 HOME_TITLE = "SportIQ 라이브스코어·실시간 스코어 | 리그 순위표·승부예측 투표 커뮤니티"
@@ -467,13 +471,18 @@ def seo_robots_txt() -> Response:
           
 @router.api_route("/livescore", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def seo_livescore_page(request: Request):
-    return _param_guarded_response(_cached("livescore", build_livescore_html), request)
-
+   try:
+       return _param_guarded_response(_cached("livescore", build_livescore_html), request)
+    except Exception:
+      return _param_guarded_response(_page("/livescore", "Live Score | SportIQ", SHORT_DESC, "Live Score", "<p>Data is temporarily unavailable.</p>"), request)
+      
 
 @router.api_route("/standings", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def seo_standings_index_page(request: Request):
-    return _param_guarded_response(_cached("standings", build_standings_index_html), request)
-
+   try:
+       return _param_guarded_response(_cached("standings", build_standings_index_html), request)
+    except Exception:
+      return _param_guarded_response(_page("/standings", "Standings | SportIQ", SHORT_DESC, "Standings", "<p>Data is temporarily unavailable.</p>"), request)
 
 @router.api_route("/standings/{league}", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def seo_standings_league_page(league: str, request: Request):
