@@ -162,7 +162,7 @@ class SitemapIndexTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("application/xml", r.headers["content-type"])
         subs = re.findall(r"<loc>(.*?)</loc>", r.text)
-        self.assertEqual(subs, [f"https://billnojay.com/sitemap-{k}.xml" for k in ("pages", "teams")])
+        self.assertEqual(subs, [f"https://billnojay.com/sitemap-{k}.xml" for k in ("pages", "teams", "picks")])
         self.assertIn("<sitemapindex", r.text)
 
     def test_sub_sitemaps_split_by_kind(self):

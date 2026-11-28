@@ -1289,7 +1289,7 @@ def _manifest_payload() -> Dict[str, Any]:
         "display": "standalone",
         "orientation": "portrait-primary",
         "background_color": "#1a1d23",
-        "theme_color": "#ff4d5e",
+        "theme_color": "#539bf5",
         "lang": "ko",
         "dir": "ltr",
         "categories": ["sports", "news", "social"],

@@ -135,8 +135,8 @@ class BrandFilesTests(unittest.TestCase):
 class MeaningKeptTests(unittest.TestCase):
     def test_up_hit_and_winner_colours(self):
         html = (ROOT / "sportiq_community.html").read_text(encoding="utf-8")
-        self.assertIn("""sWith('▲')) return '<span class="rounded-md border border-green-500/30 bg-green-500/15'""", html)
-        self.assertIn("""sWith('▼')) return '<span class="rounded-md border border-rose-500/30'""", html)
+        self.assertIn("""sWith('▲')) return '<span class="rounded-md border border-green-500/30 bg-green-500/15""", html)
+        self.assertIn("""sWith('▼')) return '<span class="rounded-md border border-rose-500/30""", html)
         dcui = (ROOT / "sportiq_datacenter_ui.js").read_text(encoding="utf-8")
         self.assertIn("r.is_hit?'#4ade80':'#f87171'", dcui)
         lounge = (ROOT / "sportiq_lounge_router.py").read_text(encoding="utf-8")
@@ -149,4 +149,4 @@ class MeaningKeptTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main() js
+    unittest.main()

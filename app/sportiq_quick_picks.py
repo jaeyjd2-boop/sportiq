@@ -603,7 +603,11 @@ def api_delete_quick_pick(pick_id: int, payload: QuickPickDeleteIn, request: Req
 
 
 def sitemap_pick_entries(limit: int = 500) -> List[Tuple[str, str, str, str]]:
-    indexable_rows = [p for p in list_recent_picks(limit=limit) if is_indexable_pick(p)]
+    try:
+        indexable_rows = [p for p in list_recent_picks(limit=limit) if is_indexable_pick(p)]
+    except Exception:
+        # DB down: still serve /picks itself rather than failing the whole sitemap.
+        indexable_rows = []
     now_hour = datetime.now(KST).replace(minute=0, second=0, microsecond=0).isoformat()
     out: List[Tuple[str, str, str, str]] = [("/picks", now_hour, "hourly", "0.8")]
     seen_authors = set()
