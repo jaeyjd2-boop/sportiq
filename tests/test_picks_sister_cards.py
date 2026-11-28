@@ -162,6 +162,24 @@ class PageTests(unittest.TestCase):
         self.assertIn("m.state==='post'", js)
         self.assertIn("'/picks?league='+encodeURIComponent(lg)+'&match='", js)
 
+    def test_chips_follow_cards_then_live_games(self):
+        cards = [{"pick_league": "LALIGA", "match_label": "레알 베티스 vs 라요 바예카노"},
+                 {"pick_league": None, "match_label": "아약스 vs PSV"}]
+        live = {"matches": [
+            {"league_code": "LALIGA", "home": "레알 베티스", "away": "라요 바예카노", "state": "pre"},   # same as a card
+            {"league_code": "MLS", "home": "레알 솔트레이크", "away": "Vancouver", "state": "pre"},      # no MLS on /picks
+            {"league_code": "NBA", "home": "유타 재즈", "away": "덴버 너기츠", "state": "post"},          # finished
+            {"league_code": "VLEAGUE_W", "home": "흥국생명", "away": "현대건설", "state": "pre"},
+            {"league_code": "NBA", "home": "LA 클리퍼스", "away": "뉴올리언스 펠리컨스", "state": "in", "is_sample": True},
+        ]}
+        with patch.object(sl, "upcoming_match_cards", return_value=cards),              patch("app.sportiq_datacenter.get_live_scores", return_value=live):
+            chips = qp._today_match_chips()
+        self.assertEqual(chips, [("LALIGA", "레알 베티스 vs 라요 바예카노"), ("VLEAGUE", "흥국생명 vs 현대건설")])
+
+    def test_chips_fall_back_when_nothing_is_found(self):
+        with patch.object(sl, "upcoming_match_cards", side_effect=RuntimeError("x")),              patch("app.sportiq_datacenter.get_live_scores", side_effect=RuntimeError("y")):
+            self.assertEqual(qp._today_match_chips(), qp.FALLBACK_MATCH_CHIPS)
+
     def test_pick_detail_shows_sister_links(self):
         pick = {"id": 5, "status": "active", "league": "EPL", "match_label": "아스널 vs 첼시", "pick_code": "HOME", "confidence": 4,
                 "headline": "아스널 홈승", "line1_reason": "a" * 20, "line2_factor": "b" * 20, "line3_pick": "c" * 20,
