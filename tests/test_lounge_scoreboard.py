@@ -114,7 +114,9 @@ class NoInventedBettingNumbersTests(unittest.TestCase):
         self.assertIn("주도권 비교·예상 득점치를 표시하지 않습니다", SRC)
         self.assertIn('" 매치업" + (aiRealV51 ? (" · AI 예측 "', SRC)
         html = (Path(lr.__file__).parent / "sportiq_community.html").read_text(encoding="utf-8")
-        self.assertIn("escHtml(valueOddsNotice||", html)
+        # The odds/Kelly value monitor that showed this notice is gone (2026-11-28): no odds on the lab tab.
+        self.assertNotIn("valueOddsNotice", html)
+        self.assertNotIn("kellyValueList", html)
 
 
 if __name__ == "__main__":

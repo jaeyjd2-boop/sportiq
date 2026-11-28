@@ -444,7 +444,7 @@ def _render_ssr_shell(*, canonical_path: str, title: str, description: str, robo
         '<a href="/">홈</a><a href="/livescore">라이브스코어</a><a href="/standings">리그 순위표</a><a class="active" href="/picks">3줄 퀵 픽</a></nav></div></header>\n'
         f'  <main class="wrap">{body_html}</main>\n'
         '  <footer class="wrap" style="border-top:1px solid #343a46;color:#aeb8c7;font-size:.82rem;padding-bottom:32px">'
-        'SportIQ 3줄 퀵 픽 커뮤니티 · 4자리 PIN은 단방향 해시(PBKDF2)로만 저장되며 개인정보를 수집하지 않습니다. <a href="/">홈</a> · <a href="/livescore">라이브스코어</a> · <a href="/standings">리그 순위표</a></footer>\n</body>\n</html>\n'
+        'SportIQ 3줄 퀵 픽 커뮤니티 · 가입 없이 닉네임으로 쓰며, 4자리 PIN은 단방향 해시(PBKDF2)로만 저장됩니다. <a href="/">홈</a> · <a href="/livescore">라이브스코어</a> · <a href="/standings">리그 순위표</a> · <a href="/privacy">개인정보처리방침</a></footer>\n</body>\n</html>\n'
     )
 
 
