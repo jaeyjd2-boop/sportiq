@@ -142,6 +142,26 @@ class PageTests(unittest.TestCase):
         self.assertNotIn("qpMatchCardsTitle", html)
         self.assertIn("qpWriteForm", html)
 
+    def test_hub_prefills_match_from_query(self):
+        with patch.object(sl, "upcoming_match_cards", return_value=[]), patch.object(qp, "list_recent_picks", return_value=[]):
+            r = CLIENT.get("/picks", params={"league": "NBA", "match": "워싱턴 위저즈  vs 올랜도 매직\"><script>"})
+        self.assertIn('value="워싱턴 위저즈 vs 올랜도 매직&quot;&gt;&lt;script&gt;"', r.text)
+        self.assertIn('<option value="NBA" selected>', r.text)
+        self.assertIn('scrollIntoView({block:"start"})', r.text)
+        self.assertIn("noindex", r.headers.get("X-Robots-Tag", ""))
+
+    def test_hub_without_match_has_empty_composer(self):
+        with patch.object(sl, "upcoming_match_cards", return_value=[]), patch.object(qp, "list_recent_picks", return_value=[]):
+            html = CLIENT.get("/picks").text
+        self.assertIn('required value="" />', html)
+        self.assertNotIn("scrollIntoView({block", html)
+
+    def test_live_modal_has_pick_write_link(self):
+        js = open(os.path.join(os.path.dirname(__file__), "..", "app", "sportiq_datacenter_ui.js"), encoding="utf-8").read()
+        self.assertIn("function pickWriteLink(m)", js)
+        self.assertIn("m.state==='post'", js)
+        self.assertIn("'/picks?league='+encodeURIComponent(lg)+'&match='", js)
+
     def test_pick_detail_shows_sister_links(self):
         pick = {"id": 5, "status": "active", "league": "EPL", "match_label": "아스널 vs 첼시", "pick_code": "HOME", "confidence": 4,
                 "headline": "아스널 홈승", "line1_reason": "a" * 20, "line2_factor": "b" * 20, "line3_pick": "c" * 20,
