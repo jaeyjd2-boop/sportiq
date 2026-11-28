@@ -300,12 +300,36 @@ def pick_league_code(sport: str, league_name: str) -> Optional[str]:
     """The /picks league code for a DB match, or None when /picks has no such league."""
     name = (league_name or "").lower()
     if sport == "football":
-        if "premier league" in name and any(x in name for x in ("2", "championship", "women", "u21", "u18")):
+        if any(x in name for x in ("2", "women", "u21", "u18", "u19")):   # Premier League 2, 2. Bundesliga, Serie A Women
             return None
         return next((code for key, code in _FOOTBALL_LEAGUES if key in name), None)
     if sport == "basketball" and ("kbl" in name or "korea" in name):
         return "KBL"
     return _SPORT_LEAGUE.get(sport)
+
+
+_LEAGUE_KO = {"EPL": "프리미어리그", "KLEAGUE": "K리그1", "LALIGA": "라리가", "BUNDESLIGA": "분데스리가",
+              "SERIEA": "세리에 A", "LIGUE1": "리그 1", "UCL": "챔피언스리그", "NBA": "NBA", "KBL": "KBL",
+              "MLB": "MLB", "NHL": "NHL", "NFL": "NFL", "VLEAGUE": "V-리그"}
+# Football leagues /picks has no code for (checked in order: "europa conference" before "europa").
+_LEAGUE_KO_EXTRA = (("conference league", "컨퍼런스리그"), ("europa league", "유로파리그"), ("championship", "챔피언십"),
+                    ("eredivisie", "에레디비시"), ("primeira liga", "프리메이라리가"), ("k league 2", "K리그2"),
+                    ("fa cup", "FA컵"), ("copa del rey", "코파 델 레이"), ("dfb", "DFB 포칼"), ("coppa italia", "코파 이탈리아"),
+                    ("major league soccer", "MLS"), ("mls", "MLS"), ("j1", "J1리그"), ("saudi", "사우디 프로리그"))
+
+
+def league_ko(sport: str, league_name: str) -> str:
+    """Korean league label for a match card: 'Primera Division' -> 라리가. Unknown names stay as they are."""
+    name = (league_name or "").strip()
+    if sport == "basketball" and "wkbl" in name.lower():
+        return "WKBL"
+    code = pick_league_code(sport, name)
+    # Football codes come from the league name; other sports' codes from the sport alone,
+    # so there only a name that is the code itself (NBA, NHL...) is replaced.
+    if code and (sport == "football" or code == "KBL" or name.upper() == code):
+        return _LEAGUE_KO[code]
+    low = name.lower()
+    return next((ko for key, ko in _LEAGUE_KO_EXTRA if key in low), name)
 
 
 def _display_name(name: str, sport: str) -> str:
@@ -379,7 +403,7 @@ def upcoming_match_cards(limit: int = 8, now: Optional[datetime] = None) -> List
             continue
         home, away = _display_name(str(r["home"]), sport), _display_name(str(r["away"]), sport)
         cards.append({
-            "id": mid, "sport": sport, "league": str(r.get("league") or ""), "home": home, "away": away,
+            "id": mid, "sport": sport, "league": league_ko(sport, str(r.get("league") or "")), "home": home, "away": away,
             "kickoff": ko.astimezone(KST).isoformat(), "pick_league": pick_league_code(sport, str(r.get("league") or "")),
             "match_label": f"{home} vs {away}",
             "links": {"ergrow": previews[mid], "zynktv": f"{ZYNKTV}/match/{mid}",
