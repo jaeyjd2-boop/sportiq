@@ -238,25 +238,44 @@ def _norm_row(d: Dict[str, Any]) -> Dict[str, Any]:
     return d
 
 
+_LIVE_LEAGUE_CODES = {"epl": "EPL", "kleague": "KLEAGUE", "laliga": "LALIGA", "bundesliga": "BUNDESLIGA", "seriea": "SERIEA",
+                      "ligue1": "LIGUE1", "ucl": "UCL", "nba": "NBA", "mlb": "MLB", "nhl": "NHL", "nfl": "NFL",
+                      "vleague": "VLEAGUE", "vleague_m": "VLEAGUE", "vleague_w": "VLEAGUE", "kbl": "KBL", "wkbl": "KBL"}
+MAX_MATCH_CHIPS = 5
+
+
 def _today_match_chips() -> List[Tuple[str, str]]:
+    """Quick-pick buttons above the composer: first the same matches as the "다가오는 경기" cards
+    (those with an ergrow preview), then today's live-score games not finished yet, only in
+    leagues the composer offers. Same match label as the cards, so one match is never shown twice
+    under two names."""
     out: List[Tuple[str, str]] = []
+    seen = set()
+
+    def add(lg: str, label: str) -> None:
+        if lg in ALLOWED_LEAGUES and label and label not in seen and len(out) < MAX_MATCH_CHIPS:
+            seen.add(label)
+            out.append((lg, label))
+
     try:
-        from app.sportiq_datacenter import get_live_scores  # type: ignore
-        res = get_live_scores(sport="all", league="all", date_offset=0)
-        lg_map = {"epl": "EPL", "kleague": "KLEAGUE", "laliga": "LALIGA", "bundesliga": "BUNDESLIGA", "seriea": "SERIEA", "ligue1": "LIGUE1", "ucl": "UCL", "nba": "NBA", "mlb": "MLB", "nhl": "NHL", "nfl": "NFL", "vleague": "VLEAGUE", "kbl": "KBL"}
-        seen = set()
-        for m in (res.get("matches") or res.get("items") or []):
-            if not isinstance(m, dict) or m.get("is_sample"):
-                continue
-            h, a = str(m.get("home") or m.get("home_team") or "").strip(), str(m.get("away") or m.get("away_team") or "").strip()
-            lg_c = lg_map.get(str(m.get("league_key") or m.get("league") or "").strip().lower(), "EPL")
-            if h and a and f"{h} vs {a}" not in seen:
-                seen.add(f"{h} vs {a}")
-                out.append((lg_c, f"{h} vs {a}"))
-            if len(out) >= 5:
-                break
+        from app.sportiq_sister_links import upcoming_match_cards
+        for c in upcoming_match_cards(limit=24):
+            add(str(c.get("pick_league") or ""), str(c.get("match_label") or ""))
     except Exception:
         pass
+    if len(out) < MAX_MATCH_CHIPS:
+        try:
+            from app.sportiq_datacenter import get_live_scores  # type: ignore
+            res = get_live_scores(sport="all", league="all", date_offset=0)
+            for m in (res.get("matches") or res.get("items") or []):
+                if not isinstance(m, dict) or m.get("is_sample") or m.get("state") == "post":
+                    continue
+                h, a = str(m.get("home") or m.get("home_team") or "").strip(), str(m.get("away") or m.get("away_team") or "").strip()
+                lg = _LIVE_LEAGUE_CODES.get(str(m.get("league_code") or m.get("league_key") or m.get("league") or "").strip().lower(), "")
+                if h and a:
+                    add(lg, f"{h} vs {a}")
+        except Exception:
+            pass
     return out or FALLBACK_MATCH_CHIPS
 
 
