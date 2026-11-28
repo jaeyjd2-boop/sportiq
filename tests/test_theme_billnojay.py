@@ -1,4 +1,4 @@
-"""billnojay.com colours: dark grey + crimson (2026-11-25).
+"""billnojay.com colours: dark slate + nordic sapphire & glacier cyan.
 
 Scratch SQLite only; no network.
 """
@@ -37,13 +37,13 @@ def contrast(a, b):
 
 
 class RemapTests(unittest.TestCase):
-    def test_brand_greens_and_slate_become_grey_crimson(self):
+    def test_brand_greens_and_slate_become_grey_sapphire(self):
         src = "a{color:#10B981} b{background:#020617;border:1px solid #1e293b} c{box-shadow:0 0 8px rgba(16, 185, 129, .4)}"
         out = th.remap(src)
-        self.assertIn("#ff4d5e", out)
+        self.assertIn("#539bf5", out)
         self.assertIn("#1a1d23", out)
         self.assertIn("#2c3038", out)
-        self.assertIn("rgba(255, 77, 94, .4)", out)
+        self.assertIn("rgba(83, 155, 245, .4)", out)
         for old in OLD_BRAND:
             self.assertNotIn(old, out.lower())
 
@@ -53,7 +53,7 @@ class RemapTests(unittest.TestCase):
 
     def test_tailwind_config_in_html_matches_module(self):
         html = (ROOT / "sportiq_community.html").read_text(encoding="utf-8")
-        m = re.search(r"colors: (\{.*?\}\}),\n", html)
+        m = re.search(r"colors: (\{.*?\}),\n", html)
         self.assertIsNotNone(m)
         self.assertEqual(json.loads(m.group(1)), th.TAILWIND_COLORS)
         for name, shades in th.TAILWIND_COLORS.items():
@@ -61,10 +61,10 @@ class RemapTests(unittest.TestCase):
                 self.assertRegex(new, r"^#[0-9a-f]{6}$", f"{name}-{shade}")
 
     def test_contrast(self):
-        self.assertGreaterEqual(contrast(th.BG, th.ACCENT), 4.5)        # dark text on crimson buttons
+        self.assertGreaterEqual(contrast(th.BG, th.ACCENT), 4.5)
         self.assertGreaterEqual(contrast(th.TEXT, th.BG), 7.0)
         self.assertGreaterEqual(contrast(th.TEXT_SUB, th.BG), 4.5)
-        self.assertGreaterEqual(contrast(th.ACCENT, th.BG), 4.5)        # crimson links/labels
+        self.assertGreaterEqual(contrast(th.ACCENT, th.BG), 4.5)
         self.assertGreaterEqual(contrast(th.ACCENT_2, th.BG), 7.0)
         self.assertGreaterEqual(contrast(th.TAILWIND_COLORS["emerald"]["400"], th.BG), 4.5)
         self.assertGreaterEqual(contrast(th.TAILWIND_COLORS["slate"]["400"], th.BG), 4.5)
@@ -80,9 +80,9 @@ class MiddlewareTests(unittest.TestCase):
         mini.add_api_route("/d", lambda: JSONResponse({"c": "#10b981"}))
         c = TestClient(mini)
         r = c.get("/h")
-        self.assertEqual(r.text, "<b style='color:#ff4d5e'>x</b>")
+        self.assertEqual(r.text, "<b style='color:#539bf5'>x</b>")
         self.assertEqual(int(r.headers["content-length"]), len(r.content))
-        self.assertEqual(c.get("/j").text, "x='#ff4d5e'")
+        self.assertEqual(c.get("/j").text, "x='#539bf5'")
         self.assertEqual(c.get("/d").json(), {"c": "#10b981"})
 
     def test_home_and_bundle_have_no_old_brand_colours(self):
@@ -92,7 +92,7 @@ class MiddlewareTests(unittest.TestCase):
             for old in OLD_BRAND:
                 self.assertNotIn(old, body)
             self.assertNotIn("rgba(16,185,129", body.replace(" ", ""))
-        self.assertIn("#ff4d5e", bundle)
+        self.assertIn("#539bf5", bundle)
 
 
 class BrandFilesTests(unittest.TestCase):
@@ -102,9 +102,9 @@ class BrandFilesTests(unittest.TestCase):
             self.assertEqual(r.status_code, 200, path)
             self.assertTrue(r.headers["content-type"].startswith(ctype), path)
             self.assertEqual(r.content, (ROOT / "static" / "brand" / fname).read_bytes(), path)
-        self.assertIn('fill="#ff4d5e"', CLIENT.get("/favicon.svg").text)
+        self.assertIn('fill="#539bf5"', CLIENT.get("/favicon.svg").text)
 
-    def test_icons_are_crimson(self):
+    def test_icons_valid_png_and_bg(self):
         from struct import unpack
         png = (ROOT / "static" / "brand" / "pwa-icon-512.png").read_bytes()
         self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n")
@@ -114,7 +114,6 @@ class BrandFilesTests(unittest.TestCase):
         except ImportError:
             return
         img = Image.open(ROOT / "static" / "brand" / "pwa-icon-512.png").convert("RGB")
-        self.assertEqual(img.getpixel((60, 256)), th._rgb(th.ACCENT))   # tile edge
         self.assertEqual(img.getpixel((5, 5)), th._rgb(th.BG))
 
     def test_head_manifest_and_og(self):

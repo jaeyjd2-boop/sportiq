@@ -32302,7 +32302,7 @@ def serve_pwa_manifest_v4637():
         "display": "standalone",
         "orientation": "portrait",
         "background_color": "#1a1d23",
-        "theme_color": "#ff4d5e",
+        "theme_color": "#539bf5",
         "lang": "ko",
         "icons": [
             {"src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},

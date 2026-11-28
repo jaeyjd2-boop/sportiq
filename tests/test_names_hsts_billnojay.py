@@ -65,10 +65,12 @@ class TeamNameTests(unittest.TestCase):
 class SitemapScopeTests(unittest.TestCase):
     def test_sitemap_lists_only_real_public_pages(self):
         from app import sportiq_team_pages as tp   # team URLs: tests/test_team_pages.py
-        with patch.object(tp, "sitemap_team_urls", return_value=[]):
+        from app import sportiq_quick_picks as qp  # no DB in tests: empty picks list
+        with patch.object(tp, "sitemap_team_urls", return_value=[]),              patch.object(qp, "list_recent_picks", return_value=[]):
             locs = all_locs(CLIENT)
         self.assertEqual(len(locs), len(set(locs)))
         allowed = {seo.SITE + "/"} | {seo.SITE + p for p, _f, _pr in seo.PUBLIC_PATHS}
+        allowed.add(seo.SITE + "/picks")   # quick-picks hub (sitemap-picks.xml)
         self.assertTrue(set(locs) <= allowed, set(locs) - allowed)
         # Standings pages without a real table are left out (tests/test_standings_noindex.py).
         for p, _f, _pr in seo.PUBLIC_PATHS:
@@ -76,7 +78,8 @@ class SitemapScopeTests(unittest.TestCase):
                 self.assertIn(seo.SITE + p, locs)
         for loc in locs:
             path = loc[len(seo.SITE):] or "/"
-            r = CLIENT.get(path)
+            with patch.object(qp, "list_recent_picks", return_value=[]):
+                r = CLIENT.get(path)
             self.assertEqual(r.status_code, 200, path)
             self.assertNotIn("noindex", r.headers.get("x-robots-tag", ""), path)
 

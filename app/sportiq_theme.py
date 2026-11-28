@@ -33,8 +33,8 @@ BG = "#1a1d23"
 PANEL = "#22262e"
 TEXT = "#f3f5f7"
 TEXT_SUB = "#c4c9d1"
-ACCENT = "#ff4d5e"      # crimson: buttons, links, LIVE, highlights (dark text on it)
-ACCENT_2 = "#ffd166"    # yellow: score emphasis, badges
+ACCENT = "#539bf5"     # nordic sapphire-sky: calm on eyes, buttons, links, highlights
+ACCENT_2 = "#ffd166"   # champagne gold: score emphasis, badges
 THEME_COLOR = ACCENT
 OG_VERSION = "28"
 
@@ -45,16 +45,20 @@ TAILWIND_COLORS: Dict[str, Dict[str, str]] = {
         "500": "#6f7782", "600": "#4f5661", "700": "#3a3f48", "800": "#2c3038", "900": "#22262e", "950": "#1a1d23",
     },
     "emerald": {
-        "50": "#fff1f2", "100": "#ffe0e3", "200": "#ffc2c8", "300": "#ff929d", "400": "#ff6372",
-        "500": "#ff4d5e", "600": "#d92d40", "700": "#b3202f", "800": "#8f1a27", "900": "#6e1520", "950": "#3d0a11",
+        "50": "#f0f6ff", "100": "#dcebff", "200": "#b8d7ff", "300": "#8ec0ff", "400": "#6cb2ff",
+        "500": "#539bf5", "600": "#2563eb", "700": "#1d4ed8", "800": "#1e40af", "900": "#193573", "950": "#132347",
     },
     "teal": {
-        "50": "#fff1f2", "100": "#ffe0e3", "200": "#ffc2c8", "300": "#ff929d", "400": "#ff6372",
-        "500": "#ff4d5e", "600": "#d92d40", "700": "#b3202f", "800": "#8f1a27", "900": "#6e1520", "950": "#3d0a11",
+        "50": "#eefbfd", "100": "#d5f3f8", "200": "#aee6f0", "300": "#7bd4e6", "400": "#52c1da",
+        "500": "#38a8c4", "600": "#1f7a94", "700": "#1b6379", "800": "#194f61", "900": "#173f4e", "950": "#102935",
     },
     "amber": {
         "50": "#fffbeb", "100": "#fff4cc", "200": "#ffe7a8", "300": "#ffdd8a", "400": "#ffd166",
         "500": "#f5b83d", "600": "#e0a526", "700": "#b45309", "800": "#92400e", "900": "#78350f", "950": "#451a03",
+    },
+    "rose": {
+        "50": "#fdf4f5", "100": "#fae8ea", "200": "#f3d0d4", "300": "#e7aeb4", "400": "#da8b93",
+        "500": "#c96d77", "600": "#ad525d", "700": "#8e414b", "800": "#6e343c", "900": "#4d272d", "950": "#29181c",
     },
 }
 
@@ -64,13 +68,17 @@ _TW_DEFAULTS = {
     "teal": ["#f0fdfa", "#ccfbf1", "#99f6e4", "#5eead4", "#2dd4bf", "#14b8a6", "#0d9488", "#0f766e", "#115e59", "#134e4a", "#042f2e"],
     "amber": ["#fffbeb", "#fef3c7", "#fde68a", "#fcd34d", "#fbbf24", "#f59e0b", "#d97706"],
 }
+_OLD_CRIMSON = ["#fff1f2", "#ffe0e3", "#ffc2c8", "#ff929d", "#ff6372", "#ff4d5e", "#d92d40", "#b3202f", "#8f1a27", "#6e1520", "#3d0a11"]
 _SHADES = ["50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"]
 
 HEX_MAP: Dict[str, str] = {}
 for _name, _olds in _TW_DEFAULTS.items():
     for _shade, _old in zip(_SHADES, _olds):
         HEX_MAP[_old] = TAILWIND_COLORS[_name][_shade]
+for _shade, _old_c in zip(_SHADES, _OLD_CRIMSON):
+    HEX_MAP[_old_c] = TAILWIND_COLORS["emerald"][_shade]
 HEX_MAP.update({
+    "#ff8590": "#8ec0ff",
     "#0b1220": "#1e2128",   # near-black panels
     "#070b14": "#16181d",   # manifest/icon background
 })
