@@ -457,12 +457,14 @@ def seo_robots_txt() -> Response:
         "User-agent: *\nAllow: /\nAllow: /og-cover.png\nAllow: /rss.xml\n"
         "Allow: /picks\nAllow: /sitemap.xml\nAllow: /sitemap-pages.xml\nAllow: /sitemap-teams.xml\nAllow: /sitemap-picks.xml\n"
         "Allow: /pwa-icon-192.png\nAllow: /pwa-icon-512.png\nAllow: /apple-touch-icon.png\n"
-        "Allow: /manifest.webmanifest\nAllow: /api/member/p0p1-upgrade-bundle\nAllow: /api/member/p0p1-upgrade.js\n"
-        "Disallow: /api/admin/\nDisallow: /api/presence/\nDisallow: /api/datacenter/\n"
-        "Disallow: /api/pro-lab/\nDisallow: /api/auto-analyst/\nDisallow: /api/member/scoreboard\n"
-        "Disallow: /api/member/auto-shorts\nDisallow: /api/member/match-h2h\n"
-        "Disallow: /api/member/live-sources-diag\nDisallow: /api/wp/member/verify\n"
-        "Disallow: /api/wp/member/reward\nDisallow: /api/member/sync\n"
+        "Allow: /manifest.webmanifest\n"
+        # Googlebot rendered the home page and fetched its JSON APIs: 84% of its requests
+        # (crawl stats to 2026-11-26), so the HTML pages in the sitemap stayed "discovered,
+        # not indexed". Every /api/ path is blocked; only the scripts the pages load stay
+        # open (the longer Allow wins), plus the public scorecard CSV linked from home.
+        "Allow: /api/member/p0p1-upgrade-bundle\nAllow: /api/member/p0p1-upgrade.js\n"
+        "Allow: /api/datacenter/widget.js\nAllow: /api/autonomous/scorecard.csv\n"
+        "Disallow: /api/\n"
         f"Sitemap: {SITE}/sitemap.xml\n"
     )
     return Response(content=txt, media_type="text/plain; charset=utf-8", headers={"Cache-Control": "public, max-age=3600"})

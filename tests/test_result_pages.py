@@ -179,4 +179,10 @@ class SitemapIndexTests(unittest.TestCase):
         self.assertIn("<lastmod>2026-11-23</lastmod>", results)   # final the day after
 
     def test_robots_points_to_index(self):
-        self.assertIn("Sitemap: https://billnojay.com/sitemap.xml", CLIENT.get("/robots.txt").text)
+        robots = CLIENT.get("/robots.txt").text
+        self.assertIn("Sitemap: https://billnojay.com/sitemap.xml", robots)
+        # Crawl budget goes to pages, not the JSON the home page fetches; page scripts stay open.
+        self.assertIn("Disallow: /api/\n", robots)
+        for path in ("/api/member/p0p1-upgrade-bundle", "/api/member/p0p1-upgrade.js", "/api/datacenter/widget.js"):
+            self.assertIn(f"Allow: {path}\n", robots)
+        self.assertNotIn("Disallow: /picks", robots)
