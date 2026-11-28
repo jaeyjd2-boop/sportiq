@@ -41,6 +41,7 @@ FALLBACK_MATCH_CHIPS: List[Tuple[str, str]] = [
 router = APIRouter(tags=["quick-picks-seo"])
 _DB_LOCK = threading.Lock()
 _DB_READY = False
+_SQ_WAL_READY = False
 _RATE_LOCK = threading.Lock()
 _WRITE_BUCKETS: Dict[str, deque] = defaultdict(deque)
 _e = lambda v: html.escape(str(v if v is not None else ""), quote=True)  # noqa: E731
@@ -66,10 +67,18 @@ def _db_tx():
         with eng.begin() as conn:
             yield ("pg", conn, text)
     else:
-        conn = sqlite3.connect(os.environ.get("SPORTIQ_LOUNGE_DB", "/tmp/sportiq_lounge.db"), timeout=10.0, check_same_thread=False)
+        global _SQ_WAL_READY
+        conn = sqlite3.connect(os.environ.get("SPORTIQ_LOUNGE_DB", "/tmp/sportiq_lounge.db"), timeout=30.0, check_same_thread=False)
+        conn.execute("PRAGMA busy_timeout=30000")
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
+        if not _SQ_WAL_READY:
+            try:
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute("PRAGMA synchronous=NORMAL")
+            except sqlite3.OperationalError:
+                pass
+            _SQ_WAL_READY = True
+
         try:
             yield ("sq", conn, None)
             conn.commit()
