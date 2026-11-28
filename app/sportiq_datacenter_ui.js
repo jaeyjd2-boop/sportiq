@@ -190,7 +190,7 @@
       +'<button class="dc-btn dc-btn-primary" id="dcGoStandingsBtn">🔢 '+dcEsc(hasLeague)+' 순위표 보기</button>'
       +'<button class="dc-btn" id="dcGoInjuriesBtn">🏥 '+dcEsc(hasLeague)+' 부상자 보기</button>'
       +'</div>'
-      +'<div id="dcSisterLinks" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>';
+      +'<div id="dcSisterLinks" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;min-height:48px;align-items:center;box-sizing:border-box;"></div>';
     modal.style.display='flex';
     if(!m.is_sample)loadSisterLinks(m);
     document.getElementById('dcCloseModalBtn').onclick=function(){modal.style.display='none';};
