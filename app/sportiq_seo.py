@@ -582,7 +582,7 @@ def sitemap_index():
     today = now_kst.date().isoformat()
     hour_iso = now_kst.strftime("%Y-%m-%dT%H:00:00+09:00")
     items = "".join(
-        f"  <sitemap>\n    <loc>{SITE}/sitemap-{k}.xml</loc>\n    <lastmod>{hour_iso if k in ("pages", "picks") else today}</lastmod>\n  </sitemap>\n"
+        f"  <sitemap>\n    <loc>{SITE}/sitemap-{k}.xml</loc>\n    <lastmod>{hour_iso if k in ('pages', 'picks') else today}</lastmod>\n  </sitemap>\n"
         for k in SITEMAP_KINDS
     )
     return _xml(f'<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{items}</sitemapindex>\n')
