@@ -243,8 +243,24 @@ def sports_needing_live_poll(now=None):
     return {(r["sport"], str(r["league"])) for r in rows}
 
 
-def collect_live(espn_client=None, as_client=None, now=None, kr_client=None):
-    """Every 10 min: refetch only leagues that have live/imminent matches (today ±1)."""
+def collect_korea_live(kr_client=None, now=None):
+    """Every 2 min: Korean games live or starting within 15 min, from billnojay's scoreboard.
+
+    The scoreboard follows the Korean portals in real time, but collect_live runs every
+    10 minutes, so /v1/matches/live (and 경기판, which polls it every minute) showed
+    K League minutes up to 10 minutes behind. Two cheap requests (yesterday, today) to
+    this same service, and only while a Korean game is on."""
+    targets = sports_needing_live_poll(now or datetime.now(timezone.utc))
+    sb_sports = {sp for sp, lg in targets if lg.startswith("kr:")}
+    if not sb_sports:
+        return {}
+    return collect_korea(kr_client, (-1, 0), sb_sports)
+
+
+def collect_live(espn_client=None, as_client=None, now=None, kr_client=None, include_korea=True):
+    """Every 10 min: refetch only leagues that have live/imminent matches (today ±1).
+
+    include_korea=False when the worker runs collect_korea_live on its own, faster job."""
     now = now or datetime.now(timezone.utc)
     targets = sports_needing_live_poll(now)
     if not targets:
@@ -272,6 +288,6 @@ def collect_live(espn_client=None, as_client=None, now=None, kr_client=None):
     if kr_sports:
         result.update(_collect_api_sports_days(as_client, [today], kr_sports, korea_only=True))
     sb_sports = {sp for sp, lg in targets if lg.startswith("kr:")}
-    if sb_sports:
+    if sb_sports and include_korea:
         result.update(collect_korea(kr_client, (-1, 0), sb_sports))
     return result

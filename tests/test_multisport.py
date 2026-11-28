@@ -447,12 +447,34 @@ class KoreaScoreboardTests(unittest.TestCase):
         self.assertEqual(res, {"kr:football": 1})
         self.assertEqual(sorted(self.requests), [-1, 0])
 
+    def test_korea_live_job_and_10_min_job_split_the_work(self):
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        kst = (now + timedelta(hours=9)).strftime("%Y.%m.%d (토) %H:%M KST")
+        self.pages[0] = [sb_item("KLEAGUE", "K리그1", "FC 서울", "대전 하나 시티즌", kst, state="in", hs=1, badge="전반")]
+        multisport.collect_korea(self.client(), offsets=(0,))
+        self.requests.clear()
+        # the 2-min job reads the scoreboard for yesterday and today
+        self.assertEqual(multisport.collect_korea_live(kr_client=self.client(), now=now), {"kr:football": 1})
+        self.assertEqual(sorted(self.requests), [-1, 0])
+        self.requests.clear()
+        # the 10-min job leaves Korean games to it
+        res = multisport.collect_live(espn_client=object(), as_client=object(), now=now, kr_client=self.client(),
+                                      include_korea=False)
+        self.assertEqual(res, {})
+        self.assertEqual(self.requests, [])
+
+    def test_korea_live_job_does_nothing_without_a_korean_game_on(self):
+        later = datetime.now(timezone.utc) + timedelta(days=3)
+        self.assertEqual(multisport.collect_korea_live(kr_client=self.client(), now=later), {})
+        self.assertEqual(self.requests, [])
+
 
 class WorkerJobTests(unittest.TestCase):
     def test_multisport_jobs_registered(self):
         from app import worker
         self.assertIsNotNone(worker.scheduler.get_job("multisport_schedule"))
         self.assertEqual(worker.scheduler.get_job("multisport_live").trigger.interval, timedelta(minutes=10))
+        self.assertEqual(worker.scheduler.get_job("multisport_korea_live").trigger.interval, timedelta(minutes=2))
 
 
 if __name__ == "__main__":

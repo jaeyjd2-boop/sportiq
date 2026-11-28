@@ -131,9 +131,16 @@ scheduler.add_job(lambda: safe("head_to_head", collect_head_to_head), "interval"
 scheduler.add_job(lambda: safe_multisport("multisport_schedule", multisport.collect_schedule), "interval",
                   minutes=max(30, settings.multisport_schedule_minutes), id="multisport_schedule", max_instances=1, coalesce=True, misfire_grace_time=None,
                   next_run_time=datetime.now(timezone.utc) + timedelta(minutes=2))
-scheduler.add_job(lambda: safe_multisport("multisport_live", multisport.collect_live), "interval",
+KOREA_LIVE_ON = settings.korea_live_minutes > 0
+scheduler.add_job(lambda: safe_multisport("multisport_live", lambda: multisport.collect_live(include_korea=not KOREA_LIVE_ON)), "interval",
                   minutes=max(5, settings.multisport_live_minutes), id="multisport_live", max_instances=1, coalesce=True, misfire_grace_time=None,
                   next_run_time=datetime.now(timezone.utc) + timedelta(minutes=4))
+# Korean live games every 2 min (billnojay scoreboard, 2 requests, only while one is on):
+# with the 10-min job above, 경기판 and /v1/matches/live showed K League minutes 10 min late.
+if KOREA_LIVE_ON:
+    scheduler.add_job(lambda: safe_multisport("multisport_korea_live", multisport.collect_korea_live), "interval",
+                      minutes=max(1, settings.korea_live_minutes), id="multisport_korea_live", max_instances=1, coalesce=True,
+                      misfire_grace_time=None, next_run_time=datetime.now(timezone.utc) + timedelta(minutes=3))
 # History for /analysis: last 30 days of finished matches + team season schedules,
 # at most 25 ESPN requests per run; progress is kept in the DB across deploys.
 scheduler.add_job(lambda: safe_multisport("multisport_backfill", multisport_backfill.collect_backfill), "interval",
