@@ -270,7 +270,7 @@ def build_livescore_html() -> str:
                 f'<td class="num">{score}</td><td>{_e(m.get("away"))}</td><td{cls}>{badge}</td></tr>'
             )
         blocks.append(
-            f"<h2>{_e(name)}</h2><div class=\"tbl-scrol\l"><table><thead><tr><th>시간(KST)</th><th>홈</th><th class=\"num\">스코어</th>"
+            f"<h2>{_e(name)}</h2><div class=\"tbl-scroll"><table><thead><tr><th>시간(KST)</th><th>홈</th><th class=\"num\">스코어</th>"
             f"<th>원정</th><th>상태</th></tr></thead><tbody>{''.join(trs)}</tbody></table></div>"
         )
     try:
@@ -340,7 +340,7 @@ def _table_html(rows: List[Dict[str, Any]], sport: str, links: Optional[Dict[str
         if href:
             team_cell = f'<a href="{_e(href)}">{team_cell}</a>'
         trs.append(f'<tr><td>{_e(r.get("rank"))}</td><td>{team_cell}</td>{tds}</tr>')
-    return f"<div class="tbl-scroll"><table><thead><tr>{head}</tr></thead><tbody>{''.join(trs)}</tbody></table></div>"
+    return f"<div class='tbl-scroll'><table><thead><tr>{head}</tr></thead><tbody>{''.join(trs)}</tbody></table></div>"
 
 
 def _stream_note(slug: str, name: str) -> str:
