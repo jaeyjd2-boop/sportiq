@@ -618,6 +618,15 @@ def sitemap_results():
 
 
 HOME_LINKS_ID = "sqSeoSiteLinks"
+# 경기판 (gyeonggipan.com) is the sister watch guide: what to watch, when and where.
+# Its indexable pages only (its /match/ pages are noindex).
+GYEONGGIPAN = "https://gyeonggipan.com"
+SISTER_WATCH_HTML = (
+    "<h2>무엇을 볼까 · 시청 가이드 (경기판)</h2><ul>"
+    f'<li><a href="{GYEONGGIPAN}/this-week/">이번 주 볼만한 경기</a></li>'
+    f'<li><a href="{GYEONGGIPAN}/previews/">경기 프리뷰·관전 포인트</a></li>'
+    f'<li><a href="{GYEONGGIPAN}/guides/">종목별 보는 법</a></li></ul>'
+)
 
 
 def home_links_html() -> str:
@@ -679,6 +688,7 @@ def home_links_html() -> str:
         '<li><a href="/livescore">오늘 라이브스코어</a></li><li><a href="/standings">리그 순위표 전체</a></li>'
         f"{leagues}</ul>"
         + (f"<h2>지난 경기 결과</h2><ul>{days}</ul>" if days else "")
+        + SISTER_WATCH_HTML
         + f"</nav>{js}"
     )
 
