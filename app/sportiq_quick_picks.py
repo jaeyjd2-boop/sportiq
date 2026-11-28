@@ -385,6 +385,10 @@ _SSR_CSS = (
     ".pick-lines{list-style:none;padding:0;margin:12px 0;display:grid;gap:8px}.pick-lines li{background:#171a21;border-left:3px solid var(--accent);padding:10px 12px;border-radius:8px;font-size:.94rem}.pick-lines li strong{color:var(--gold);margin-right:6px}"
     ".meta-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;font-size:.82rem;color:var(--muted);margin-top:10px}.filter-strip{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}.filter-chip{padding:6px 11px;border-radius:999px;background:var(--panel);border:1px solid var(--border);color:var(--sub);font-size:.82rem;font-weight:700}.filter-chip.active{border-color:var(--accent);color:#8ec0ff;background:rgba(83,155,245,.12)}"
     ".hp-trap{position:absolute;left:-9999px;opacity:0;pointer-events:none}.toast-msg{margin-top:10px;font-size:.86rem;font-weight:700}"
+    ".mc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}.mc{background:#171a21;border:1px solid var(--border);border-radius:12px;padding:12px 13px;display:flex;flex-direction:column;gap:7px}"
+    ".mc-top{display:flex;justify-content:space-between;gap:8px;font-size:.76rem;color:var(--muted);font-variant-numeric:tabular-nums}.mc-teams{font-weight:800;font-size:.97rem;line-height:1.35}"
+    ".sis-links{display:flex;flex-wrap:wrap;gap:6px}.sis-links a{padding:4px 9px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);color:var(--sub);font-size:.78rem;font-weight:700}.sis-links a:hover{border-color:var(--accent);color:#8ec0ff;text-decoration:none}"
+    ".mc .btn-ghost{margin-top:auto;align-self:flex-start}"
 )
 
 _GA4_SNIPPET = (
@@ -458,6 +462,67 @@ def _pick_card_html(p: Dict[str, Any]) -> str:
     )
 
 
+_SISTER_LABELS = (("ergrow", "분석 읽기 · 어그로"), ("zynktv", "기록 보기 · ZYNK"), ("gyeonggipan", "시청 가이드 · 경기판"))
+_WEEKDAYS = "월화수목금토일"
+
+
+def _sister_links_html(links: Dict[str, Optional[str]]) -> str:
+    return "".join(f'<a href="{_e(links[k])}" target="_blank" rel="noopener">{_e(lbl)}</a>' for k, lbl in _SISTER_LABELS if links.get(k))
+
+
+def _kickoff_label(iso_str: str) -> str:
+    try:
+        dt = datetime.fromisoformat(iso_str).astimezone(KST)
+    except (TypeError, ValueError):
+        return ""
+    day = {0: "오늘", 1: "내일", 2: "모레"}.get((dt.date() - datetime.now(KST).date()).days, f"{dt.month}/{dt.day}")
+    return f"{day}({_WEEKDAYS[dt.weekday()]}) {dt:%H:%M}"
+
+
+def _match_cards_html(active_lg: str = "") -> str:
+    """Upcoming matches with an ergrow preview (sportiq_sister_links.upcoming_match_cards): links to
+    the analysis, record and watch guide of the same match, and a button that fills the composer."""
+    try:
+        from app.sportiq_sister_links import upcoming_match_cards
+        cards = upcoming_match_cards(limit=24)
+    except Exception:
+        cards = []
+    if active_lg:
+        cards = [c for c in cards if c.get("pick_league") == active_lg]
+    cards = cards[:8]
+    if not cards:
+        return ""
+    items = []
+    for c in cards:
+        write = (f'<button type="button" class="btn-ghost" data-write-lg="{_e(c["pick_league"])}" data-write-match="{_e(c["match_label"])}">✍️ 이 경기 3줄 픽 쓰기</button>'
+                 if c.get("pick_league") in ALLOWED_LEAGUES else "")
+        items.append(f'<div class="mc"><div class="mc-top"><span>{_e(c.get("league") or "")}</span><span>{_e(_kickoff_label(c["kickoff"]))}</span></div>'
+                     f'<div class="mc-teams">{_e(c["home"])} <span style="color:var(--muted);font-weight:600">vs</span> {_e(c["away"])}</div>'
+                     f'<div class="sis-links">{_sister_links_html(c["links"])}</div>{write}</div>')
+    grid = "".join(items)
+    return ('<section class="card" aria-labelledby="qpMatchCardsTitle"><h2 id="qpMatchCardsTitle">📅 다가오는 경기 · 분석·기록·시청 가이드</h2>'
+            '<p class="sub" style="margin-bottom:12px">자매 사이트 어그로(분석), ZYNK(기록), 경기판(시청 가이드)의 같은 경기 페이지입니다. 읽어 보고 내 3줄 픽을 남겨 보세요.</p>'
+            f'<div class="mc-grid" id="qpMatchCards">{grid}</div></section>'
+            '<script>(function(){var g=document.getElementById("qpMatchCards");if(!g)return;g.addEventListener("click",function(e){var b=e.target.closest("[data-write-match]");if(!b)return;'
+            'var lg=document.getElementById("qpLeague"),m=document.getElementById("qpMatch"),f=document.getElementById("qpWriteForm");if(lg)lg.value=b.getAttribute("data-write-lg");if(m)m.value=b.getAttribute("data-write-match");'
+            'if(f)f.scrollIntoView({behavior:"smooth",block:"start"});var l1=document.getElementById("qpLine1");if(l1)setTimeout(function(){l1.focus({preventScroll:true});},350);});})();</script>')
+
+
+def _pick_sister_html(pick: Dict[str, Any]) -> str:
+    """"이 경기 더 보기" under a pick: the same match on ergrow / zynktv / 경기판, when it is found."""
+    try:
+        from app.sportiq_sister_links import links_for_pick
+        created = datetime.fromisoformat(str(pick.get("created_at") or ""))
+        links = links_for_pick(str(pick.get("league") or ""), str(pick.get("match_label") or ""), created)
+    except Exception:
+        return ""
+    inner = _sister_links_html(links)
+    if not inner:
+        return ""
+    return (f'<section class="card" aria-labelledby="qpSisterTitle"><h2 id="qpSisterTitle">🔗 이 경기 더 보기</h2>'
+            f'<p class="sub" style="margin-bottom:10px">{_e(pick["match_label"])} 경기의 분석 글, 기록, 시청 가이드입니다.</p><div class="sis-links">{inner}</div></section>')
+
+
 class QuickPickCreateIn(BaseModel):
     league: str
     match_label: str
@@ -490,7 +555,7 @@ def ssr_picks_hub(request: Request):
     picks = list_recent_picks(league=active_lg, limit=25)
     chips = [f'<a class="filter-chip{" active" if not active_lg else ""}" href="/picks">전체 리그</a>'] + [f'<a class="filter-chip{" active" if active_lg == c else ""}" href="/picks?league={c}">{_e(n)}</a>' for c, n in ALLOWED_LEAGUES.items()]
     cards = "".join(_pick_card_html(p) for p in picks) or '<div class="card"><p class="sub">아직 등록된 3줄 퀵 픽이 없습니다. 첫 번째 승부예측 퀵 픽을 남겨 보세요!</p></div>'
-    body = '<div style="margin-bottom:14px"><h1>승부예측 3줄 퀵 픽 라운지</h1><p class="sub">경기별 핵심 근거·변수·최종 승부픽을 3줄로 간결하게 공유하고 팬들과 의견을 나누세요.</p></div>' + _composer_widget_html(default_league=active_lg or "EPL") + f'<nav class="filter-strip" aria-label="리그 필터">{"".join(chips)}</nav><section aria-label="최신 3줄 퀵 픽 목록">{cards}</section>'
+    body = '<div style="margin-bottom:14px"><h1>승부예측 3줄 퀵 픽 라운지</h1><p class="sub">경기별 핵심 근거·변수·최종 승부픽을 3줄로 간결하게 공유하고 팬들과 의견을 나누세요.</p></div>' + _match_cards_html(active_lg) + _composer_widget_html(default_league=active_lg or "EPL") + f'<nav class="filter-strip" aria-label="리그 필터">{"".join(chips)}</nav><section aria-label="최신 3줄 퀵 픽 목록">{cards}</section>'
     crumbs = _breadcrumbs_ld([("SportIQ", f"{SITE}/"), ("3줄 퀵 픽", f"{SITE}/picks")])
     col_ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "SportIQ 승부예측 3줄 퀵 픽 라운지", "url": f"{SITE}/picks", "inLanguage": "ko-KR", "mainEntity": {"@type": "ItemList", "itemListElement": [{"@type": "ListItem", "position": i, "url": f"{SITE}/picks/{p['id']}", "name": p["headline"]} for i, p in enumerate(picks[:15], start=1)]}}
     html_out = _render_ssr_shell(canonical_path="/picks", title="승부예측 3줄 퀵 픽 라운지 · 경기별 한줄 근거 커뮤니티 | SportIQ", description="EPL·K리그1·NBA·MLB 오늘 경기의 핵심 근거, 결장 변수, 최종 승부픽을 3줄로 공유하는 실시간 스포츠 토론 포럼입니다.", robots=NOINDEX if has_query else INDEX_ROBOTS, ld_blocks=[crumbs, col_ld], body_html=body)
@@ -530,6 +595,7 @@ def ssr_pick_detail_page(pick_id: int, request: Request):
         f'<ul class="pick-lines"><li><strong>① 핵심근거</strong>{_e(pick["line1_reason"])}</li><li><strong>② 변수체크</strong>{_e(pick["line2_factor"])}</li><li><strong>③ 최종픽</strong>{_e(pick["line3_pick"])}</li></ul>'
         f'<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:16px"><button type="button" class="btn-primary" id="qpLikeBtn">👍 공감하기 (<span id="qpLikeCnt">{int(pick.get("likes_count") or 0)}</span>)</button>'
         '<div style="display:flex;align-items:center;gap:6px"><input id="qpDelPin" class="inp" type="password" inputmode="numeric" maxlength="4" placeholder="PIN 4자리" style="width:105px;padding:7px 9px;font-size:.82rem" /><button type="button" class="btn-ghost" id="qpDelBtn">글 삭제</button></div></div><div id="qpActionMsg" class="toast-msg" role="status"></div></article>'
+        + _pick_sister_html(pick) +
         f'<section class="card" aria-labelledby="qpCommentsHeading"><h2 id="qpCommentsHeading">💬 매치업 토론 댓글 ({len(comments)})</h2><div id="qpCommentList">{comments_html}</div>'
         '<form id="qpCommentForm" style="margin-top:14px;border-top:1px solid #343a46;padding-top:14px" novalidate><input type="text" name="website" class="hp-trap" tabindex="-1" autocomplete="off" /><div class="grid-2" style="margin-bottom:8px"><input id="qpCmtAuthor" class="inp" type="text" maxlength="20" placeholder="닉네임 (2~20자)" required /><input id="qpCmtPin" class="inp" type="password" inputmode="numeric" maxlength="4" placeholder="PIN 4자리" required /></div>'
         '<textarea id="qpCmtBody" class="inp" rows="2" maxlength="450" placeholder="경기에 대한 추가 의견이나 반론을 남겨 주세요." required style="margin-bottom:8px"></textarea><button type="submit" class="btn-primary">댓글 등록</button><div id="qpCmtMsg" class="toast-msg" role="status"></div></form></section>'
